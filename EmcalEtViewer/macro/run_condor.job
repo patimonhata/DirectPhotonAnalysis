@@ -1,5 +1,5 @@
 Universe           = vanilla
-Initialdir         = /sphenix/user/ryotaro/DisplayLegoPlot/macro
+Initialdir         = /sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/macro
 Executable         = run_job.sh
 PeriodicHold       = (NumJobStarts>=1 && JobStatus == 1)
 concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
@@ -12,7 +12,7 @@ nEvents            = 1000
 save_tree          = true
 job_offset         = 0
 process_shift      = $(Process) + $(job_offset) 
-output_directory = /sphenix/user/ryotaro/DisplayLegoPlot/output/condor
+output_directory = /sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/output/condor
 
 
 Output             = $(output_directory)/condor_$(runnumber)_$INT(process_shift).out

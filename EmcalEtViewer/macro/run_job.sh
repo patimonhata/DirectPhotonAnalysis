@@ -8,7 +8,7 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 # source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.504
 
 
-export MYINSTALL=/sphenix/user/ryotaro/DisplayLegoPlot/install
+export MYINSTALL=/sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install
 
 export LD_LIBRARY_PATH=$MYINSTALL/lib:$LD_LIBRARY_PATH
 export ROOT_INCLUDE_PATH=$MYINSTALL/include:$ROOT_INCLUDE_PATH

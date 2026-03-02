@@ -49,29 +49,41 @@ void DrawCemcLego(const char *file_name,
   tree->SetBranchStatus("vtx_x", 1);
   tree->SetBranchStatus("vtx_y", 1);
   tree->SetBranchStatus("vtx_z", 1);
-  // tree->SetBranchStatus("eta0", 1);
-  tree->SetBranchStatus("etavtx", 1);
-  // tree->SetBranchStatus("phi0", 1);
-  tree->SetBranchStatus("phivtx", 1);
-  // tree->SetBranchStatus("et0", 1);
-  tree->SetBranchStatus("etvtx", 1);
+  // // tree->SetBranchStatus("eta0", 1);
+  // tree->SetBranchStatus("etavtx", 1);
+  // // tree->SetBranchStatus("phi0", 1);
+  // tree->SetBranchStatus("phivtx", 1);
+  // // tree->SetBranchStatus("et0", 1);
+  // tree->SetBranchStatus("etvtx", 1);
+  
+  const bool use_vtx = (std::string(mode) == "vtx");
 
+  if (use_vtx) {
+    tree->SetBranchStatus("etavtx", 1);
+    tree->SetBranchStatus("phivtx", 1);
+    tree->SetBranchStatus("etvtx", 1);
+  } else {
+    tree->SetBranchStatus("eta0", 1);
+    tree->SetBranchStatus("phi0", 1);
+    tree->SetBranchStatus("et0", 1);
+  }
 
   tree->SetBranchAddress("event", &event);
   tree->SetBranchAddress("vtx_x", &vtx_x);
   tree->SetBranchAddress("vtx_y", &vtx_y);
   tree->SetBranchAddress("vtx_z", &vtx_z);
-  // tree->SetBranchAddress("eta0", &eta0);
-  tree->SetBranchAddress("etavtx", &etavtx);
-  // tree->SetBranchAddress("phi0", &phi0);
-  tree->SetBranchAddress("phivtx", &phivtx);
-  // tree->SetBranchAddress("et0", &et0);
-  tree->SetBranchAddress("etvtx", &etvtx);
 
+  if (use_vtx) {
+    tree->SetBranchAddress("etavtx", &etavtx);
+    tree->SetBranchAddress("phivtx", &phivtx);
+    tree->SetBranchAddress("etvtx", &etvtx);
+  } else {  
+    tree->SetBranchAddress("eta0", &eta0);
+    tree->SetBranchAddress("phi0", &phi0);
+    tree->SetBranchAddress("et0", &et0);
+  }
 
   std::cout << "Came to 4" << std::endl;
-
-  const bool use_vtx = (std::string(mode) == "vtx");
 
   gStyle->SetOptStat(0);
   TCanvas *canvas = new TCanvas("cemc_lego", "CEMC E_{T} lego", 1200, 800);
@@ -110,7 +122,7 @@ void DrawCemcLego(const char *file_name,
     if (line == "q" || line == "Q") break;
     
     /* or update in a constant seconds */
-    gSystem->Sleep(1000); // 1000 ms = 1秒
+    // gSystem->Sleep(1000); // 1000 ms = 1秒
     
     gSystem->ProcessEvents();
   }

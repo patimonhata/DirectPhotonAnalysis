@@ -6,7 +6,7 @@
 #include <fun4all/Fun4AllUtils.h>
 #include <Calo_Calib.C>
 
-#include "/sphenix/user/ryotaro/DisplayLegoPlot/install/include/displaylegoplot/DisplayLegoPlot.h"
+#include "/sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/displaylegoplot/DisplayLegoPlot.h"
 
 R__LOAD_LIBRARY(libDisplayLegoPlot.so)
 

@@ -19,3 +19,5 @@ compile_commands.json
 */src/ltmain.sh
 */src/Makefile.in
 */src/missing
+
+*.png

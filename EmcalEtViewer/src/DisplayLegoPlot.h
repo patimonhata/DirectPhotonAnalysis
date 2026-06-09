@@ -27,6 +27,9 @@ class DisplayLegoPlot : public SubsysReco
   int End(PHCompositeNode* topNode) override;
   // void Print(const std::string &what) const override;
 
+  void set_output_dir(std::string output_dir) { m_output_dir = output_dir;};
+  void set_output_file(std::string output_file) { m_output_file = output_file;};
+
  private:
   void resetEventBuffers();
   bool getVertexXyz(PHCompositeNode* topNode, float& vx, float& vy, float& vz) const;

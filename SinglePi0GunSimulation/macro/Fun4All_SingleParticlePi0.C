@@ -32,6 +32,7 @@
 #include <phool/recoConsts.h>
 
 #include <RawClusterBuilderTemplate.h>
+#include "Calo_Calib_ryotaro.C"
 
 #include "/sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/displaylegoplot/DisplayLegoPlot.h"
 
@@ -62,7 +63,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   }
 
   // std::string baseDir(cwd);
-  std::string baseDir("/sphenix/u/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output");
+  std::string baseDir("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output");
   std::string outDir  = baseDir + "/DST_" + particle_name;
   std::string outDir2 = baseDir + "/ana_" + particle_name;
   std::string outDir3 = baseDir + "/jobtime_" + particle_name;
@@ -90,7 +91,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0., 0.);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(5., 5.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(6., 6.);
 
   // register all input generators with Fun4All
   InputRegister();
@@ -113,7 +114,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   Enable::CEMC_ABSORBER = true;
   Enable::CEMC_CELL = true;
   Enable::CEMC_TOWER = true;
-  Enable::CEMC_CLUSTER = true;
+  // Enable::CEMC_CLUSTER = true;
   // Enable::CEMC_EVAL =  false;
   // Enable::CEMC_QA =  false;
 
@@ -162,6 +163,9 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   if (Enable::HCALOUT_TOWER) HCALOuter_Towers();
   if (Enable::HCALOUT_CLUSTER) HCALOuter_Clusters();
   if (Enable::TOPOCLUSTER) TopoClusterReco();
+
+  Process_Calo_Calib_ryotaro();
+
   // if (Enable::TRACKING_TRACK) TrackingInit();
   // if (Enable::MVTX_CLUSTER) Mvtx_Clustering();
   // if (Enable::INTT_CLUSTER) Intt_Clustering();
@@ -190,22 +194,28 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
     outputName += "reconstructed";
   }
   outputName += "Info_" + pid_str + ".root";
-  std::string outputName2 = outDir2 + "/ana_" + pid_str + ".root";
+  std::string outputName2 = outDir2 + "/ana_" + pid_str + "ClusterBuilder_5events.root";
 
   Fun4AllDstOutputManager *out = new Fun4AllDstOutputManager("DSTOUT", outputName);
   fun4allServer->registerOutputManager(out);
 
-  // RawClusterBuilderTemplate* rawClusterBuilder = new RawClusterBuilderTemplate("myClusterBuilder");
-  // rawClusterBuilder->Detector("CEMC");
-  // rawClusterBuilder->setSubclusterSplitting(false);
-  // rawClusterBuilder->set_UseTowerInfo(1);
-  // rawClusterBuilder->set_threshold_energy(0.070);
-  // fun4allServer->registerSubsystem(rawClusterBuilder);  
+  RawClusterBuilderTemplate* rawClusterBuilder = new RawClusterBuilderTemplate("myClusterBuilder");
+  rawClusterBuilder->Detector("CEMC");
+  rawClusterBuilder->setSubclusterSplitting(false);
+  rawClusterBuilder->set_UseTowerInfo(1);
+  rawClusterBuilder->set_threshold_energy(0.070);
+  std::string emc_prof = getenv("CALIBRATIONROOT");
+  emc_prof += "/EmcProfile/CEMCprof_Thresh30MeV.root";
+  rawClusterBuilder->LoadProfile(emc_prof);
+  rawClusterBuilder->setSubclusterSplitting(false);
+  rawClusterBuilder->setOutputClusterNodeName("CLUSTERINFO_CEMC_NO_SPLIT");
+  rawClusterBuilder->set_UseTowerInfo(1); // to use towerinfo objects rather than old RawTower
+  fun4allServer->registerSubsystem(rawClusterBuilder);  
 
-  int run=0;
-  DisplayLegoPlot* module_display_lego_plot = new DisplayLegoPlot("myDisplayLego", run, pid_str, save_tree);
-  module_display_lego_plot->set_output_file("/sphenix/u/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/0.root");
-  fun4allServer->registerSubsystem(module_display_lego_plot);  
+  // int run=0;
+  // DisplayLegoPlot* module_display_lego_plot = new DisplayLegoPlot("myDisplayLego", run, pid_str, save_tree);
+  // module_display_lego_plot->set_output_file( Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/%s.root", pid_str.c_str()));
+  // fun4allServer->registerSubsystem(module_display_lego_plot);  
 
   fun4allServer->run(nEvents);
 

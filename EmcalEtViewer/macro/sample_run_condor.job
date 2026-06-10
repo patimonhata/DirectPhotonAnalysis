@@ -1,22 +1,22 @@
 Universe           = vanilla
-Initialdir         = /sphenix/u/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/macro
+Initialdir         = /sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/macro
 Executable         = run_job.sh
 PeriodicHold       = (NumJobStarts>=1 && JobStatus == 1)
 concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
-request_memory     = 8GB
+request_memory     = 4GB
 Priority           = 20
 job_lease_duration = 86400
 
 runnumber          = 0
-nEvents            = 20
+nEvents            = 1000
 save_tree          = true
 job_offset         = 0
 process_shift      = $(Process) + $(job_offset) 
-output_directory = /sphenix/u/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/condor
+output_directory = /sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/output/condor
 
 
 Output             = $(output_directory)/condor_$(runnumber)_$INT(process_shift).out
 Error              = $(output_directory)/condor_$(runnumber)_$INT(process_shift).err
-Log                = /tmp/ryotaro/SinglePi0GunSimulation/condor_$(runnumber)_$INT(process_shift).log
-Arguments          = "$INT(process_shift) $(nEvents) $(save_tree)"
-Queue 5000
+Log                = /tmp/ryotaro/DisplayLegoPlot/condor_$(runnumber)_$INT(process_shift).log
+Arguments          = "$INT(process_shift) $(runnumber) $(nEvents) $(save_tree)"
+Queue 1

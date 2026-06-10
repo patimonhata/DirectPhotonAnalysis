@@ -8,7 +8,7 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 # source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.532
 
 
-export MYINSTALL=/sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install
+export MYINSTALL=/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install
 
 export LD_LIBRARY_PATH=$MYINSTALL/lib:$LD_LIBRARY_PATH
 export ROOT_INCLUDE_PATH=$MYINSTALL/include:$ROOT_INCLUDE_PATH
@@ -18,12 +18,10 @@ source /opt/sphenix/core/bin/setup_local.sh $MYINSTALL
 
 process=$1
 nEvents=$2
-save_tree=$3
 
 echo process: ${process}
 echo nEvents: ${nEvents}
-echo save_tree: ${save_tree}
 
-root.exe -q -b Fun4All_SingleParticlePi0.C\(${process},${nEvents},${save_tree}\)
+root.exe -q -b Fun4All_Pi0Reconstruction.C\(${process},${nEvents}\)
 
-echo all done process the Fun4All_SingleParticlePi0.C, process_id: ${process}
+echo all done process the Fun4All_Pi0Reconstruction.C, process_id: ${process}

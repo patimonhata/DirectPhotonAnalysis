@@ -24,6 +24,8 @@ libPi0Reconstruction_la_LIBADD = \
   -lSubsysReco \
   -lffaobjects \
   -lffarawobjects \
+  -lcalo_io \
+  -lglobalvertex \
   -ltrack_io \
   -lintt
 

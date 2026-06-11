@@ -158,7 +158,7 @@ void Process_Calo_Calib_ryotaro()
   // Clusters
   std::cout << "Building clusters" << std::endl;
   RawClusterBuilderTemplate *ClusterBuilder = new RawClusterBuilderTemplate("EmcRawClusterBuilderTemplate");
-  ClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIBryotaro"); // edited by ryotaro
+  ClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIBryotaro_CEMC"); // edited by ryotaro
   ClusterBuilder->Detector("CEMC");
   ClusterBuilder->set_threshold_energy(0.070);  // for when using basic calibration
   std::string emc_prof = getenv("CALIBRATIONROOT");

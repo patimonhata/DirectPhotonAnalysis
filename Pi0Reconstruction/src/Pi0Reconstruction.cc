@@ -3,13 +3,15 @@
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
-#include <globalvertex/GlobalVertex.h>
+#include <globalvertex/GlobalVertexv3.h>
 #include <globalvertex/GlobalVertexMap.h>
+#include <globalvertex/MbdVertexv3.h>
 #include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
 
 #include <TFile.h>
 #include <TSystem.h>
+#include <TTree.h>
 
 #include <algorithm>
 #include <cmath>
@@ -95,6 +97,9 @@ int Pi0Reconstruction::Init(PHCompositeNode * /*topNode*/)
   h_cluster_e_ = new TH1D("h_cluster_e", "CEMC cluster energy;E_{cluster} [GeV];Clusters", 200, 0.0, 20.0);
   h_pair_e_asym_ = new TH1D("h_pair_e_asym", "CEMC cluster pair energy asymmetry;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
 
+  event_tree_ = new TTree("event_tree", "Pi0 reconstruction event tree");
+  create_tree_branches();
+
   std::cout << "Pi0Reconstruction::Init - writing output to " << output_file_name_ << std::endl;
   std::cout << "Pi0Reconstruction::Init - cluster node: " << cluster_node_name_ << std::endl;
 
@@ -108,11 +113,16 @@ int Pi0Reconstruction::InitRun(PHCompositeNode * /*topNode*/)
 
 int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
 {
-  if (event_counter_ % 200 == 0)
+  const unsigned int event_number = event_counter_;
+  if (event_number % 200 == 0)
   {
-    std::cout << "Pi0Reconstruction::process_event - event " << event_counter_ << std::endl;
+    std::cout << "Pi0Reconstruction::process_event - event " << event_number << std::endl;
   }
   ++event_counter_;
+
+  reset_tree_variables();
+  tree_event_ = event_number;
+  tree_min_cluster_energy_ = min_cluster_energy_;
 
   RawClusterContainer *cluster_container = findNode::getClass<RawClusterContainer>(topNode, cluster_node_name_);
   if (!cluster_container)
@@ -123,6 +133,10 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
     }
     ++missing_cluster_node_warnings_;
 
+    if (!abort_on_missing_cluster_node_ && event_tree_)
+    {
+      event_tree_->Fill();
+    }
     return abort_on_missing_cluster_node_ ? Fun4AllReturnCodes::ABORTRUN : Fun4AllReturnCodes::EVENT_OK;
   }
 
@@ -131,8 +145,14 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
   {
     return Fun4AllReturnCodes::ABORTRUN;
   }
-  std::vector<PhotonCandidate> photons;
-  photons.reserve(cluster_container->size());
+  tree_vertex_x_ = vertex[0];
+  tree_vertex_y_ = vertex[1];
+  tree_vertex_z_ = vertex[2];
+
+  std::vector<PhotonCandidate> all_photons;
+  std::vector<unsigned int> selected_photon_indices;
+  all_photons.reserve(cluster_container->size());
+  selected_photon_indices.reserve(cluster_container->size());
 
   RawClusterContainer::ConstRange cluster_range = cluster_container->getClusters();
   for (RawClusterContainer::ConstIterator iter = cluster_range.first; iter != cluster_range.second; ++iter)
@@ -144,28 +164,42 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
     }
 
     const double energy = cluster->get_energy();
-    if (!std::isfinite(energy) || energy < min_cluster_energy_)
+    PhotonCandidate candidate;
+    if (!build_photon_candidate(energy, cluster->get_x(), cluster->get_y(), cluster->get_z(), vertex, candidate))
+    {
+      continue;
+    }
+
+    const unsigned int cluster_index = static_cast<unsigned int>(all_photons.size());
+    all_photons.push_back(candidate);
+    tree_cluster_e_.push_back(candidate.energy);
+    tree_cluster_x_.push_back(cluster->get_x());
+    tree_cluster_y_.push_back(cluster->get_y());
+    tree_cluster_z_.push_back(cluster->get_z());
+    tree_cluster_px_.push_back(candidate.momentum[0]);
+    tree_cluster_py_.push_back(candidate.momentum[1]);
+    tree_cluster_pz_.push_back(candidate.momentum[2]);
+
+    if (energy < min_cluster_energy_)
     {
       continue;
     }
 
     h_cluster_e_->Fill(energy);
-
-    PhotonCandidate candidate;
-    if (build_photon_candidate(energy, cluster->get_x(), cluster->get_y(), cluster->get_z(), vertex, candidate))
-    {
-      photons.push_back(candidate);
-    }
+    selected_photon_indices.push_back(cluster_index);
   }
 
-  h_ncluster_->Fill(static_cast<double>(photons.size()));
-
-  for (std::size_t i = 0; i < photons.size(); ++i)
+  tree_ncluster_all_ = static_cast<unsigned int>(all_photons.size());
+  tree_ncluster_ = static_cast<unsigned int>(selected_photon_indices.size());
+  h_ncluster_->Fill(static_cast<double>(tree_ncluster_));
+  for (std::size_t i = 0; i < selected_photon_indices.size(); ++i)
   {
-    for (std::size_t j = i + 1; j < photons.size(); ++j)
+    for (std::size_t j = i + 1; j < selected_photon_indices.size(); ++j)
     {
-      const PhotonCandidate &first = photons[i];
-      const PhotonCandidate &second = photons[j];
+      const unsigned int first_index = selected_photon_indices[i];
+      const unsigned int second_index = selected_photon_indices[j];
+      const PhotonCandidate &first = all_photons[first_index];
+      const PhotonCandidate &second = all_photons[second_index];
 
       const double total_energy = first.energy + second.energy;
       const double px = first.momentum[0] + second.momentum[0];
@@ -174,12 +208,24 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
       const double mass2 = total_energy * total_energy - px * px - py * py - pz * pz;
       const double mass = std::sqrt(std::max(0.0, mass2));
 
+      const double energy_asymmetry = total_energy > 0.0 ? std::abs(first.energy - second.energy) / total_energy : -1.0;
+
+      tree_pair_cluster_i_.push_back(first_index);
+      tree_pair_cluster_j_.push_back(second_index);
+      tree_pair_m_gg_.push_back(mass);
+      tree_pair_e_asym_.push_back(energy_asymmetry);
+
       h_m_gg_->Fill(mass);
       if (total_energy > 0.0)
       {
-        h_pair_e_asym_->Fill( abs(first.energy - second.energy) / total_energy);
+        h_pair_e_asym_->Fill(energy_asymmetry);
       }
     }
+  }
+
+  if (event_tree_)
+  {
+    event_tree_->Fill();
   }
 
   return Fun4AllReturnCodes::EVENT_OK;
@@ -212,6 +258,10 @@ int Pi0Reconstruction::End(PHCompositeNode * /*topNode*/)
   h_ncluster_->Write();
   h_cluster_e_->Write();
   h_pair_e_asym_->Write();
+  if (event_tree_)
+  {
+    event_tree_->Write();
+  }
   output_file_->Close();
   delete output_file_;
   output_file_ = nullptr;
@@ -280,6 +330,56 @@ bool Pi0Reconstruction::build_photon_candidate(double energy, double x, double y
   candidate.energy = energy;
   candidate.momentum = {energy * dx / distance, energy * dy / distance, energy * dz / distance};
   return true;
+}
+
+void Pi0Reconstruction::reset_tree_variables()
+{
+  tree_ncluster_ = 0;
+  tree_ncluster_all_ = 0;
+  tree_min_cluster_energy_ = 0.0;
+  tree_vertex_x_ = 0.0;
+  tree_vertex_y_ = 0.0;
+  tree_vertex_z_ = 0.0;
+
+  tree_cluster_e_.clear();
+  tree_cluster_x_.clear();
+  tree_cluster_y_.clear();
+  tree_cluster_z_.clear();
+  tree_cluster_px_.clear();
+  tree_cluster_py_.clear();
+  tree_cluster_pz_.clear();
+  tree_pair_cluster_i_.clear();
+  tree_pair_cluster_j_.clear();
+  tree_pair_m_gg_.clear();
+  tree_pair_e_asym_.clear();
+}
+
+void Pi0Reconstruction::create_tree_branches()
+{
+  if (!event_tree_)
+  {
+    return;
+  }
+
+  event_tree_->Branch("event", &tree_event_);
+  event_tree_->Branch("ncluster", &tree_ncluster_);
+  event_tree_->Branch("ncluster_all", &tree_ncluster_all_);
+  event_tree_->Branch("min_cluster_energy", &tree_min_cluster_energy_);
+  event_tree_->Branch("vertex_x", &tree_vertex_x_);
+  event_tree_->Branch("vertex_y", &tree_vertex_y_);
+  event_tree_->Branch("vertex_z", &tree_vertex_z_);
+
+  event_tree_->Branch("cluster_e", &tree_cluster_e_);
+  event_tree_->Branch("cluster_x", &tree_cluster_x_);
+  event_tree_->Branch("cluster_y", &tree_cluster_y_);
+  event_tree_->Branch("cluster_z", &tree_cluster_z_);
+  event_tree_->Branch("cluster_px", &tree_cluster_px_);
+  event_tree_->Branch("cluster_py", &tree_cluster_py_);
+  event_tree_->Branch("cluster_pz", &tree_cluster_pz_);
+  event_tree_->Branch("pair_cluster_i", &tree_pair_cluster_i_);
+  event_tree_->Branch("pair_cluster_j", &tree_pair_cluster_j_);
+  event_tree_->Branch("pair_m_gg", &tree_pair_m_gg_);
+  event_tree_->Branch("pair_e_asym", &tree_pair_e_asym_);
 }
 
 void Pi0Reconstruction::create_output_directory() const

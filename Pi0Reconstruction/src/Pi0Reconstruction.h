@@ -11,6 +11,7 @@
 
 class PHCompositeNode;
 class TFile;
+class TTree;
 
 class Pi0Reconstruction : public SubsysReco {
   public:
@@ -47,6 +48,8 @@ class Pi0Reconstruction : public SubsysReco {
 
     bool get_event_vertex(PHCompositeNode *topNode, std::array<double, 3> &vertex);
     bool build_photon_candidate(double energy, double x, double y, double z, const std::array<double, 3> &vertex, PhotonCandidate &candidate) const;
+    void reset_tree_variables();
+    void create_tree_branches();
     void create_output_directory() const;
 
     std::string output_file_name_ = "/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/pi0_reconstruction.root";
@@ -63,10 +66,31 @@ class Pi0Reconstruction : public SubsysReco {
     double mass_histogram_max_ = 1.0;
 
     TFile *output_file_ = nullptr;
+    TTree *event_tree_ = nullptr;
     TH1D *h_m_gg_ = nullptr;
     TH1D *h_ncluster_ = nullptr;
     TH1D *h_cluster_e_ = nullptr;
     TH1D *h_pair_e_asym_ = nullptr;
+
+    unsigned int tree_event_ = 0;
+    unsigned int tree_ncluster_ = 0;
+    unsigned int tree_ncluster_all_ = 0;
+    double tree_min_cluster_energy_ = 0.0;
+    double tree_vertex_x_ = 0.0;
+    double tree_vertex_y_ = 0.0;
+    double tree_vertex_z_ = 0.0;
+
+    std::vector<double> tree_cluster_e_;
+    std::vector<double> tree_cluster_x_;
+    std::vector<double> tree_cluster_y_;
+    std::vector<double> tree_cluster_z_;
+    std::vector<double> tree_cluster_px_;
+    std::vector<double> tree_cluster_py_;
+    std::vector<double> tree_cluster_pz_;
+    std::vector<unsigned int> tree_pair_cluster_i_;
+    std::vector<unsigned int> tree_pair_cluster_j_;
+    std::vector<double> tree_pair_m_gg_;
+    std::vector<double> tree_pair_e_asym_;
 
     unsigned int event_counter_ = 0;
     unsigned int missing_cluster_node_warnings_ = 0;

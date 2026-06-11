@@ -21,6 +21,3 @@ compile_commands.json
 */src/missing
 
 */*.png
-
-*/macro/run_job.sh
-*/macro/run_condor.job

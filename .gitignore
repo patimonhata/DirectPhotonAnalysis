@@ -22,5 +22,5 @@ compile_commands.json
 
 */*.png
 
-*/run_job.sh
-*/run_condor.job
+*/macro/run_job.sh
+*/macro/run_condor.job

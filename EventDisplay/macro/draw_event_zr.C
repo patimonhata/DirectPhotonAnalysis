@@ -55,6 +55,7 @@ double estimate_emcal_radius(TTree* clusters)
 
 void draw_event_zr(const char* filename = "event_display.root", int event_id = 0, bool draw_other_truth = false, bool draw_hits = false)
 {
+  const std::string output_filename = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/image/event_%d_zr.pdf",event_id);
   gStyle->SetOptStat(0);
 
   TFile* file = TFile::Open(filename, "READ");
@@ -77,6 +78,10 @@ void draw_event_zr(const char* filename = "event_display.root", int event_id = 0
   const double emcal_r = estimate_emcal_radius(clusters);
   gROOT->cd();
   TCanvas* canvas = new TCanvas("canvas_zr", "event display z-r", 1100, 800);
+  canvas->SetLeftMargin(0.13);
+  canvas->SetRightMargin(0.04);
+  canvas->SetTopMargin(0.07);
+  canvas->SetBottomMargin(0.12);
   TH2F* frame = new TH2F("frame_zr", Form("Event %d;z [cm];r [cm]", event_id), 100, -180.0, 180.0, 100, 0.0, 140.0);
   frame->SetDirectory(nullptr);
   frame->Draw();
@@ -173,8 +178,9 @@ void draw_event_zr(const char* filename = "event_display.root", int event_id = 0
   legend->AddEntry((TObject*) 0, "blue: #gamma truth", "");
   legend->Draw();
 
-  canvas->SaveAs(Form("event_%d_zr.pdf", event_id));
-  canvas->SaveAs(Form("event_%d_zr.png", event_id));
+  canvas->SaveAs(output_filename.c_str());
+  // canvas->SaveAs(Form("event_%d_zr.pdf", event_id));
+  // canvas->SaveAs(Form("event_%d_zr.png", event_id));
   segments->ResetBranchAddresses();
   clusters->ResetBranchAddresses();
   if (draw_hits && hits)

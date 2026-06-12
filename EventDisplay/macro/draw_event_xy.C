@@ -44,6 +44,10 @@ void draw_event_xy(const char* filename = "event_display.root", int event_id = 0
   const double frame_r = std::max(130.0, emcal_r + 30.0);
   gROOT->cd();
   TCanvas* canvas = new TCanvas("canvas_xy", "event display x-y", 900, 900);
+  canvas->SetLeftMargin(0.14);
+  canvas->SetRightMargin(0.04);
+  canvas->SetTopMargin(0.06);
+  canvas->SetBottomMargin(0.12);
   TH2F* frame = new TH2F("frame_xy", Form("Event %d;x [cm];y [cm]", event_id), 100, -frame_r, frame_r, 100, -frame_r, frame_r);
   frame->SetDirectory(nullptr);
   frame->Draw();

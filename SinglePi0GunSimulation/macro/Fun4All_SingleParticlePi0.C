@@ -91,7 +91,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0., 0.);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(6., 6.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(9., 9.);
 
   // register all input generators with Fun4All
   InputRegister();

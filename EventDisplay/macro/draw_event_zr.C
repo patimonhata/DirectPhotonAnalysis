@@ -1,3 +1,4 @@
+#include <TBox.h>
 #include <TCanvas.h>
 #include <TFile.h>
 #include <TH2F.h>
@@ -13,9 +14,12 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace
 {
+const double kZrEmcalInnerRadius = 93.0;
+const double kZrEmcalOuterRadius = 113.0;
 double marker_size(double energy)
 {
   if (!std::isfinite(energy) || energy < 0.0)
@@ -25,31 +29,33 @@ double marker_size(double energy)
   return std::min(2.4, 0.8 + 0.18 * energy);
 }
 
-double estimate_emcal_radius(TTree* clusters)
+bool has_track(const std::vector<int>& track_ids, int track_id)
 {
-  if (!clusters)
+  for (int stored_track_id : track_ids)
   {
-    return 95.0;
-  }
-
-  int event = 0;
-  double r = 0.0;
-  double radius = 95.0;
-  clusters->ResetBranchAddresses();
-  clusters->SetBranchAddress("event", &event);
-  clusters->SetBranchAddress("r", &r);
-
-  for (Long64_t i = 0; i < clusters->GetEntries(); ++i)
-  {
-    clusters->GetEntry(i);
-    if (std::isfinite(r) && r > 0.0)
+    if (stored_track_id == track_id)
     {
-      radius = r;
-      break;
+      return true;
     }
   }
-  clusters->ResetBranchAddresses();
-  return radius;
+  return false;
+}
+
+int truth_segment_color(bool draw_pi0, bool draw_gamma, bool draw_electron)
+{
+  if (draw_pi0)
+  {
+    return kRed + 1;
+  }
+  if (draw_gamma)
+  {
+    return kBlue + 1;
+  }
+  if (draw_electron)
+  {
+    return kMagenta + 1;
+  }
+  return kGray + 1;
 }
 }
 
@@ -75,7 +81,6 @@ void draw_event_zr(const char* filename = "event_display.root", int event_id = 0
     return;
   }
 
-  const double emcal_r = estimate_emcal_radius(clusters);
   gROOT->cd();
   TCanvas* canvas = new TCanvas("canvas_zr", "event display z-r", 1100, 800);
   canvas->SetLeftMargin(0.13);
@@ -86,24 +91,42 @@ void draw_event_zr(const char* filename = "event_display.root", int event_id = 0
   frame->SetDirectory(nullptr);
   frame->Draw();
 
-  TLine* emcal_line = new TLine(-180.0, emcal_r, 180.0, emcal_r);
-  emcal_line->SetLineColor(kGray + 2);
-  emcal_line->SetLineStyle(2);
-  emcal_line->SetLineWidth(2);
-  emcal_line->Draw();
+  TBox* emcal_band = new TBox(-180.0, kZrEmcalInnerRadius, 180.0, kZrEmcalOuterRadius);
+  emcal_band->SetFillColorAlpha(kGray + 1, 0.18);
+  emcal_band->SetLineColor(kGray + 2);
+  emcal_band->SetLineStyle(2);
+  emcal_band->SetLineWidth(2);
+  emcal_band->Draw();
 
   int event = 0;
+  int track_id = 0;
+  int pid = 0;
+  int parent_id = 0;
   int segment_type = 0;
   double z0 = 0.0;
   double z1 = 0.0;
   double r0 = 0.0;
   double r1 = 0.0;
   segments->SetBranchAddress("event", &event);
+  segments->SetBranchAddress("track_id", &track_id);
+  segments->SetBranchAddress("pid", &pid);
+  segments->SetBranchAddress("parent_id", &parent_id);
   segments->SetBranchAddress("segment_type", &segment_type);
   segments->SetBranchAddress("z0", &z0);
   segments->SetBranchAddress("z1", &z1);
   segments->SetBranchAddress("r0", &r0);
   segments->SetBranchAddress("r1", &r1);
+
+  std::vector<int> pi0_track_ids;
+  for (Long64_t i = 0; i < segments->GetEntries(); ++i)
+  {
+    segments->GetEntry(i);
+    if (event == event_id && segment_type == 1 && pid == 111)
+    {
+      pi0_track_ids.push_back(track_id);
+    }
+  }
+
   for (Long64_t i = 0; i < segments->GetEntries(); ++i)
   {
     segments->GetEntry(i);
@@ -111,13 +134,18 @@ void draw_event_zr(const char* filename = "event_display.root", int event_id = 0
     {
       continue;
     }
-    if (!draw_other_truth && segment_type != 1 && segment_type != 2)
+
+    const bool draw_pi0 = segment_type == 1;
+    const bool draw_gamma = segment_type == 2;
+    const bool draw_electron = has_track(pi0_track_ids, parent_id) && std::abs(pid) == 11;
+    if (!draw_other_truth && !draw_pi0 && !draw_gamma && !draw_electron)
     {
       continue;
     }
+
     TLine* line = new TLine(z0, r0, z1, r1);
-    line->SetLineWidth(segment_type == 1 ? 3 : 2);
-    line->SetLineColor(segment_type == 1 ? kRed + 1 : (segment_type == 2 ? kBlue + 1 : kGray + 1));
+    line->SetLineWidth(draw_pi0 ? 3 : 2);
+    line->SetLineColor(truth_segment_color(draw_pi0, draw_gamma, draw_electron));
     line->Draw();
   }
 
@@ -170,12 +198,13 @@ void draw_event_zr(const char* filename = "event_display.root", int event_id = 0
     }
   }
 
-  TLegend* legend = new TLegend(0.14, 0.75, 0.38, 0.88);
+  TLegend* legend = new TLegend(0.14, 0.70, 0.42, 0.88);
   legend->SetBorderSize(0);
   legend->SetFillStyle(0);
-  legend->AddEntry(emcal_line, "EMCal radius", "l");
+  legend->AddEntry(emcal_band, "EMCal 93-113 cm", "f");
   legend->AddEntry((TObject*) 0, "red: #pi^{0} truth", "");
   legend->AddEntry((TObject*) 0, "blue: #gamma truth", "");
+  legend->AddEntry((TObject*) 0, "magenta: e^{#pm} truth", "");
   legend->Draw();
 
   canvas->SaveAs(output_filename.c_str());

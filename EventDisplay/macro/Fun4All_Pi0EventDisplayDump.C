@@ -17,10 +17,10 @@ R__LOAD_LIBRARY(/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/install/lib
 int Fun4All_Pi0EventDisplayDump(
     int processID = 0,
     const int n_events = 0,
-    // const std::string cluster_node = "CLUSTERINFO_CEMC",
-    const std::string cluster_node = "CLUSTERINFO_CEMC_NO_SPLIT",
-    // const std::string tower_node = "TOWERINFO_CALIB_CEMC"
+    const std::string cluster_node = "CLUSTERINFO_CEMC",
+    // const std::string cluster_node = "CLUSTERINFO_CEMC_NO_SPLIT",
     const std::string tower_node = "TOWERINFO_CALIB_CEMC"
+    // const std::string tower_node = "TOWERINFO_CALIB_CEMC"
 )
 {
   std::ostringstream pid;

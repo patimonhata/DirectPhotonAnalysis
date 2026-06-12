@@ -13,10 +13,41 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-
+#include <string>
+#include <vector>
 
 double xy_marker_size(double energy);
-double xy_estimate_emcal_radius(TTree* clusters);
+const double kXyEmcalInnerRadius = 93.0;
+const double kXyEmcalOuterRadius = 113.0;
+
+bool xy_has_track(const std::vector<int>& track_ids, int track_id)
+{
+  for (int stored_track_id : track_ids)
+  {
+    if (stored_track_id == track_id)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+int xy_truth_segment_color(bool draw_pi0, bool draw_gamma, bool draw_electron)
+{
+  if (draw_pi0)
+  {
+    return kRed + 1;
+  }
+  if (draw_gamma)
+  {
+    return kBlue + 1;
+  }
+  if (draw_electron)
+  {
+    return kMagenta + 1;
+  }
+  return kGray + 1;
+}
 
 void draw_event_xy(const char* filename = "event_display.root", int event_id = 0, bool draw_other_truth = false, bool draw_hits = false)
 {
@@ -40,8 +71,7 @@ void draw_event_xy(const char* filename = "event_display.root", int event_id = 0
     return;
   }
 
-  const double emcal_r = xy_estimate_emcal_radius(clusters);
-  const double frame_r = std::max(130.0, emcal_r + 30.0);
+  const double frame_r = std::max(130.0, kXyEmcalOuterRadius + 30.0);
   gROOT->cd();
   TCanvas* canvas = new TCanvas("canvas_xy", "event display x-y", 900, 900);
   canvas->SetLeftMargin(0.14);
@@ -52,25 +82,49 @@ void draw_event_xy(const char* filename = "event_display.root", int event_id = 0
   frame->SetDirectory(nullptr);
   frame->Draw();
 
-  TEllipse* emcal = new TEllipse(0.0, 0.0, emcal_r, emcal_r);
-  emcal->SetFillStyle(0);
-  emcal->SetLineColor(kGray + 2);
-  emcal->SetLineStyle(2);
-  emcal->SetLineWidth(2);
-  emcal->Draw();
+  TEllipse* emcal_band = new TEllipse(0.0, 0.0, kXyEmcalOuterRadius, kXyEmcalOuterRadius);
+  emcal_band->SetFillColorAlpha(kGray + 1, 0.18);
+  emcal_band->SetLineColor(kGray + 2);
+  emcal_band->SetLineStyle(2);
+  emcal_band->SetLineWidth(2);
+  emcal_band->Draw();
+
+  TEllipse* emcal_inner = new TEllipse(0.0, 0.0, kXyEmcalInnerRadius, kXyEmcalInnerRadius);
+  emcal_inner->SetFillColor(kWhite);
+  emcal_inner->SetLineColor(kGray + 2);
+  emcal_inner->SetLineStyle(2);
+  emcal_inner->SetLineWidth(2);
+  emcal_inner->Draw();
 
   int event = 0;
+  int track_id = 0;
+  int pid = 0;
+  int parent_id = 0;
   int segment_type = 0;
   double x0 = 0.0;
   double y0 = 0.0;
   double x1 = 0.0;
   double y1 = 0.0;
   segments->SetBranchAddress("event", &event);
+  segments->SetBranchAddress("track_id", &track_id);
+  segments->SetBranchAddress("pid", &pid);
+  segments->SetBranchAddress("parent_id", &parent_id);
   segments->SetBranchAddress("segment_type", &segment_type);
   segments->SetBranchAddress("x0", &x0);
   segments->SetBranchAddress("y0", &y0);
   segments->SetBranchAddress("x1", &x1);
   segments->SetBranchAddress("y1", &y1);
+
+  std::vector<int> pi0_track_ids;
+  for (Long64_t i = 0; i < segments->GetEntries(); ++i)
+  {
+    segments->GetEntry(i);
+    if (event == event_id && segment_type == 1 && pid == 111)
+    {
+      pi0_track_ids.push_back(track_id);
+    }
+  }
+
   for (Long64_t i = 0; i < segments->GetEntries(); ++i)
   {
     segments->GetEntry(i);
@@ -78,13 +132,18 @@ void draw_event_xy(const char* filename = "event_display.root", int event_id = 0
     {
       continue;
     }
-    if (!draw_other_truth && segment_type != 1 && segment_type != 2)
+
+    const bool draw_pi0 = segment_type == 1;
+    const bool draw_gamma = segment_type == 2;
+    const bool draw_electron = xy_has_track(pi0_track_ids, parent_id) && std::abs(pid) == 11;
+    if (!draw_other_truth && !draw_pi0 && !draw_gamma && !draw_electron)
     {
       continue;
     }
+
     TLine* line = new TLine(x0, y0, x1, y1);
-    line->SetLineWidth(segment_type == 1 ? 3 : 2);
-    line->SetLineColor(segment_type == 1 ? kRed + 1 : (segment_type == 2 ? kBlue + 1 : kGray + 1));
+    line->SetLineWidth(draw_pi0 ? 3 : 2);
+    line->SetLineColor(xy_truth_segment_color(draw_pi0, draw_gamma, draw_electron));
     line->Draw();
   }
 
@@ -137,12 +196,13 @@ void draw_event_xy(const char* filename = "event_display.root", int event_id = 0
     }
   }
 
-  TLegend* legend = new TLegend(0.14, 0.78, 0.38, 0.90);
+  TLegend* legend = new TLegend(0.14, 0.74, 0.42, 0.90);
   legend->SetBorderSize(0);
   legend->SetFillStyle(0);
-  legend->AddEntry(emcal, "EMCal radius", "l");
+  legend->AddEntry(emcal_band, "EMCal 93-113 cm", "f");
   legend->AddEntry((TObject*) 0, "red: #pi^{0} truth", "");
   legend->AddEntry((TObject*) 0, "blue: #gamma truth", "");
+  legend->AddEntry((TObject*) 0, "magenta: e^{#pm} truth", "");
   legend->Draw();
 
   canvas->SaveAs(output_filename.c_str());
@@ -166,30 +226,4 @@ double xy_marker_size(double energy)
   return std::min(2.4, 0.8 + 0.18 * energy);
 }
 
-
-double xy_estimate_emcal_radius(TTree* clusters)
-{
-  if (!clusters)
-  {
-    return 95.0;
-  }
-
-  int event = 0;
-  double r = 0.0;
-  double radius = 95.0;
-  clusters->ResetBranchAddresses();
-  clusters->SetBranchAddress("event", &event);
-  clusters->SetBranchAddress("r", &r);
-  for (Long64_t i = 0; i < clusters->GetEntries(); ++i)
-  {
-    clusters->GetEntry(i);
-    if (std::isfinite(r) && r > 0.0)
-    {
-      radius = r;
-      break;
-    }
-  }
-  clusters->ResetBranchAddresses();
-  return radius;
-}
 

@@ -16,7 +16,7 @@ R__LOAD_LIBRARY(/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/install/lib
 
 int Fun4All_Pi0EventDisplayDump(
     int processID = 0,
-    const int n_events = 0,
+    const int n_events = 100,
     const std::string cluster_node = "CLUSTERINFO_CEMC",
     // const std::string cluster_node = "CLUSTERINFO_CEMC_NO_SPLIT",
     const std::string tower_node = "TOWERINFO_CALIB_CEMC"
@@ -27,8 +27,9 @@ int Fun4All_Pi0EventDisplayDump(
   pid << std::setw(6) << std::setfill('0') << processID;
   const std::string pid_str = pid.str();
 
-  const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_10GeV_eta0/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
-  const std::string output_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/event_display_%s.root", pid_str.c_str());
+  const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
+  // const std::string output_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/root/event_display_%s.root", pid_str.c_str());
+  const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/output/root/event_display_%s.root", pid_str.c_str());
 
   Fun4AllServer* se = Fun4AllServer::instance();
   se->Verbosity(1);

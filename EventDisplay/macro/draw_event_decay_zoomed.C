@@ -142,7 +142,7 @@ bool decay_zoom_has_undrawn_daughters(const std::vector<DecayZoomParticle>& daug
 
 void draw_event_decay_zoomed(const char* filename = "event_display.root", int event_id = 0, double zoom_cm = 5.0)
 {
-  const std::string output_filename = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/image/event_%d_decay_zoomed.pdf", event_id);
+  const std::string output_filename = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/output/image/event_%d_decay_zoomed.pdf", event_id);
   gStyle->SetOptStat(0);
 
   TFile* file = TFile::Open(filename, "READ");

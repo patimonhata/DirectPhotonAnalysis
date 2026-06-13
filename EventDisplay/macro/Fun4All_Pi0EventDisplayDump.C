@@ -10,9 +10,9 @@
 #include <sstream>
 #include <string>
 
-#include "/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/install/include/pi0eventdisplaydump/Pi0EventDisplayDump.h"
+#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/install/include/pi0eventdisplaydump/Pi0EventDisplayDump.h"
 
-R__LOAD_LIBRARY(/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/install/lib/libPi0EventDisplayDump.so)
+R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/install/lib/libPi0EventDisplayDump.so)
 
 int Fun4All_Pi0EventDisplayDump(
     int processID = 0,
@@ -27,7 +27,7 @@ int Fun4All_Pi0EventDisplayDump(
   pid << std::setw(6) << std::setfill('0') << processID;
   const std::string pid_str = pid.str();
 
-  const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
+  const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_100GeV_eta0/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
   // const std::string output_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/root/event_display_%s.root", pid_str.c_str());
   const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/output/root/event_display_%s.root", pid_str.c_str());
 

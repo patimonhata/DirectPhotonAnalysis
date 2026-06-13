@@ -51,7 +51,7 @@ int xy_truth_segment_color(bool draw_pi0, bool draw_gamma, bool draw_electron)
 
 void draw_event_xy(const char* filename = "event_display.root", int event_id = 0, bool draw_other_truth = false, bool draw_hits = false)
 {
-  const std::string output_filename = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/image/event_%d_xy.pdf",event_id);
+  const std::string output_filename = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/output/image/event_%d_xy.pdf",event_id);
   gStyle->SetOptStat(0);
 
   TFile* file = TFile::Open(filename, "READ");

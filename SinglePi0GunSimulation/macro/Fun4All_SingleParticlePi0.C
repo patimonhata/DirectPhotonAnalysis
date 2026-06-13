@@ -34,7 +34,7 @@
 #include <RawClusterBuilderTemplate.h>
 #include "Calo_Calib_ryotaro.C"
 
-#include "/sphenix/u/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/displaylegoplot/DisplayLegoPlot.h"
+#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/displaylegoplot/DisplayLegoPlot.h"
 
 
 void ensure_dir(const std::string& path);
@@ -91,7 +91,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0., 0.);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(9., 9.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(100., 100.);
 
   // register all input generators with Fun4All
   InputRegister();

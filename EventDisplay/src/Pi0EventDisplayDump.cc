@@ -246,7 +246,7 @@ void Pi0EventDisplayDump::fill_truth_particle(PHG4TruthInfoContainer* truth, PHG
   }
 }
 
-void Pi0EventDisplayDump::fill_truth_segment(PHG4TruthInfoContainer* truth, PHG4Particle* particle, double /*display_radius*/)
+void Pi0EventDisplayDump::fill_truth_segment(PHG4TruthInfoContainer* truth, PHG4Particle* particle, double display_radius)
 {
   // b_event = b_event; // これは何
   b_track_id = particle->get_track_id();
@@ -270,9 +270,11 @@ void Pi0EventDisplayDump::fill_truth_segment(PHG4TruthInfoContainer* truth, PHG4
   }
 
   if (!have_end) {
-    b_x1 = b_x0;
-    b_y1 = b_y0;
-    b_z1 = b_z0;
+    have_end = project_to_radius(b_x0, b_y0, b_z0, particle->get_px(), particle->get_py(), particle->get_pz(), display_radius, b_x1, b_y1, b_z1);
+  }
+
+  if (!have_end){
+    return;
   }
 
   b_r0 = radius(b_x0, b_y0);

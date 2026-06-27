@@ -91,7 +91,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0., 0.);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(100., 100.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(5., 5.);
 
   // register all input generators with Fun4All
   InputRegister();
@@ -200,9 +200,8 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   fun4allServer->registerOutputManager(out);
 
   RawClusterBuilderTemplate* rawClusterBuilder = new RawClusterBuilderTemplate("myClusterBuilder");
+  rawClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIBryotaro_CEMC"); // Is this the cause
   rawClusterBuilder->Detector("CEMC");
-  rawClusterBuilder->setSubclusterSplitting(false);
-  rawClusterBuilder->set_UseTowerInfo(1);
   rawClusterBuilder->set_threshold_energy(0.070);
   std::string emc_prof = getenv("CALIBRATIONROOT");
   emc_prof += "/EmcProfile/CEMCprof_Thresh30MeV.root";

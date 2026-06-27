@@ -81,11 +81,11 @@ int CemcTowerDumper::process_event(PHCompositeNode* topNode)
     std::cout << "event: " << m_event << std::endl;
   }
 
-  auto *towers = findNode::getClass<TowerInfoContainer>(topNode, "TOWERINFO_CALIB_CEMC");
+  auto *towers = findNode::getClass<TowerInfoContainer>(topNode, m_tower_node_name);
   auto *geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
 
   if (!towers || !geom) {
-    std::cout << "CemcTowerDumper::process_event Missing TOWERINFO_CALIB_CEMC or TOWERGEOM_CEMC" << std::endl;
+    std::cout << "CemcTowerDumper::process_event Missing " << m_tower_node_name << " or TOWERGEOM_CEMC" << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 

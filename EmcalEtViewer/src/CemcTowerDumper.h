@@ -3,6 +3,7 @@
 #define EMCALETVIEWER_SRC_CEMCTOWERDUMPER_H_
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <fun4all/SubsysReco.h>
@@ -29,6 +30,7 @@ class CemcTowerDumper : public SubsysReco
 
   void set_output_dir(std::string output_dir) { m_output_dir = output_dir;};
   void set_output_file(std::string output_file) { m_output_file = output_file;};
+  void set_tower_node_name(std::string tower_node_name) { m_tower_node_name = std::move(tower_node_name);};
 
  private:
   void resetEventBuffers();
@@ -39,6 +41,7 @@ class CemcTowerDumper : public SubsysReco
   bool m_save_tree = false;
   std::string m_output_dir;
   std::string m_output_file;
+  std::string m_tower_node_name = "TOWERINFO_CALIB_CEMC";
 
   TFile* m_out_file = nullptr;
   TTree* m_tree = nullptr;

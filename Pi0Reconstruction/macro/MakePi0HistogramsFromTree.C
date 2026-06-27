@@ -19,8 +19,8 @@ int MakePi0HistogramsFromTree(
   std::string pid_str = pid.str();
 
   // const std::string input_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/pi0_reconstruction_%s.root", pid_str.c_str());
-  const std::string input_file = "/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/100kevents_5GeV_pi0_reconstruction_NO_SPLIT_CLUSTERS_tree.root";
-  const std::string output_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/5GeV_pi0_over70MeV_rehist_%s.root", pid_str.c_str());  
+  const std::string input_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/100kevents_5GeV_pi0_reconstruction_SPLIT_CLUSTERS_tree.root";
+  const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/5GeV_pi0_over70MeV_80-160MeV_rehist_%s.root", pid_str.c_str());  
 
   TFile *input = TFile::Open(input_file.c_str(), "READ");
   if (!input || input->IsZombie())

@@ -17,6 +17,6 @@ output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/outp
 
 Output             = $(output_directory)/condor_$(runnumber)_$INT(process_shift).out
 Error              = $(output_directory)/condor_$(runnumber)_$INT(process_shift).err
-Log                = /tmp/ryotaro/DisplayLegoPlot/condor_$(runnumber)_$INT(process_shift).log
+Log                = /tmp/ryotaro/CemcTowerDumper/condor_$(runnumber)_$INT(process_shift).log
 Arguments          = "$INT(process_shift) $(runnumber) $(nEvents) $(save_tree)"
 Queue 1

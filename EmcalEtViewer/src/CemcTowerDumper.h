@@ -1,6 +1,6 @@
-// Fun4All analysis module for INTT hit carryover monitor, made by Ryotaro Koike 20250808
-#ifndef EMCALETVIEWER_SRC_DISPLAYLEGOPLOT_H_
-#define EMCALETVIEWER_SRC_DISPLAYLEGOPLOT_H_
+// Fun4All analysis module for CEMC tower dumping, made by Ryotaro Koike 20250808
+#ifndef EMCALETVIEWER_SRC_CEMCTOWERDUMPER_H_
+#define EMCALETVIEWER_SRC_CEMCTOWERDUMPER_H_
 
 #include <string>
 #include <vector>
@@ -11,11 +11,11 @@ class PHCompositeNode;
 class TFile;
 class TTree;
 
-class DisplayLegoPlot : public SubsysReco
+class CemcTowerDumper : public SubsysReco
 {
  public:
-  DisplayLegoPlot(const std::string& name, int run, std::string job_index, bool save_tree);
-  ~DisplayLegoPlot() override;
+  CemcTowerDumper(const std::string& name, int run, std::string job_index, bool save_tree);
+  ~CemcTowerDumper() override;
 
   // mandatory methods for Fun4All analysis module
   int Init(PHCompositeNode* topNode) override;
@@ -59,4 +59,4 @@ class DisplayLegoPlot : public SubsysReco
   std::vector<int> m_iphi;
 };
 
-#endif  // EMCALETVIEWER_SRC_DISPLAYLEGOPLOT_H_
+#endif  // EMCALETVIEWER_SRC_CEMCTOWERDUMPER_H_

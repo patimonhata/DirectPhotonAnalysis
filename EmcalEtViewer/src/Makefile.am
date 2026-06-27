@@ -11,15 +11,15 @@ AM_LDFLAGS = \
   -L$(OFFLINE_MAIN)/lib64
 
 pkginclude_HEADERS = \
-  DisplayLegoPlot.h 
+  CemcTowerDumper.h 
 
 lib_LTLIBRARIES = \
-  libDisplayLegoPlot.la
+  libCemcTowerDumper.la
 
-libDisplayLegoPlot_la_SOURCES = \
-  DisplayLegoPlot.cc
+libCemcTowerDumper_la_SOURCES = \
+  CemcTowerDumper.cc
 
-libDisplayLegoPlot_la_LIBADD = \
+libCemcTowerDumper_la_LIBADD = \
   -lphool \
   -lSubsysReco \
   -lffaobjects \
@@ -34,7 +34,7 @@ noinst_PROGRAMS = \
   testexternals
 
 testexternals_SOURCES = testexternals.cc
-testexternals_LDADD   = libDisplayLegoPlot.la
+testexternals_LDADD   = libCemcTowerDumper.la
 
 testexternals.cc:
 	echo "//*** this is a generated file. Do not commit, do not edit" > $@

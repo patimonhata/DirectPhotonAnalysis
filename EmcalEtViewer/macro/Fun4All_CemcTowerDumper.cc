@@ -6,11 +6,11 @@
 #include <fun4all/Fun4AllUtils.h>
 #include <Calo_Calib.C>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/displaylegoplot/DisplayLegoPlot.h"
+#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/cemctowerdumper/CemcTowerDumper.h"
 
-R__LOAD_LIBRARY(libDisplayLegoPlot.so)
+R__LOAD_LIBRARY(libCemcTowerDumper.so)
 
-void Fun4All_DisplayLegoPlot(int process_id, int run, int n_events, bool save_tree=false){
+void Fun4All_CemcTowerDumper(int process_id, int run, int n_events, bool save_tree=false){
   Fun4AllServer* fun4all_server = Fun4AllServer::instance();
 
   std::vector<Fun4AllInputManager*> input_managers; 
@@ -33,14 +33,14 @@ void Fun4All_DisplayLegoPlot(int process_id, int run, int n_events, bool save_tr
 
   Process_Calo_Calib(); /* From wiki: Note you want to put this after you declare the input managers but before your analysis module. */
 
-  DisplayLegoPlot* module_display_lego_plot = new DisplayLegoPlot("name", run, job_index, save_tree);
+  CemcTowerDumper* module_cemc_tower_dumper = new CemcTowerDumper("name", run, job_index, save_tree);
 
   // std::string output_directory = Form("output/%d", run);
-  std::string output_directory = std::string("/sphenix/user/ryotaro/DisplayLegoPlot/output/") + std::to_string(run);;
+  std::string output_directory = std::string("/sphenix/user/ryotaro/CemcTowerDumper/output/") + std::to_string(run);;
   std::string final_output_file_name = Form("%d-%s.root", run, job_index.c_str());
   system(Form("if [ -f %s/completed/%s ]; then rm %s/completed/%s; fi;", output_directory.c_str(), final_output_file_name.c_str(), output_directory.c_str(), final_output_file_name.c_str()));  
 
-  fun4all_server->registerSubsystem(module_display_lego_plot);
+  fun4all_server->registerSubsystem(module_cemc_tower_dumper);
   fun4all_server->run(n_events);
   fun4all_server->End();
   

@@ -27,6 +27,6 @@ echo runnumber: ${runnumber}
 echo nEvents: ${nEvents}
 echo save_tree: ${save_tree}
 
-root.exe -q -b Fun4All_DisplayLegoPlot.cc\(${process},${runnumber},${nEvents},${save_tree}\)
+root.exe -q -b Fun4All_CemcTowerDumper.cc\(${process},${runnumber},${nEvents},${save_tree}\)
 
-echo all done process the Fun4All_DisplayLegoPlot.C, process_id: ${process}
+echo all done process the Fun4All_CemcTowerDumper.C, process_id: ${process}

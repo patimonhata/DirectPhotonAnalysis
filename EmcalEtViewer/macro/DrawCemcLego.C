@@ -12,7 +12,7 @@
 #include <vector>
 
 void DrawCemcLego(const char *file_name,
-                  const char *tree_name = "cemc_et",
+                  const char *tree_name = "cemc_towers",
                   const char *mode = "vtx")
 {
   std::cout << "Came to 1" << std::endl;

@@ -1,4 +1,4 @@
-#include "DisplayLegoPlot.h"
+#include "CemcTowerDumper.h"
 
 #include <TFile.h>
 #include <TSystem.h>
@@ -21,31 +21,31 @@
 #include <iostream>
 #include <utility>
 
-DisplayLegoPlot::DisplayLegoPlot(const std::string& name, int run, std::string job_index, bool save_tree)
+CemcTowerDumper::CemcTowerDumper(const std::string& name, int run, std::string job_index, bool save_tree)
   : SubsysReco(name)
   , m_run(run)
   , m_job_index(std::move(job_index))
   , m_save_tree(save_tree)
 {
-  m_output_dir = std::string("/sphenix/user/ryotaro/DisplayLegoPlot/output/") + std::to_string(m_run);
+  m_output_dir = std::string("/sphenix/user/ryotaro/CemcTowerDumper/output/") + std::to_string(m_run);
   m_output_file = m_output_dir + "/" + std::to_string(m_run) + "-" + m_job_index + ".root";
 
 }
 
-DisplayLegoPlot::~DisplayLegoPlot()
+CemcTowerDumper::~CemcTowerDumper()
 {
-  std::cout << "DisplayLegoPlot::~DisplayLegoPlot() Calling the deconstructor" << std::endl;
+  std::cout << "CemcTowerDumper::~CemcTowerDumper() Calling the deconstructor" << std::endl;
 }
 
 
-int DisplayLegoPlot::Init(PHCompositeNode* topNode)
+int CemcTowerDumper::Init(PHCompositeNode* topNode)
 {
-  std::cout << "DisplayLegoPlot::Init(PHCompositeNode *topNode) Initializing" << std::endl;
+  std::cout << "CemcTowerDumper::Init(PHCompositeNode *topNode) Initializing" << std::endl;
 
   if (m_save_tree) {
     gSystem->mkdir(m_output_dir.c_str(), true);
     m_out_file = new TFile(m_output_file.c_str(), "RECREATE");
-    m_tree = new TTree("cemc_et", "CEMC E_T per event");
+    m_tree = new TTree("cemc_towers", "CEMC towers per event");
 
     m_tree->Branch("event", &m_event);
     m_tree->Branch("vtx_x", &m_vtx_x);
@@ -67,13 +67,13 @@ int DisplayLegoPlot::Init(PHCompositeNode* topNode)
 }
 
 
-int DisplayLegoPlot::InitRun(PHCompositeNode* topNode)
+int CemcTowerDumper::InitRun(PHCompositeNode* topNode)
 {
-  std::cout << "DisplayLegoPlot::InitRun(PHCompositeNode *topNode) Initializing for Run XXX... " << std::endl;
+  std::cout << "CemcTowerDumper::InitRun(PHCompositeNode *topNode) Initializing for Run XXX... " << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int DisplayLegoPlot::process_event(PHCompositeNode* topNode)
+int CemcTowerDumper::process_event(PHCompositeNode* topNode)
 {
   resetEventBuffers();
   m_event++;
@@ -85,7 +85,7 @@ int DisplayLegoPlot::process_event(PHCompositeNode* topNode)
   auto *geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
 
   if (!towers || !geom) {
-    std::cout << "DisplayLegoPlot::process_event Missing TOWERINFO_CALIB_CEMC or TOWERGEOM_CEMC" << std::endl;
+    std::cout << "CemcTowerDumper::process_event Missing TOWERINFO_CALIB_CEMC or TOWERGEOM_CEMC" << std::endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
@@ -119,11 +119,6 @@ int DisplayLegoPlot::process_event(PHCompositeNode* topNode)
     }
 
     const float energy = tower->get_energy();
-    if (!(energy > 0.0f)) {
-      // std::cout << "energy is zero" << std::endl;
-      continue;
-    }
-
     const unsigned int tower_key = towers->encode_key(static_cast<unsigned int>(ich));  /* TowerInfo の方の key */
     int ieta = towers->getTowerEtaBin(tower_key); /* tower がカバーする eta 領域のビン番号 */
     int iphi = towers->getTowerPhiBin(tower_key);
@@ -168,28 +163,28 @@ int DisplayLegoPlot::process_event(PHCompositeNode* topNode)
 }
 
 
-int DisplayLegoPlot::ResetEvent(PHCompositeNode* topNode)
+int CemcTowerDumper::ResetEvent(PHCompositeNode* topNode)
 {
-  // std::cout << "DisplayLegoPlot::ResetEvent(PHCompositeNode *topNode) Resetting internal structures, prepare for next event" << std::endl;
+  // std::cout << "CemcTowerDumper::ResetEvent(PHCompositeNode *topNode) Resetting internal structures, prepare for next event" << std::endl;
   
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int DisplayLegoPlot::Reset(PHCompositeNode* topNode)
+int CemcTowerDumper::Reset(PHCompositeNode* topNode)
 {
-  std::cout << "DisplayLegoPlot::Reset(PHCompositeNode *topNode) being Reset" << std::endl;
+  std::cout << "CemcTowerDumper::Reset(PHCompositeNode *topNode) being Reset" << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int DisplayLegoPlot::EndRun(const int runnumber)
+int CemcTowerDumper::EndRun(const int runnumber)
 {
-  std::cout << "DisplayLegoPlot::EndRun(const int runnumber) Ending Run for Run " << runnumber << std::endl;
+  std::cout << "CemcTowerDumper::EndRun(const int runnumber) Ending Run for Run " << runnumber << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-int DisplayLegoPlot::End(PHCompositeNode* topNode)
+int CemcTowerDumper::End(PHCompositeNode* topNode)
 {
-  std::cout << "DisplayLegoPlot::End(PHCompositeNode *topNode) This is the End... " << std::endl;
+  std::cout << "CemcTowerDumper::End(PHCompositeNode *topNode) This is the End... " << std::endl;
 
   if (m_save_tree && m_out_file) {
     m_out_file->cd();
@@ -205,7 +200,7 @@ int DisplayLegoPlot::End(PHCompositeNode* topNode)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-void DisplayLegoPlot::resetEventBuffers()
+void CemcTowerDumper::resetEventBuffers()
 {
   m_eta0.clear();
   m_etavtx.clear();
@@ -218,11 +213,11 @@ void DisplayLegoPlot::resetEventBuffers()
   m_iphi.clear();
 }
 
-bool DisplayLegoPlot::getVertexXyz(PHCompositeNode* topNode, float& vx, float& vy, float& vz) const
+bool CemcTowerDumper::getVertexXyz(PHCompositeNode* topNode, float& vx, float& vy, float& vz) const
 {
   auto* gvtx_map = findNode::getClass<GlobalVertexMap>(topNode, "GlobalVertexMap");
   if (!gvtx_map || gvtx_map->empty()) {
-    std::cout << "In DisplayLegoPlot::GetVertexXYZ, gvtx_map not found." << std::endl;
+    std::cout << "In CemcTowerDumper::GetVertexXYZ, gvtx_map not found." << std::endl;
     return false;
   }
 
@@ -254,6 +249,6 @@ bool DisplayLegoPlot::getVertexXyz(PHCompositeNode* topNode, float& vx, float& v
   return std::isfinite(vx) && std::isfinite(vy) && std::isfinite(vz);
 }
 
-// void DisplayLegoPlot::Print(const std::string &what) const {
-//   std::cout << "DisplayLegoPlot::Print(const std::string &what) const Printing info for " << what << std::endl;
+// void CemcTowerDumper::Print(const std::string &what) const {
+//   std::cout << "CemcTowerDumper::Print(const std::string &what) const Printing info for " << what << std::endl;
 // }

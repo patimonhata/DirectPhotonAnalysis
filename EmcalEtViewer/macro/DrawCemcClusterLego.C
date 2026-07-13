@@ -4,6 +4,7 @@
 #include <TH1F.h>
 #include <TH2F.h>
 #include <TMath.h>
+#include <TPad.h>
 #include <TStyle.h>
 #include <TSystem.h>
 #include <TTree.h>
@@ -35,6 +36,24 @@ namespace
     return selected;
   }
 
+  std::vector<int> findTopEnergyClusters(const std::vector<float>& energy, int n_clusters_to_find)
+  {
+    std::vector<int> indices;
+    for (size_t i = 0; i < energy.size(); ++i) {
+      if (std::isfinite(energy[i])) {
+        indices.push_back(static_cast<int>(i));
+      }
+    }
+
+    std::sort(indices.begin(), indices.end(),
+              [&energy](int lhs, int rhs) { return energy[lhs] > energy[rhs]; });
+
+    if (static_cast<int>(indices.size()) > n_clusters_to_find) {
+      indices.resize(n_clusters_to_find);
+    }
+    return indices;
+  }
+
   float getClusterZ(const std::string& zmode,
                     size_t index,
                     const std::vector<float>& energy,
@@ -46,15 +65,107 @@ namespace
     return et[index];
   }
 
-  float getMaxFinite(const std::vector<float>& values)
+  void fillMemberEnergyMap(int cluster_index,
+                           const std::vector<int>& member_cluster_index,
+                           const std::vector<int>& member_tower_ieta,
+                           const std::vector<int>& member_tower_iphi,
+                           const std::vector<float>& member_energy,
+                           TH2F* histogram)
   {
-    float max_value = 0.0f;
-    for (const float value : values) {
-      if (std::isfinite(value) && value > max_value) {
-        max_value = value;
-      }
+    if (cluster_index < 0) {
+      return;
     }
-    return max_value;
+
+    for (size_t imember = 0; imember < member_cluster_index.size(); ++imember) {
+      if (member_cluster_index[imember] != cluster_index) {
+        continue;
+      }
+      const float energy = member_energy[imember];
+      if (!std::isfinite(energy)) {
+        continue;
+      }
+      histogram->Fill(member_tower_ieta[imember], member_tower_iphi[imember], energy);
+    }
+  }
+
+  void setMemberEnergyMapZoom(int cluster_index,
+                              const std::vector<int>& member_cluster_index,
+                              const std::vector<int>& member_tower_ieta,
+                              const std::vector<int>& member_tower_iphi,
+                              TH2F* histogram,
+                              int margin = 4)
+  {
+    if (cluster_index < 0) {
+      histogram->GetXaxis()->SetRangeUser(-0.5, 95.5);
+      histogram->GetYaxis()->SetRangeUser(-0.5, 255.5);
+      return;
+    }
+
+    int min_ieta = 96;
+    int max_ieta = -1;
+    int min_iphi = 256;
+    int max_iphi = -1;
+    for (size_t imember = 0; imember < member_cluster_index.size(); ++imember) {
+      if (member_cluster_index[imember] != cluster_index) {
+        continue;
+      }
+      min_ieta = std::min(min_ieta, member_tower_ieta[imember]);
+      max_ieta = std::max(max_ieta, member_tower_ieta[imember]);
+      min_iphi = std::min(min_iphi, member_tower_iphi[imember]);
+      max_iphi = std::max(max_iphi, member_tower_iphi[imember]);
+    }
+
+    if (max_ieta < min_ieta || max_iphi < min_iphi) {
+      histogram->GetXaxis()->SetRangeUser(-0.5, 95.5);
+      histogram->GetYaxis()->SetRangeUser(-0.5, 255.5);
+      return;
+    }
+
+    min_ieta = std::max(0, min_ieta - margin);
+    max_ieta = std::min(95, max_ieta + margin);
+    min_iphi = std::max(0, min_iphi - margin);
+    max_iphi = std::min(255, max_iphi + margin);
+
+    histogram->GetXaxis()->SetRangeUser(min_ieta - 0.5, max_ieta + 0.5);
+    histogram->GetYaxis()->SetRangeUser(min_iphi - 0.5, max_iphi + 0.5);
+  }
+
+  void setTwoMemberEnergyMapZoom(int first_cluster_index,
+                                 int second_cluster_index,
+                                 const std::vector<int>& member_cluster_index,
+                                 const std::vector<int>& member_tower_ieta,
+                                 const std::vector<int>& member_tower_iphi,
+                                 TH2F* histogram,
+                                 int margin = 4)
+  {
+    int min_ieta = 96;
+    int max_ieta = -1;
+    int min_iphi = 256;
+    int max_iphi = -1;
+    for (size_t imember = 0; imember < member_cluster_index.size(); ++imember) {
+      const int cluster_index = member_cluster_index[imember];
+      if (cluster_index != first_cluster_index && cluster_index != second_cluster_index) {
+        continue;
+      }
+      min_ieta = std::min(min_ieta, member_tower_ieta[imember]);
+      max_ieta = std::max(max_ieta, member_tower_ieta[imember]);
+      min_iphi = std::min(min_iphi, member_tower_iphi[imember]);
+      max_iphi = std::max(max_iphi, member_tower_iphi[imember]);
+    }
+
+    if (max_ieta < min_ieta || max_iphi < min_iphi) {
+      histogram->GetXaxis()->SetRangeUser(-0.5, 95.5);
+      histogram->GetYaxis()->SetRangeUser(-0.5, 255.5);
+      return;
+    }
+
+    min_ieta = std::max(0, min_ieta - margin);
+    max_ieta = std::min(95, max_ieta + margin);
+    min_iphi = std::max(0, min_iphi - margin);
+    max_iphi = std::min(255, max_iphi + margin);
+
+    histogram->GetXaxis()->SetRangeUser(min_ieta - 0.5, max_ieta + 0.5);
+    histogram->GetYaxis()->SetRangeUser(min_iphi - 0.5, max_iphi + 0.5);
   }
 }
 
@@ -167,8 +278,21 @@ void DrawCemcClusterLego(const char* file_name = "",
 
   gStyle->SetOptStat(0);
 
-  TCanvas* canvas = new TCanvas("cemc_cluster_lego", "CEMC cluster viewer", 1500, 1000);
-  canvas->Divide(2, 2);
+  TCanvas* canvas = new TCanvas("cemc_cluster_lego", "CEMC cluster viewer", 1500, 1350);
+  TPad* pad_cluster_map = new TPad("pad_cluster_map", "cluster map", 0.0, 2.0 / 3.0, 0.5, 1.0);
+  TPad* pad_cluster_energy = new TPad("pad_cluster_energy", "cluster energy", 0.5, 2.0 / 3.0, 1.0, 1.0);
+  TPad* pad_leading_member_energy = new TPad("pad_leading_member_energy", "leading member energy", 0.0, 1.0 / 3.0, 0.5, 2.0 / 3.0);
+  TPad* pad_subleading_member_energy = new TPad("pad_subleading_member_energy", "subleading member energy", 0.5, 1.0 / 3.0, 1.0, 2.0 / 3.0);
+  TPad* pad_top_two_member_energy = new TPad("pad_top_two_member_energy", "top two member energy", 0.0, 0.0, 1.0, 1.0 / 3.0);
+  pad_cluster_map->SetRightMargin(0.12);
+  pad_leading_member_energy->SetRightMargin(0.14);
+  pad_subleading_member_energy->SetRightMargin(0.14);
+  pad_top_two_member_energy->SetRightMargin(0.08);
+  pad_cluster_map->Draw();
+  pad_cluster_energy->Draw();
+  pad_leading_member_energy->Draw();
+  pad_subleading_member_energy->Draw();
+  pad_top_two_member_energy->Draw();
 
   TH2F* h_cluster_map = new TH2F("h_cluster_map",
                                  ";#eta;#phi;cluster E_{T} [GeV]",
@@ -176,15 +300,28 @@ void DrawCemcClusterLego(const char* file_name = "",
                                  256, -TMath::Pi(), TMath::Pi());
   TH1F* h_cluster_energy = new TH1F("h_cluster_energy",
                                     ";cluster energy [GeV];clusters",
-                                    100, 0.0, 50.0);
-  TH2F* h_member_energy = new TH2F("h_member_energy",
-                                   ";tower i#eta;tower i#phi;member energy [GeV]",
-                                   96, -0.5, 95.5,
-                                   256, -0.5, 255.5);
-  TH2F* h_member_fraction = new TH2F("h_member_fraction",
-                                     ";tower i#eta;tower i#phi;member energy fraction",
-                                     96, -0.5, 95.5,
-                                     256, -0.5, 255.5);
+                                    100, 0.0, 5.0);
+  TH2F* h_leading_member_energy = new TH2F("h_leading_member_energy",
+                                           ";tower i#eta;tower i#phi;member energy [GeV]",
+                                           96, -0.5, 95.5,
+                                           256, -0.5, 255.5);
+  TH2F* h_subleading_member_energy = new TH2F("h_subleading_member_energy",
+                                              ";tower i#eta;tower i#phi;member energy [GeV]",
+                                              96, -0.5, 95.5,
+                                              256, -0.5, 255.5);
+  TH2F* h_top_two_member_energy = new TH2F("h_top_two_member_energy",
+                                           ";tower i#eta;tower i#phi;member energy [GeV]",
+                                           96, -0.5, 95.5,
+                                           256, -0.5, 255.5);
+
+  h_cluster_map->SetMinimum(0.0);
+  h_cluster_map->SetMaximum(5.0);
+  h_leading_member_energy->SetMinimum(0.0);
+  h_leading_member_energy->SetMaximum(5.0);
+  h_subleading_member_energy->SetMinimum(0.0);
+  h_subleading_member_energy->SetMaximum(5.0);
+  h_top_two_member_energy->SetMinimum(0.0);
+  h_top_two_member_energy->SetMaximum(5.0);
 
   const Long64_t n_entries = tree->GetEntries();
   for (Long64_t ievt = 0; ievt < n_entries; ++ievt) {
@@ -192,8 +329,9 @@ void DrawCemcClusterLego(const char* file_name = "",
 
     h_cluster_map->Reset("ICES");
     h_cluster_energy->Reset("ICES");
-    h_member_energy->Reset("ICES");
-    h_member_fraction->Reset("ICES");
+    h_leading_member_energy->Reset("ICES");
+    h_subleading_member_energy->Reset("ICES");
+    h_top_two_member_energy->Reset("ICES");
 
     const bool use_vtx = (requested_mode == "vtx" && has_vertex);
     const std::vector<float>& cluster_eta = use_vtx ? *cluster_etavtx : *cluster_eta0;
@@ -209,13 +347,8 @@ void DrawCemcClusterLego(const char* file_name = "",
     }
 
     h_cluster_map->GetZaxis()->SetTitle(use_energy_z ? "cluster energy [GeV]" : "cluster E_{T} [GeV]");
-    const float max_z = use_energy_z ? getMaxFinite(*cluster_energy) : getMaxFinite(cluster_et);
-    if (max_z > 0.0f) {
-      h_cluster_map->SetMaximum(1.05f * max_z);
-    }
-
-    const float max_energy = getMaxFinite(*cluster_energy);
-    h_cluster_energy->SetBins(100, 0.0, std::max(1.0f, 1.1f * max_energy));
+    h_cluster_map->SetMinimum(0.0);
+    h_cluster_map->SetMaximum(5.0);
 
     for (int iclus = 0; iclus < n_clusters; ++iclus) {
       if (!isFinitePosition(cluster_eta[iclus], cluster_phi[iclus])) {
@@ -230,33 +363,23 @@ void DrawCemcClusterLego(const char* file_name = "",
       }
     }
 
-    float selected_member_sum = 0.0f;
-    if (selected_cluster >= 0) {
-      for (size_t imember = 0; imember < member_cluster_index->size(); ++imember) {
-        if ((*member_cluster_index)[imember] != selected_cluster) {
-          continue;
-        }
-        const float energy = (*member_energy)[imember];
-        if (std::isfinite(energy)) {
-          selected_member_sum += energy;
-        }
-      }
-
-      for (size_t imember = 0; imember < member_cluster_index->size(); ++imember) {
-        if ((*member_cluster_index)[imember] != selected_cluster) {
-          continue;
-        }
-        const int ieta = (*member_tower_ieta)[imember];
-        const int iphi = (*member_tower_iphi)[imember];
-        const float energy = (*member_energy)[imember];
-        if (!std::isfinite(energy)) {
-          continue;
-        }
-        const float fraction = (selected_member_sum > 0.0f) ? energy / selected_member_sum : (*member_energy_fraction)[imember];
-        h_member_energy->Fill(ieta, iphi, energy);
-        h_member_fraction->Fill(ieta, iphi, fraction);
-      }
-    }
+    const std::vector<int> top_clusters = findTopEnergyClusters(*cluster_energy, 2);
+    const int leading_cluster = top_clusters.size() > 0 ? top_clusters[0] : -1;
+    const int subleading_cluster = top_clusters.size() > 1 ? top_clusters[1] : -1;
+    fillMemberEnergyMap(leading_cluster, *member_cluster_index, *member_tower_ieta, *member_tower_iphi,
+                        *member_energy, h_leading_member_energy);
+    fillMemberEnergyMap(subleading_cluster, *member_cluster_index, *member_tower_ieta, *member_tower_iphi,
+                        *member_energy, h_subleading_member_energy);
+    setMemberEnergyMapZoom(leading_cluster, *member_cluster_index, *member_tower_ieta, *member_tower_iphi,
+                           h_leading_member_energy);
+    setMemberEnergyMapZoom(subleading_cluster, *member_cluster_index, *member_tower_ieta, *member_tower_iphi,
+                           h_subleading_member_energy);
+    fillMemberEnergyMap(leading_cluster, *member_cluster_index, *member_tower_ieta, *member_tower_iphi,
+                        *member_energy, h_top_two_member_energy);
+    fillMemberEnergyMap(subleading_cluster, *member_cluster_index, *member_tower_ieta, *member_tower_iphi,
+                        *member_energy, h_top_two_member_energy);
+    setTwoMemberEnergyMapZoom(leading_cluster, subleading_cluster, *member_cluster_index,
+                              *member_tower_ieta, *member_tower_iphi, h_top_two_member_energy);
 
     int selected_id = -1;
     float selected_energy = 0.0f;
@@ -276,24 +399,36 @@ void DrawCemcClusterLego(const char* file_name = "",
     h_cluster_map->SetTitle(Form("Event %d  clusters=%d  mode=%s  z=%s  selected index=%d",
                                  event, n_clusters, used_mode.c_str(), requested_zmode.c_str(), selected_cluster));
     h_cluster_energy->SetTitle(Form("Event %d cluster energy spectrum", event));
-    h_member_energy->SetTitle(Form("Selected cluster id=%d  E=%.3f GeV  E_{T}=%.3f GeV  towers=%d  lead=(%d,%d)",
-                                   selected_id, selected_energy, selected_et, selected_ntowers, lead_ieta, lead_iphi));
-    h_member_fraction->SetTitle(Form("Selected cluster tower energy fraction  sum(member E)=%.3f GeV",
-                                     selected_member_sum));
+    h_leading_member_energy->SetTitle(Form("Highest-energy cluster index=%d  id=%d  E=%.3f GeV",
+                                           leading_cluster,
+                                           leading_cluster >= 0 ? static_cast<int>((*cluster_id)[leading_cluster]) : -1,
+                                           leading_cluster >= 0 ? (*cluster_energy)[leading_cluster] : 0.0f));
+    h_subleading_member_energy->SetTitle(Form("Second-highest-energy cluster index=%d  id=%d  E=%.3f GeV",
+                                              subleading_cluster,
+                                              subleading_cluster >= 0 ? static_cast<int>((*cluster_id)[subleading_cluster]) : -1,
+                                              subleading_cluster >= 0 ? (*cluster_energy)[subleading_cluster] : 0.0f));
+    h_top_two_member_energy->SetTitle(Form("Highest and second-highest clusters  leading index=%d id=%d E=%.3f GeV  second index=%d id=%d E=%.3f GeV",
+                                           leading_cluster,
+                                           leading_cluster >= 0 ? static_cast<int>((*cluster_id)[leading_cluster]) : -1,
+                                           leading_cluster >= 0 ? (*cluster_energy)[leading_cluster] : 0.0f,
+                                           subleading_cluster,
+                                           subleading_cluster >= 0 ? static_cast<int>((*cluster_id)[subleading_cluster]) : -1,
+                                           subleading_cluster >= 0 ? (*cluster_energy)[subleading_cluster] : 0.0f));
 
-    canvas->cd(1);
+    pad_cluster_map->cd();
     h_cluster_map->Draw("lego2");
 
-    canvas->cd(2);
+    pad_cluster_energy->cd();
     h_cluster_energy->Draw("hist");
 
-    canvas->cd(3);
-    h_member_energy->Draw("lego2");
+    pad_leading_member_energy->cd();
+    h_leading_member_energy->Draw("colz");
 
-    canvas->cd(4);
-    h_member_fraction->SetMinimum(0.0);
-    h_member_fraction->SetMaximum(1.0);
-    h_member_fraction->Draw("lego2");
+    pad_subleading_member_energy->cd();
+    h_subleading_member_energy->Draw("colz");
+
+    pad_top_two_member_energy->cd();
+    h_top_two_member_energy->Draw("colz");
 
     canvas->Update();
     canvas->SaveAs("cluster_event.png");

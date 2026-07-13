@@ -19,7 +19,8 @@ void Fun4All_CemcClusterDumper(int process_id, int run, int n_events, bool save_
   int job_index_len = 5;
   job_index.insert(0, job_index_len - job_index.size(), '0');
 
-  std::string fileName = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0/DST_single_pi0_reconstructedInfo_000000.root";
+  // std::string fileName = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0/DST_single_pi0_reconstructedInfo_000000.root";
+  std::string fileName = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinforyotaro/DST_single_pi0_reconstructedInfo_000000.root";
   input_managers.push_back(new Fun4AllDstInputManager(Form("DST_cluster")));
   input_managers.back()->Verbosity(2);
   input_managers.back()->AddFile(fileName);

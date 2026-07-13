@@ -20,4 +20,5 @@ compile_commands.json
 */src/Makefile.in
 */src/missing
 
-*/*.png
+*.png
+*.pdf

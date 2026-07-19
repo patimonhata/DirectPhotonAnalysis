@@ -14,6 +14,7 @@
 #include <iostream>
 #include <map>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -22,7 +23,7 @@ namespace
 {
 struct EventData
 {
-  unsigned int event = 0;
+  unsigned long long event_uid = 0;
   unsigned int ncluster = 0;
   unsigned int ncluster_all = 0;
   std::vector<double> *cluster_e = nullptr;
@@ -39,15 +40,22 @@ struct PairInfo
   double energy_asymmetry = std::numeric_limits<double>::quiet_NaN();
 };
 
-void SetBranches(TTree *tree, EventData &data)
+bool SetBranches(TTree *tree, EventData &data)
 {
-  tree->SetBranchAddress("event", &data.event);
+  if (!tree || !tree->GetBranch("event_uid"))
+  {
+    std::cerr << "Missing required event_uid branch" << std::endl;
+    return false;
+  }
+
+  tree->SetBranchAddress("event_uid", &data.event_uid);
   tree->SetBranchAddress("ncluster", &data.ncluster);
   tree->SetBranchAddress("ncluster_all", &data.ncluster_all);
   tree->SetBranchAddress("cluster_e", &data.cluster_e);
   tree->SetBranchAddress("cluster_px", &data.cluster_px);
   tree->SetBranchAddress("cluster_py", &data.cluster_py);
   tree->SetBranchAddress("cluster_pz", &data.cluster_pz);
+  return true;
 }
 
 PairInfo BuildOnlyPair(const EventData &data)
@@ -135,15 +143,27 @@ int CompareSplitClusterMass(
 
   EventData no_split;
   EventData split;
-  SetBranches(no_split_tree, no_split);
-  SetBranches(split_tree, split);
+  if (!SetBranches(no_split_tree, no_split) || !SetBranches(split_tree, split))
+  {
+    std::cerr << "Both input trees must contain unique event_uid values" << std::endl;
+    no_split_input->Close();
+    split_input->Close();
+    return 1;
+  }
 
-  std::map<unsigned int, Long64_t> split_entry_by_event;
+  std::map<unsigned long long, Long64_t> split_entry_by_uid;
   const Long64_t split_entries = split_tree->GetEntries();
   for (Long64_t entry = 0; entry < split_entries; ++entry)
   {
     split_tree->GetEntry(entry);
-    split_entry_by_event[split.event] = entry;
+    const auto result = split_entry_by_uid.emplace(split.event_uid, entry);
+    if (!result.second)
+    {
+      std::cerr << "Duplicate event_uid in SPLIT tree: " << split.event_uid << std::endl;
+      no_split_input->Close();
+      split_input->Close();
+      return 1;
+    }
   }
 
   TH1D *h_m_no_split_n2 = new TH1D("h_m_no_split_n2", "NO_SPLIT, N_{cluster}=2;M_{#gamma#gamma} [GeV];Events", 120, 0.0, 0.30);
@@ -164,11 +184,19 @@ int CompareSplitClusterMass(
   double sum_delta_mass = 0.0;
   double sum_energy_ratio = 0.0;
   double sum_opening_ratio = 0.0;
+  std::set<unsigned long long> no_split_uids;
 
   const Long64_t no_split_entries = no_split_tree->GetEntries();
   for (Long64_t entry = 0; entry < no_split_entries; ++entry)
   {
     no_split_tree->GetEntry(entry);
+    if (!no_split_uids.insert(no_split.event_uid).second)
+    {
+      std::cerr << "Duplicate event_uid in NO_SPLIT tree: " << no_split.event_uid << std::endl;
+      no_split_input->Close();
+      split_input->Close();
+      return 1;
+    }
     if (no_split.ncluster != 2)
     {
       continue;
@@ -183,8 +211,8 @@ int CompareSplitClusterMass(
     h_m_no_split_n2->Fill(no_split_pair.mass);
     sum_no_split_mass += no_split_pair.mass;
 
-    const auto split_entry_iter = split_entry_by_event.find(no_split.event);
-    if (split_entry_iter == split_entry_by_event.end())
+    const auto split_entry_iter = split_entry_by_uid.find(no_split.event_uid);
+    if (split_entry_iter == split_entry_by_uid.end())
     {
       continue;
     }

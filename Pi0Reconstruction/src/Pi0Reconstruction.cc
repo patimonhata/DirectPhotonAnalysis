@@ -43,6 +43,11 @@ void Pi0Reconstruction::set_cluster_node_name(const std::string &cluster_node_na
   cluster_node_name_ = cluster_node_name;
 }
 
+void Pi0Reconstruction::set_process_id(unsigned int process_id)
+{
+  process_id_ = process_id;
+}
+
 void Pi0Reconstruction::set_vertex_node_name(const std::string &vertex_node_name)
 {
   vertex_node_name_ = vertex_node_name;
@@ -102,6 +107,7 @@ int Pi0Reconstruction::Init(PHCompositeNode * /*topNode*/)
 
   std::cout << "Pi0Reconstruction::Init - writing output to " << output_file_name_ << std::endl;
   std::cout << "Pi0Reconstruction::Init - cluster node: " << cluster_node_name_ << std::endl;
+  std::cout << "Pi0Reconstruction::Init - process ID: " << process_id_ << std::endl;
 
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -121,7 +127,9 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
   ++event_counter_;
 
   reset_tree_variables();
+  tree_process_id_ = process_id_;
   tree_event_ = event_number;
+  tree_event_uid_ = (static_cast<unsigned long long>(process_id_) << 32U) | static_cast<unsigned long long>(event_number); // Fills the upper 32 bits with process_id_ and the lower 32 bits with event_number 
   tree_min_cluster_energy_ = min_cluster_energy_;
 
   RawClusterContainer *cluster_container = findNode::getClass<RawClusterContainer>(topNode, cluster_node_name_);
@@ -334,6 +342,9 @@ bool Pi0Reconstruction::build_photon_candidate(double energy, double x, double y
 
 void Pi0Reconstruction::reset_tree_variables()
 {
+  tree_process_id_ = 0;
+  tree_event_ = 0;
+  tree_event_uid_ = 0;
   tree_ncluster_ = 0;
   tree_ncluster_all_ = 0;
   tree_min_cluster_energy_ = 0.0;
@@ -361,7 +372,9 @@ void Pi0Reconstruction::create_tree_branches()
     return;
   }
 
+  event_tree_->Branch("process_id", &tree_process_id_);
   event_tree_->Branch("event", &tree_event_);
+  event_tree_->Branch("event_uid", &tree_event_uid_);
   event_tree_->Branch("ncluster", &tree_ncluster_);
   event_tree_->Branch("ncluster_all", &tree_ncluster_all_);
   event_tree_->Branch("min_cluster_energy", &tree_min_cluster_energy_);

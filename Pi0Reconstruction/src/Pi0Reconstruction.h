@@ -25,6 +25,7 @@ class Pi0Reconstruction : public SubsysReco {
 
     void set_output_file_name(const std::string &output_file_name);
     void set_cluster_node_name(const std::string &cluster_node_name);
+    void set_process_id(unsigned int process_id);
     void set_vertex_node_name(const std::string &vertex_node_name);
     void set_vertex_mode(VertexMode vertex_mode);
     void set_abort_on_missing_cluster_node(bool abort_on_missing_cluster_node);
@@ -56,6 +57,7 @@ class Pi0Reconstruction : public SubsysReco {
     std::string cluster_node_name_ = "CLUSTER_CEMC";
     std::string vertex_node_name_ = "GlobalVertexMap";
     VertexMode vertex_mode_ = VertexMode::Origin;
+    unsigned int process_id_ = 0;
 
     bool abort_on_missing_cluster_node_ = true;
     bool abort_on_missing_vertex_node_ = false;
@@ -72,7 +74,9 @@ class Pi0Reconstruction : public SubsysReco {
     TH1D *h_cluster_e_ = nullptr;
     TH1D *h_pair_e_asym_ = nullptr;
 
+    unsigned int tree_process_id_ = 0;
     unsigned int tree_event_ = 0;
+    unsigned long long tree_event_uid_ = 0;
     unsigned int tree_ncluster_ = 0;
     unsigned int tree_ncluster_all_ = 0;
     double tree_min_cluster_energy_ = 0.0;

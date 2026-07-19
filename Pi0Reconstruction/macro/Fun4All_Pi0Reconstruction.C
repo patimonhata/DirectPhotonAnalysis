@@ -28,9 +28,9 @@ int Fun4All_Pi0Reconstruction(
   pid << std::setw(6) << std::setfill('0') << processID;
   std::string pid_str = pid.str();
   const std::string input_file = input_directory + Form("/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
-  // const std::string tag = output_tag.empty() ? cluster_node : output_tag;
-  // const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_%s_%s.root", tag.c_str(), pid_str.c_str());
-  const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_%s.root", pid_str.c_str());
+  const std::string output_file = output_tag.empty()
+      ? Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_%s.root", pid_str.c_str())
+      : Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_%s_%s.root", output_tag.c_str(), pid_str.c_str());
   
   
 
@@ -45,6 +45,7 @@ int Fun4All_Pi0Reconstruction(
   Pi0Reconstruction *pi0_reconstruction = new Pi0Reconstruction("Pi0Reconstruction");
   pi0_reconstruction->set_output_file_name(output_file);
   pi0_reconstruction->set_cluster_node_name(cluster_node);
+  pi0_reconstruction->set_process_id(static_cast<unsigned int>(processID));
   pi0_reconstruction->set_vertex_mode(Pi0Reconstruction::VertexMode::Origin);
   pi0_reconstruction->set_abort_on_missing_cluster_node(true);
   pi0_reconstruction->set_min_cluster_energy(0.00);

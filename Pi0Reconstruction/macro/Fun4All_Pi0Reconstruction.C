@@ -16,16 +16,20 @@ R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/ins
 
 int Fun4All_Pi0Reconstruction(
     int processID=0,
-    const int n_events = 0
-    // const std::string input_file = "/sphenix/u/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0/DST_single_pi0_reconstructedInfo_000000_ClusterBuilder_100events.root",
-    // const std::string output_file = "/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/pi0_reconstruction.root")
+    const int n_events = 0,
+    // const std::string cluster_node = "CLUSTERINFO_CEMC_NO_SPLIT",
+    const std::string cluster_node = "CLUSTERINFO_CEMC",
+    // const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0",
+    const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinfo",
+    const std::string output_tag = ""
 )
 {
   std::ostringstream pid;
   pid << std::setw(6) << std::setfill('0') << processID;
   std::string pid_str = pid.str();
-  // const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_6GeV_eta0/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
-  const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinforyotaro/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
+  const std::string input_file = input_directory + Form("/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
+  // const std::string tag = output_tag.empty() ? cluster_node : output_tag;
+  // const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_%s_%s.root", tag.c_str(), pid_str.c_str());
   const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_%s.root", pid_str.c_str());
   
   
@@ -40,8 +44,7 @@ int Fun4All_Pi0Reconstruction(
 
   Pi0Reconstruction *pi0_reconstruction = new Pi0Reconstruction("Pi0Reconstruction");
   pi0_reconstruction->set_output_file_name(output_file);
-  pi0_reconstruction->set_cluster_node_name("CLUSTERINFO_CEMC"); 
-  // pi0_reconstruction->set_cluster_node_name("CLUSTERINFO_CEMC_NO_SPLIT"); 
+  pi0_reconstruction->set_cluster_node_name(cluster_node);
   pi0_reconstruction->set_vertex_mode(Pi0Reconstruction::VertexMode::Origin);
   pi0_reconstruction->set_abort_on_missing_cluster_node(true);
   pi0_reconstruction->set_min_cluster_energy(0.00);
@@ -50,6 +53,7 @@ int Fun4All_Pi0Reconstruction(
 
   std::cout << "Fun4All_Pi0Reconstruction - input: " << input_file << std::endl;
   std::cout << "Fun4All_Pi0Reconstruction - output: " << output_file << std::endl;
+  std::cout << "Fun4All_Pi0Reconstruction - cluster node: " << cluster_node << std::endl;
   fun4all_server->run(n_events);
   fun4all_server->End();
 

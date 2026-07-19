@@ -147,8 +147,9 @@ void Process_Calo_Calib_ryotaro()
     }
     CaloTowerCalib *calibEMC_MC = new CaloTowerCalib("CEMCCALIB_MC");
     calibEMC_MC->set_detector_type(CaloTowerDefs::CEMC);
-    calibEMC_MC->set_inputNodePrefix("TOWERINFO_CALIB_");
-    calibEMC_MC->set_outputNodePrefix("TOWERINFO_CALIB_");
+    // calibEMC_MC->set_inputNodePrefix("TOWERINFO_CALIB_");
+    calibEMC_MC->set_inputNodePrefix("TOWERINFO_CALIBryotaro_"); // edited by ryotaro
+    calibEMC_MC->set_outputNodePrefix("TOWERINFO_CALIBryotaro_"); // edited by ryotaro
     calibEMC_MC->set_directURL(MC_Calib);
     calibEMC_MC->set_doCalibOnly(true);
     se->registerSubsystem(calibEMC_MC);
@@ -158,7 +159,8 @@ void Process_Calo_Calib_ryotaro()
   // Clusters
   std::cout << "Building clusters" << std::endl;
   RawClusterBuilderTemplate *ClusterBuilder = new RawClusterBuilderTemplate("EmcRawClusterBuilderTemplate");
-  ClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIBryotaro_CEMC"); // edited by ryotaro
+  // ClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIBryotaro_CEMC"); // edited by ryotaro
+  ClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIB_CEMC"); // edited by ryotaro
   ClusterBuilder->Detector("CEMC");
   ClusterBuilder->set_threshold_energy(0.070);  // for when using basic calibration
   std::string emc_prof = getenv("CALIBRATIONROOT");
@@ -166,6 +168,7 @@ void Process_Calo_Calib_ryotaro()
   ClusterBuilder->LoadProfile(emc_prof);
   ClusterBuilder->set_UseTowerInfo(1);   // to use towerinfo objects rather than old RawTower
   ClusterBuilder->set_UseAltZVertex(1);  // Use MBD Vertex for vertex-based corrections
+  // ClusterBuilder->checkenergy(1); // edited by ryotaro
   se->registerSubsystem(ClusterBuilder);
 }
 

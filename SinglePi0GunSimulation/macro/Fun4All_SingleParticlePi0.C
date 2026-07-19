@@ -34,7 +34,7 @@
 #include <RawClusterBuilderTemplate.h>
 #include "Calo_Calib_ryotaro.C"
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/displaylegoplot/DisplayLegoPlot.h"
+#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/EmcalEtViewer/install/include/cemctowerdumper/CemcTowerDumper.h"
 
 
 void ensure_dir(const std::string& path);
@@ -64,7 +64,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
 
   // std::string baseDir(cwd);
   std::string baseDir("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output");
-  std::string outDir  = baseDir + "/DST_" + particle_name;
+  std::string outDir  = baseDir + "/DST_" + particle_name + "_5GeV_eta05_towerinfo";
   std::string outDir2 = baseDir + "/ana_" + particle_name;
   std::string outDir3 = baseDir + "/jobtime_" + particle_name;
   ensure_dir(outDir);
@@ -88,9 +88,9 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
                                                                             PHG4SimpleEventGenerator::Gaus);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_mean(0., 0., 0.);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_width(0., 0., 0.);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0., 0.);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
-  // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0.5, 0.5);
+  // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(5., 5.);
 
   // register all input generators with Fun4All
@@ -200,7 +200,8 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   fun4allServer->registerOutputManager(out);
 
   RawClusterBuilderTemplate* rawClusterBuilder = new RawClusterBuilderTemplate("myClusterBuilder");
-  rawClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIBryotaro_CEMC"); // Is this the cause
+  // rawClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIBryotaro_CEMC"); // Is this the cause
+  rawClusterBuilder->setInputTowerNodeName("TOWERINFO_CALIB_CEMC"); // Is this the cause
   rawClusterBuilder->Detector("CEMC");
   rawClusterBuilder->set_threshold_energy(0.070);
   std::string emc_prof = getenv("CALIBRATIONROOT");
@@ -209,6 +210,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   rawClusterBuilder->setSubclusterSplitting(false);
   rawClusterBuilder->setOutputClusterNodeName("CLUSTERINFO_CEMC_NO_SPLIT");
   rawClusterBuilder->set_UseTowerInfo(1); // to use towerinfo objects rather than old RawTower
+  // rawClusterBuilder->checkenergy(1);
   fun4allServer->registerSubsystem(rawClusterBuilder);  
 
   // int run=0;

@@ -15,6 +15,6 @@ output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/outpu
 
 Output             = $(output_directory)/condor_$(runnumber)_$INT(process_shift).out
 Error              = $(output_directory)/condor_$(runnumber)_$INT(process_shift).err
-Log                = /tmp/ryotaro/EventDisplay/condor_$(runnumber)_$INT(process_shift).log
+Log                = /tmp/ryotaro_EventDisplay_condor_$(runnumber)_$INT(process_shift).log
 Arguments          = "$INT(process_shift)"
 Queue 1

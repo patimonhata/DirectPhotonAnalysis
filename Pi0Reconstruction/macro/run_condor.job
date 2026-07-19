@@ -8,7 +8,7 @@ Priority           = 20
 job_lease_duration = 86400
 
 runnumber          = 0
-nEvents            = 100
+nEvents            = 20
 job_offset         = 0
 process_shift      = $(Process) + $(job_offset) 
 output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/condor
@@ -18,4 +18,4 @@ Output             = $(output_directory)/condor_$(runnumber)_$INT(process_shift)
 Error              = $(output_directory)/condor_$(runnumber)_$INT(process_shift).err
 Log                = /tmp/ryotaro/Pi0Reconstruction/condor_$(runnumber)_$INT(process_shift).log
 Arguments          = "$INT(process_shift) $(nEvents)"
-Queue 1000
+Queue 5000

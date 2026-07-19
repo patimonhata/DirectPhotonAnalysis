@@ -20,7 +20,7 @@ int MakePi0HistogramsFromTree(
 
   // const std::string input_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/pi0_reconstruction_%s.root", pid_str.c_str());
   const std::string input_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/100kevents_5GeV_pi0_eta0_reconstruction_towerinfo_SPLIT_CLUSTERS_tree.root";
-  const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/5GeV_pi0_eta0_over300MeV_rehist_%s_towerinfo_SPLIT.root", pid_str.c_str());  
+  const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/0005GeV_pi0_eta0_over300MeV_rehist_%s_towerinfo_SPLIT.root", pid_str.c_str());  
 
   TFile *input = TFile::Open(input_file.c_str(), "READ");
   if (!input || input->IsZombie())
@@ -65,6 +65,7 @@ int MakePi0HistogramsFromTree(
   TH1D *h_cluster_e = new TH1D("h_cluster_e", "CEMC cluster energy;E_{cluster} [GeV];Clusters", 200, 0.0, 20.0);
   TH1D *h_m_gg = new TH1D("h_m_gg", "CEMC cluster pair invariant mass;M_{#gamma#gamma} [GeV];Pairs", 100, 0.0, 1.0);
   TH1D *h_pair_e_asym = new TH1D("h_pair_e_asym", "CEMC cluster pair energy asymmetry after mass window;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
+  TH1D *h_pair_e_asym_outside_mass_window = new TH1D("h_pair_e_asym_outside_mass_window", "CEMC cluster pair energy asymmetry outside mass window;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
 
   const Long64_t entries = tree->GetEntries();
   for (Long64_t entry = 0; entry < entries; ++entry)
@@ -112,13 +113,20 @@ int MakePi0HistogramsFromTree(
 
         h_m_gg->Fill(mass);
 
-        if (mass < mass_window_min || mass > mass_window_max || total_energy <= 0.0)
+        if (total_energy <= 0.0)
         {
           continue;
         }
 
         const double energy_asymmetry = std::abs(first_energy - second_energy) / total_energy;
-        h_pair_e_asym->Fill(energy_asymmetry);
+        if (mass < mass_window_min || mass > mass_window_max)
+        {
+          h_pair_e_asym_outside_mass_window->Fill(energy_asymmetry);
+        }
+        else
+        {
+          h_pair_e_asym->Fill(energy_asymmetry);
+        }
       }
     }
   }
@@ -128,6 +136,7 @@ int MakePi0HistogramsFromTree(
   h_cluster_e->Write();
   h_m_gg->Write();
   h_pair_e_asym->Write();
+  h_pair_e_asym_outside_mass_window->Write();
   output->Close();
   input->Close();
 

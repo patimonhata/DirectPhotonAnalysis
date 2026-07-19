@@ -1,0 +1,20 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/macro
+Executable         = run_split_comparison_job.sh
+PeriodicHold       = (NumJobStarts>=1 && JobStatus == 1)
+concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
+request_memory     = 4GB
+Priority           = 20
+job_lease_duration = 86400
+
+runnumber          = 0
+nEvents            = 20
+job_offset         = 0
+process_shift      = $(Process) + $(job_offset)
+output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/condor
+
+Output             = $(output_directory)/split_comparison_$(runnumber)_$INT(process_shift).out
+Error              = $(output_directory)/split_comparison_$(runnumber)_$INT(process_shift).err
+Log                = /tmp/ryotaro-Pi0Reconstruction-split_comparison_$(runnumber)_$INT(process_shift).log
+Arguments          = "$INT(process_shift) $(nEvents)"
+Queue 5000

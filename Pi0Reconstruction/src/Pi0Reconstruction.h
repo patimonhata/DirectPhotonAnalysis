@@ -53,7 +53,7 @@ class Pi0Reconstruction : public SubsysReco {
     void create_tree_branches();
     void create_output_directory() const;
 
-    std::string output_file_name_ = "/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/pi0_reconstruction.root";
+    std::string output_file_name_ = "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/pi0_reconstruction.root";
     std::string cluster_node_name_ = "CLUSTER_CEMC";
     std::string vertex_node_name_ = "GlobalVertexMap";
     VertexMode vertex_mode_ = VertexMode::Origin;

@@ -93,9 +93,7 @@ int MakeTruthPi0HistogramsFromEventDisplayTree(
   prid << std::setw(6) << std::setfill('0') << processID;
   std::string pid_str = prid.str();
 
-  // const std::string input_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/100events_5GeVpi0_eta0_event_display_%s_NOSPLIT_CLUSTERS.root", pid_str.c_str());
   const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/output/root/event_display_%s.root", pid_str.c_str());
-  // const std::string output_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/TruthAnalysis/output/root/100events_5GeVpi0_eta0_truth_histograms_%s_NOSPLIT_CLUSTERS.root", pid_str.c_str());
   const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/TruthAnalysis/output/root/100events_5GeVpi0_eta0_truth_histograms_%s_NOSPLIT_CLUSTERS.root", pid_str.c_str());
 
 

@@ -1,8 +1,6 @@
 #! /bin/bash
 # export USER="$(id -u -n)"
 # export LOGNAME=${USER}
-# export HOME=/sphenix/u/${LOGNAME}
-
 #source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.464
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 # source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.504

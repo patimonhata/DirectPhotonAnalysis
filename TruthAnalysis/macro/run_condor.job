@@ -1,5 +1,5 @@
 Universe           = vanilla
-Initialdir         = /sphenix/u/ryotaro/DirectPhotonAnalysis/TruthAnalysis/macro
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/TruthAnalysis/macro
 Executable         = run_job.sh
 PeriodicHold       = (NumJobStarts>=1 && JobStatus == 1)
 concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
@@ -10,7 +10,7 @@ job_lease_duration = 86400
 runnumber          = 0
 job_offset         = 0
 process_shift      = $(Process) + $(job_offset) 
-output_directory = /sphenix/u/ryotaro/DirectPhotonAnalysis/TruthAnalysis/output/condor
+output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/TruthAnalysis/output/condor
 
 
 Output             = $(output_directory)/condor_$(runnumber)_$INT(process_shift).out

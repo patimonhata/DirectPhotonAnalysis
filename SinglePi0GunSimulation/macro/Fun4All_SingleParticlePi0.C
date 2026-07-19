@@ -215,7 +215,6 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
 
   // int run=0;
   // DisplayLegoPlot* module_display_lego_plot = new DisplayLegoPlot("myDisplayLego", run, pid_str, save_tree);
-  // module_display_lego_plot->set_output_file( Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/%s.root", pid_str.c_str()));
   // fun4allServer->registerSubsystem(module_display_lego_plot);  
 
   fun4allServer->run(nEvents);

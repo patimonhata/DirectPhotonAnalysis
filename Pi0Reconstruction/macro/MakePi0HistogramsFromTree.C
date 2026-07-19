@@ -18,7 +18,6 @@ int MakePi0HistogramsFromTree(
   pid << std::setw(6) << std::setfill('0') << processID;
   std::string pid_str = pid.str();
 
-  // const std::string input_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/pi0_reconstruction_%s.root", pid_str.c_str());
   const std::string input_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/100kevents_5GeV_pi0_eta0_reconstruction_towerinfo_SPLIT_CLUSTERS_tree.root";
   const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/0005GeV_pi0_eta0_over300MeV_rehist_%s_towerinfo_SPLIT.root", pid_str.c_str());  
 

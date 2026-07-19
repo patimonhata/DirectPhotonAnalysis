@@ -27,9 +27,7 @@ int Fun4All_Pi0EventDisplayDump(
   pid << std::setw(6) << std::setfill('0') << processID;
   const std::string pid_str = pid.str();
 
-  // const std::string input_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinfo/DST_single_pi0_reconstructedInfo_%s.root", pid_str.c_str());
   const std::string input_file = Form("/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SingleGammaGunSimulation/output/DST_gamma_5to15GeV_etapm1/DST_single_gamma_reconstructedInfo_%s.root", pid_str.c_str());
-  // const std::string output_file = Form("/sphenix/u/ryotaro/DirectPhotonAnalysis/EventDisplay/output/root/event_display_%s.root", pid_str.c_str());
   const std::string output_file = Form("/sphenix/user/ryotaro/DirectPhotonAnalysis/EventDisplay/output/root/0_event_display_%s.root", pid_str.c_str());
 
   Fun4AllServer* se = Fun4AllServer::instance();

@@ -17,7 +17,8 @@ R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/ins
 int Fun4All_Pi0ReconstructionSplitComparison(
     int processID = 0,
     const int n_events = 0,
-    const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinfo",
+    // const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinfo",
+    const std::string input_directory = "/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SinglePi0GunSimulation/output/DST_pi0_5to15GeV_etapm1",
     const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root")
 {
   if (processID < 0) {
@@ -44,20 +45,28 @@ int Fun4All_Pi0ReconstructionSplitComparison(
   Pi0Reconstruction *split_reconstruction = new Pi0Reconstruction("Pi0Reconstruction_SPLIT");
   split_reconstruction->set_output_file_name(split_output_file);
   split_reconstruction->set_cluster_node_name("CLUSTERINFO_CEMC");
+  split_reconstruction->set_cemc_tower_node_name("TOWERINFO_CALIB_CEMC");
   split_reconstruction->set_process_id(static_cast<unsigned int>(processID));
   split_reconstruction->set_vertex_mode(Pi0Reconstruction::VertexMode::Origin);
   split_reconstruction->set_abort_on_missing_cluster_node(true);
+  split_reconstruction->set_abort_on_missing_cemc_tower_node(true);
   split_reconstruction->set_min_cluster_energy(0.0);
+  split_reconstruction->set_shower_shape_min_tower_energy(0.070);
+  split_reconstruction->set_store_shower_shape_tower_patch(true);
   split_reconstruction->set_mass_histogram_bins(100, 0.0, 1.0);
   fun4all_server->registerSubsystem(split_reconstruction);
 
   Pi0Reconstruction *no_split_reconstruction = new Pi0Reconstruction("Pi0Reconstruction_NO_SPLIT");
   no_split_reconstruction->set_output_file_name(no_split_output_file);
   no_split_reconstruction->set_cluster_node_name("CLUSTERINFO_CEMC_NO_SPLIT");
+  no_split_reconstruction->set_cemc_tower_node_name("TOWERINFO_CALIB_CEMC");
   no_split_reconstruction->set_process_id(static_cast<unsigned int>(processID));
   no_split_reconstruction->set_vertex_mode(Pi0Reconstruction::VertexMode::Origin);
   no_split_reconstruction->set_abort_on_missing_cluster_node(true);
+  no_split_reconstruction->set_abort_on_missing_cemc_tower_node(true);
   no_split_reconstruction->set_min_cluster_energy(0.0);
+  no_split_reconstruction->set_shower_shape_min_tower_energy(0.070);
+  no_split_reconstruction->set_store_shower_shape_tower_patch(true);
   no_split_reconstruction->set_mass_histogram_bins(100, 0.0, 1.0);
   fun4all_server->registerSubsystem(no_split_reconstruction);
 

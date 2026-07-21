@@ -45,10 +45,14 @@ int Fun4All_Pi0Reconstruction(
   Pi0Reconstruction *pi0_reconstruction = new Pi0Reconstruction("Pi0Reconstruction");
   pi0_reconstruction->set_output_file_name(output_file);
   pi0_reconstruction->set_cluster_node_name(cluster_node);
+  pi0_reconstruction->set_cemc_tower_node_name("TOWERINFO_CALIB_CEMC");
   pi0_reconstruction->set_process_id(static_cast<unsigned int>(processID));
   pi0_reconstruction->set_vertex_mode(Pi0Reconstruction::VertexMode::Origin);
   pi0_reconstruction->set_abort_on_missing_cluster_node(true);
+  pi0_reconstruction->set_abort_on_missing_cemc_tower_node(true);
   pi0_reconstruction->set_min_cluster_energy(0.00);
+  pi0_reconstruction->set_shower_shape_min_tower_energy(0.070);
+  pi0_reconstruction->set_store_shower_shape_tower_patch(true);
   pi0_reconstruction->set_mass_histogram_bins(100, 0.0, 1.0);
   fun4all_server->registerSubsystem(pi0_reconstruction);
 

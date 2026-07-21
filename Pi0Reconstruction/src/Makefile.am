@@ -12,6 +12,7 @@ AM_LDFLAGS = \
 
 pkginclude_HEADERS = \
   Pi0Reconstruction.h \
+  ShowerShapeCalculator.h \
   TowerClusterEnergyAudit.h
 
 lib_LTLIBRARIES = \
@@ -19,6 +20,7 @@ lib_LTLIBRARIES = \
 
 libPi0Reconstruction_la_SOURCES = \
   Pi0Reconstruction.cc \
+  ShowerShapeCalculator.cc \
   TowerClusterEnergyAudit.cc
 
 libPi0Reconstruction_la_LIBADD = \

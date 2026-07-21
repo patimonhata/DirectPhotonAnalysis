@@ -2,6 +2,7 @@
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
+#include <calobase/TowerInfoContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <globalvertex/GlobalVertexv3.h>
 #include <globalvertex/GlobalVertexMap.h>
@@ -68,6 +69,31 @@ void Pi0Reconstruction::set_abort_on_missing_vertex_node(bool abort_on_missing_v
   abort_on_missing_vertex_node_ = abort_on_missing_vertex_node;
 }
 
+void Pi0Reconstruction::set_cemc_tower_node_name(const std::string &cemc_tower_node_name)
+{
+  cemc_tower_node_name_ = cemc_tower_node_name;
+}
+
+void Pi0Reconstruction::set_abort_on_missing_cemc_tower_node(bool abort_on_missing_cemc_tower_node)
+{
+  abort_on_missing_cemc_tower_node_ = abort_on_missing_cemc_tower_node;
+}
+
+void Pi0Reconstruction::set_shower_shape_min_tower_energy(double min_tower_energy)
+{
+  if (!std::isfinite(min_tower_energy) || min_tower_energy < 0.0)
+  {
+    std::cout << "Pi0Reconstruction::set_shower_shape_min_tower_energy - invalid threshold requested; keeping current setting" << std::endl;
+    return;
+  }
+  shower_shape_min_tower_energy_ = min_tower_energy;
+}
+
+void Pi0Reconstruction::set_store_shower_shape_tower_patch(bool store_tower_patch)
+{
+  store_shower_shape_tower_patch_ = store_tower_patch;
+}
+
 void Pi0Reconstruction::set_min_cluster_energy(double min_cluster_energy)
 {
   min_cluster_energy_ = min_cluster_energy;
@@ -90,6 +116,10 @@ int Pi0Reconstruction::Init(PHCompositeNode * /*topNode*/)
 {
   create_output_directory();
 
+  ShowerShapeCalculator::Config shower_shape_config;
+  shower_shape_config.min_tower_energy = static_cast<float>(shower_shape_min_tower_energy_);
+  shower_shape_calculator_ = ShowerShapeCalculator(shower_shape_config);
+
   output_file_ = TFile::Open(output_file_name_.c_str(), "RECREATE");
   if (!output_file_ || output_file_->IsZombie())
   {
@@ -107,6 +137,8 @@ int Pi0Reconstruction::Init(PHCompositeNode * /*topNode*/)
 
   std::cout << "Pi0Reconstruction::Init - writing output to " << output_file_name_ << std::endl;
   std::cout << "Pi0Reconstruction::Init - cluster node: " << cluster_node_name_ << std::endl;
+  std::cout << "Pi0Reconstruction::Init - CEMC tower node: " << cemc_tower_node_name_ << std::endl;
+  std::cout << "Pi0Reconstruction::Init - shower-shape tower threshold: " << shower_shape_min_tower_energy_ << " GeV" << std::endl;
   std::cout << "Pi0Reconstruction::Init - process ID: " << process_id_ << std::endl;
 
   return Fun4AllReturnCodes::EVENT_OK;
@@ -131,6 +163,10 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
   tree_event_ = event_number;
   tree_event_uid_ = (static_cast<unsigned long long>(process_id_) << 32U) | static_cast<unsigned long long>(event_number); // Fills the upper 32 bits with process_id_ and the lower 32 bits with event_number 
   tree_min_cluster_energy_ = min_cluster_energy_;
+  tree_shower_shape_min_tower_energy_ = shower_shape_min_tower_energy_;
+  tree_shower_shape_algorithm_version_ = ShowerShapeCalculator::kAlgorithmVersion;
+  tree_shower_shape_patch_side_ = ShowerShapeCalculator::kPatchSide;
+  tree_store_shower_shape_tower_patch_ = store_shower_shape_tower_patch_;
 
   RawClusterContainer *cluster_container = findNode::getClass<RawClusterContainer>(topNode, cluster_node_name_);
   if (!cluster_container)
@@ -146,6 +182,21 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
       event_tree_->Fill();
     }
     return abort_on_missing_cluster_node_ ? Fun4AllReturnCodes::ABORTRUN : Fun4AllReturnCodes::EVENT_OK;
+  }
+
+  TowerInfoContainer *cemc_towers = findNode::getClass<TowerInfoContainer>(topNode, cemc_tower_node_name_);
+  if (!cemc_towers)
+  {
+    if (missing_cemc_tower_node_warnings_ < 5)
+    {
+      std::cout << "Pi0Reconstruction::process_event - missing CEMC tower node required for shower shapes: "
+                << cemc_tower_node_name_ << std::endl;
+    }
+    ++missing_cemc_tower_node_warnings_;
+    if (abort_on_missing_cemc_tower_node_)
+    {
+      return Fun4AllReturnCodes::ABORTRUN;
+    }
   }
 
   std::array<double, 3> vertex = {0.0, 0.0, 0.0};
@@ -181,12 +232,21 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
     const unsigned int cluster_index = static_cast<unsigned int>(all_photons.size());
     all_photons.push_back(candidate);
     tree_cluster_e_.push_back(candidate.energy);
+    tree_cluster_et_.push_back(candidate.transverse_energy);
+    tree_cluster_eta_.push_back(candidate.eta);
     tree_cluster_x_.push_back(cluster->get_x());
     tree_cluster_y_.push_back(cluster->get_y());
     tree_cluster_z_.push_back(cluster->get_z());
     tree_cluster_px_.push_back(candidate.momentum[0]);
     tree_cluster_py_.push_back(candidate.momentum[1]);
     tree_cluster_pz_.push_back(candidate.momentum[2]);
+
+    ShowerShapeCalculator::Result shower_shape;
+    if (cemc_towers)
+    {
+      shower_shape = shower_shape_calculator_.calculate(*cluster, *cemc_towers);
+    }
+    append_shower_shape_result(shower_shape);
 
     if (energy < min_cluster_energy_)
     {
@@ -337,7 +397,45 @@ bool Pi0Reconstruction::build_photon_candidate(double energy, double x, double y
 
   candidate.energy = energy;
   candidate.momentum = {energy * dx / distance, energy * dy / distance, energy * dz / distance};
+  candidate.transverse_energy = std::hypot(candidate.momentum[0], candidate.momentum[1]);
+  candidate.eta = candidate.transverse_energy > std::numeric_limits<double>::epsilon()
+      ? std::asinh(candidate.momentum[2] / candidate.transverse_energy)
+      : std::numeric_limits<double>::quiet_NaN();
   return true;
+}
+
+void Pi0Reconstruction::append_shower_shape_result(const ShowerShapeCalculator::Result &result)
+{
+  tree_cluster_shower_valid_.push_back(result.valid ? 1U : 0U);
+  tree_cluster_shower_full_containment_.push_back(result.full_containment ? 1U : 0U);
+  tree_cluster_shower_edge_padded_.push_back(result.edge_padded ? 1U : 0U);
+  tree_cluster_shower_tower_data_complete_.push_back(result.tower_data_complete ? 1U : 0U);
+  tree_cluster_shower_cog_ieta_.push_back(result.cog_ieta);
+  tree_cluster_shower_cog_iphi_.push_back(result.cog_iphi);
+  tree_cluster_shower_cluster_e_thresholded_.push_back(result.cluster_energy_above_threshold);
+  tree_cluster_shower_owned_patch_e_.push_back(result.owned_patch_energy);
+  tree_cluster_shower_w_eta_cogx_.push_back(result.w_eta_cogx);
+  tree_cluster_shower_w_phi_cogx_.push_back(result.w_phi_cogx);
+  tree_cluster_shower_e11_.push_back(result.e11);
+  tree_cluster_shower_e33_.push_back(result.e33);
+  tree_cluster_shower_e32_.push_back(result.e32);
+  tree_cluster_shower_e35_.push_back(result.e35);
+  tree_cluster_shower_e11_over_e33_.push_back(result.e11_over_e33);
+  tree_cluster_shower_e32_over_e35_.push_back(result.e32_over_e35);
+  tree_cluster_shower_et1_.push_back(result.et1);
+  tree_cluster_shower_et2_.push_back(result.et2);
+  tree_cluster_shower_et3_.push_back(result.et3);
+  tree_cluster_shower_et4_.push_back(result.et4);
+
+  if (store_shower_shape_tower_patch_)
+  {
+    tree_cluster_shower_patch_e_.insert(
+        tree_cluster_shower_patch_e_.end(), result.patch_energy.begin(), result.patch_energy.end());
+    tree_cluster_shower_patch_good_.insert(
+        tree_cluster_shower_patch_good_.end(), result.patch_good.begin(), result.patch_good.end());
+    tree_cluster_shower_patch_owned_.insert(
+        tree_cluster_shower_patch_owned_.end(), result.patch_owned.begin(), result.patch_owned.end());
+  }
 }
 
 void Pi0Reconstruction::reset_tree_variables()
@@ -351,14 +449,43 @@ void Pi0Reconstruction::reset_tree_variables()
   tree_vertex_x_ = 0.0;
   tree_vertex_y_ = 0.0;
   tree_vertex_z_ = 0.0;
+  tree_shower_shape_min_tower_energy_ = 0.0;
+  tree_shower_shape_algorithm_version_ = 0;
+  tree_shower_shape_patch_side_ = 0;
+  tree_store_shower_shape_tower_patch_ = false;
 
   tree_cluster_e_.clear();
+  tree_cluster_et_.clear();
+  tree_cluster_eta_.clear();
   tree_cluster_x_.clear();
   tree_cluster_y_.clear();
   tree_cluster_z_.clear();
   tree_cluster_px_.clear();
   tree_cluster_py_.clear();
   tree_cluster_pz_.clear();
+  tree_cluster_shower_valid_.clear();
+  tree_cluster_shower_full_containment_.clear();
+  tree_cluster_shower_edge_padded_.clear();
+  tree_cluster_shower_tower_data_complete_.clear();
+  tree_cluster_shower_cog_ieta_.clear();
+  tree_cluster_shower_cog_iphi_.clear();
+  tree_cluster_shower_cluster_e_thresholded_.clear();
+  tree_cluster_shower_owned_patch_e_.clear();
+  tree_cluster_shower_w_eta_cogx_.clear();
+  tree_cluster_shower_w_phi_cogx_.clear();
+  tree_cluster_shower_e11_.clear();
+  tree_cluster_shower_e33_.clear();
+  tree_cluster_shower_e32_.clear();
+  tree_cluster_shower_e35_.clear();
+  tree_cluster_shower_e11_over_e33_.clear();
+  tree_cluster_shower_e32_over_e35_.clear();
+  tree_cluster_shower_et1_.clear();
+  tree_cluster_shower_et2_.clear();
+  tree_cluster_shower_et3_.clear();
+  tree_cluster_shower_et4_.clear();
+  tree_cluster_shower_patch_e_.clear();
+  tree_cluster_shower_patch_good_.clear();
+  tree_cluster_shower_patch_owned_.clear();
   tree_pair_cluster_i_.clear();
   tree_pair_cluster_j_.clear();
   tree_pair_m_gg_.clear();
@@ -381,14 +508,43 @@ void Pi0Reconstruction::create_tree_branches()
   event_tree_->Branch("vertex_x", &tree_vertex_x_);
   event_tree_->Branch("vertex_y", &tree_vertex_y_);
   event_tree_->Branch("vertex_z", &tree_vertex_z_);
+  event_tree_->Branch("shower_shape_min_tower_energy", &tree_shower_shape_min_tower_energy_);
+  event_tree_->Branch("shower_shape_algorithm_version", &tree_shower_shape_algorithm_version_);
+  event_tree_->Branch("shower_shape_patch_side", &tree_shower_shape_patch_side_);
+  event_tree_->Branch("store_shower_shape_tower_patch", &tree_store_shower_shape_tower_patch_);
 
   event_tree_->Branch("cluster_e", &tree_cluster_e_);
+  event_tree_->Branch("cluster_et", &tree_cluster_et_);
+  event_tree_->Branch("cluster_eta", &tree_cluster_eta_);
   event_tree_->Branch("cluster_x", &tree_cluster_x_);
   event_tree_->Branch("cluster_y", &tree_cluster_y_);
   event_tree_->Branch("cluster_z", &tree_cluster_z_);
   event_tree_->Branch("cluster_px", &tree_cluster_px_);
   event_tree_->Branch("cluster_py", &tree_cluster_py_);
   event_tree_->Branch("cluster_pz", &tree_cluster_pz_);
+  event_tree_->Branch("cluster_shower_valid", &tree_cluster_shower_valid_);
+  event_tree_->Branch("cluster_shower_full_containment", &tree_cluster_shower_full_containment_);
+  event_tree_->Branch("cluster_shower_edge_padded", &tree_cluster_shower_edge_padded_);
+  event_tree_->Branch("cluster_shower_tower_data_complete", &tree_cluster_shower_tower_data_complete_);
+  event_tree_->Branch("cluster_shower_cog_ieta", &tree_cluster_shower_cog_ieta_);
+  event_tree_->Branch("cluster_shower_cog_iphi", &tree_cluster_shower_cog_iphi_);
+  event_tree_->Branch("cluster_shower_cluster_e_thresholded", &tree_cluster_shower_cluster_e_thresholded_);
+  event_tree_->Branch("cluster_shower_owned_patch_e", &tree_cluster_shower_owned_patch_e_);
+  event_tree_->Branch("cluster_shower_w_eta_cogx", &tree_cluster_shower_w_eta_cogx_);
+  event_tree_->Branch("cluster_shower_w_phi_cogx", &tree_cluster_shower_w_phi_cogx_);
+  event_tree_->Branch("cluster_shower_e11", &tree_cluster_shower_e11_);
+  event_tree_->Branch("cluster_shower_e33", &tree_cluster_shower_e33_);
+  event_tree_->Branch("cluster_shower_e32", &tree_cluster_shower_e32_);
+  event_tree_->Branch("cluster_shower_e35", &tree_cluster_shower_e35_);
+  event_tree_->Branch("cluster_shower_e11_over_e33", &tree_cluster_shower_e11_over_e33_);
+  event_tree_->Branch("cluster_shower_e32_over_e35", &tree_cluster_shower_e32_over_e35_);
+  event_tree_->Branch("cluster_shower_et1", &tree_cluster_shower_et1_);
+  event_tree_->Branch("cluster_shower_et2", &tree_cluster_shower_et2_);
+  event_tree_->Branch("cluster_shower_et3", &tree_cluster_shower_et3_);
+  event_tree_->Branch("cluster_shower_et4", &tree_cluster_shower_et4_);
+  event_tree_->Branch("cluster_shower_patch_e", &tree_cluster_shower_patch_e_);
+  event_tree_->Branch("cluster_shower_patch_good", &tree_cluster_shower_patch_good_);
+  event_tree_->Branch("cluster_shower_patch_owned", &tree_cluster_shower_patch_owned_);
   event_tree_->Branch("pair_cluster_i", &tree_pair_cluster_i_);
   event_tree_->Branch("pair_cluster_j", &tree_pair_cluster_j_);
   event_tree_->Branch("pair_m_gg", &tree_pair_m_gg_);

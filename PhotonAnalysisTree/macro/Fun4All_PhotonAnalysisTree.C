@@ -70,13 +70,21 @@ int Fun4All_PhotonAnalysisTree(
   const int end_status = server->End();
   delete server;
 
-  if (run_status != Fun4AllReturnCodes::EVENT_OK ||
-      end_status != Fun4AllReturnCodes::EVENT_OK)
+  // Fun4AllServer::run(0) returns -1 after consuming the only DST input to EOF.
+  // PhotonAnalysisTree itself never returns ABORTEVENT/SYNC_FAIL (-1), so this
+  // value is an expected completion only for the explicit "run to EOF" mode.
+  const bool run_ok = run_status == Fun4AllReturnCodes::EVENT_OK ||
+      (n_events == 0 && run_status == Fun4AllReturnCodes::ABORTEVENT);
+  if (!run_ok || end_status != Fun4AllReturnCodes::EVENT_OK)
   {
     std::cerr << "Fun4All_PhotonAnalysisTree - failed (run=" << run_status
               << ", End=" << end_status << ")" << std::endl;
     gSystem->Exit(EXIT_FAILURE);
     return EXIT_FAILURE;
+  }
+  if (run_status != Fun4AllReturnCodes::EVENT_OK)
+  {
+    std::cout << "Fun4All_PhotonAnalysisTree - completed at input EOF" << std::endl;
   }
   return EXIT_SUCCESS;
 }

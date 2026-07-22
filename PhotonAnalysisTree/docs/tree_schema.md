@@ -75,7 +75,7 @@ These raw quantities are sufficient to reproduce the ONNX inputs; derived model 
 | `nosplit_cluster_p_gamma` | ONNX direct-gamma probability |
 | `nosplit_cluster_p_gamma_valid` | exact training-time feature integrity checks passed and inference succeeded |
 
-The score macros also write model paths, feature order, counters, and domain warnings as top-level ROOT metadata objects.
+Scored files intentionally contain only the `event_tree` and `metadata` TTrees. Adapter counters are written to the job log. Model paths, hashes, feature order, and domain warnings are recorded once per merged dataset in `output/merged/manifest.json`.
 
 ## Metadata tree
 

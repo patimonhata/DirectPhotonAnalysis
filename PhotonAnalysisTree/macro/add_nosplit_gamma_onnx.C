@@ -5,10 +5,6 @@ R__LOAD_LIBRARY(libPi0GammaOnnx.so)
 #include "../src/Pi0GammaOnnx.h"
 
 #include <TFile.h>
-#include <TKey.h>
-#include <TNamed.h>
-#include <TObject.h>
-#include <TParameter.h>
 #include <TTree.h>
 
 #include <algorithm>
@@ -43,47 +39,25 @@ double delta_phi(double lhs, double rhs)
   return value;
 }
 
-bool copy_other_keys(TFile& input, TFile& output, const std::string& tree_name)
+bool copy_metadata_tree(TFile& input, TFile& output)
 {
-  TIter next(input.GetListOfKeys());
-  while (auto* key = dynamic_cast<TKey*>(next()))
+  TTree* source_tree = input.Get<TTree>("metadata");
+  if (!source_tree)
   {
-    if (key->GetName() == tree_name)
-    {
-      continue;
-    }
-    std::unique_ptr<TObject> object(key->ReadObj());
-    if (!object)
-    {
-      std::cerr << "Cannot read input key: " << key->GetName() << std::endl;
-      return false;
-    }
-    output.cd();
-    if (auto* source_tree = dynamic_cast<TTree*>(object.get()))
-    {
-      std::unique_ptr<TTree> cloned_tree(source_tree->CloneTree(-1));
-      if (!cloned_tree)
-      {
-        std::cerr << "Cannot clone input TTree: " << key->GetName() << std::endl;
-        return false;
-      }
-      cloned_tree->SetName(key->GetName());
-      cloned_tree->SetDirectory(&output);
-      const bool written = cloned_tree->Write(key->GetName(), TObject::kOverwrite) > 0;
-      cloned_tree->SetDirectory(nullptr);
-      if (!written)
-      {
-        std::cerr << "Cannot write cloned TTree: " << key->GetName() << std::endl;
-        return false;
-      }
-    }
-    else if (object->Write(key->GetName(), TObject::kOverwrite) <= 0)
-    {
-      std::cerr << "Cannot copy input key: " << key->GetName() << std::endl;
-      return false;
-    }
+    std::cerr << "Missing metadata TTree" << std::endl;
+    return false;
   }
-  return true;
+  output.cd();
+  std::unique_ptr<TTree> cloned_tree(source_tree->CloneTree(-1));
+  if (!cloned_tree)
+  {
+    std::cerr << "Cannot clone metadata TTree" << std::endl;
+    return false;
+  }
+  cloned_tree->SetDirectory(&output);
+  const bool written = cloned_tree->Write("metadata", TObject::kOverwrite) > 0;
+  cloned_tree->SetDirectory(nullptr);
+  return written;
 }
 }
 
@@ -96,11 +70,6 @@ int add_nosplit_gamma_onnx(
   constexpr const char* tree_name = "event_tree";
   constexpr const char* score_branch = "nosplit_cluster_p_gamma";
   constexpr const char* valid_branch = "nosplit_cluster_p_gamma_valid";
-  constexpr const char* global_features =
-      "cluster_eta,log1p(cluster_energy/cosh(cluster_eta)),log1p(cluster_ntower)";
-  constexpr const char* point_features =
-      "tower_eta-cluster_eta,wrapped(tower_phi-cluster_phi),log1p(tower_energy),tower_energy/cluster_energy";
-
   if (!input_path || !output_path || !model_path)
   {
     return 1;
@@ -300,21 +269,11 @@ int add_nosplit_gamma_onnx(
 
   output->cd();
   output_tree->Write();
-  if (!copy_other_keys(*input, *output, tree_name))
+  if (!copy_metadata_tree(*input, *output))
   {
     output->Close();
     return 10;
   }
-  TNamed("nosplit_gamma_onnx_model_file", model_path).Write();
-  TNamed("nosplit_gamma_global_features", global_features).Write();
-  TNamed("nosplit_gamma_point_features", point_features).Write();
-  TNamed("nosplit_gamma_training_domain_warning",
-         "The model was trained only on events with exactly one no-split cluster; multi-cluster scores require separate validation.").Write();
-  TParameter<Long64_t>("nosplit_gamma_total_clusters", total_clusters).Write();
-  TParameter<Long64_t>("nosplit_gamma_valid_scores", valid_scores).Write();
-  TParameter<Long64_t>("nosplit_gamma_invalid_clusters", invalid_clusters).Write();
-  TParameter<Long64_t>("nosplit_gamma_multi_cluster_events", multi_cluster_events).Write();
-  TParameter<Long64_t>("nosplit_gamma_malformed_events", malformed_events).Write();
   output->Close();
 
   std::cout << "add_nosplit_gamma_onnx - events/clusters/valid/invalid/multicluster/malformed = "

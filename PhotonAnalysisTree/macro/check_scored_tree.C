@@ -1,4 +1,5 @@
 #include <TFile.h>
+#include <TKey.h>
 #include <TTree.h>
 
 #include <algorithm>
@@ -25,9 +26,22 @@ int check_scored_tree(const char* input_path)
   }
   TTree* tree = input->Get<TTree>("event_tree");
   TTree* metadata = input->Get<TTree>("metadata");
-  if (!tree || !metadata)
+  bool has_event_tree = false;
+  bool has_metadata = false;
+  bool layout_ok = input->GetListOfKeys()->GetSize() == 2;
+  TIter next(input->GetListOfKeys());
+  while (auto* key = dynamic_cast<TKey*>(next()))
   {
-    std::cerr << "check_scored_tree - missing event_tree or metadata" << std::endl;
+    const std::string name = key->GetName();
+    const bool is_tree = std::string(key->GetClassName()) == "TTree";
+    has_event_tree |= name == "event_tree" && is_tree;
+    has_metadata |= name == "metadata" && is_tree;
+    layout_ok &= (name == "event_tree" || name == "metadata") && is_tree;
+  }
+  layout_ok &= has_event_tree && has_metadata;
+  if (!tree || !metadata || !layout_ok)
+  {
+    std::cerr << "check_scored_tree - expected only event_tree and metadata TTrees" << std::endl;
     return 2;
   }
 

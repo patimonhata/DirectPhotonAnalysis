@@ -1,10 +1,6 @@
 #include <TMVA/RBDT.hxx>
 
 #include <TFile.h>
-#include <TKey.h>
-#include <TNamed.h>
-#include <TObject.h>
-#include <TParameter.h>
 #include <TTree.h>
 
 #include <algorithm>
@@ -30,47 +26,25 @@ bool bind(TTree* tree, const char* name, T* address)
   return tree->SetBranchAddress(name, address) >= 0;
 }
 
-bool copy_other_keys(TFile& input, TFile& output, const std::string& tree_name)
+bool copy_metadata_tree(TFile& input, TFile& output)
 {
-  TIter next(input.GetListOfKeys());
-  while (auto* key = dynamic_cast<TKey*>(next()))
+  TTree* source_tree = input.Get<TTree>("metadata");
+  if (!source_tree)
   {
-    if (key->GetName() == tree_name)
-    {
-      continue;
-    }
-    std::unique_ptr<TObject> object(key->ReadObj());
-    if (!object)
-    {
-      std::cerr << "Cannot read input key: " << key->GetName() << std::endl;
-      return false;
-    }
-    output.cd();
-    if (auto* source_tree = dynamic_cast<TTree*>(object.get()))
-    {
-      std::unique_ptr<TTree> cloned_tree(source_tree->CloneTree(-1));
-      if (!cloned_tree)
-      {
-        std::cerr << "Cannot clone input TTree: " << key->GetName() << std::endl;
-        return false;
-      }
-      cloned_tree->SetName(key->GetName());
-      cloned_tree->SetDirectory(&output);
-      const bool written = cloned_tree->Write(key->GetName(), TObject::kOverwrite) > 0;
-      cloned_tree->SetDirectory(nullptr);
-      if (!written)
-      {
-        std::cerr << "Cannot write cloned TTree: " << key->GetName() << std::endl;
-        return false;
-      }
-    }
-    else if (object->Write(key->GetName(), TObject::kOverwrite) <= 0)
-    {
-      std::cerr << "Cannot copy input key: " << key->GetName() << std::endl;
-      return false;
-    }
+    std::cerr << "Missing metadata TTree" << std::endl;
+    return false;
   }
-  return true;
+  output.cd();
+  std::unique_ptr<TTree> cloned_tree(source_tree->CloneTree(-1));
+  if (!cloned_tree)
+  {
+    std::cerr << "Cannot clone metadata TTree" << std::endl;
+    return false;
+  }
+  cloned_tree->SetDirectory(&output);
+  const bool written = cloned_tree->Write("metadata", TObject::kOverwrite) > 0;
+  cloned_tree->SetDirectory(nullptr);
+  return written;
 }
 }
 
@@ -84,9 +58,6 @@ int add_split_bdt(
   constexpr const char* score_branch = "split_cluster_bdt_base_v3E_score";
   constexpr const char* valid_branch = "split_cluster_bdt_base_v3E_valid";
   constexpr const char* model_key = "myBDT";
-  constexpr const char* feature_order =
-      "ET,weta_cogx,wphi_cogx,vertex_z,cluster_eta,e11_over_e33,et1,et2,et3,et4,e32_over_e35";
-
   if (!input_path || !output_path || !model_path)
   {
     std::cerr << "Input, output, and model paths must be non-empty" << std::endl;
@@ -236,19 +207,11 @@ int add_split_bdt(
 
   output->cd();
   output_tree->Write();
-  if (!copy_other_keys(*input, *output, tree_name))
+  if (!copy_metadata_tree(*input, *output))
   {
     output->Close();
     return 9;
   }
-  TNamed("split_bdt_model_file", model_path).Write();
-  TNamed("split_bdt_model_key", model_key).Write();
-  TNamed("split_bdt_feature_order", feature_order).Write();
-  TNamed("split_bdt_training_domain_warning",
-         "Model performance bins begin at cluster ET=6 GeV; lower-ET scores are extrapolations.").Write();
-  TParameter<Long64_t>("split_bdt_total_clusters", total_clusters).Write();
-  TParameter<Long64_t>("split_bdt_valid_scores", valid_scores).Write();
-  TParameter<Long64_t>("split_bdt_malformed_events", malformed_events).Write();
   output->Close();
 
   std::cout << "add_split_bdt - events/clusters/valid/malformed = "

@@ -15,15 +15,16 @@ export PROJECT_ROOT=/sphenix/user/ryotaro/DirectPhotonAnalysis
 
 ## 2. Fun4All module のビルド
 
-ソースを変更した module だけ再ビルドすればよいです。
+それぞれのモジュールをビルドします。sPHENIX のスタンダードな手法でビルドできます。
 
 ### EmcalEtViewer
 
-`SinglePi0GunSimulation` はこの install にある `CemcTowerDumper` header を include します。
+`SinglePi0GunSimulation` はこの install にある `CemcTowerDumper` header を include します。  \
+`build/` がまだない場合は module の直下で `mkdir -p build install` を先に実行します。
 
 ```bash
 cd "${PROJECT_ROOT}/EmcalEtViewer/build"
-../src/autogen.sh --prefix="${PROJECT_ROOT}/EmcalEtViewer/install"
+${PROJECT_ROOT}/EmcalEtViewer/src/autogen.sh --prefix="${PROJECT_ROOT}/EmcalEtViewer/install"
 make -j4
 make install
 source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/EmcalEtViewer/install"
@@ -33,7 +34,7 @@ source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/EmcalEtViewer/insta
 
 ```bash
 cd "${PROJECT_ROOT}/Pi0Reconstruction/build"
-../src/autogen.sh --prefix="${PROJECT_ROOT}/Pi0Reconstruction/install"
+${PROJECT_ROOT}/EmcalEtViewer/src/autogen.sh --prefix="${PROJECT_ROOT}/Pi0Reconstruction/install"
 make -j4
 make install
 source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/Pi0Reconstruction/install"
@@ -43,23 +44,25 @@ source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/Pi0Reconstruction/i
 
 ```bash
 cd "${PROJECT_ROOT}/EventDisplay/build"
-../src/autogen.sh --prefix="${PROJECT_ROOT}/EventDisplay/install"
+${PROJECT_ROOT}/EmcalEtViewer/src/autogen.sh --prefix="${PROJECT_ROOT}/EventDisplay/install"
 make -j4
 make install
 source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/EventDisplay/install"
 ```
 
-`build/` がまだない場合は module の直下で `mkdir -p build install` を先に実行します。
-
 ## 3. 単一 pi0 sample の生成
 
 実行前に `Fun4All_SingleParticlePi0.C` の次の設定を確認します。
 
-- particle、vertex、eta、phi、pt
-- 出力ディレクトリ名
-- CDB global tag / timestamp
-- tower calibration と cluster threshold
-- split / no-split node の作り方
+* particle、vertex、eta、phi、pt
+
+* 出力ディレクトリ名
+
+* CDB global tag / timestamp
+
+* tower calibration と cluster threshold
+
+* split / no-split node の作り方
 
 5イベントのローカル確認例です。
 
@@ -88,7 +91,11 @@ SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/
 ```bash
 cd "${PROJECT_ROOT}/Pi0Reconstruction/macro"
 source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/Pi0Reconstruction/install"
-root.exe -q -b 'Fun4All_Pi0ReconstructionSplitComparison.C(0,0,"/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo","/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root")'
+root.exe -q -b 'Fun4All_Pi0ReconstructionSplitComparison.C(\
+                  0,\
+                  0,\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo",\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root")'
 ```
 
 期待される出力は次の2ファイルです。
@@ -104,17 +111,30 @@ Pi0Reconstruction/output/root/pi0_reconstruction_NO_SPLIT_000000.root
 一方の cluster node だけを処理する場合は、次の形です。
 
 ```bash
-root.exe -q -b 'Fun4All_Pi0Reconstruction.C(0,0,"CLUSTERINFO_CEMC","/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo","SPLIT")'
+root.exe -q -b 'Fun4All_Pi0Reconstruction.C(\
+                  0,\
+                  0,\
+                  "CLUSTERINFO_CEMC",\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo",\
+                  "SPLIT")'
 ```
 
 ## 5. split / no-split の比較
 
-cluster 数の比較例です。最後の `0.07` は比較時の最小 cluster energy [GeV] です。
+cluster 数の比較例です。
+
+![生成される画像例](ImageSample/compare_split_cluster_counts_5GeV-1.png)
+
+最後の `0.07` は比較時の最小 cluster energy \[GeV] です。
 省略した場合は energy cut を追加せず、`cluster_e` の全要素を数えます。
 
 ```bash
 cd "${PROJECT_ROOT}/Pi0Reconstruction/macro"
-root.exe -q -b 'CompareSplitClusterCounts.C("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_NO_SPLIT_000000.root","/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_SPLIT_000000.root","/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/compare_split_cluster_counts_000000.root",0.07)'
+root.exe -q -b 'CompareSplitClusterCounts.C(\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_NO_SPLIT_000000.root",\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_SPLIT_000000.root",\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/compare_split_cluster_counts_000000.root",\
+                  0.07)'
 ```
 
 出力は ROOT と、同じ basename の PDF です。比較は entry 番号ではなく `event_uid` で対応付けます。
@@ -122,10 +142,13 @@ root.exe -q -b 'CompareSplitClusterCounts.C("/sphenix/user/ryotaro/DirectPhotonA
 cluster pair mass の比較例です。
 
 ```bash
-root.exe -q -b 'CompareSplitClusterMass.C("/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_NO_SPLIT_000000.root","/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_SPLIT_000000.root","/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/compare_split_cluster_mass_000000.root")'
+root.exe -q -b 'CompareSplitClusterMass.C(\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_NO_SPLIT_000000.root",\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_SPLIT_000000.root",\
+                  "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/compare_split_cluster_mass_000000.root")'
 ```
 
-この mass 比較では、NO_SPLIT 側で `ncluster==2` のイベントを起点にし、同じ `event_uid` の
+この mass 比較では、NO\_SPLIT 側で `ncluster==2` のイベントを起点にし、同じ `event_uid` の
 SPLIT 側を探します。
 
 ## 6. EventDisplay Tree の作成と描画
@@ -185,23 +208,33 @@ event_tree->Scan("process_id:event:event_uid:ncluster:ncluster_all", "", "", 10)
 
 最低限、次を確認します。
 
-- ROOT file が zombie でなく、期待する Tree / histogram が存在する
-- Tree entries が処理イベント数と一致する
-- `event_uid` が Tree 内で重複しない
-- split / no-split 比較で matched events が0でない
-- `cluster_e` など同じ対象を表す vector の長さが一致する
-- `h_m_gg`、energy、cluster 数に明らかな異常値がない
+* ROOT file が zombie でなく、期待する Tree / histogram が存在する
+
+* Tree entries が処理イベント数と一致する
+
+* `event_uid` が Tree 内で重複しない
+
+* split / no-split 比較で matched events が0でない
+
+* `cluster_e` など同じ対象を表す vector の長さが一致する
+
+* `h_m_gg`、energy、cluster 数に明らかな異常値がない
 
 ## 9. Condor 実行
 
 各 `macro/run_condor.job` の次の値を確認してから投入します。
 
-- `Initialdir` と `Executable`
-- `nEvents`
-- `job_offset` と `process_shift`
-- `Queue`
-- `output_directory`、`Log`、必要 memory
-- マクロの既定入力・出力・解析条件
+* `Initialdir` と `Executable`
+
+* `nEvents`
+
+* `job_offset` と `process_shift`
+
+* `Queue`
+
+* `output_directory`、`Log`、必要 memory
+
+* マクロの既定入力・出力・解析条件
 
 例:
 

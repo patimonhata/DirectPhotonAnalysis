@@ -12,6 +12,9 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"
 
 root -l -b -q \
+  -e ".L $module_dir/macro/add_nosplit_bdt.C" \
+  -e "gSystem->Exit(add_nosplit_bdt(\"$input_file\",\"$bdt_output\",\"$bdt_model\"));"
+root -l -b -q \
   -e ".L $module_dir/macro/add_split_bdt.C" \
   -e "gSystem->Exit(add_split_bdt(\"$input_file\",\"$bdt_output\",\"$bdt_model\"));"
 root -l -b -q \

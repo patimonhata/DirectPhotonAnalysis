@@ -11,11 +11,12 @@ Single-particle gun DSTを1回だけ読み、truth、SPLIT cluster、NO_SPLIT cl
 ## 内容
 
 - truth: primary、direct daughter、CEMC半径へのgamma投影、acceptance、truth mass/asymmetry
-- `split_*`: `CLUSTERINFO_CEMC`、shower shape、全cluster pair
+- `split_*`: `CLUSTERINFO_CEMC`、shower shape、全cluster pair、cluster constituent tower
 - `nosplit_*`: `CLUSTERINFO_CEMC_NO_SPLIT`、shower shape、全cluster pair、cluster constituent tower
 - `split_cluster_bdt_base_v3E_*`: SPLIT clusterで学習した`base_v3E` BDTをSPLIT clusterへ適用
 - `nosplit_cluster_bdt_base_v3E_*`: NO_SPLIT clusterで学習した`base_v3E` BDTをNO_SPLIT clusterへ適用
 - `nosplit_cluster_p_gamma*`: 同梱ONNX modelが後段で追加
+- `split_cluster_p_gamma*`: 将来のSPLIT学習ONNX modelを`add_split_gamma_onnx.C`で追加
 
 完全なbranch契約は[docs/tree_schema.md](docs/tree_schema.md)を参照してください。
 
@@ -25,7 +26,7 @@ Single-particle gun DSTを1回だけ読み、truth、SPLIT cluster、NO_SPLIT cl
 
 ```bash
 cd /sphenix/user/ryotaro/DirectPhotonAnalysis
-./PhotonAnalysisTree/build.sh
+./PhotonAnalysisTree/src/build.sh
 ```
 
 buildは次を作ります。
@@ -50,13 +51,14 @@ inputは変更せず、BDT追加fileと最終fileを別々に作ります。
 ```bash
 ./PhotonAnalysisTree/run_add_scores.sh \
   PhotonAnalysisTree/output/root/photon_analysis_tree_000000.root \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_000000_with_bdt.root \
+  PhotonAnalysisTree/output/root/photon_analysis_tree_000000_with_split_bdt.root \
+  PhotonAnalysisTree/output/root/photon_analysis_tree_000000_with_both_bdt.root \
   PhotonAnalysisTree/output/root/photon_analysis_tree_000000_scored.root
 ```
 
 wrapperは最後に`check_scored_tree.C`を実行し、cluster、tower、pair、score vectorの長さに加え、`metadata` TTreeが実際に読めること、event数とsource file IDが一致することを検証します。scored ROOT fileのtop-level objectは`event_tree`と`metadata`だけです。adapterのcluster数、valid数、malformed数などの集計は標準出力（Condor log）だけに記録します。既存outputは上書きしません。Condorで多数jobを同時実行してもACLiCの共有build fileが競合しないよう、score macroは各process内でloadします。
 
-NO_SPLIT clusterで学習したBDTをNO_SPLIT clusterへ適用する場合は、独立macroを使います。default modelは`model_base_v3E_nosplit_single_tmva.root`です。標準の`run_add_scores.sh`には組み込んでいないため、必要なfileに明示的に適用します。
+NO_SPLIT clusterで学習したBDTは`run_add_scores.sh`の第2段でNO_SPLIT clusterへ適用します。default modelは`model_base_v3E_nosplit_single_tmva.root`です。必要に応じて独立macroとしても実行できます。
 
 ```bash
 root -l -b \
@@ -65,6 +67,16 @@ root -l -b \
 ```
 
 このmacroが追加するのは`nosplit_cluster_bdt_base_v3E_score`と`nosplit_cluster_bdt_base_v3E_valid`です。入力featureの定義と順序は既存のSPLIT学習版macroと同一ですが、値はすべて`nosplit_cluster_*` branchから取得します。
+
+SPLIT clusterで学習したONNX modelが用意できた後は、model pathを明示して次のmacroを使います。このmacroには意図的にdefault modelを設定していません。
+
+```bash
+root -l -b \
+  -e '.L PhotonAnalysisTree/macro/add_split_gamma_onnx.C' \
+  -e 'gSystem->Exit(add_split_gamma_onnx("input.root", "output.root", "split_model.onnx"));'
+```
+
+入力にはschema version 2以降の`split_tower_*` branchが必要です。SPLITでは同じtowerが複数clusterへ分配され得るため、point featureのenergyには未分配の`split_tower_energy`ではなく、RawClusterに保存された割当energy `split_tower_cluster_value`を使います。
 
 ## scored fileをmergeする
 

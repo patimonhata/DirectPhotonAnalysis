@@ -1,6 +1,6 @@
 # TTree schema
 
-Schema version: 1. Energy/momentumはGeV、positionはcm、angleはradianです。invalid scalar/scoreは`-999`、valid flagは`0`です。
+Schema version: 2. Energy/momentumはGeV、positionはcm、angleはradianです。invalid scalar/scoreは`-999`、valid flagは`0`です。
 
 ## Index contract
 
@@ -8,7 +8,7 @@ Schema version: 1. Energy/momentumはGeV、positionはcm、angleはradianです�
 - `event_uid = (source_file_id << 32) | event_in_file`
 - SPLIT/NO_SPLIT clusterはそれぞれenergy降順、同energyならcluster ID昇順
 - `<collection>_pair_cluster_i/j`は同じcollectionのcluster vector index
-- `nosplit_tower_cluster_index`はNO_SPLIT cluster vector index
+- `<collection>_tower_cluster_index`は同じcollectionのcluster vector index
 - score vectorは対応するcluster vectorと同じ長さ・順序
 - shower patchはclusterごとに7x7 = 49要素をcluster順にflatten
 
@@ -52,19 +52,21 @@ Truth projection and acceptance reproduce the definitions used by`TruthAnalysis/
 
 SPLITは`CLUSTERINFO_CEMC`、NO_SPLITは`CLUSTERINFO_CEMC_NO_SPLIT`です。同名のkinematic branchを共通化しないのは、両collectionが一般に異なるcluster個数・ID・energyを持つためです。
 
-## NO_SPLIT constituent towers
+## Constituent towers
+
+`<c>`は`split`または`nosplit`です。
 
 | Branch | Meaning |
 |---|---|
-| `nosplit_ntower` | every `nosplit_tower_*` vector length |
-| `nosplit_tower_cluster_index` | owner cluster index |
-| `nosplit_tower_key`, `ieta`, `iphi` | RawTower key and decoded bins |
-| `nosplit_tower_x/y/z/r/eta/phi` | tower geometry |
-| `nosplit_tower_energy` | calibrated TowerInfo energy |
-| `nosplit_tower_cluster_value` | value stored in RawCluster |
-| `nosplit_tower_time/is_good/status` | TowerInfo metadata |
+| `<c>_ntower` | every `<c>_tower_*` vector length; SPLITではclusterごとのtower entry数の和 |
+| `<c>_tower_cluster_index` | owner cluster index |
+| `<c>_tower_key`, `ieta`, `iphi` | RawTower key and decoded bins |
+| `<c>_tower_x/y/z/r/eta/phi` | tower geometry |
+| `<c>_tower_energy` | 未分配のcalibrated TowerInfo energy |
+| `<c>_tower_cluster_value` | RawClusterに保存された当該clusterへの割当energy |
+| `<c>_tower_time/is_good/status` | TowerInfo metadata |
 
-These raw quantities are sufficient to reproduce the ONNX inputs; derived model features are intentionally not duplicated in the base tree.
+NO_SPLIT collectionではtower keyはevent内で一意です。SPLIT collectionでは同じtower keyが複数clusterに現れ得るため、`split_ntower`はunique tower数ではなくentry数です。SPLIT ONNXの`log1p(tower_energy)`とenergy fractionには、cluster energyとの整合性を保つため`split_tower_cluster_value`を使います。これらのraw quantityからONNX inputを再現し、derived featureはbase treeへ重複保存しません。
 
 ## Added score branches
 
@@ -76,6 +78,8 @@ These raw quantities are sufficient to reproduce the ONNX inputs; derived model 
 | `nosplit_cluster_bdt_base_v3E_valid` | 上記scoreのfinite input and valid shower shape |
 | `nosplit_cluster_p_gamma` | ONNX direct-gamma probability |
 | `nosplit_cluster_p_gamma_valid` | exact training-time feature integrity checks passed and inference succeeded |
+| `split_cluster_p_gamma` | SPLIT学習ONNXによるSPLIT clusterのdirect-gamma probability |
+| `split_cluster_p_gamma_valid` | SPLIT constituent feature integrity checks passed and inference succeeded |
 
 Scored files intentionally contain only the `event_tree` and `metadata` TTrees. Adapter counters are written to the job log. Model paths, hashes, feature order, and domain warnings are recorded once per merged dataset in `output/merged/manifest.json`.
 

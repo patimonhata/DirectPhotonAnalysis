@@ -17,15 +17,15 @@ find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist)
 find_path(
   PI0RECONSTRUCTION_INCLUDE_DIR
   ShowerShapeCalculator.h
-  HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../Pi0Reconstruction/install/include/pi0reconstruction"
+  HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../Pi0Reconstruction/install/include/pi0reconstruction"
 )
 find_library(
   PI0RECONSTRUCTION_LIBRARY
   NAMES Pi0Reconstruction
-  HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../Pi0Reconstruction/install/lib"
+  HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../Pi0Reconstruction/install/lib"
 )
 if(NOT PI0RECONSTRUCTION_INCLUDE_DIR OR NOT PI0RECONSTRUCTION_LIBRARY)
-  message(FATAL_ERROR "Build and install ../Pi0Reconstruction before PhotonAnalysisTree")
+  message(FATAL_ERROR "Build and install ../../Pi0Reconstruction before PhotonAnalysisTree")
 endif()
 
 foreach(library phool SubsysReco fun4all calo_io g4dst)
@@ -39,11 +39,11 @@ foreach(library phool SubsysReco fun4all calo_io g4dst)
   list(APPEND SPHENIX_LIBRARIES "${${library_upper}_LIBRARY}")
 endforeach()
 
-add_library(PhotonAnalysisTree SHARED src/PhotonAnalysisTree.cc)
+add_library(PhotonAnalysisTree SHARED PhotonAnalysisTree.cc)
 target_include_directories(
   PhotonAnalysisTree
   PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   PRIVATE
     "${SPHENIX_PREFIX}/include"
@@ -75,11 +75,11 @@ if(NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIBRARY)
   message(FATAL_ERROR "ONNX Runtime was not found in OFFLINE_MAIN")
 endif()
 
-add_library(Pi0GammaOnnx SHARED src/Pi0GammaOnnx.cc)
+add_library(Pi0GammaOnnx SHARED Pi0GammaOnnx.cc)
 target_include_directories(
   Pi0GammaOnnx
   PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   PRIVATE "${ONNXRUNTIME_INCLUDE_DIR}"
 )
@@ -87,5 +87,5 @@ target_link_libraries(Pi0GammaOnnx PRIVATE "${ONNXRUNTIME_LIBRARY}")
 target_compile_options(Pi0GammaOnnx PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
-install(FILES src/PhotonAnalysisTree.h src/Pi0GammaOnnx.h ../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h DESTINATION include)
-install(FILES models/best_model.onnx models/onnx_metadata.json DESTINATION ${CMAKE_INSTALL_DATADIR}/PhotonAnalysisTree/models)
+install(FILES PhotonAnalysisTree.h Pi0GammaOnnx.h ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h DESTINATION include)
+install(FILES ../models/best_model.onnx ../models/onnx_metadata.json DESTINATION ${CMAKE_INSTALL_DATADIR}/PhotonAnalysisTree/models)

@@ -17,11 +17,12 @@ output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTr
 input_file         = $(tree_directory)/photon_analysis_tree_$INT(process_id,%06d).root
 split_bdt_output_file = $(tree_directory)/photon_analysis_tree_$INT(process_id,%06d)_with_split_bdt.root
 both_bdt_output_file  = $(tree_directory)/photon_analysis_tree_$INT(process_id,%06d)_with_both_bdt.root
+split_score_output  = $(tree_directory)/photon_analysis_tree_$INT(process_id,%06d)_split_scored.root
 final_output_file  = $(tree_directory)/photon_analysis_tree_$INT(process_id,%06d)_scored.root
 
 Output             = $(output_directory)/scores_$INT(process_id,%06d).out
 Error              = $(output_directory)/scores_$INT(process_id,%06d).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-scores_$INT(process_id,%06d).log
-Arguments          = "$(input_file) $(split_bdt_output_file) $(both_bdt_output_file) $(final_output_file)"
+Arguments          = "$(input_file) $(split_bdt_output_file) $(both_bdt_output_file) $(split_score_output) $(final_output_file)"
 
 Queue $(n_jobs)

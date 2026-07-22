@@ -105,8 +105,8 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
   {
     ++n_events_invalid_truth_;
   }
-  if (!fill_collection(split_clusters, towers, geometry, false, split_) ||
-      !fill_collection(nosplit_clusters, towers, geometry, true, nosplit_))
+  if (!fill_collection(split_clusters, towers, geometry, true, false, split_) ||
+      !fill_collection(nosplit_clusters, towers, geometry, true, true, nosplit_))
   {
     ++n_events_invalid_detector_;
     std::cout << "PhotonAnalysisTree::process_event - invalid cluster/tower content in event "
@@ -266,6 +266,7 @@ bool PhotonAnalysisTree::fill_collection(RawClusterContainer* clusters,
                                          TowerInfoContainer* towers,
                                          RawTowerGeomContainer* geometry,
                                          bool include_towers,
+                                         bool require_unique_tower_keys,
                                          ClusterCollection& output)
 {
   std::vector<const RawCluster*> ordered_clusters;
@@ -340,9 +341,9 @@ bool PhotonAnalysisTree::fill_collection(RawClusterContainer* clusters,
     for (auto tower_iter = tower_range.first; tower_iter != tower_range.second; ++tower_iter)
     {
       const unsigned int raw_key = tower_iter->first;
-      if (!seen_tower_keys.insert(raw_key).second)
+      if (require_unique_tower_keys && !seen_tower_keys.insert(raw_key).second)
       {
-        std::cout << "PhotonAnalysisTree::fill_collection - duplicate no-split tower key "
+        std::cout << "PhotonAnalysisTree::fill_collection - duplicate tower key "
                   << raw_key << std::endl;
         return false;
       }
@@ -528,7 +529,7 @@ void PhotonAnalysisTree::create_trees()
   event_tree_->Branch("shower_shape_algorithm_version", &shower_shape_algorithm_version_);
   event_tree_->Branch("shower_shape_patch_side", &shower_shape_patch_side_);
   event_tree_->Branch("store_shower_shape_tower_patch", &store_shower_shape_tower_patch_);
-  create_collection_branches("split", split_, false);
+  create_collection_branches("split", split_, true);
   create_collection_branches("nosplit", nosplit_, true);
 
   metadata_tree_ = new TTree("metadata", "One entry per source DST");

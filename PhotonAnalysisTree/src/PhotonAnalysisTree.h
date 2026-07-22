@@ -43,7 +43,7 @@ class PhotonAnalysisTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 1;
+  static constexpr int schema_version_ = 2;
   static constexpr double invalid_double_ = -999.0;
   static constexpr int invalid_int_ = -999;
   static constexpr double default_cemc_radius_ = 95.0;
@@ -124,6 +124,7 @@ class PhotonAnalysisTree : public SubsysReco
                        TowerInfoContainer* towers,
                        RawTowerGeomContainer* geometry,
                        bool include_towers,
+                       bool require_unique_tower_keys,
                        ClusterCollection& output);
   void append_shower_shape(const ShowerShapeCalculator::Result& result, ClusterCollection& output);
 

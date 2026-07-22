@@ -121,9 +121,8 @@ root.exe -q -b 'Fun4All_Pi0Reconstruction.C(\
 
 ## 5. split / no-split の比較
 
-cluster 数の比較例です。
-
-![生成される画像例](ImageSample/compare_split_cluster_counts_5GeV-1.png)
+cluster 数の比較例です。以下のような、pdf 形式の画像(と画像の元になる ROOT file)が生成されます。  
+![生成される画像例](../ImageSample/Pi0Reconstruction_compare_split_cluster_counts_5GeV-1.png)
 
 最後の `0.07` は比較時の最小 cluster energy \[GeV] です。
 省略した場合は energy cut を追加せず、`cluster_e` の全要素を数えます。
@@ -153,8 +152,14 @@ SPLIT 側を探します。
 
 ## 6. EventDisplay Tree の作成と描画
 
-現在の `Fun4All_Pi0EventDisplayDump.C` は、別プロジェクトの single-gamma sample を既定入力にしています。
-pi0 DST を使う場合は、マクロ内の `input_file` と必要に応じて `output_file` を先に変更します。
+SingleParticleGun で生成したイベントを視覚化するための event display を独自に用意しています。
+
+||||
+|---|---|---|
+|![画像例1](../ImageSample/EventDisplay_event_0_decay_zoomed-1.png) | ![画像例2](../ImageSample/EventDisplay_event_0_xy_towerinforyotaro_SPLIT-1.png) | ![画像例3](../ImageSample/EventDisplay_event_0_zr_towerinforyotaro_SPLIT-1.png) |
+
+DST file を input として受け取ります。
+マクロ内の `input_file` と必要に応じて `output_file` を先に変更します。
 
 ```bash
 cd "${PROJECT_ROOT}/EventDisplay/macro"
@@ -192,57 +197,3 @@ root.exe -q -b 'MakeTruthPi0HistogramsFromEventDisplayTree.C(0,1.1,100000)'
 引数は `processID acceptance_eta_max progress_interval` です。出力には histogram、
 `truth_pi0_tree`、acceptance と集計値の `TParameter` が入ります。
 
-## 8. ROOT 出力の確認
-
-```bash
-root -l /sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root/pi0_reconstruction_SPLIT_000000.root
-```
-
-ROOT prompt で次を確認します。
-
-```cpp
-_file0->ls();
-event_tree->Print();
-event_tree->Scan("process_id:event:event_uid:ncluster:ncluster_all", "", "", 10);
-```
-
-最低限、次を確認します。
-
-* ROOT file が zombie でなく、期待する Tree / histogram が存在する
-
-* Tree entries が処理イベント数と一致する
-
-* `event_uid` が Tree 内で重複しない
-
-* split / no-split 比較で matched events が0でない
-
-* `cluster_e` など同じ対象を表す vector の長さが一致する
-
-* `h_m_gg`、energy、cluster 数に明らかな異常値がない
-
-## 9. Condor 実行
-
-各 `macro/run_condor.job` の次の値を確認してから投入します。
-
-* `Initialdir` と `Executable`
-
-* `nEvents`
-
-* `job_offset` と `process_shift`
-
-* `Queue`
-
-* `output_directory`、`Log`、必要 memory
-
-* マクロの既定入力・出力・解析条件
-
-例:
-
-```bash
-cd "${PROJECT_ROOT}/SinglePi0GunSimulation/macro"
-mkdir -p "${PROJECT_ROOT}/SinglePi0GunSimulation/output/condor"
-condor_submit run_condor.job
-```
-
-再投入時は既存の `processID` と衝突しないよう `job_offset` を変更します。
-同じ出力名は上書きされ得るため、投入前に [再現メモ](reproducibility-log.md) を1エントリ残します。

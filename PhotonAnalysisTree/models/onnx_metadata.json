@@ -1,0 +1,94 @@
+{
+  "class_labels": {
+    "0": "pi0",
+    "1": "gamma"
+  },
+  "format": "Pi0GammaClassifier ONNX deployment model",
+  "inputs": {
+    "global_features": {
+      "dtype": "float32",
+      "features": [
+        "cluster_eta",
+        "log1p_cluster_et",
+        "log1p_cluster_ntower"
+      ],
+      "normalized_in_model": true,
+      "shape": [
+        "batch",
+        3
+      ]
+    },
+    "point_features": {
+      "dtype": "float32",
+      "features": [
+        "delta_eta_from_cluster",
+        "delta_phi_from_cluster",
+        "log1p_tower_energy",
+        "tower_energy_fraction"
+      ],
+      "normalized_in_model": true,
+      "shape": [
+        "batch",
+        "number_of_towers",
+        4
+      ]
+    },
+    "point_mask": {
+      "dtype": "bool",
+      "meaning": "true for a real tower and false for padding",
+      "shape": [
+        "batch",
+        "number_of_towers"
+      ]
+    }
+  },
+  "model_config": {
+    "cluster_hidden_dim": 128,
+    "dropout": 0.0,
+    "global_dim": 3,
+    "n_classes": 2,
+    "point_dim": 4,
+    "point_hidden_dim": 64,
+    "pooling": "sum"
+  },
+  "normalization": {
+    "global_mean": [
+      -0.0029064237605780363,
+      2.371143102645874,
+      2.1765594482421875
+    ],
+    "global_std": [
+      0.5731731057167053,
+      0.2915475070476532,
+      0.2305891066789627
+    ],
+    "point_mean": [
+      -1.3364775441004895e-05,
+      0.0023240705486387014,
+      0.5907517075538635,
+      0.12429740279912949
+    ],
+    "point_std": [
+      0.020711632445454597,
+      0.02285144478082657,
+      0.6904088258743286,
+      0.2088141143321991
+    ]
+  },
+  "onnx_sha256": "194eb9a0394b5752619d324aa8a17dde547ff67713ea908dcfed869ef0931a6d",
+  "opset": 17,
+  "output": {
+    "dtype": "float32",
+    "meaning": "softmax probability for class index 1 (direct gamma)",
+    "name": "p_gamma",
+    "shape": [
+      "batch"
+    ]
+  },
+  "source_checkpoint": "best_model.pt",
+  "source_checkpoint_sha256": "70a38c93a0a40c222c3cd9cd348b126e2619c797e6d1cdeb7abb38480c803356",
+  "validation": {
+    "maximum_absolute_difference": 0.0,
+    "runtime_validation_cases": 3
+  }
+}

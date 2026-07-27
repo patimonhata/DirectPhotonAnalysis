@@ -16,15 +16,15 @@
 int PlotPairEnergyAsymmetry(
     const std::string input_directory = "Pi0Reconstruction/output",
     const std::string output_base =
-        "Pi0Reconstruction/output/5GeV_pi0_eta0_pair_energy_asymmetry_SPLIT")
+        "Pi0Reconstruction/output/10GeV_pi0_eta0_pair_energy_asymmetry_SPLIT")
 {
   SetsPhenixStyle();
   TH1::AddDirectory(false);
 
   const std::array<std::string, 3> input_names = {
-      "5GeV_pi0_eta0_over100MeV_rehist_SPLIT.root",
-      "5GeV_pi0_eta0_over300MeV_rehist_SPLIT.root",
-      "5GeV_pi0_eta0_over500MeV_rehist_SPLIT.root"};
+      "10GeV_pi0_eta0_over100MeV_rehist_SPLIT.root",
+      "10GeV_pi0_eta0_over300MeV_rehist_SPLIT.root",
+      "10GeV_pi0_eta0_over500MeV_rehist_SPLIT.root"};
   const std::array<int, 3> energy_thresholds_mev = {100, 300, 500};
   const std::array<Color_t, 3> colors = {
       kRed + 1,
@@ -97,12 +97,10 @@ int PlotPairEnergyAsymmetry(
   label.SetNDC();
   label.SetTextAlign(13);
   label.DrawLatex(0.20, 0.90, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.52, 0.90, "Single #pi^{0}, 5 GeV, #eta = 0");
+  label.DrawLatex(0.52, 0.90, "Single #pi^{0}, 10 GeV, #eta = 0");
 
   canvas.RedrawAxis();
   canvas.SaveAs((output_base + ".pdf").c_str());
 
-  std::cout << "Saved " << output_base << ".pdf and " << output_base << ".png"
-            << std::endl;
   return 0;
 }

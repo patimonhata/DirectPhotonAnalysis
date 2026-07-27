@@ -8,7 +8,8 @@ request_memory     = 4GB
 Priority           = 20
 job_lease_duration = 86400
 
-n_jobs             = 5000
+# 10000 segments are available; start with segments 0--999.
+n_jobs             = 1000
 n_events           = 0
 job_offset         = 0
 process_id         = $(Process) + $(job_offset)

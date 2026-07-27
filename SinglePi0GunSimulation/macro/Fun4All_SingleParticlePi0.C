@@ -64,7 +64,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
 
   // std::string baseDir(cwd);
   std::string baseDir("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output");
-  std::string outDir  = baseDir + "/DST_" + particle_name + "_5GeV_eta05_towerinfo";
+  std::string outDir  = baseDir + "/DST_" + particle_name + "_10GeV_eta0";
   std::string outDir2 = baseDir + "/ana_" + particle_name;
   std::string outDir3 = baseDir + "/jobtime_" + particle_name;
   ensure_dir(outDir);
@@ -88,10 +88,10 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
                                                                             PHG4SimpleEventGenerator::Gaus);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_mean(0., 0., 0.);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_width(0., 0., 0.);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0.5, 0.5);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0., 0.);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(5., 5.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(3., 15.);
 
   // register all input generators with Fun4All
   InputRegister();

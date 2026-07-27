@@ -17,8 +17,8 @@ R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/ins
 int Fun4All_Pi0ReconstructionSplitComparison(
     int processID = 0,
     const int n_events = 0,
-    // const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinfo",
-    const std::string input_directory = "/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SinglePi0GunSimulation/output/newDST_pi0_5to15GeV_etapm1",
+    const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_10GeV_eta0",
+    // const std::string input_directory = "/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SinglePi0GunSimulation/output/newDST_pi0_5to15GeV_etapm1",
     const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/root")
 {
   if (processID < 0) {

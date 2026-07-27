@@ -20,7 +20,7 @@ int Fun4All_Pi0Reconstruction(
     // const std::string cluster_node = "CLUSTERINFO_CEMC_NO_SPLIT",
     const std::string cluster_node = "CLUSTERINFO_CEMC",
     // const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0",
-    const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0_towerinfo",
+    const std::string input_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_5GeV_eta0",
     const std::string output_tag = ""
 )
 {

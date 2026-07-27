@@ -35,10 +35,8 @@ int Fun4All_PhotonAnalysisTree(
   std::ostringstream id;
   id << std::setw(6) << std::setfill('0') << process_id;
   const std::string id_string = id.str();
-  const std::string input_file = input_directory +
-      "/DST_single_pi0_reconstructedInfo_" + id_string + ".root";
-  const std::string output_file = output_directory +
-      "/photon_analysis_tree_" + id_string + ".root";
+  const std::string input_file = input_directory + "/DST_single_pi0_reconstructedInfo_" + id_string + ".root";
+  const std::string output_file = output_directory + "/photon_analysis_tree_" + id_string + ".root";
 
   Fun4AllServer* server = Fun4AllServer::instance();
   server->Verbosity(1);

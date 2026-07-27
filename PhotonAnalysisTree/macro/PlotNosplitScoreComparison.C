@@ -168,7 +168,8 @@ bool make_output_directory(const std::string& output_base)
 }  // namespace
 
 int PlotNosplitScoreComparison(
-    const std::string input_path = "PhotonAnalysisTree/output/merged/all.root",
+    // const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
+    const std::string input_path = "PhotonAnalysisTree/output/merged/100segments_Jet5.root",
     const std::string output_base = "PhotonAnalysisTree/output/plots/nosplit_score_comparison")
 {
   SetsPhenixStyle();
@@ -195,6 +196,8 @@ int PlotNosplitScoreComparison(
   std::vector<float>* mlp_score = nullptr;
   std::vector<unsigned char>* mlp_valid = nullptr;
 
+  tree->SetBranchStatus("*", false);
+
   bool branches_ok = true;
   const auto bind = [&](const char* branch_name, auto* address)
   {
@@ -204,15 +207,21 @@ int PlotNosplitScoreComparison(
       branches_ok = false;
       return;
     }
+    tree->SetBranchStatus(branch_name, true);
     tree->SetBranchAddress(branch_name, address);
   };
 
   bind("truth_pt", &truth_pt);
-  bind("nosplit_cluster_et", &cluster_et);
-  bind("nosplit_cluster_bdt_base_v3E_score", &bdt_score);
-  bind("nosplit_cluster_bdt_base_v3E_valid", &bdt_valid);
-  bind("nosplit_cluster_p_gamma", &mlp_score);
-  bind("nosplit_cluster_p_gamma_valid", &mlp_valid);
+  // bind("nosplit_cluster_et", &cluster_et);
+  // bind("nosplit_cluster_bdt_base_v3E_score", &bdt_score);
+  // bind("nosplit_cluster_bdt_base_v3E_valid", &bdt_valid);
+  // bind("nosplit_cluster_p_gamma", &mlp_score);
+  // bind("nosplit_cluster_p_gamma_valid", &mlp_valid);
+  bind("split_cluster_et", &cluster_et);
+  bind("split_cluster_bdt_base_v3E_score", &bdt_score);
+  bind("split_cluster_bdt_base_v3E_valid", &bdt_valid);
+  bind("split_cluster_p_gamma", &mlp_score);
+  bind("split_cluster_p_gamma_valid", &mlp_valid);
   if (!branches_ok)
   {
     return 1;
@@ -260,6 +269,7 @@ int PlotNosplitScoreComparison(
   const Long64_t entries = tree->GetEntries();
   for (Long64_t entry = 0; entry < entries; ++entry)
   {
+    if (entry%1000 == 0) {std::cout << "entry: " << entry << std::endl;}
     tree->GetEntry(entry);
 
     if (!cluster_et || !bdt_score || !bdt_valid || !mlp_score || !mlp_valid)

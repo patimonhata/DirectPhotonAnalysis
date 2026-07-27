@@ -43,7 +43,7 @@ void PhotonAnalysisTree::ClusterCollection::clear()
 
 int PhotonAnalysisTree::Init(PHCompositeNode* /*topNode*/)
 {
-  if (expected_primary_pdg_ != 22 && expected_primary_pdg_ != 111)
+  if (expected_primary_pdg_ != 22 && expected_primary_pdg_ != 111 && expected_primary_pdg_ != 221)
   {
     std::cout << "PhotonAnalysisTree::Init - expected primary PDG must be 22 or 111" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;

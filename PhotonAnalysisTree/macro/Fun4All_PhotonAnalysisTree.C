@@ -20,13 +20,13 @@ int Fun4All_PhotonAnalysisTree(
     const int process_id = 0,
     const int n_events = 0,
     const std::string input_directory =
-        "/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SinglePi0GunSimulation/output/newDST_pi0_5to15GeV_etapm1",
+        "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_3to15GeV_etapm1_vertexpm60",
     const std::string output_directory =
         "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/root",
     const int expected_primary_pdg = 111)
 {
   if (process_id < 0 || n_events < 0 ||
-      (expected_primary_pdg != 22 && expected_primary_pdg != 111))
+      (expected_primary_pdg != 22 && expected_primary_pdg != 111 && expected_primary_pdg != 221))
   {
     std::cerr << "Fun4All_PhotonAnalysisTree - invalid argument" << std::endl;
     return EXIT_FAILURE;

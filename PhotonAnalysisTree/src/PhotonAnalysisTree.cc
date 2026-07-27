@@ -191,6 +191,9 @@ bool PhotonAnalysisTree::fill_truth(PHG4TruthInfoContainer* truth, RawTowerGeomC
   b_truth_vx_ = primary_vertex->get_x();
   b_truth_vy_ = primary_vertex->get_y();
   b_truth_vz_ = primary_vertex->get_z();
+  b_vertex_x_ = b_truth_vx_;
+  b_vertex_y_ = b_truth_vy_;
+  b_vertex_z_ = b_truth_vz_;
 
   std::vector<PHG4Particle*> daughters;
   const auto particle_range = truth->GetParticleRange();

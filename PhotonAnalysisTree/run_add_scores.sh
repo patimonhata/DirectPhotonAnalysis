@@ -23,7 +23,7 @@ root -l -b -q \
   -e "gSystem->Exit(add_nosplit_bdt(\"$split_bdt_output\",\"$both_bdt_output\",\"$nosplit_bdt_model\"));"
 root -l -b -q \
   -e ".L $module_dir/macro/add_split_gamma_onnx.C" \
-  -e "gSystem->Exit(add_split_gamma_onnx(\"$both_bdt_output\",\"split_score_output\",\"$split_onnx_model\"));"
+  -e "gSystem->Exit(add_split_gamma_onnx(\"$both_bdt_output\",\"$split_score_output\",\"$split_onnx_model\"));"
 root -l -b -q \
   -e ".L $module_dir/macro/add_nosplit_gamma_onnx.C" \
   -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$split_score_output\",\"$final_output\",\"$nosplit_onnx_model\"));"

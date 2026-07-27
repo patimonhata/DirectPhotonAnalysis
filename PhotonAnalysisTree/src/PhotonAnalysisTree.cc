@@ -70,7 +70,9 @@ int PhotonAnalysisTree::Init(PHCompositeNode* /*topNode*/)
   std::cout << "PhotonAnalysisTree::Init - input: " << input_file_name_ << '\n'
             << "PhotonAnalysisTree::Init - output: " << output_file_name_ << '\n'
             << "PhotonAnalysisTree::Init - split/no-split nodes: "
-            << split_cluster_node_name_ << "/" << nosplit_cluster_node_name_ << std::endl;
+            << split_cluster_node_name_ << "/" << nosplit_cluster_node_name_ << '\n'
+            << "PhotonAnalysisTree::Init - truth/no-split required: "
+            << require_truth_node_ << "/" << require_nosplit_cluster_node_ << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -89,7 +91,11 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
   auto* split_clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   auto* nosplit_clusters = findNode::getClass<RawClusterContainer>(topNode, nosplit_cluster_node_name_);
 
-  if (!truth || !towers || !geometry || !split_clusters || !nosplit_clusters)
+  const bool missing_required_node =
+      !towers || !geometry || !split_clusters ||
+      (require_truth_node_ && !truth) ||
+      (require_nosplit_cluster_node_ && !nosplit_clusters);
+  if (missing_required_node)
   {
     ++n_events_invalid_detector_;
     std::cout << "PhotonAnalysisTree::process_event - missing node in event " << b_event_in_file_
@@ -101,12 +107,16 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
-  if (!fill_truth(truth, geometry))
+  if (truth && !fill_truth(truth, geometry))
   {
     ++n_events_invalid_truth_;
   }
-  if (!fill_collection(split_clusters, towers, geometry, true, false, split_) ||
-      !fill_collection(nosplit_clusters, towers, geometry, true, true, nosplit_))
+  const bool split_valid =
+      fill_collection(split_clusters, towers, geometry, true, false, split_);
+  const bool nosplit_valid =
+      !nosplit_clusters ||
+      fill_collection(nosplit_clusters, towers, geometry, true, true, nosplit_);
+  if (!split_valid || !nosplit_valid)
   {
     ++n_events_invalid_detector_;
     std::cout << "PhotonAnalysisTree::process_event - invalid cluster/tower content in event "
@@ -543,6 +553,8 @@ void PhotonAnalysisTree::create_trees()
   metadata_tree_->Branch("tower_geom_node", &tower_geom_node_name_);
   metadata_tree_->Branch("split_cluster_node", &split_cluster_node_name_);
   metadata_tree_->Branch("nosplit_cluster_node", &nosplit_cluster_node_name_);
+  metadata_tree_->Branch("require_truth_node", &require_truth_node_);
+  metadata_tree_->Branch("require_nosplit_cluster_node", &require_nosplit_cluster_node_);
   metadata_tree_->Branch("cluster_ordering", &cluster_ordering_);
   metadata_tree_->Branch("acceptance_eta_max", &acceptance_eta_max_);
   metadata_tree_->Branch("n_events_processed", &n_events_processed_);

@@ -1,6 +1,6 @@
 # TTree schema
 
-Schema version: 2. Energy/momentumはGeV、positionはcm、angleはradianです。invalid scalar/scoreは`-999`、valid flagは`0`です。
+Schema version: 3. Energy/momentumはGeV、positionはcm、angleはradianです。invalid scalar/scoreは`-999`、valid flagは`0`です。
 
 ## Index contract
 
@@ -34,6 +34,8 @@ Schema version: 2. Energy/momentumはGeV、positionはcm、angleはradianです�
 
 Truth projection and acceptance reproduce the definitions used by`TruthAnalysis/MakeTruthPi0HistogramsFromEventDisplayTree.C`; direct daughters are stored once as vectors instead of duplicated `gamma1_*`/`gamma2_*` scalars.
 
+`require_truth_node=false`で実行し、入力DSTにtruth nodeがない場合もeventは保存されます。その場合は`truth_valid=0`、truth scalarはinvalid値、truth vectorは空です。
+
 ## Cluster collections
 
 `<c>` is `split` or `nosplit`.
@@ -51,6 +53,8 @@ Truth projection and acceptance reproduce the definitions used by`TruthAnalysis/
 | `<c>_pair_m_gg`, `<c>_pair_e_asym` | reconstructed pair quantities |
 
 SPLITは`CLUSTERINFO_CEMC`、NO_SPLITは`CLUSTERINFO_CEMC_NO_SPLIT`です。同名のkinematic branchを共通化しないのは、両collectionが一般に異なるcluster個数・ID・energyを持つためです。
+
+`require_nosplit_cluster_node=false`で実行し、入力DSTにNO_SPLIT nodeがない場合は、`nosplit_ncluster=0`、`nosplit_ntower=0`、すべての`nosplit_*` vectorが空になります。SPLIT collection、calibrated tower、tower geometryは常に必須です。
 
 ## Constituent towers
 
@@ -85,4 +89,4 @@ Scored files intentionally contain only the `event_tree` and `metadata` TTrees. 
 
 ## Metadata tree
 
-One entry per source DST with schema version, input/output paths, node names, ordering rule, acceptance, and processed/written/invalid counters. `hadd` concatenates metadata entries while concatenating event entries.
+One entry per source DST with schema version, input/output paths, node names, required-node flags, ordering rule, acceptance, and processed/written/invalid counters. `hadd` concatenates metadata entries while concatenating event entries.

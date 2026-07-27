@@ -20,6 +20,10 @@ Single-particle gun DSTを1回だけ読み、truth、SPLIT cluster、NO_SPLIT cl
 
 完全なbranch契約は[docs/tree_schema.md](docs/tree_schema.md)を参照してください。
 
+TruthまたはNO_SPLIT clusterを持たないDSTでは、それぞれ`set_require_truth_node(false)`、
+`set_require_nosplit_cluster_node(false)`を設定できます。省略collectionのbranchは削除せず、
+invalid値または空vectorとして保存します。
+
 ## Build
 
 先に既存`Pi0Reconstruction`をbuild/installしてから実行します。
@@ -43,6 +47,22 @@ buildは次を作ります。
 第1引数はsource/process ID、第2引数はevent数です。`0` event指定は全eventです。default inputは依頼時の`newDST_pi0_5to15GeV_etapm1`、default outputは`PhotonAnalysisTree/output/root`です。
 
 直接ROOT macroを呼ぶ場合は、input/output directoryとexpected primary PDGも変更できます。
+
+Pythia Jet5では同じsegment IDを持つ次の4 streamを、それぞれ別のinput managerへ
+basenameで登録します。
+
+- `DST_CALO_CLUSTER`
+- `DST_MBD_EPD`
+- `DST_TRUTH_JET`
+- `G4Hits`
+
+```bash
+root -l -b -q \
+  'PhotonAnalysisTree/macro/Fun4All_PhotonAnalysisTreePythia.C(0,0)'
+```
+
+第1引数はsegment ID、第2引数はevent数（`0`は全event）です。出力名は
+`photon_analysis_tree_<segment>.root`です。Truth nodeは必須、NO_SPLIT clusterはoptionalです。
 
 ## scoreを追加する
 
@@ -129,3 +149,5 @@ condor_submit -append "n_jobs = 100" -append "job_offset = 500" run_add_scores.j
 - `run_tree.sh`, `run_tree.job`: DSTからbase TTreeを生成
 - `run_add_scores.sh`, `run_add_scores.job`: BDT/gamma score branchを追加して検証
 - `make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
+
+`run_tree.job`はPythia Jet5のsegment 0--999をdefaultでqueueします。

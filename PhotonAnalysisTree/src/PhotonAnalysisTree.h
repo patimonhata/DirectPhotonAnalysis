@@ -36,6 +36,8 @@ class PhotonAnalysisTree : public SubsysReco
   void set_tower_geom_node_name(const std::string& value) { tower_geom_node_name_ = value; }
   void set_split_cluster_node_name(const std::string& value) { split_cluster_node_name_ = value; }
   void set_nosplit_cluster_node_name(const std::string& value) { nosplit_cluster_node_name_ = value; }
+  void set_require_truth_node(bool value) { require_truth_node_ = value; }
+  void set_require_nosplit_cluster_node(bool value) { require_nosplit_cluster_node_ = value; }
   void set_acceptance_eta_max(double value) { acceptance_eta_max_ = value; }
   void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
   void set_shower_shape_min_tower_energy(double value) { shower_shape_min_tower_energy_ = value; }
@@ -43,7 +45,7 @@ class PhotonAnalysisTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 2;
+  static constexpr int schema_version_ = 3;
   static constexpr double invalid_double_ = -999.0;
   static constexpr int invalid_int_ = -999;
   static constexpr double default_cemc_radius_ = 95.0;
@@ -148,6 +150,8 @@ class PhotonAnalysisTree : public SubsysReco
   std::string split_cluster_node_name_ = "CLUSTERINFO_CEMC";
   std::string nosplit_cluster_node_name_ = "CLUSTERINFO_CEMC_NO_SPLIT";
   std::string cluster_ordering_ = "energy_descending_then_cluster_id_ascending";
+  bool require_truth_node_ = true;
+  bool require_nosplit_cluster_node_ = true;
   unsigned int source_file_id_ = 0;
   int expected_primary_pdg_ = 111;
   double acceptance_eta_max_ = 1.1;

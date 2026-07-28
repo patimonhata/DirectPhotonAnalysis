@@ -127,6 +127,16 @@ bool make_output_directory(const std::string &output_base) {
   return true;
 }
 
+std::string collection_output_base(const std::string &output_base,
+                                   const std::string &collection) {
+  const std::size_t slash = output_base.find_last_of("/");
+  const std::string directory =
+      slash == std::string::npos ? "" : output_base.substr(0, slash + 1U);
+  const std::string stem =
+      slash == std::string::npos ? output_base : output_base.substr(slash + 1U);
+  return directory + collection + "/" + stem + "_" + collection;
+}
+
 std::size_t find_truth_pt_bin(const double truth_pt) {
   if (!std::isfinite(truth_pt) || truth_pt < truth_pt_edges.front() ||
       truth_pt > truth_pt_edges.back()) {
@@ -1189,10 +1199,8 @@ bool print_component_summary(
 } // namespace
 
 int PlotConditionalPartnerEfficiency(
-    const std::string input_path =
-        "PhotonAnalysisTree/output/merged/100kevents_pi0_5to15GeV_etapm1.root",
-    const std::string output_base =
-        "PhotonAnalysisTree/output/plots/conditional_partner_et5to7",
+    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_5to15GeV_etapm1.root",
+    const std::string output_base = "PhotonAnalysisTree/output/plots/conditional_efficiency/conditional_partner_et5to7",
     const double anchor_eta_max = 0.7, const double anchor_et_min = 5.0,
     const double anchor_et_max = 7.0, const double delta_r_cut = 0.03,
     const double mass_window_min = 0.10, const double mass_window_max = 0.18,
@@ -1201,7 +1209,7 @@ int PlotConditionalPartnerEfficiency(
     const double merged_response_max = 1.5,
     const double individual_response_min = 0.5,
     const double individual_response_max = 1.5,
-    const double min_cluster_energy = 0.1) {
+    const double min_cluster_energy = 0.5) {
   if (input_path.empty() || output_base.empty() || !(anchor_eta_max > 0.0) ||
       !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||
       !(delta_r_cut > 0.0) || !(merged_delta_r_cut > 0.0) ||
@@ -1398,72 +1406,80 @@ int PlotConditionalPartnerEfficiency(
                              "nosplit_event_component_truth_pt_" +
                                  std::to_string(bin));
   }
-  if (!make_output_directory(output_base)) {
+  const std::string split_output_base =
+      collection_output_base(output_base, "split");
+  const std::string nosplit_output_base =
+      collection_output_base(output_base, "nosplit");
+  if (!make_output_directory(output_base) ||
+      !make_output_directory(split_output_base) ||
+      !make_output_directory(nosplit_output_base)) {
     return 5;
   }
   const auto draw_collection = [&](std::vector<StageHistograms> &event,
                                    std::vector<StageHistograms> &cluster,
-                                   const std::string &prefix,
+                                   const std::string &collection_base,
                                    const std::string &label) {
     draw_counts(event, label, true,
-                output_base + "_" + prefix + "_event_counts_truth_pt.pdf",
+                collection_base + "_event_counts_truth_pt.pdf",
                 anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
                 mass_window_min, mass_window_max);
     draw_efficiencies(event, label, true,
-                      output_base + "_" + prefix +
+                      collection_base +
                           "_event_efficiency_truth_pt.pdf",
                       anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
                       mass_window_min, mass_window_max);
     draw_counts(cluster, label, false,
-                output_base + "_" + prefix + "_cluster_counts_truth_pt.pdf",
+                collection_base + "_cluster_counts_truth_pt.pdf",
                 anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
                 mass_window_min, mass_window_max);
     draw_efficiencies(cluster, label, false,
-                      output_base + "_" + prefix +
+                      collection_base +
                           "_cluster_efficiency_truth_pt.pdf",
                       anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
                       mass_window_min, mass_window_max);
   };
-  draw_collection(split_event, split_cluster, "split", "SPLIT");
-  draw_collection(nosplit_event, nosplit_cluster, "nosplit", "NO_SPLIT");
+  draw_collection(split_event, split_cluster, split_output_base, "SPLIT");
+  draw_collection(nosplit_event, nosplit_cluster, nosplit_output_base,
+                  "NO_SPLIT");
   const auto draw_components =
-      [&output_base, anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
+      [anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
        merged_delta_r_cut, merged_response_min, merged_response_max,
        individual_response_min, individual_response_max](
           std::vector<EventComponentHistograms> &components,
-          const std::string &prefix, const std::string &label) {
+          const std::string &collection_base, const std::string &label) {
         draw_component_counts(
             components, label,
-            output_base + "_" + prefix + "_event_components_truth_pt.pdf",
+            collection_base + "_event_components_truth_pt.pdf",
             anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
             merged_delta_r_cut, merged_response_min, merged_response_max,
             individual_response_min, individual_response_max);
         draw_component_fractions(
             components, label,
-            output_base + "_" + prefix +
+            collection_base +
                 "_event_component_fractions_truth_pt.pdf",
             anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
             merged_delta_r_cut, merged_response_min, merged_response_max,
             individual_response_min, individual_response_max);
       };
-  draw_components(split_components, "split", "SPLIT");
-  draw_components(nosplit_components, "nosplit", "NO_SPLIT");
+  draw_components(split_components, split_output_base, "SPLIT");
+  draw_components(nosplit_components, nosplit_output_base, "NO_SPLIT");
   draw_cut_stages(split_event_stages, "SPLIT", false,
-                  output_base + "_split_event_selection_stages_truth_pt.pdf",
+                  split_output_base + "_event_selection_stages_truth_pt.pdf",
                   min_cluster_energy, anchor_eta_max, anchor_et_min,
                   anchor_et_max, delta_r_cut);
   draw_cut_stages(split_pair_stages, "SPLIT", true,
-                  output_base +
-                      "_split_matched_pair_selection_stages_truth_pt.pdf",
+                  split_output_base +
+                      "_matched_pair_selection_stages_truth_pt.pdf",
                   min_cluster_energy, anchor_eta_max, anchor_et_min,
                   anchor_et_max, delta_r_cut);
   draw_cut_stages(nosplit_event_stages, "NO_SPLIT", false,
-                  output_base + "_nosplit_event_selection_stages_truth_pt.pdf",
+                  nosplit_output_base +
+                      "_event_selection_stages_truth_pt.pdf",
                   min_cluster_energy, anchor_eta_max, anchor_et_min,
                   anchor_et_max, delta_r_cut);
   draw_cut_stages(nosplit_pair_stages, "NO_SPLIT", true,
-                  output_base +
-                      "_nosplit_matched_pair_selection_stages_truth_pt.pdf",
+                  nosplit_output_base +
+                      "_matched_pair_selection_stages_truth_pt.pdf",
                   min_cluster_energy, anchor_eta_max, anchor_et_min,
                   anchor_et_max, delta_r_cut);
 

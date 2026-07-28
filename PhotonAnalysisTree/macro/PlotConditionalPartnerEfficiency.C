@@ -896,7 +896,7 @@ void draw_component_counts(
   const std::array<int, n_event_components> colors = {kBlue + 1, kMagenta - 3,
                                                       kOrange + 7, kGray + 1};
   const std::array<int, n_event_components> markers = {22, 23, 33, 34};
-  const std::array<std::size_t, n_event_components> stack_order = {3, 2, 1, 0};
+  const std::array<std::size_t, n_event_components> stack_order = {0, 1, 2, 3};
   TCanvas canvas(("c_event_components_" + collection_label).c_str(),
                  "Selected-event components by truth pT", 1500, 900);
   canvas.Divide(3, 2);

@@ -97,6 +97,16 @@ bool make_output_directory(const std::string &output_base) {
   return true;
 }
 
+std::string collection_output_base(const std::string &output_base,
+                                   const std::string &collection) {
+  const std::size_t slash = output_base.find_last_of("/");
+  const std::string directory =
+      slash == std::string::npos ? "" : output_base.substr(0, slash + 1U);
+  const std::string stem =
+      slash == std::string::npos ? output_base : output_base.substr(slash + 1U);
+  return directory + collection + "/" + stem + "_" + collection;
+}
+
 CollectionHistograms make_histograms(const std::string &prefix,
                                      const int asymmetry_nbins) {
   CollectionHistograms histograms;
@@ -618,9 +628,10 @@ void print_summary(const std::string &collection,
 } // namespace
 
 int PlotTruthPairMatching(
-    const std::string input_path = "PhotonAnalysisTree/output/merged/all.root",
+    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_eta_5to15GeV_etapm1.root",
     const std::string output_base =
-        "PhotonAnalysisTree/output/plots/truth_pair_matching",
+        "PhotonAnalysisTree/output/plots/pair_matching_efficiency/"
+        "truth_pair_matching",
     const double delta_r_cut = 0.03, const double mass_window_min = 0.10,
     const double mass_window_max = 0.18, const double min_cluster_energy = 0.1,
     const int asymmetry_nbins = 20) {
@@ -650,8 +661,8 @@ int PlotTruthPairMatching(
   unsigned char truth_both_gamma_in_acceptance = 0;
   double truth_pt = -999.0;
   double truth_pair_e_asym = -999.0;
-  std::vector<double> *truth_projection_eta = nullptr;
-  std::vector<double> *truth_projection_phi = nullptr;
+  std::vector<double> *truth_eta = nullptr;
+  std::vector<double> *truth_phi = nullptr;
   std::vector<unsigned char> *truth_projection_valid = nullptr;
   CollectionBranches split;
   CollectionBranches nosplit;
@@ -685,8 +696,8 @@ int PlotTruthPairMatching(
   bind("truth_both_gamma_in_acceptance", &truth_both_gamma_in_acceptance);
   bind("truth_pt", &truth_pt);
   bind("truth_pair_e_asym", &truth_pair_e_asym);
-  bind("truth_daughter_projection_eta", &truth_projection_eta);
-  bind("truth_daughter_projection_phi", &truth_projection_phi);
+  bind("truth_daughter_eta", &truth_eta);
+  bind("truth_daughter_phi", &truth_phi);
   bind("truth_daughter_projection_valid", &truth_projection_valid);
   bind_collection("split", split);
   bind_collection("nosplit", nosplit);
@@ -708,9 +719,8 @@ int PlotTruthPairMatching(
     ++histograms.truth_events;
     histograms.truth->Fill(truth_pair_e_asym);
 
-    const MatchResult match =
-        match_truth_to_clusters(*truth_projection_eta, *truth_projection_phi,
-                                branches, min_cluster_energy);
+    const MatchResult match = match_truth_to_clusters(
+        *truth_eta, *truth_phi, branches, min_cluster_energy);
     if (!match.valid) {
       const bool branch_shapes_valid =
           branches.cluster_e && branches.cluster_eta && branches.cluster_phi &&
@@ -763,10 +773,9 @@ int PlotTruthPairMatching(
       continue;
     }
     if (!std::isfinite(truth_pair_e_asym) || truth_pair_e_asym < 0.0 ||
-        truth_pair_e_asym > 1.0 || !truth_projection_eta ||
-        !truth_projection_phi || !truth_projection_valid ||
-        truth_projection_eta->size() != 2U ||
-        truth_projection_phi->size() != 2U ||
+        truth_pair_e_asym > 1.0 || !truth_eta || !truth_phi ||
+        !truth_projection_valid || truth_eta->size() != 2U ||
+        truth_phi->size() != 2U ||
         truth_projection_valid->size() != 2U ||
         !truth_projection_valid->at(0) || !truth_projection_valid->at(1)) {
       ++invalid_truth_shape;
@@ -793,49 +802,55 @@ int PlotTruthPairMatching(
                       "nosplit_truth_pt_" + std::to_string(bin));
   }
 
-  if (!make_output_directory(output_base)) {
+  const std::string split_output_base =
+      collection_output_base(output_base, "split");
+  const std::string nosplit_output_base =
+      collection_output_base(output_base, "nosplit");
+  if (!make_output_directory(output_base) ||
+      !make_output_directory(split_output_base) ||
+      !make_output_directory(nosplit_output_base)) {
     return 5;
   }
-  draw_count_plot(split_histograms, "SPLIT", output_base + "_split_counts.pdf",
+  draw_count_plot(split_histograms, "SPLIT", split_output_base + "_counts.pdf",
                   delta_r_cut, mass_window_min, mass_window_max,
                   min_cluster_energy);
   draw_efficiency_plot(split_histograms, "SPLIT",
-                       output_base + "_split_efficiency.pdf", delta_r_cut,
+                       split_output_base + "_efficiency.pdf", delta_r_cut,
                        mass_window_min, mass_window_max, min_cluster_energy);
   draw_delta_r_plot(split_histograms, "SPLIT",
-                    output_base + "_split_delta_r.pdf", delta_r_cut,
+                    split_output_base + "_delta_r.pdf", delta_r_cut,
                     min_cluster_energy);
 
   draw_count_plot(nosplit_histograms, "NO_SPLIT",
-                  output_base + "_nosplit_counts.pdf", delta_r_cut,
+                  nosplit_output_base + "_counts.pdf", delta_r_cut,
                   mass_window_min, mass_window_max, min_cluster_energy);
   draw_efficiency_plot(nosplit_histograms, "NO_SPLIT",
-                       output_base + "_nosplit_efficiency.pdf", delta_r_cut,
+                       nosplit_output_base + "_efficiency.pdf", delta_r_cut,
                        mass_window_min, mass_window_max, min_cluster_energy);
   draw_delta_r_plot(nosplit_histograms, "NO_SPLIT",
-                    output_base + "_nosplit_delta_r.pdf", delta_r_cut,
+                    nosplit_output_base + "_delta_r.pdf", delta_r_cut,
                     min_cluster_energy);
   draw_truth_pt_counts(split_truth_pt_histograms, "SPLIT",
-                       output_base + "_split_counts_truth_pt.pdf", delta_r_cut,
+                       split_output_base + "_counts_truth_pt.pdf", delta_r_cut,
                        mass_window_min, mass_window_max, min_cluster_energy);
   draw_truth_pt_efficiencies(split_truth_pt_histograms, "SPLIT",
-                             output_base + "_split_efficiency_truth_pt.pdf",
+                             split_output_base + "_efficiency_truth_pt.pdf",
                              delta_r_cut, mass_window_min, mass_window_max,
                              min_cluster_energy);
   draw_truth_pt_delta_r(split_truth_pt_histograms, "SPLIT",
-                        output_base + "_split_delta_r_truth_pt.pdf",
+                        split_output_base + "_delta_r_truth_pt.pdf",
                         delta_r_cut, mass_window_min, mass_window_max,
                         min_cluster_energy);
   draw_truth_pt_counts(nosplit_truth_pt_histograms, "NO_SPLIT",
-                       output_base + "_nosplit_counts_truth_pt.pdf",
+                       nosplit_output_base + "_counts_truth_pt.pdf",
                        delta_r_cut, mass_window_min, mass_window_max,
                        min_cluster_energy);
   draw_truth_pt_efficiencies(nosplit_truth_pt_histograms, "NO_SPLIT",
-                             output_base + "_nosplit_efficiency_truth_pt.pdf",
+                             nosplit_output_base + "_efficiency_truth_pt.pdf",
                              delta_r_cut, mass_window_min, mass_window_max,
                              min_cluster_energy);
   draw_truth_pt_delta_r(nosplit_truth_pt_histograms, "NO_SPLIT",
-                        output_base + "_nosplit_delta_r_truth_pt.pdf",
+                        nosplit_output_base + "_delta_r_truth_pt.pdf",
                         delta_r_cut, mass_window_min, mass_window_max,
                         min_cluster_energy);
 

@@ -24,10 +24,17 @@
 namespace {
 constexpr double pi = 3.14159265358979323846;
 const std::vector<double> truth_pt_edges = {5.0, 7.0, 9.0, 11.0, 13.0, 15.0};
-const std::array<std::string, 5> truth_pt_labels = {
+constexpr std::size_t n_truth_pt_bins = 5U;
+const std::array<std::string, n_truth_pt_bins> truth_pt_labels = {
     "5 #leq p_{T}^{truth} < 7 GeV", "7 #leq p_{T}^{truth} < 9 GeV",
     "9 #leq p_{T}^{truth} < 11 GeV", "11 #leq p_{T}^{truth} < 13 GeV",
     "13 #leq p_{T}^{truth} #leq 15 GeV"};
+const std::array<std::string, n_truth_pt_bins> reco_et_labels = {
+    "5 #leq E_{T}^{cluster} < 7 GeV",
+    "7 #leq E_{T}^{cluster} < 9 GeV",
+    "9 #leq E_{T}^{cluster} < 11 GeV",
+    "11 #leq E_{T}^{cluster} < 13 GeV",
+    "13 #leq E_{T}^{cluster} #leq 15 GeV"};
 
 struct CollectionBranches {
   std::vector<double> *cluster_e = nullptr;
@@ -96,6 +103,34 @@ struct CutStageHistograms {
   Long64_t n_malformed = 0;
 };
 
+enum class ClusterSelection : std::size_t {
+  all = 0,
+  min_energy = 1,
+  eta = 2,
+  min_energy_eta = 3,
+  count = 4
+};
+
+constexpr std::size_t n_cluster_selections =
+    static_cast<std::size_t>(ClusterSelection::count);
+constexpr std::size_t n_cluster_retentions = n_cluster_selections - 1U;
+const std::array<std::string, n_cluster_selections> cluster_selection_names = {
+    "all", "min_energy", "eta", "min_energy_eta"};
+const std::array<std::string, n_cluster_retentions> cluster_retention_names = {
+    "min_energy", "eta", "min_energy_eta"};
+
+constexpr std::size_t selection_index(const ClusterSelection selection) {
+  return static_cast<std::size_t>(selection);
+}
+
+struct RecoEtHistograms {
+  std::array<std::unique_ptr<TH1D>, n_truth_pt_bins> truth_pt_contribution;
+  std::array<std::unique_ptr<TH1D>, n_cluster_selections> selection;
+  std::array<std::unique_ptr<TH1D>, n_cluster_retentions> retention;
+  std::array<Long64_t, n_truth_pt_bins> n_truth_pt_contribution = {};
+  std::array<Long64_t, n_cluster_selections> n_selection = {};
+};
+
 double wrap_delta_phi(double value) {
   while (value > pi) {
     value -= 2.0 * pi;
@@ -149,6 +184,20 @@ std::size_t find_truth_pt_bin(const double truth_pt) {
       std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), truth_pt);
   return static_cast<std::size_t>(std::distance(truth_pt_edges.begin(), upper) -
                                   1);
+}
+
+std::size_t find_reco_et_bin(const double cluster_et) {
+  if (!std::isfinite(cluster_et) || cluster_et < truth_pt_edges.front() ||
+      cluster_et > truth_pt_edges.back()) {
+    return reco_et_labels.size();
+  }
+  if (cluster_et == truth_pt_edges.back()) {
+    return reco_et_labels.size() - 1U;
+  }
+  const auto upper =
+      std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), cluster_et);
+  return static_cast<std::size_t>(
+      std::distance(truth_pt_edges.begin(), upper) - 1);
 }
 
 bool valid_cluster(const CollectionBranches &branches,
@@ -376,6 +425,100 @@ bool valid_collection_shape(const CollectionBranches &branches) {
          branches.cluster_e->size() == branches.cluster_et->size() &&
          branches.cluster_e->size() == branches.cluster_eta->size() &&
          branches.cluster_e->size() == branches.cluster_phi->size();
+}
+
+RecoEtHistograms make_reco_et_histograms(const std::string &prefix,
+                                         const int asymmetry_nbins) {
+  RecoEtHistograms histograms;
+  const auto make = [&](const std::string &suffix) {
+    auto histogram = std::make_unique<TH1D>(
+        ("h_" + prefix + "_" + suffix).c_str(), "", asymmetry_nbins, 0.0,
+        1.0);
+    histogram->SetDirectory(nullptr);
+    histogram->Sumw2();
+    histogram->SetStats(false);
+    return histogram;
+  };
+  for (std::size_t truth_bin = 0; truth_bin < n_truth_pt_bins; ++truth_bin) {
+    histograms.truth_pt_contribution[truth_bin] =
+        make("truth_pt_" + std::to_string(truth_bin) + "_selected");
+  }
+  for (std::size_t selection = 0; selection < n_cluster_selections;
+       ++selection) {
+    histograms.selection[selection] =
+        make("selection_" + cluster_selection_names[selection]);
+  }
+  for (std::size_t retention = 0; retention < n_cluster_retentions;
+       ++retention) {
+    histograms.retention[retention] =
+        make("retention_" + cluster_retention_names[retention]);
+  }
+  return histograms;
+}
+
+std::vector<RecoEtHistograms>
+make_reco_et_histogram_set(const std::string &prefix,
+                           const int asymmetry_nbins) {
+  std::vector<RecoEtHistograms> histograms;
+  histograms.reserve(reco_et_labels.size());
+  for (std::size_t reco_bin = 0; reco_bin < reco_et_labels.size(); ++reco_bin) {
+    histograms.push_back(make_reco_et_histograms(
+        prefix + "_reco_et_" + std::to_string(reco_bin), asymmetry_nbins));
+  }
+  return histograms;
+}
+
+bool fill_reco_et_histograms(std::vector<RecoEtHistograms> &histograms,
+                             const std::size_t truth_pt_bin,
+                             const double truth_alpha,
+                             const CollectionBranches &branches,
+                             const double min_cluster_energy,
+                             const double eta_max) {
+  if (!valid_collection_shape(branches)) {
+    return false;
+  }
+  for (std::size_t cluster = 0; cluster < branches.cluster_et->size();
+       ++cluster) {
+    if (!valid_cluster(branches, cluster)) {
+      continue;
+    }
+    const std::size_t reco_bin =
+        find_reco_et_bin(branches.cluster_et->at(cluster));
+    if (reco_bin >= histograms.size()) {
+      continue;
+    }
+    RecoEtHistograms &current = histograms[reco_bin];
+    const bool passes_energy =
+        branches.cluster_e->at(cluster) >= min_cluster_energy;
+    const bool passes_eta =
+        std::abs(branches.cluster_eta->at(cluster)) < eta_max;
+    const std::array<bool, n_cluster_selections> passed = {
+        true, passes_energy, passes_eta, passes_energy && passes_eta};
+    for (std::size_t selection = 0; selection < n_cluster_selections;
+         ++selection) {
+      if (passed[selection]) {
+        current.selection[selection]->Fill(truth_alpha);
+        ++current.n_selection[selection];
+      }
+    }
+    if (passes_energy && passes_eta) {
+      current.truth_pt_contribution[truth_pt_bin]->Fill(truth_alpha);
+      ++current.n_truth_pt_contribution[truth_pt_bin];
+    }
+  }
+  return true;
+}
+
+void make_reco_et_retentions(std::vector<RecoEtHistograms> &histograms) {
+  for (RecoEtHistograms &current : histograms) {
+    for (std::size_t retention = 0; retention < n_cluster_retentions;
+         ++retention) {
+      current.retention[retention]->Divide(
+          current.selection[retention + 1U].get(),
+          current.selection[selection_index(ClusterSelection::all)].get(), 1.0,
+          1.0, "B");
+    }
+  }
 }
 
 void fill_event_selection_stages(CutStageHistograms &histograms,
@@ -1196,10 +1339,197 @@ bool print_component_summary(
   }
   return closure_ok;
 }
+
+void draw_reco_et_information(
+    RecoEtHistograms &histograms, const std::string &collection_label,
+    const bool retention, const double min_cluster_energy,
+    const double eta_max) {
+  TLatex label;
+  label.SetNDC();
+  label.SetTextAlign(13);
+  label.SetTextSize(0.041);
+  label.DrawLatex(0.09, 0.94, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(0.09, 0.86,
+                  ("Single #pi^{0} gun, " + collection_label).c_str());
+  label.DrawLatex(
+      0.09, 0.78,
+      retention ? "Cluster-selection retention by reconstructed E_{T}"
+                : "Truth-p_{T} contributions by reconstructed E_{T}");
+  label.DrawLatex(0.09, 0.70,
+                  Form("E_{cluster} #geq %.3g GeV, |#eta_{cluster}| < %.1f",
+                       min_cluster_energy, eta_max));
+
+  if (retention) {
+    TLegend legend(0.09, 0.31, 0.95, 0.62);
+    legend.SetTextSize(0.036);
+    legend.AddEntry(histograms.retention[0].get(), "E cut only / no cut",
+                    "lep");
+    legend.AddEntry(histograms.retention[1].get(), "#eta cut only / no cut",
+                    "lep");
+    legend.AddEntry(histograms.retention[2].get(), "Both cuts / no cut",
+                    "lep");
+    legend.DrawClone();
+    return;
+  }
+
+  TLegend legend(0.09, 0.12, 0.95, 0.64);
+  legend.SetTextSize(0.032);
+  for (std::size_t truth_bin = 0; truth_bin < n_truth_pt_bins; ++truth_bin) {
+    legend.AddEntry(histograms.truth_pt_contribution[truth_bin].get(),
+                    truth_pt_labels[truth_bin].c_str(), "f");
+  }
+  legend.AddEntry(
+      histograms.selection[selection_index(ClusterSelection::min_energy_eta)]
+          .get(),
+      "Total after both cuts", "lep");
+  legend.DrawClone();
+}
+
+void draw_reco_et_truth_pt_stack(
+    std::vector<RecoEtHistograms> &histograms,
+    const std::string &collection_label, const std::string &output_path,
+    const double min_cluster_energy, const double eta_max) {
+  const std::array<int, n_truth_pt_bins> colors = {
+      kBlue + 1, kCyan + 1, kGreen + 2, kOrange + 7, kRed + 1};
+  TCanvas canvas(("c_reco_et_truth_pt_stack_" + collection_label).c_str(),
+                 "Truth-pT contributions in reconstructed-ET panels", 1500,
+                 900);
+  canvas.Divide(3, 2);
+  std::vector<std::unique_ptr<THStack>> stacks;
+  stacks.reserve(histograms.size());
+  for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
+    canvas.cd(static_cast<int>(reco_bin + 1U));
+    RecoEtHistograms &current = histograms[reco_bin];
+    TH1D &total = *current.selection[
+        selection_index(ClusterSelection::min_energy_eta)];
+    total.SetLineColor(kBlack);
+    total.SetMarkerColor(kBlack);
+    total.SetMarkerStyle(20);
+    total.SetMarkerSize(0.65);
+    total.SetLineWidth(2);
+    total.GetXaxis()->SetTitle("Truth #alpha");
+    total.GetYaxis()->SetTitle("Clusters");
+    total.SetMinimum(0.0);
+    total.SetMaximum(total.GetMaximum() > 0.0 ? 1.30 * total.GetMaximum() : 1.0);
+
+    stacks.push_back(std::make_unique<THStack>(
+        ("stack_reco_et_" + collection_label + "_" +
+         std::to_string(reco_bin))
+            .c_str(),
+        ""));
+    for (std::size_t truth_bin = 0; truth_bin < n_truth_pt_bins; ++truth_bin) {
+      TH1D &contribution = *current.truth_pt_contribution[truth_bin];
+      contribution.SetLineColor(colors[truth_bin]);
+      contribution.SetFillColorAlpha(colors[truth_bin], 0.55);
+      contribution.SetLineWidth(2);
+      stacks.back()->Add(&contribution);
+    }
+    total.Draw("E1");
+    stacks.back()->Draw("HIST SAME");
+    total.Draw("E1 SAME");
+    TLatex panel;
+    panel.SetNDC();
+    panel.SetTextAlign(13);
+    panel.SetTextSize(0.045);
+    panel.DrawLatex(0.18, 0.92, reco_et_labels[reco_bin].c_str());
+    gPad->RedrawAxis();
+  }
+  canvas.cd(6);
+  draw_reco_et_information(histograms.front(), collection_label, false,
+                           min_cluster_energy, eta_max);
+  canvas.SaveAs(output_path.c_str());
+}
+
+void draw_reco_et_retentions(std::vector<RecoEtHistograms> &histograms,
+                             const std::string &collection_label,
+                             const std::string &output_path,
+                             const double min_cluster_energy,
+                             const double eta_max) {
+  const std::array<int, n_cluster_retentions> colors = {kBlue + 1, kOrange + 7,
+                                                        kGreen + 2};
+  const std::array<int, n_cluster_retentions> markers = {24, 25, 20};
+  TCanvas canvas(("c_reco_et_retention_" + collection_label).c_str(),
+                 "Cluster-selection retention in reconstructed-ET panels",
+                 1500, 900);
+  canvas.Divide(3, 2);
+  for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
+    canvas.cd(static_cast<int>(reco_bin + 1U));
+    for (std::size_t retention = 0; retention < n_cluster_retentions;
+         ++retention) {
+      TH1D &histogram = *histograms[reco_bin].retention[retention];
+      histogram.SetLineColor(colors[retention]);
+      histogram.SetMarkerColor(colors[retention]);
+      histogram.SetMarkerStyle(markers[retention]);
+      histogram.SetMarkerSize(0.7);
+      histogram.SetLineWidth(2);
+      histogram.GetXaxis()->SetTitle("Truth #alpha");
+      histogram.GetYaxis()->SetTitle("Fraction retained");
+      histogram.SetMinimum(0.0);
+      histogram.SetMaximum(1.05);
+      histogram.Draw(retention == 0U ? "E1" : "E1 SAME");
+    }
+    TLatex panel;
+    panel.SetNDC();
+    panel.SetTextAlign(13);
+    panel.SetTextSize(0.045);
+    panel.DrawLatex(0.18, 0.92, reco_et_labels[reco_bin].c_str());
+    gPad->RedrawAxis();
+  }
+  canvas.cd(6);
+  draw_reco_et_information(histograms.front(), collection_label, true,
+                           min_cluster_energy, eta_max);
+  canvas.SaveAs(output_path.c_str());
+}
+
+void write_reco_et_histograms(TFile &output,
+                              std::vector<RecoEtHistograms> &histograms) {
+  output.cd();
+  for (RecoEtHistograms &current : histograms) {
+    for (auto &histogram : current.truth_pt_contribution) {
+      histogram->Write();
+    }
+    for (auto &histogram : current.selection) {
+      histogram->Write();
+    }
+    for (auto &histogram : current.retention) {
+      histogram->Write();
+    }
+  }
+}
+
+bool print_reco_et_summary(const std::string &label,
+                           const std::vector<RecoEtHistograms> &histograms) {
+  bool selection_ok = true;
+  for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
+    const RecoEtHistograms &current = histograms[reco_bin];
+    Long64_t contribution_sum = 0;
+    for (const Long64_t count : current.n_truth_pt_contribution) {
+      contribution_sum += count;
+    }
+    const Long64_t all =
+        current.n_selection[selection_index(ClusterSelection::all)];
+    const Long64_t energy =
+        current.n_selection[selection_index(ClusterSelection::min_energy)];
+    const Long64_t eta =
+        current.n_selection[selection_index(ClusterSelection::eta)];
+    const Long64_t both = current.n_selection[
+        selection_index(ClusterSelection::min_energy_eta)];
+    const bool bin_ok = contribution_sum == both && energy <= all && eta <= all &&
+                        both <= energy && both <= eta;
+    selection_ok &= bin_ok;
+    std::cout << label << " " << reco_et_labels[reco_bin]
+              << " all/energy/eta/both/contribution_sum = " << all << "/"
+              << energy << "/" << eta << "/" << both << "/"
+              << contribution_sum << " closure=" << (bin_ok ? "OK" : "FAIL")
+              << std::endl;
+  }
+  return selection_ok;
+}
+
 } // namespace
 
 int PlotConditionalPartnerEfficiency(
-    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_5to15GeV_etapm1.root",
+    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
     const std::string output_base = "PhotonAnalysisTree/output/plots/conditional_efficiency/conditional_partner_et5to7",
     const double anchor_eta_max = 0.7, const double anchor_et_min = 5.0,
     const double anchor_et_max = 7.0, const double delta_r_cut = 0.03,
@@ -1209,7 +1539,7 @@ int PlotConditionalPartnerEfficiency(
     const double merged_response_max = 1.5,
     const double individual_response_min = 0.5,
     const double individual_response_max = 1.5,
-    const double min_cluster_energy = 0.5) {
+    const double min_cluster_energy = 0.1) {
   if (input_path.empty() || output_base.empty() || !(anchor_eta_max > 0.0) ||
       !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||
       !(delta_r_cut > 0.0) || !(merged_delta_r_cut > 0.0) ||
@@ -1278,8 +1608,8 @@ int PlotConditionalPartnerEfficiency(
   bind("truth_pt", &truth_pt);
   bind("truth_pair_e_asym", &truth_alpha);
   bind("truth_daughter_pt", &truth_daughter_pt);
-  bind("truth_daughter_projection_eta", &truth_eta);
-  bind("truth_daughter_projection_phi", &truth_phi);
+  bind("truth_daughter_eta", &truth_eta);
+  bind("truth_daughter_phi", &truth_phi);
   bind("truth_daughter_projection_valid", &truth_projection_valid);
   bind_collection("split", split);
   bind_collection("nosplit", nosplit);
@@ -1317,8 +1647,14 @@ int PlotConditionalPartnerEfficiency(
   std::vector<CutStageHistograms> nosplit_pair_stages =
       make_truth_pt_cut_stage_histograms("nosplit_pair_stage",
                                          pair_stage_suffixes, asymmetry_nbins);
+  std::vector<RecoEtHistograms> split_reco_et =
+      make_reco_et_histogram_set("split_cluster", asymmetry_nbins);
+  std::vector<RecoEtHistograms> nosplit_reco_et =
+      make_reco_et_histogram_set("nosplit_cluster", asymmetry_nbins);
 
   Long64_t invalid_truth_shape = 0;
+  Long64_t split_reco_et_malformed = 0;
+  Long64_t nosplit_reco_et_malformed = 0;
   Long64_t truth_pt_outside_bins = 0;
   for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry) {
     if (entry % 5000 == 0) {
@@ -1345,6 +1681,14 @@ int PlotConditionalPartnerEfficiency(
     if (bin >= truth_pt_labels.size()) {
       ++truth_pt_outside_bins;
       continue;
+    }
+    if (!fill_reco_et_histograms(split_reco_et, bin, truth_alpha, split,
+                                  min_cluster_energy, anchor_eta_max)) {
+      ++split_reco_et_malformed;
+    }
+    if (!fill_reco_et_histograms(nosplit_reco_et, bin, truth_alpha, nosplit,
+                                  min_cluster_energy, anchor_eta_max)) {
+      ++nosplit_reco_et_malformed;
     }
     fill_event_histograms(split_event[bin], truth_alpha, *truth_eta, *truth_phi,
                           split, anchor_eta_max, anchor_et_min, anchor_et_max,
@@ -1390,6 +1734,8 @@ int PlotConditionalPartnerEfficiency(
                                anchor_et_min, anchor_et_max, delta_r_cut);
   }
 
+  make_reco_et_retentions(split_reco_et);
+  make_reco_et_retentions(nosplit_reco_et);
   for (std::size_t bin = 0; bin < truth_pt_labels.size(); ++bin) {
     make_efficiencies(split_event[bin],
                       "split_event_truth_pt_" + std::to_string(bin));
@@ -1482,6 +1828,22 @@ int PlotConditionalPartnerEfficiency(
                       "_matched_pair_selection_stages_truth_pt.pdf",
                   min_cluster_energy, anchor_eta_max, anchor_et_min,
                   anchor_et_max, delta_r_cut);
+  draw_reco_et_truth_pt_stack(
+      split_reco_et, "SPLIT",
+      split_output_base + "_cluster_truth_pt_stack_reco_et.pdf",
+      min_cluster_energy, anchor_eta_max);
+  draw_reco_et_retentions(
+      split_reco_et, "SPLIT",
+      split_output_base + "_cluster_selection_retention_reco_et.pdf",
+      min_cluster_energy, anchor_eta_max);
+  draw_reco_et_truth_pt_stack(
+      nosplit_reco_et, "NO_SPLIT",
+      nosplit_output_base + "_cluster_truth_pt_stack_reco_et.pdf",
+      min_cluster_energy, anchor_eta_max);
+  draw_reco_et_retentions(
+      nosplit_reco_et, "NO_SPLIT",
+      nosplit_output_base + "_cluster_selection_retention_reco_et.pdf",
+      min_cluster_energy, anchor_eta_max);
 
   TFile output((output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) {
@@ -1499,6 +1861,8 @@ int PlotConditionalPartnerEfficiency(
   write_cut_stage_histograms(output, split_pair_stages);
   write_cut_stage_histograms(output, nosplit_event_stages);
   write_cut_stage_histograms(output, nosplit_pair_stages);
+  write_reco_et_histograms(output, split_reco_et);
+  write_reco_et_histograms(output, nosplit_reco_et);
   TParameter<double> stored_eta_max("anchor_eta_max", anchor_eta_max);
   TParameter<double> stored_et_min("anchor_et_min", anchor_et_min);
   TParameter<double> stored_et_max("anchor_et_max", anchor_et_max);
@@ -1539,6 +1903,9 @@ int PlotConditionalPartnerEfficiency(
   const bool component_closure_ok =
       print_component_summary("SPLIT component", split_components) &&
       print_component_summary("NO_SPLIT component", nosplit_components);
+  const bool reco_et_selection_ok =
+      print_reco_et_summary("SPLIT reco-ET", split_reco_et) &&
+      print_reco_et_summary("NO_SPLIT reco-ET", nosplit_reco_et);
   bool cut_stage_nesting_ok = true;
   cut_stage_nesting_ok &=
       print_cut_stage_summary("SPLIT event stages", split_event_stages);
@@ -1552,9 +1919,13 @@ int PlotConditionalPartnerEfficiency(
                "pT outside bins = "
             << invalid_truth_shape << " / " << truth_pt_outside_bins
             << std::endl;
-  std::cout << "Wrote " << output_base << ".root and sixteen PDF plots"
+  std::cout << "Reco-ET malformed SPLIT / NO_SPLIT collections = "
+            << split_reco_et_malformed << " / " << nosplit_reco_et_malformed
             << std::endl;
-  Long64_t malformed = invalid_truth_shape;
+  std::cout << "Wrote " << output_base << ".root and twenty PDF plots"
+            << std::endl;
+  Long64_t malformed = invalid_truth_shape + split_reco_et_malformed +
+                       nosplit_reco_et_malformed;
   for (const auto *family :
        {&split_event, &split_cluster, &nosplit_event, &nosplit_cluster}) {
     for (const StageHistograms &histograms : *family) {
@@ -1572,5 +1943,8 @@ int PlotConditionalPartnerEfficiency(
       malformed += histograms.n_malformed;
     }
   }
-  return malformed == 0 && component_closure_ok && cut_stage_nesting_ok ? 0 : 7;
+  return malformed == 0 && component_closure_ok && cut_stage_nesting_ok &&
+                 reco_et_selection_ok
+             ? 0
+             : 7;
 }

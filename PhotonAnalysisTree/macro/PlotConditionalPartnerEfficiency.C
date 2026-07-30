@@ -1,6 +1,8 @@
 #include "Utilities/sPhenixStyle.C"
 
+#include <TAttMarker.h>
 #include <TCanvas.h>
+#include <TColor.h>
 #include <TFile.h>
 #include <TH1D.h>
 #include <THStack.h>
@@ -130,6 +132,57 @@ struct RecoEtHistograms {
   std::array<Long64_t, n_truth_pt_bins> n_truth_pt_contribution = {};
   std::array<Long64_t, n_cluster_selections> n_selection = {};
 };
+
+enum class CoreCondition : std::size_t {
+  reference = 0,
+  selected = 1,
+  matched = 2,
+  removed = 3,
+  count = 4
+};
+
+constexpr std::size_t n_core_conditions =
+    static_cast<std::size_t>(CoreCondition::count);
+constexpr std::size_t condition_index(const CoreCondition condition) {
+  return static_cast<std::size_t>(condition);
+}
+
+// Color identifies the core selection role throughout the plot family.
+const std::array<int, n_core_conditions> core_condition_colors = {
+    kBlack, kGreen + 2, kBlue + 1, kRed + 1};
+
+// Marker families distinguish the counted object and whether the quantity is a
+// count or a derived ratio. Exact event-level quantities retain the same marker
+// between the count, component, and cut-stage views.
+const std::array<int, n_core_conditions> event_count_markers = {
+    kFullCircle, kFullSquare, kFullTriangleUp, kFullTriangleDown};
+const std::array<int, n_core_conditions> cluster_count_markers = {
+    kFullDiamond, kFullCross, kFullStar, kFullCrossX};
+const std::array<int, n_core_conditions> event_ratio_markers = {
+    kOpenCircle, kOpenSquare, kOpenTriangleUp, kOpenTriangleDown};
+const std::array<int, n_core_conditions> cluster_ratio_markers = {
+    kOpenDiamond, kOpenSquareDiagonal, kOpenStar, kOpenCross};
+const std::array<int, n_event_components> event_component_colors = {
+    core_condition_colors[condition_index(CoreCondition::matched)],
+    kMagenta - 3, kOrange + 7, kGray + 1};
+const std::array<int, n_event_components> event_component_count_markers = {
+    event_count_markers[condition_index(CoreCondition::matched)],
+    kFullDiamond, kFullStar, kFullCross};
+const std::array<int, n_event_components> event_component_ratio_markers = {
+    event_ratio_markers[condition_index(CoreCondition::matched)],
+    kOpenDiamond, kOpenStar, kOpenCross};
+
+
+void set_point_style(TH1D &histogram, const int color, const int marker,
+                     const int line_style = 1,
+                     const double marker_size = 0.65) {
+  histogram.SetLineColor(color);
+  histogram.SetMarkerColor(color);
+  histogram.SetMarkerStyle(marker);
+  histogram.SetMarkerSize(marker_size);
+  histogram.SetLineStyle(line_style);
+  histogram.SetLineWidth(2);
+}
 
 double wrap_delta_phi(double value) {
   while (value > pi) {
@@ -814,21 +867,15 @@ void make_efficiencies(StageHistograms &histograms, const std::string &prefix) {
 }
 
 void style_counts(StageHistograms &histograms, const bool event_family) {
-  histograms.reference->SetLineColor(kBlack);
-  histograms.reference->SetMarkerColor(kBlack);
-  histograms.denominator->SetLineColor(kGreen + 2);
-  histograms.denominator->SetMarkerColor(kGreen + 2);
-  histograms.matched->SetLineColor(kBlue + 1);
-  histograms.matched->SetMarkerColor(kBlue + 1);
-  histograms.removed->SetLineColor(kRed + 1);
-  histograms.removed->SetMarkerColor(kRed + 1);
-  int marker = 20;
-  for (TH1D *histogram :
-       {histograms.reference.get(), histograms.denominator.get(),
-        histograms.matched.get(), histograms.removed.get()}) {
-    histogram->SetMarkerStyle(marker++);
-    histogram->SetMarkerSize(0.65);
-    histogram->SetLineWidth(2);
+  const auto &markers =
+      event_family ? event_count_markers : cluster_count_markers;
+  const std::array<TH1D *, n_core_conditions> styled_histograms = {
+      histograms.reference.get(), histograms.denominator.get(),
+      histograms.matched.get(), histograms.removed.get()};
+  for (std::size_t condition = 0; condition < n_core_conditions; ++condition) {
+    TH1D *histogram = styled_histograms[condition];
+    set_point_style(*histogram, core_condition_colors[condition],
+                    markers[condition]);
     histogram->GetXaxis()->SetTitle("Truth #alpha");
     histogram->GetYaxis()->SetTitle(event_family ? "Events" : "Clusters");
   }
@@ -942,16 +989,18 @@ void draw_efficiencies(std::vector<StageHistograms> &histograms,
     canvas.cd(static_cast<int>(bin + 1U));
     TH1D *matched = histograms[bin].efficiency_matched.get();
     TH1D *removed = histograms[bin].efficiency_removed.get();
-    matched->SetLineColor(kBlue + 1);
-    matched->SetMarkerColor(kBlue + 1);
-    matched->SetMarkerStyle(22);
-    removed->SetLineColor(kRed + 1);
-    removed->SetMarkerColor(kRed + 1);
-    removed->SetMarkerStyle(23);
+    const auto &markers =
+        event_family ? event_ratio_markers : cluster_ratio_markers;
+    set_point_style(
+        *matched,
+        core_condition_colors[condition_index(CoreCondition::matched)],
+        markers[condition_index(CoreCondition::matched)], 2, 0.9);
+    set_point_style(
+        *removed,
+        core_condition_colors[condition_index(CoreCondition::removed)],
+        markers[condition_index(CoreCondition::removed)], 2, 0.9);
     for (TH1D *histogram : {matched, removed}) {
       histogram->SetStats(false);
-      histogram->SetLineWidth(2);
-      histogram->SetMarkerSize(0.7);
       histogram->GetXaxis()->SetTitle("Truth #alpha");
       histogram->GetYaxis()->SetTitle("Conditional efficiency");
       histogram->SetMinimum(0.0);
@@ -974,13 +1023,10 @@ void draw_efficiencies(std::vector<StageHistograms> &histograms,
 }
 
 void style_component_histogram(TH1D &histogram, const int color,
-                               const int marker) {
-  histogram.SetLineColor(color);
-  histogram.SetMarkerColor(color);
+                               const int marker, const int line_style = 1,
+                               const double marker_size = 0.65) {
+  set_point_style(histogram, color, marker, line_style, marker_size);
   histogram.SetFillColorAlpha(color, 0.45);
-  histogram.SetMarkerStyle(marker);
-  histogram.SetMarkerSize(0.65);
-  histogram.SetLineWidth(2);
   histogram.GetXaxis()->SetTitle("Truth #alpha");
 }
 
@@ -1046,9 +1092,6 @@ void draw_component_counts(
     const double merged_delta_r_cut, const double merged_response_min,
     const double merged_response_max, const double individual_response_min,
     const double individual_response_max) {
-  const std::array<int, n_event_components> colors = {kBlue + 1, kMagenta - 3,
-                                                      kOrange + 7, kGray + 1};
-  const std::array<int, n_event_components> markers = {22, 23, 33, 34};
   const std::array<std::size_t, n_event_components> stack_order = {0, 1, 2, 3};
   TCanvas canvas(("c_event_components_" + collection_label).c_str(),
                  "Selected-event components by truth pT", 1500, 900);
@@ -1058,26 +1101,25 @@ void draw_component_counts(
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     canvas.cd(static_cast<int>(bin + 1U));
     EventComponentHistograms &current = histograms[bin];
-    current.reference->SetLineColor(kBlack);
-    current.reference->SetMarkerColor(kBlack);
-    current.reference->SetMarkerStyle(20);
-    current.reference->SetMarkerSize(0.65);
-    current.reference->SetLineWidth(2);
+    set_point_style(
+        *current.reference,
+        core_condition_colors[condition_index(CoreCondition::reference)],
+        event_count_markers[condition_index(CoreCondition::reference)]);
     current.reference->GetXaxis()->SetTitle("Truth #alpha");
     current.reference->GetYaxis()->SetTitle("Events");
     current.reference->SetMinimum(0.0);
     current.reference->SetMaximum(current.reference->GetMaximum() > 0.0
                                       ? 1.30 * current.reference->GetMaximum()
                                       : 1.0);
-    current.selected->SetLineColor(kGreen + 2);
-    current.selected->SetMarkerColor(kGreen + 2);
-    current.selected->SetMarkerStyle(21);
-    current.selected->SetMarkerSize(0.65);
-    current.selected->SetLineWidth(2);
+    set_point_style(
+        *current.selected,
+        core_condition_colors[condition_index(CoreCondition::selected)],
+        event_count_markers[condition_index(CoreCondition::selected)]);
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
-      style_component_histogram(*current.component[component],
-                                colors[component], markers[component]);
+      style_component_histogram(
+          *current.component[component], event_component_colors[component],
+          event_component_count_markers[component]);
     }
     stacks.push_back(std::make_unique<THStack>(
         ("stack_" + collection_label + "_" + std::to_string(bin)).c_str(), ""));
@@ -1112,9 +1154,6 @@ void draw_component_fractions(
     const double merged_delta_r_cut, const double merged_response_min,
     const double merged_response_max, const double individual_response_min,
     const double individual_response_max) {
-  const std::array<int, n_event_components> colors = {kBlue + 1, kMagenta - 3,
-                                                      kOrange + 7, kGray + 1};
-  const std::array<int, n_event_components> markers = {22, 23, 33, 34};
   TCanvas canvas(("c_event_component_fractions_" + collection_label).c_str(),
                  "Selected-event component fractions by truth pT", 1500, 900);
   canvas.Divide(3, 2);
@@ -1124,8 +1163,9 @@ void draw_component_fractions(
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
       TH1D &fraction = *current.fraction[component];
-      style_component_histogram(fraction, colors[component],
-                                markers[component]);
+      style_component_histogram(fraction, event_component_colors[component],
+                                event_component_ratio_markers[component], 2,
+                                0.9);
       fraction.SetFillStyle(0);
       fraction.GetYaxis()->SetTitle("Fraction of selected events");
       fraction.SetMinimum(0.0);
@@ -1206,9 +1246,27 @@ void draw_cut_stages(std::vector<CutStageHistograms> &histograms,
                      const double min_cluster_energy,
                      const double anchor_eta_max, const double anchor_et_min,
                      const double anchor_et_max, const double delta_r_cut) {
-  const std::array<int, n_cut_stages> colors = {kBlack, kBlue + 1, kMagenta + 1,
-                                                kGreen + 2};
-  const std::array<int, n_cut_stages> markers = {20, 24, 22, 23};
+  // The two cut-stage families have different physics at the same ordinal
+  // stage, so give intermediate stages family-specific colors. The reference
+  // and final stages reuse the exact styles of their equivalent event counts.
+  const std::array<int, n_cut_stages> event_colors = {
+      core_condition_colors[condition_index(CoreCondition::reference)],
+      TColor::GetColor("#8C564B"), TColor::GetColor("#17BECF"),
+      core_condition_colors[condition_index(CoreCondition::selected)]};
+  const std::array<int, n_cut_stages> event_markers = {
+      event_count_markers[condition_index(CoreCondition::reference)],
+      kOpenCircle, kOpenSquare,
+      event_count_markers[condition_index(CoreCondition::selected)]};
+  const std::array<int, n_cut_stages> pair_colors = {
+      core_condition_colors[condition_index(CoreCondition::reference)],
+      TColor::GetColor("#9467BD"), TColor::GetColor("#BCBD22"),
+      core_condition_colors[condition_index(CoreCondition::matched)]};
+  const std::array<int, n_cut_stages> pair_markers = {
+      event_count_markers[condition_index(CoreCondition::reference)],
+      kOpenDiamond, kOpenCross,
+      event_count_markers[condition_index(CoreCondition::matched)]};
+  const auto &colors = pair_family ? pair_colors : event_colors;
+  const auto &markers = pair_family ? pair_markers : event_markers;
   TCanvas canvas(("c_" + collection_label +
                   (pair_family ? "_pair_stages" : "_event_stages"))
                      .c_str(),
@@ -1218,11 +1276,7 @@ void draw_cut_stages(std::vector<CutStageHistograms> &histograms,
     canvas.cd(static_cast<int>(bin + 1U));
     for (std::size_t stage = 0; stage < n_cut_stages; ++stage) {
       TH1D &histogram = *histograms[bin].stage[stage];
-      histogram.SetLineColor(colors[stage]);
-      histogram.SetMarkerColor(colors[stage]);
-      histogram.SetMarkerStyle(markers[stage]);
-      histogram.SetMarkerSize(0.65);
-      histogram.SetLineWidth(2);
+      set_point_style(histogram, colors[stage], markers[stage]);
       histogram.GetXaxis()->SetTitle("Truth #alpha");
       histogram.GetYaxis()->SetTitle("Events");
       histogram.SetMinimum(0.0);
@@ -1389,8 +1443,12 @@ void draw_reco_et_truth_pt_stack(
     std::vector<RecoEtHistograms> &histograms,
     const std::string &collection_label, const std::string &output_path,
     const double min_cluster_energy, const double eta_max) {
+  // A dedicated ordered palette prevents truth-pT bins from borrowing the
+  // categorical colors used for selections and event classifications.
   const std::array<int, n_truth_pt_bins> colors = {
-      kBlue + 1, kCyan + 1, kGreen + 2, kOrange + 7, kRed + 1};
+      TColor::GetColor("#440154"), TColor::GetColor("#3B528B"),
+      TColor::GetColor("#21918C"), TColor::GetColor("#5EC962"),
+      TColor::GetColor("#FDE725")};
   TCanvas canvas(("c_reco_et_truth_pt_stack_" + collection_label).c_str(),
                  "Truth-pT contributions in reconstructed-ET panels", 1500,
                  900);
@@ -1402,11 +1460,7 @@ void draw_reco_et_truth_pt_stack(
     RecoEtHistograms &current = histograms[reco_bin];
     TH1D &total = *current.selection[
         selection_index(ClusterSelection::min_energy_eta)];
-    total.SetLineColor(kBlack);
-    total.SetMarkerColor(kBlack);
-    total.SetMarkerStyle(20);
-    total.SetMarkerSize(0.65);
-    total.SetLineWidth(2);
+    set_point_style(total, kBlack, kFullDiamond);
     total.GetXaxis()->SetTitle("Truth #alpha");
     total.GetYaxis()->SetTitle("Clusters");
     total.SetMinimum(0.0);
@@ -1539,7 +1593,7 @@ int PlotConditionalPartnerEfficiency(
     const double merged_response_max = 1.5,
     const double individual_response_min = 0.5,
     const double individual_response_max = 1.5,
-    const double min_cluster_energy = 0.1) {
+    const double min_cluster_energy = 0.3) {
   if (input_path.empty() || output_base.empty() || !(anchor_eta_max > 0.0) ||
       !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||
       !(delta_r_cut > 0.0) || !(merged_delta_r_cut > 0.0) ||

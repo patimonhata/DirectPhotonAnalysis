@@ -7,6 +7,30 @@ split_bdt_output=${2:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_O
 both_bdt_output=${3:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
 split_score_output=${4:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
 final_output=${5:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
+
+if [[ ! -f "$input_file" ]]; then
+  echo "Input file does not exist: $input_file" >&2
+  exit 1
+fi
+if [[ ! -w "$input_file" ]]; then
+  echo "Input file is not writable: $input_file" >&2
+  exit 1
+fi
+if [[ -e "$final_output" || -L "$final_output" ]]; then
+  echo "Refusing to overwrite final output: $final_output" >&2
+  exit 1
+fi
+if [[ "$(realpath -m -- "$input_file")" == "$(realpath -m -- "$final_output")" ]]; then
+  echo "Input and final output paths must differ" >&2
+  exit 1
+fi
+final_directory=$(dirname -- "$final_output")
+mkdir -p -- "$final_directory"
+if [[ ! -w "$final_directory" ]]; then
+  echo "Final output directory is not writable: $final_directory" >&2
+  exit 1
+fi
+
 split_bdt_model=${6:-/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_split_single_tmva.root}
 nosplit_bdt_model=${7:-/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_nosplit_single_tmva.root}
 split_onnx_model=${8:-$module_dir/models/best_model.onnx}
@@ -18,22 +42,25 @@ export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"
 #for single gun
 root -l -b -q \
   -e ".L $module_dir/macro/add_split_bdt.C" \
-  -e "gSystem->Exit(add_split_bdt(\"$input_file\",\"$split_bdt_output\",\"$split_bdt_model\"));"
+  -e "gSystem->Exit(add_split_bdt(\"$input_file\",\"$split_bdt_model\"));"
 root -l -b -q \
   -e ".L $module_dir/macro/add_nosplit_bdt.C" \
-   -e "gSystem->Exit(add_nosplit_bdt(\"$split_bdt_output\",\"$both_bdt_output\",\"$nosplit_bdt_model\"));"
+  -e "gSystem->Exit(add_nosplit_bdt(\"$input_file\",\"$nosplit_bdt_model\"));"
 root -l -b -q \
   -e ".L $module_dir/macro/add_split_gamma_onnx.C" \
-  -e "gSystem->Exit(add_split_gamma_onnx(\"$both_bdt_output\",\"$split_score_output\",\"$split_onnx_model\"));"
-  # -e "gSystem->Exit(add_split_gamma_onnx(\"$split_bdt_output\",\"$final_output\",\"$split_onnx_model\"));"
+  -e "gSystem->Exit(add_split_gamma_onnx(\"$input_file\",\"$split_onnx_model\"));"
+  # -e "gSystem->Exit(add_split_gamma_onnx(\"$input_file\",\"$split_onnx_model\"));"
 root -l -b -q \
   -e ".L $module_dir/macro/add_nosplit_gamma_onnx.C" \
-  -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$split_score_output\",\"$final_output\",\"$nosplit_onnx_model\"));"
+  -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$input_file\",\"$nosplit_onnx_model\"));"
 root -l -b -q \
   -e ".L $module_dir/macro/check_scored_tree.C" \
-  -e "gSystem->Exit(check_scored_tree(\"$final_output\"));"
+  -e "gSystem->Exit(check_scored_tree(\"$input_file\"));"
+
+mv -- "$input_file" "$final_output"
+echo "Scored ROOT file: $final_output"
 
 # for pythia
 # root -l -b -q \
 #    -e ".L $module_dir/macro/add_split_gamma_onnx.C" \
-#    -e "gSystem->Exit(add_split_gamma_onnx(\"$split_bdt_output\",\"$final_output\",\"$split_onnx_model\"));"
+#    -e "gSystem->Exit(add_split_gamma_onnx(\"$input_file\",\"$split_onnx_model\"));"

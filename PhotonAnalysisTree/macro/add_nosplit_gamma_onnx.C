@@ -4,12 +4,12 @@ R__LOAD_LIBRARY(libPi0GammaOnnx.so)
 
 #include "../src/Pi0GammaOnnx.h"
 
+#include <TBranch.h>
 #include <TFile.h>
 #include <TTree.h>
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -39,70 +39,37 @@ double delta_phi(double lhs, double rhs)
   return value;
 }
 
-bool copy_metadata_tree(TFile& input, TFile& output)
-{
-  TTree* source_tree = input.Get<TTree>("metadata");
-  if (!source_tree)
-  {
-    std::cerr << "Missing metadata TTree" << std::endl;
-    return false;
-  }
-  output.cd();
-  std::unique_ptr<TTree> cloned_tree(source_tree->CloneTree(-1));
-  if (!cloned_tree)
-  {
-    std::cerr << "Cannot clone metadata TTree" << std::endl;
-    return false;
-  }
-  cloned_tree->SetDirectory(&output);
-  const bool written = cloned_tree->Write("metadata", TObject::kOverwrite) > 0;
-  cloned_tree->SetDirectory(nullptr);
-  return written;
-}
 }
 
 int add_nosplit_gamma_onnx(
     const char* input_path,
-    const char* output_path,
     const char* model_path =
         "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/best_model.onnx")
 {
   constexpr const char* tree_name = "event_tree";
   constexpr const char* score_branch = "nosplit_cluster_p_gamma";
   constexpr const char* valid_branch = "nosplit_cluster_p_gamma_valid";
-  if (!input_path || !output_path || !model_path)
+  if (!input_path || !model_path)
   {
+    std::cerr << "Input and NO_SPLIT ONNX model paths must be provided" << std::endl;
     return 1;
   }
-  std::error_code input_error;
-  std::error_code output_error;
-  const auto input_canonical = std::filesystem::weakly_canonical(input_path, input_error);
-  const auto output_canonical = std::filesystem::weakly_canonical(output_path, output_error);
-  if (!input_error && !output_error && input_canonical == output_canonical)
-  {
-    std::cerr << "Input and output must differ" << std::endl;
-    return 2;
-  }
-  if (std::filesystem::exists(output_path))
-  {
-    std::cerr << "Refusing to overwrite output: " << output_path << std::endl;
-    return 3;
-  }
-  const std::filesystem::path output_fs(output_path);
-  if (!output_fs.parent_path().empty())
-  {
-    std::filesystem::create_directories(output_fs.parent_path());
-  }
 
-  std::unique_ptr<TFile> input(TFile::Open(input_path, "READ"));
-  if (!input || input->IsZombie())
+  std::unique_ptr<TFile> file(TFile::Open(input_path, "UPDATE"));
+  if (!file || file->IsZombie() || !file->IsWritable())
   {
+    std::cerr << "Cannot open input for update: " << input_path << std::endl;
     return 4;
   }
-  TTree* tree = input->Get<TTree>(tree_name);
-  if (!tree || tree->GetBranch(score_branch))
+  TTree* tree = file->Get<TTree>(tree_name);
+  if (!tree)
   {
-    std::cerr << "Missing event_tree or gamma branch already exists" << std::endl;
+    std::cerr << "Missing event_tree" << std::endl;
+    return 5;
+  }
+  if (tree->GetBranch(score_branch) || tree->GetBranch(valid_branch))
+  {
+    std::cerr << "NO_SPLIT gamma score or valid branch already exists" << std::endl;
     return 5;
   }
 
@@ -144,17 +111,22 @@ int add_nosplit_gamma_onnx(
     return 7;
   }
 
-  std::unique_ptr<TFile> output(TFile::Open(output_path, "RECREATE"));
-  if (!output || output->IsZombie())
-  {
-    return 8;
-  }
-  output->cd();
-  TTree* output_tree = tree->CloneTree(0);
+  file->cd();
   std::vector<float> scores;
   std::vector<unsigned char> valid;
-  output_tree->Branch(score_branch, &scores);
-  output_tree->Branch(valid_branch, &valid);
+  TBranch* score_output = tree->Branch(score_branch, &scores);
+  TBranch* valid_output = tree->Branch(valid_branch, &valid);
+  if (!score_output || !valid_output)
+  {
+    std::cerr << "Cannot create NO_SPLIT gamma output branches" << std::endl;
+    return 8;
+  }
+  const auto fill_outputs = [&]()
+  {
+    const int score_bytes = score_output->Fill();
+    const int valid_bytes = valid_output->Fill();
+    return score_bytes >= 0 && valid_bytes >= 0;
+  };
 
   Long64_t total_clusters = 0;
   Long64_t valid_scores = 0;
@@ -180,7 +152,11 @@ int add_nosplit_gamma_onnx(
     {
       ++malformed_events;
       invalid_clusters += ncluster;
-      output_tree->Fill();
+      if (!fill_outputs())
+      {
+        std::cerr << "Failed to fill NO_SPLIT gamma output branches at entry " << entry << std::endl;
+        return 10;
+      }
       continue;
     }
 
@@ -200,7 +176,11 @@ int add_nosplit_gamma_onnx(
     {
       ++malformed_events;
       invalid_clusters += ncluster;
-      output_tree->Fill();
+      if (!fill_outputs())
+      {
+        std::cerr << "Failed to fill NO_SPLIT gamma output branches at entry " << entry << std::endl;
+        return 10;
+      }
       continue;
     }
 
@@ -264,17 +244,26 @@ int add_nosplit_gamma_onnx(
         ++invalid_clusters;
       }
     }
-    output_tree->Fill();
+    if (!fill_outputs())
+    {
+      std::cerr << "Failed to fill NO_SPLIT gamma output branches at entry " << entry << std::endl;
+      return 10;
+    }
   }
 
-  output->cd();
-  output_tree->Write();
-  if (!copy_metadata_tree(*input, *output))
+  if (score_output->GetEntries() != entries || valid_output->GetEntries() != entries)
   {
-    output->Close();
+    std::cerr << "NO_SPLIT gamma output branch entry count mismatch" << std::endl;
     return 10;
   }
-  output->Close();
+  file->cd();
+  if (tree->Write(tree_name, TObject::kOverwrite) <= 0)
+  {
+    std::cerr << "Failed to write updated event_tree" << std::endl;
+    return 10;
+  }
+  file->Flush();
+  file->Close();
 
   std::cout << "add_nosplit_gamma_onnx - events/clusters/valid/invalid/multicluster/malformed = "
             << entries << "/" << total_clusters << "/" << valid_scores << "/"

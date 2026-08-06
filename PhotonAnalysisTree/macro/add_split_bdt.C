@@ -1,14 +1,13 @@
 #include <TMVA/RBDT.hxx>
 
+#include <TBranch.h>
 #include <TFile.h>
 #include <TTree.h>
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <iostream>
 #include <memory>
-#include <string>
 #include <vector>
 
 namespace
@@ -26,31 +25,10 @@ bool bind(TTree* tree, const char* name, T* address)
   return tree->SetBranchAddress(name, address) >= 0;
 }
 
-bool copy_metadata_tree(TFile& input, TFile& output)
-{
-  TTree* source_tree = input.Get<TTree>("metadata");
-  if (!source_tree)
-  {
-    std::cerr << "Missing metadata TTree" << std::endl;
-    return false;
-  }
-  output.cd();
-  std::unique_ptr<TTree> cloned_tree(source_tree->CloneTree(-1));
-  if (!cloned_tree)
-  {
-    std::cerr << "Cannot clone metadata TTree" << std::endl;
-    return false;
-  }
-  cloned_tree->SetDirectory(&output);
-  const bool written = cloned_tree->Write("metadata", TObject::kOverwrite) > 0;
-  cloned_tree->SetDirectory(nullptr);
-  return written;
-}
 }
 
 int add_split_bdt(
     const char* input_path,
-    const char* output_path,
     const char* model_path =
         "/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_split_single_tmva.root")
 {
@@ -58,41 +36,27 @@ int add_split_bdt(
   constexpr const char* score_branch = "split_cluster_bdt_base_v3E_score";
   constexpr const char* valid_branch = "split_cluster_bdt_base_v3E_valid";
   constexpr const char* model_key = "myBDT";
-  if (!input_path || !output_path || !model_path)
+  if (!input_path || !model_path)
   {
-    std::cerr << "Input, output, and model paths must be non-empty" << std::endl;
+    std::cerr << "Input and model paths must be non-empty" << std::endl;
     return 1;
-  }
-  std::error_code input_error;
-  std::error_code output_error;
-  const auto input_canonical = std::filesystem::weakly_canonical(input_path, input_error);
-  const auto output_canonical = std::filesystem::weakly_canonical(output_path, output_error);
-  if (!input_error && !output_error && input_canonical == output_canonical)
-  {
-    std::cerr << "Input and output must differ" << std::endl;
-    return 1;
-  }
-  if (std::filesystem::exists(output_path))
-  {
-    std::cerr << "Refusing to overwrite output: " << output_path << std::endl;
-    return 2;
-  }
-  const std::filesystem::path output_fs(output_path);
-  if (!output_fs.parent_path().empty())
-  {
-    std::filesystem::create_directories(output_fs.parent_path());
   }
 
-  std::unique_ptr<TFile> input(TFile::Open(input_path, "READ"));
-  if (!input || input->IsZombie())
+  std::unique_ptr<TFile> file(TFile::Open(input_path, "UPDATE"));
+  if (!file || file->IsZombie() || !file->IsWritable())
   {
-    std::cerr << "Cannot open input: " << input_path << std::endl;
+    std::cerr << "Cannot open input for update: " << input_path << std::endl;
+    return 2;
+  }
+  TTree* tree = file->Get<TTree>(tree_name);
+  if (!tree)
+  {
+    std::cerr << "Missing event_tree" << std::endl;
     return 3;
   }
-  TTree* tree = input->Get<TTree>(tree_name);
-  if (!tree || tree->GetBranch(score_branch))
+  if (tree->GetBranch(score_branch) || tree->GetBranch(valid_branch))
   {
-    std::cerr << "Missing event_tree or BDT branch already exists" << std::endl;
+    std::cerr << "SPLIT BDT score or valid branch already exists" << std::endl;
     return 4;
   }
 
@@ -140,17 +104,16 @@ int add_split_bdt(
     return 6;
   }
 
-  std::unique_ptr<TFile> output(TFile::Open(output_path, "RECREATE"));
-  if (!output || output->IsZombie())
-  {
-    return 7;
-  }
-  output->cd();
-  TTree* output_tree = tree->CloneTree(0);
+  file->cd();
   std::vector<float> scores;
   std::vector<unsigned char> valid;
-  output_tree->Branch(score_branch, &scores);
-  output_tree->Branch(valid_branch, &valid);
+  TBranch* score_output = tree->Branch(score_branch, &scores);
+  TBranch* valid_output = tree->Branch(valid_branch, &valid);
+  if (!score_output || !valid_output)
+  {
+    std::cerr << "Cannot create SPLIT BDT output branches" << std::endl;
+    return 7;
+  }
 
   Long64_t total_clusters = 0;
   Long64_t valid_scores = 0;
@@ -202,20 +165,30 @@ int add_split_bdt(
       valid[cluster] = (*shower_valid)[cluster] ? 1U : 0U;
       valid_scores += valid[cluster] ? 1 : 0;
     }
-    output_tree->Fill();
+    if (score_output->Fill() < 0 || valid_output->Fill() < 0)
+    {
+      std::cerr << "Failed to fill SPLIT BDT output branches at entry " << entry << std::endl;
+      return 9;
+    }
   }
 
-  output->cd();
-  output_tree->Write();
-  if (!copy_metadata_tree(*input, *output))
+  const Long64_t entries = tree->GetEntries();
+  if (score_output->GetEntries() != entries || valid_output->GetEntries() != entries)
   {
-    output->Close();
+    std::cerr << "SPLIT BDT output branch entry count mismatch" << std::endl;
     return 9;
   }
-  output->Close();
+  file->cd();
+  if (tree->Write(tree_name, TObject::kOverwrite) <= 0)
+  {
+    std::cerr << "Failed to write updated event_tree" << std::endl;
+    return 9;
+  }
+  file->Flush();
+  file->Close();
 
   std::cout << "add_split_bdt - events/clusters/valid/malformed = "
-            << tree->GetEntries() << "/" << total_clusters << "/"
+            << entries << "/" << total_clusters << "/"
             << valid_scores << "/" << malformed_events << std::endl;
   return malformed_events == 0 ? 0 : 8;
 }

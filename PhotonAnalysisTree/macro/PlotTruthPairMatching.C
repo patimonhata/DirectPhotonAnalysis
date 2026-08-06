@@ -58,8 +58,10 @@ struct CollectionHistograms {
   Long64_t delta_r_overflow_events = 0;
 };
 
-const std::vector<double> truth_pt_edges = {5.0, 7.0, 9.0, 11.0, 13.0, 15.0};
-const std::array<std::string, 5> truth_pt_labels = {
+const std::vector<double> truth_pt_edges = {3.0, 5.0, 7.0, 9.0,
+                                            11.0, 13.0, 15.0};
+const std::array<std::string, 6> truth_pt_labels = {
+    "3 #leq p_{T}^{truth} < 5 GeV",
     "5 #leq p_{T}^{truth} < 7 GeV", "7 #leq p_{T}^{truth} < 9 GeV",
     "9 #leq p_{T}^{truth} < 11 GeV", "11 #leq p_{T}^{truth} < 13 GeV",
     "13 #leq p_{T}^{truth} #leq 15 GeV"};
@@ -427,24 +429,28 @@ void draw_truth_pt_information_panel(CollectionHistograms &histograms,
                                      const double delta_r_cut,
                                      const double mass_min,
                                      const double mass_max,
-                                     const double min_cluster_energy) {
-  TLatex label;
-  label.SetNDC();
-  label.SetTextAlign(13);
-  label.SetTextSize(0.045);
-  label.DrawLatex(0.15, 0.91, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.15, 0.83,
-                  ("Single #pi^{0} gun, " + collection_label).c_str());
-  label.DrawLatex(0.15, 0.75, "Binned in truth #pi^{0} p_{T}");
-  label.DrawLatex(0.15, 0.67,
-                  Form("max(#DeltaR_{0},#DeltaR_{1}) < %.3f", delta_r_cut));
-  label.DrawLatex(
-      0.15, 0.59,
-      Form("%.2f #leq m_{#gamma#gamma} #leq %.2f GeV", mass_min, mass_max));
-  label.DrawLatex(0.15, 0.51,
-                  Form("E_{cluster} #geq %.3g GeV", min_cluster_energy));
+                                     const double min_cluster_energy,
+                                     const bool conditions) {
+  if (conditions) {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.SetTextSize(0.045);
+    label.DrawLatex(0.15, 0.91, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(0.15, 0.83,
+                    ("Single #pi^{0} gun, " + collection_label).c_str());
+    label.DrawLatex(0.15, 0.75, "Binned in truth #pi^{0} p_{T}");
+    label.DrawLatex(0.15, 0.67,
+                    Form("max(#DeltaR_{0},#DeltaR_{1}) < %.3f", delta_r_cut));
+    label.DrawLatex(
+        0.15, 0.59,
+        Form("%.2f #leq m_{#gamma#gamma} #leq %.2f GeV", mass_min, mass_max));
+    label.DrawLatex(0.15, 0.51,
+                    Form("E_{cluster} #geq %.3g GeV", min_cluster_energy));
+    return;
+  }
 
-  TLegend legend(0.15, 0.18, 0.91, 0.43);
+  TLegend legend(0.10, 0.25, 0.93, 0.75);
   if (plot_type == "counts") {
     legend.AddEntry(histograms.truth.get(),
                     "Truth #pi^{0}#rightarrow#gamma#gamma in acceptance",
@@ -473,8 +479,8 @@ void draw_truth_pt_counts(std::vector<CollectionHistograms> &histograms,
                           const double mass_max,
                           const double min_cluster_energy) {
   TCanvas canvas(("c_" + collection_label + "_counts_truth_pt").c_str(),
-                 "Truth pair matching counts by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+                 "Truth pair matching counts by truth pT", 1350, 1350);
+  canvas.Divide(3, 3);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     canvas.cd(static_cast<int>(bin + 1U));
     CollectionHistograms &current = histograms[bin];
@@ -492,10 +498,14 @@ void draw_truth_pt_counts(std::vector<CollectionHistograms> &histograms,
     label.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(7);
   draw_truth_pt_information_panel(histograms.front(), collection_label,
                                   "counts", delta_r_cut, mass_min, mass_max,
-                                  min_cluster_energy);
+                                  min_cluster_energy, true);
+  canvas.cd(8);
+  draw_truth_pt_information_panel(histograms.front(), collection_label,
+                                  "counts", delta_r_cut, mass_min, mass_max,
+                                  min_cluster_energy, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -506,8 +516,8 @@ void draw_truth_pt_efficiencies(std::vector<CollectionHistograms> &histograms,
                                 const double mass_max,
                                 const double min_cluster_energy) {
   TCanvas canvas(("c_" + collection_label + "_efficiency_truth_pt").c_str(),
-                 "Truth pair matching efficiency by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+                 "Truth pair matching efficiency by truth pT", 1350, 1350);
+  canvas.Divide(3, 3);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     canvas.cd(static_cast<int>(bin + 1U));
     TH1D *matched = histograms[bin].efficiency_matched.get();
@@ -538,10 +548,14 @@ void draw_truth_pt_efficiencies(std::vector<CollectionHistograms> &histograms,
     label.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(7);
   draw_truth_pt_information_panel(histograms.front(), collection_label,
                                   "efficiency", delta_r_cut, mass_min, mass_max,
-                                  min_cluster_energy);
+                                  min_cluster_energy, true);
+  canvas.cd(8);
+  draw_truth_pt_information_panel(histograms.front(), collection_label,
+                                  "efficiency", delta_r_cut, mass_min, mass_max,
+                                  min_cluster_energy, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -552,8 +566,8 @@ void draw_truth_pt_delta_r(std::vector<CollectionHistograms> &histograms,
                            const double mass_max,
                            const double min_cluster_energy) {
   TCanvas canvas(("c_" + collection_label + "_delta_r_truth_pt").c_str(),
-                 "Truth-cluster delta R by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+                 "Truth-cluster delta R by truth pT", 1350, 1350);
+  canvas.Divide(3, 3);
   std::vector<std::unique_ptr<TLine>> cut_lines;
   cut_lines.reserve(histograms.size());
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
@@ -588,10 +602,14 @@ void draw_truth_pt_delta_r(std::vector<CollectionHistograms> &histograms,
     label.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(7);
   draw_truth_pt_information_panel(histograms.front(), collection_label,
                                   "delta_r", delta_r_cut, mass_min, mass_max,
-                                  min_cluster_energy);
+                                  min_cluster_energy, true);
+  canvas.cd(8);
+  draw_truth_pt_information_panel(histograms.front(), collection_label,
+                                  "delta_r", delta_r_cut, mass_min, mass_max,
+                                  min_cluster_energy, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -628,7 +646,7 @@ void print_summary(const std::string &collection,
 } // namespace
 
 int PlotTruthPairMatching(
-    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_eta_5to15GeV_etapm1.root",
+    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
     const std::string output_base =
         "PhotonAnalysisTree/output/plots/pair_matching_efficiency/"
         "truth_pair_matching",

@@ -25,18 +25,27 @@
 
 namespace {
 constexpr double pi = 3.14159265358979323846;
-const std::vector<double> truth_pt_edges = {5.0, 7.0, 9.0, 11.0, 13.0, 15.0};
-constexpr std::size_t n_truth_pt_bins = 5U;
+const std::vector<double> truth_pt_edges = {3.0, 5.0, 7.0, 9.0,
+                                            11.0, 13.0, 15.0};
+constexpr std::size_t n_truth_pt_bins = 6U;
 const std::array<std::string, n_truth_pt_bins> truth_pt_labels = {
-    "5 #leq p_{T}^{truth} < 7 GeV", "7 #leq p_{T}^{truth} < 9 GeV",
+    "3 #leq p_{T}^{truth} < 5 GeV", "5 #leq p_{T}^{truth} < 7 GeV",
+    "7 #leq p_{T}^{truth} < 9 GeV",
     "9 #leq p_{T}^{truth} < 11 GeV", "11 #leq p_{T}^{truth} < 13 GeV",
     "13 #leq p_{T}^{truth} #leq 15 GeV"};
 const std::array<std::string, n_truth_pt_bins> reco_et_labels = {
+    "3 #leq E_{T}^{cluster} < 5 GeV",
     "5 #leq E_{T}^{cluster} < 7 GeV",
     "7 #leq E_{T}^{cluster} < 9 GeV",
     "9 #leq E_{T}^{cluster} < 11 GeV",
     "11 #leq E_{T}^{cluster} < 13 GeV",
     "13 #leq E_{T}^{cluster} #leq 15 GeV"};
+constexpr int canvas_columns = 3;
+constexpr int canvas_rows = 3;
+constexpr int canvas_width = 1350;
+constexpr int canvas_height = 1350;
+constexpr int conditions_pad = static_cast<int>(n_truth_pt_bins) + 1;
+constexpr int legend_pad = conditions_pad + 1;
 
 struct CollectionBranches {
   std::vector<double> *cluster_e = nullptr;
@@ -886,27 +895,33 @@ void draw_information(StageHistograms &histograms,
                       const bool event_family, const bool efficiency,
                       const double anchor_eta_max, const double anchor_et_min,
                       const double anchor_et_max, const double delta_r_cut,
-                      const double mass_min, const double mass_max) {
-  TLatex label;
-  label.SetNDC();
-  label.SetTextAlign(13);
-  label.SetTextSize(0.044);
-  label.DrawLatex(0.14, 0.92, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.14, 0.84,
-                  ("Single #pi^{0} gun, " + collection_label).c_str());
-  label.DrawLatex(0.14, 0.76,
-                  event_family ? "Event-conditional efficiency"
-                               : "Anchor-cluster conditional efficiency");
-  label.DrawLatex(
-      0.14, 0.68,
-      Form("|#eta_{anchor}| < %.1f, %.0f < E_{T}^{anchor} < %.0f GeV",
-           anchor_eta_max, anchor_et_min, anchor_et_max));
-  label.DrawLatex(0.14, 0.60,
-                  Form("max(#DeltaR_{0},#DeltaR_{1}) < %.3f", delta_r_cut));
-  label.DrawLatex(
-      0.14, 0.52,
-      Form("%.2f #leq m_{#gamma#gamma} #leq %.2f GeV", mass_min, mass_max));
-  TLegend legend(0.14, 0.12, 0.93, 0.43);
+                      const double mass_min, const double mass_max,
+                      const bool conditions) {
+  if (conditions) {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.SetTextSize(0.044);
+    label.DrawLatex(0.14, 0.92, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(0.14, 0.84,
+                    ("Single #pi^{0} gun, " + collection_label).c_str());
+    label.DrawLatex(0.14, 0.76,
+                    event_family ? "Event-conditional efficiency"
+                                 : "Anchor-cluster conditional efficiency");
+    label.DrawLatex(
+        0.14, 0.68,
+        Form("|#eta_{anchor}| < %.1f, %.0f < E_{T}^{anchor} < %.0f GeV",
+             anchor_eta_max, anchor_et_min, anchor_et_max));
+    label.DrawLatex(0.14, 0.60,
+                    Form("max(#DeltaR_{0},#DeltaR_{1}) < %.3f", delta_r_cut));
+    label.DrawLatex(
+        0.14, 0.52,
+        Form("%.2f #leq m_{#gamma#gamma} #leq %.2f GeV", mass_min, mass_max));
+    return;
+  }
+
+  TLegend legend(0.10, 0.25, 0.95, 0.75);
+  legend.SetTextSize(0.040);
   if (efficiency) {
     legend.AddEntry(histograms.efficiency_matched.get(),
                     event_family ? "Correct pair / selected events"
@@ -946,8 +961,8 @@ void draw_counts(std::vector<StageHistograms> &histograms,
   TCanvas canvas(
       ("c_counts_" + collection_label + (event_family ? "_event" : "_cluster"))
           .c_str(),
-      "Conditional counts by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+      "Conditional counts by truth pT", canvas_width, canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     canvas.cd(static_cast<int>(bin + 1U));
     StageHistograms &current = histograms[bin];
@@ -967,10 +982,14 @@ void draw_counts(std::vector<StageHistograms> &histograms,
     panel.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(conditions_pad);
   draw_information(histograms.front(), collection_label, event_family, false,
                    anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
-                   mass_min, mass_max);
+                   mass_min, mass_max, true);
+  canvas.cd(legend_pad);
+  draw_information(histograms.front(), collection_label, event_family, false,
+                   anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
+                   mass_min, mass_max, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -983,8 +1002,9 @@ void draw_efficiencies(std::vector<StageHistograms> &histograms,
   TCanvas canvas(("c_efficiency_" + collection_label +
                   (event_family ? "_event" : "_cluster"))
                      .c_str(),
-                 "Conditional efficiencies by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+                 "Conditional efficiencies by truth pT", canvas_width,
+                 canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     canvas.cd(static_cast<int>(bin + 1U));
     TH1D *matched = histograms[bin].efficiency_matched.get();
@@ -1015,10 +1035,14 @@ void draw_efficiencies(std::vector<StageHistograms> &histograms,
     panel.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(conditions_pad);
   draw_information(histograms.front(), collection_label, event_family, true,
                    anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
-                   mass_min, mass_max);
+                   mass_min, mass_max, true);
+  canvas.cd(legend_pad);
+  draw_information(histograms.front(), collection_label, event_family, true,
+                   anchor_eta_max, anchor_et_min, anchor_et_max, delta_r_cut,
+                   mass_min, mass_max, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -1036,38 +1060,43 @@ void draw_component_information(
     const double anchor_et_min, const double anchor_et_max,
     const double delta_r_cut, const double merged_delta_r_cut,
     const double merged_response_min, const double merged_response_max,
-    const double individual_response_min,
-    const double individual_response_max) {
-  TLatex label;
-  label.SetNDC();
-  label.SetTextAlign(13);
-  label.SetTextSize(0.039);
-  label.DrawLatex(0.10, 0.94, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(
-      0.10, 0.87,
-      ("Single #pi^{0} gun, " + collection_label +
-       (fractions ? ", selected-event fractions" : ", event components"))
-          .c_str());
-  label.DrawLatex(
-      0.10, 0.80,
-      Form("|#eta_{anchor}| < %.1f, %.0f < E_{T}^{anchor} < %.0f GeV",
-           anchor_eta_max, anchor_et_min, anchor_et_max));
-  label.DrawLatex(0.10, 0.73,
-                  Form("Pair/individual match: #DeltaR < %.3f", delta_r_cut));
-  label.DrawLatex(0.10, 0.66,
-                  Form("Merged: max #DeltaR < %.3f, %.1f < "
-                       "E_{T}^{anchor}/p_{T}^{#pi^{0}} < %.1f",
-                       merged_delta_r_cut, merged_response_min,
-                       merged_response_max));
-  label.DrawLatex(
-      0.10, 0.59,
-      Form("Individual: %.1f < E_{T}^{anchor}/p_{T}^{#gamma} < %.1f",
-           individual_response_min, individual_response_max));
-  label.DrawLatex(0.10, 0.52,
-                  "Exclusive priority: correct > merged > individual > other");
+    const double individual_response_min, const double individual_response_max,
+    const bool conditions) {
+  if (conditions) {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.SetTextSize(0.039);
+    label.DrawLatex(0.10, 0.94, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(
+        0.10, 0.87,
+        ("Single #pi^{0} gun, " + collection_label +
+         (fractions ? ", selected-event fractions" : ", event components"))
+            .c_str());
+    label.DrawLatex(
+        0.10, 0.80,
+        Form("|#eta_{anchor}| < %.1f, %.0f < E_{T}^{anchor} < %.0f GeV",
+             anchor_eta_max, anchor_et_min, anchor_et_max));
+    label.DrawLatex(0.10, 0.73,
+                    Form("Pair/individual match: #DeltaR < %.3f", delta_r_cut));
+    label.DrawLatex(0.10, 0.66,
+                    Form("Merged: max #DeltaR < %.3f, %.1f < "
+                         "E_{T}^{anchor}/p_{T}^{#pi^{0}} < %.1f",
+                         merged_delta_r_cut, merged_response_min,
+                         merged_response_max));
+    label.DrawLatex(
+        0.10, 0.59,
+        Form("Individual: %.1f < E_{T}^{anchor}/p_{T}^{#gamma} < %.1f",
+             individual_response_min, individual_response_max));
+    label.DrawLatex(
+        0.10, 0.52,
+        "Exclusive priority: correct > merged > individual > other");
 
-  TLegend legend(0.10, 0.10, 0.94, 0.47);
-  legend.SetTextSize(0.034);
+    return;
+  }
+
+  TLegend legend(0.08, 0.16, 0.96, 0.84);
+  legend.SetTextSize(0.040);
   if (!fractions) {
     legend.AddEntry(histograms.reference.get(),
                     "Truth #pi^{0} #rightarrow #gamma#gamma in acceptance",
@@ -1094,8 +1123,9 @@ void draw_component_counts(
     const double individual_response_max) {
   const std::array<std::size_t, n_event_components> stack_order = {0, 1, 2, 3};
   TCanvas canvas(("c_event_components_" + collection_label).c_str(),
-                 "Selected-event components by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+                 "Selected-event components by truth pT", canvas_width,
+                 canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
   std::vector<std::unique_ptr<THStack>> stacks;
   stacks.reserve(histograms.size());
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
@@ -1117,9 +1147,9 @@ void draw_component_counts(
         event_count_markers[condition_index(CoreCondition::selected)]);
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
-      style_component_histogram(
-          *current.component[component], event_component_colors[component],
-          event_component_count_markers[component]);
+      style_component_histogram(*current.component[component],
+                                event_component_colors[component],
+                                event_component_count_markers[component]);
     }
     stacks.push_back(std::make_unique<THStack>(
         ("stack_" + collection_label + "_" + std::to_string(bin)).c_str(), ""));
@@ -1137,12 +1167,18 @@ void draw_component_counts(
     panel.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
-  draw_component_information(histograms.front(), collection_label, false,
-                             anchor_eta_max, anchor_et_min, anchor_et_max,
-                             delta_r_cut, merged_delta_r_cut,
-                             merged_response_min, merged_response_max,
-                             individual_response_min, individual_response_max);
+  canvas.cd(conditions_pad);
+  draw_component_information(
+      histograms.front(), collection_label, false, anchor_eta_max,
+      anchor_et_min, anchor_et_max, delta_r_cut, merged_delta_r_cut,
+      merged_response_min, merged_response_max, individual_response_min,
+      individual_response_max, true);
+  canvas.cd(legend_pad);
+  draw_component_information(
+      histograms.front(), collection_label, false, anchor_eta_max,
+      anchor_et_min, anchor_et_max, delta_r_cut, merged_delta_r_cut,
+      merged_response_min, merged_response_max, individual_response_min,
+      individual_response_max, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -1155,8 +1191,9 @@ void draw_component_fractions(
     const double merged_response_max, const double individual_response_min,
     const double individual_response_max) {
   TCanvas canvas(("c_event_component_fractions_" + collection_label).c_str(),
-                 "Selected-event component fractions by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+                 "Selected-event component fractions by truth pT", canvas_width,
+                 canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     canvas.cd(static_cast<int>(bin + 1U));
     EventComponentHistograms &current = histograms[bin];
@@ -1179,11 +1216,18 @@ void draw_component_fractions(
     panel.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(conditions_pad);
   draw_component_information(
       histograms.front(), collection_label, true, anchor_eta_max, anchor_et_min,
       anchor_et_max, delta_r_cut, merged_delta_r_cut, merged_response_min,
-      merged_response_max, individual_response_min, individual_response_max);
+      merged_response_max, individual_response_min, individual_response_max,
+      true);
+  canvas.cd(legend_pad);
+  draw_component_information(
+      histograms.front(), collection_label, true, anchor_eta_max, anchor_et_min,
+      anchor_et_max, delta_r_cut, merged_delta_r_cut, merged_response_min,
+      merged_response_max, individual_response_min, individual_response_max,
+      false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -1191,29 +1235,34 @@ void draw_cut_stage_information(
     CutStageHistograms &histograms, const std::string &collection_label,
     const bool pair_family, const double min_cluster_energy,
     const double anchor_eta_max, const double anchor_et_min,
-    const double anchor_et_max, const double delta_r_cut) {
-  TLatex label;
-  label.SetNDC();
-  label.SetTextAlign(13);
-  label.SetTextSize(0.041);
-  label.DrawLatex(0.10, 0.93, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.10, 0.85,
-                  ("Single #pi^{0} gun, " + collection_label).c_str());
-  label.DrawLatex(0.10, 0.77,
-                  pair_family ? "Matched-pair selection stages"
-                              : "Event cluster-selection stages");
-  label.DrawLatex(0.10, 0.69,
-                  Form("E_{cluster} #geq %.3g GeV", min_cluster_energy));
-  label.DrawLatex(0.10, 0.61,
-                  Form("|#eta| < %.1f, %.0f < E_{T} < %.0f GeV", anchor_eta_max,
-                       anchor_et_min, anchor_et_max));
-  if (pair_family) {
-    label.DrawLatex(0.10, 0.53,
-                    Form("max(#DeltaR_{0},#DeltaR_{1}) < %.3f", delta_r_cut));
+    const double anchor_et_max, const double delta_r_cut,
+    const bool conditions) {
+  if (conditions) {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.SetTextSize(0.041);
+    label.DrawLatex(0.10, 0.93, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(0.10, 0.85,
+                    ("Single #pi^{0} gun, " + collection_label).c_str());
+    label.DrawLatex(0.10, 0.77,
+                    pair_family ? "Matched-pair selection stages"
+                                : "Event cluster-selection stages");
+    label.DrawLatex(0.10, 0.69,
+                    Form("E_{cluster} #geq %.3g GeV", min_cluster_energy));
+    label.DrawLatex(0.10, 0.61,
+                    Form("|#eta| < %.1f, %.0f < E_{T} < %.0f GeV",
+                         anchor_eta_max, anchor_et_min, anchor_et_max));
+    if (pair_family) {
+      label.DrawLatex(0.10, 0.53,
+                      Form("max(#DeltaR_{0},#DeltaR_{1}) < %.3f", delta_r_cut));
+    }
+
+    return;
   }
 
-  TLegend legend(0.10, 0.12, 0.95, pair_family ? 0.46 : 0.48);
-  legend.SetTextSize(0.034);
+  TLegend legend(0.08, 0.20, 0.96, 0.80);
+  legend.SetTextSize(0.038);
   legend.AddEntry(histograms.stage[0].get(),
                   "Truth #pi^{0} #rightarrow #gamma#gamma in acceptance",
                   "lep");
@@ -1270,8 +1319,8 @@ void draw_cut_stages(std::vector<CutStageHistograms> &histograms,
   TCanvas canvas(("c_" + collection_label +
                   (pair_family ? "_pair_stages" : "_event_stages"))
                      .c_str(),
-                 "Selection stages by truth pT", 1500, 900);
-  canvas.Divide(3, 2);
+                 "Selection stages by truth pT", canvas_width, canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     canvas.cd(static_cast<int>(bin + 1U));
     for (std::size_t stage = 0; stage < n_cut_stages; ++stage) {
@@ -1293,10 +1342,14 @@ void draw_cut_stages(std::vector<CutStageHistograms> &histograms,
     panel.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(conditions_pad);
   draw_cut_stage_information(histograms.front(), collection_label, pair_family,
                              min_cluster_energy, anchor_eta_max, anchor_et_min,
-                             anchor_et_max, delta_r_cut);
+                             anchor_et_max, delta_r_cut, true);
+  canvas.cd(legend_pad);
+  draw_cut_stage_information(histograms.front(), collection_label, pair_family,
+                             min_cluster_energy, anchor_eta_max, anchor_et_min,
+                             anchor_et_max, delta_r_cut, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -1394,40 +1447,44 @@ bool print_component_summary(
   return closure_ok;
 }
 
-void draw_reco_et_information(
-    RecoEtHistograms &histograms, const std::string &collection_label,
-    const bool retention, const double min_cluster_energy,
-    const double eta_max) {
-  TLatex label;
-  label.SetNDC();
-  label.SetTextAlign(13);
-  label.SetTextSize(0.041);
-  label.DrawLatex(0.09, 0.94, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.09, 0.86,
-                  ("Single #pi^{0} gun, " + collection_label).c_str());
-  label.DrawLatex(
-      0.09, 0.78,
-      retention ? "Cluster-selection retention by reconstructed E_{T}"
-                : "Truth-p_{T} contributions by reconstructed E_{T}");
-  label.DrawLatex(0.09, 0.70,
-                  Form("E_{cluster} #geq %.3g GeV, |#eta_{cluster}| < %.1f",
-                       min_cluster_energy, eta_max));
+void draw_reco_et_information(RecoEtHistograms &histograms,
+                              const std::string &collection_label,
+                              const bool retention,
+                              const double min_cluster_energy,
+                              const double eta_max, const bool conditions) {
+  if (conditions) {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.SetTextSize(0.041);
+    label.DrawLatex(0.09, 0.94, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(0.09, 0.86,
+                    ("Single #pi^{0} gun, " + collection_label).c_str());
+    label.DrawLatex(0.09, 0.78,
+                    retention
+                        ? "Cluster-selection retention by reconstructed E_{T}"
+                        : "Truth-p_{T} contributions by reconstructed E_{T}");
+    label.DrawLatex(0.09, 0.70,
+                    Form("E_{cluster} #geq %.3g GeV, |#eta_{cluster}| < %.1f",
+                         min_cluster_energy, eta_max));
+
+    return;
+  }
 
   if (retention) {
-    TLegend legend(0.09, 0.31, 0.95, 0.62);
-    legend.SetTextSize(0.036);
+    TLegend legend(0.08, 0.25, 0.96, 0.75);
+    legend.SetTextSize(0.040);
     legend.AddEntry(histograms.retention[0].get(), "E cut only / no cut",
                     "lep");
     legend.AddEntry(histograms.retention[1].get(), "#eta cut only / no cut",
                     "lep");
-    legend.AddEntry(histograms.retention[2].get(), "Both cuts / no cut",
-                    "lep");
+    legend.AddEntry(histograms.retention[2].get(), "Both cuts / no cut", "lep");
     legend.DrawClone();
     return;
   }
 
-  TLegend legend(0.09, 0.12, 0.95, 0.64);
-  legend.SetTextSize(0.032);
+  TLegend legend(0.08, 0.12, 0.96, 0.88);
+  legend.SetTextSize(0.036);
   for (std::size_t truth_bin = 0; truth_bin < n_truth_pt_bins; ++truth_bin) {
     legend.AddEntry(histograms.truth_pt_contribution[truth_bin].get(),
                     truth_pt_labels[truth_bin].c_str(), "f");
@@ -1439,36 +1496,37 @@ void draw_reco_et_information(
   legend.DrawClone();
 }
 
-void draw_reco_et_truth_pt_stack(
-    std::vector<RecoEtHistograms> &histograms,
-    const std::string &collection_label, const std::string &output_path,
-    const double min_cluster_energy, const double eta_max) {
+void draw_reco_et_truth_pt_stack(std::vector<RecoEtHistograms> &histograms,
+                                 const std::string &collection_label,
+                                 const std::string &output_path,
+                                 const double min_cluster_energy,
+                                 const double eta_max) {
   // A dedicated ordered palette prevents truth-pT bins from borrowing the
   // categorical colors used for selections and event classifications.
   const std::array<int, n_truth_pt_bins> colors = {
-      TColor::GetColor("#440154"), TColor::GetColor("#3B528B"),
-      TColor::GetColor("#21918C"), TColor::GetColor("#5EC962"),
-      TColor::GetColor("#FDE725")};
+      TColor::GetColor("#440154"), TColor::GetColor("#414487"),
+      TColor::GetColor("#2A788E"), TColor::GetColor("#22A884"),
+      TColor::GetColor("#7AD151"), TColor::GetColor("#FDE725")};
   TCanvas canvas(("c_reco_et_truth_pt_stack_" + collection_label).c_str(),
-                 "Truth-pT contributions in reconstructed-ET panels", 1500,
-                 900);
-  canvas.Divide(3, 2);
+                 "Truth-pT contributions in reconstructed-ET panels",
+                 canvas_width, canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
   std::vector<std::unique_ptr<THStack>> stacks;
   stacks.reserve(histograms.size());
   for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
     canvas.cd(static_cast<int>(reco_bin + 1U));
     RecoEtHistograms &current = histograms[reco_bin];
-    TH1D &total = *current.selection[
-        selection_index(ClusterSelection::min_energy_eta)];
+    TH1D &total =
+        *current.selection[selection_index(ClusterSelection::min_energy_eta)];
     set_point_style(total, kBlack, kFullDiamond);
     total.GetXaxis()->SetTitle("Truth #alpha");
     total.GetYaxis()->SetTitle("Clusters");
     total.SetMinimum(0.0);
-    total.SetMaximum(total.GetMaximum() > 0.0 ? 1.30 * total.GetMaximum() : 1.0);
+    total.SetMaximum(total.GetMaximum() > 0.0 ? 1.30 * total.GetMaximum()
+                                              : 1.0);
 
     stacks.push_back(std::make_unique<THStack>(
-        ("stack_reco_et_" + collection_label + "_" +
-         std::to_string(reco_bin))
+        ("stack_reco_et_" + collection_label + "_" + std::to_string(reco_bin))
             .c_str(),
         ""));
     for (std::size_t truth_bin = 0; truth_bin < n_truth_pt_bins; ++truth_bin) {
@@ -1488,9 +1546,12 @@ void draw_reco_et_truth_pt_stack(
     panel.DrawLatex(0.18, 0.92, reco_et_labels[reco_bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(conditions_pad);
   draw_reco_et_information(histograms.front(), collection_label, false,
-                           min_cluster_energy, eta_max);
+                           min_cluster_energy, eta_max, true);
+  canvas.cd(legend_pad);
+  draw_reco_et_information(histograms.front(), collection_label, false,
+                           min_cluster_energy, eta_max, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -1504,8 +1565,8 @@ void draw_reco_et_retentions(std::vector<RecoEtHistograms> &histograms,
   const std::array<int, n_cluster_retentions> markers = {24, 25, 20};
   TCanvas canvas(("c_reco_et_retention_" + collection_label).c_str(),
                  "Cluster-selection retention in reconstructed-ET panels",
-                 1500, 900);
-  canvas.Divide(3, 2);
+                 canvas_width, canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
   for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
     canvas.cd(static_cast<int>(reco_bin + 1U));
     for (std::size_t retention = 0; retention < n_cluster_retentions;
@@ -1529,9 +1590,12 @@ void draw_reco_et_retentions(std::vector<RecoEtHistograms> &histograms,
     panel.DrawLatex(0.18, 0.92, reco_et_labels[reco_bin].c_str());
     gPad->RedrawAxis();
   }
-  canvas.cd(6);
+  canvas.cd(conditions_pad);
   draw_reco_et_information(histograms.front(), collection_label, true,
-                           min_cluster_energy, eta_max);
+                           min_cluster_energy, eta_max, true);
+  canvas.cd(legend_pad);
+  draw_reco_et_information(histograms.front(), collection_label, true,
+                           min_cluster_energy, eta_max, false);
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -1593,7 +1657,7 @@ int PlotConditionalPartnerEfficiency(
     const double merged_response_max = 1.5,
     const double individual_response_min = 0.5,
     const double individual_response_max = 1.5,
-    const double min_cluster_energy = 0.3) {
+    const double min_cluster_energy = 0.1) {
   if (input_path.empty() || output_base.empty() || !(anchor_eta_max > 0.0) ||
       !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||
       !(delta_r_cut > 0.0) || !(merged_delta_r_cut > 0.0) ||

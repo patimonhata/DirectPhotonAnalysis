@@ -119,16 +119,23 @@ void draw_panel_label(const std::string& text)
 
 void draw_information_panel(HistogramPair& histograms,
                             const std::string& collection_label,
-                            const char* binning_text)
+                            const char* binning_text,
+                            const bool conditions)
 {
-  TLatex label;
-  label.SetNDC();
-  label.SetTextAlign(13);
-  label.DrawLatex(0.20, 0.91, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.20, 0.82, "Single #pi^{0} gun");
-  label.DrawLatex(0.20, 0.73, (collection_label + " common valid clusters").c_str());
-  label.DrawLatex(0.20, 0.64, binning_text);
-  draw_legend(histograms, collection_label, 0.20, 0.36, 0.88, 0.55);
+  if (conditions)
+  {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.DrawLatex(0.20, 0.91, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(0.20, 0.82, "Single #pi^{0} gun");
+    label.DrawLatex(
+        0.20, 0.73, (collection_label + " common valid clusters").c_str());
+    label.DrawLatex(0.20, 0.64, binning_text);
+    return;
+  }
+
+  draw_legend(histograms, collection_label, 0.15, 0.35, 0.90, 0.65);
 }
 
 std::size_t find_bin(const double value, const std::vector<double>& edges)
@@ -167,6 +174,17 @@ bool make_output_directory(const std::string& output_base)
     return false;
   }
   return true;
+}
+
+std::string collection_output_base(const std::string& output_base,
+                                   const std::string& collection)
+{
+  const std::size_t slash = output_base.find_last_of("/");
+  const std::string directory =
+      slash == std::string::npos ? "" : output_base.substr(0, slash + 1U);
+  const std::string stem =
+      slash == std::string::npos ? output_base : output_base.substr(slash + 1U);
+  return directory + collection + "/" + stem + "_" + collection;
 }
 
 int plot_collection(TTree* tree,
@@ -212,8 +230,10 @@ int plot_collection(TTree* tree,
 
   HistogramPair inclusive = make_histogram_pair(collection + "_inclusive");
 
-  const std::vector<double> truth_pt_edges = {5.0, 7.0, 9.0, 11.0, 13.0, 15.0};
-  const std::array<std::string, 5> truth_pt_labels = {
+  const std::vector<double> truth_pt_edges = {
+      3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0};
+  const std::array<std::string, 6> truth_pt_labels = {
+      "3 #leq p_{T}^{truth} < 5 GeV",
       "5 #leq p_{T}^{truth} < 7 GeV",
       "7 #leq p_{T}^{truth} < 9 GeV",
       "9 #leq p_{T}^{truth} < 11 GeV",
@@ -228,16 +248,14 @@ int plot_collection(TTree* tree,
   }
 
   const std::vector<double> cluster_et_edges = {
-      0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0,
-      std::numeric_limits<double>::infinity()};
-  const std::array<std::string, 7> cluster_et_labels = {
-      "0 #leq E_{T}^{cluster} < 2 GeV",
-      "2 #leq E_{T}^{cluster} < 4 GeV",
-      "4 #leq E_{T}^{cluster} < 6 GeV",
-      "6 #leq E_{T}^{cluster} < 8 GeV",
-      "8 #leq E_{T}^{cluster} < 10 GeV",
-      "10 #leq E_{T}^{cluster} < 12 GeV",
-      "12 #leq E_{T}^{cluster} GeV"};
+      3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0};
+  const std::array<std::string, 6> cluster_et_labels = {
+      "3 #leq E_{T}^{cluster} < 5 GeV",
+      "5 #leq E_{T}^{cluster} < 7 GeV",
+      "7 #leq E_{T}^{cluster} < 9 GeV",
+      "9 #leq E_{T}^{cluster} < 11 GeV",
+      "11 #leq E_{T}^{cluster} < 13 GeV",
+      "13 #leq E_{T}^{cluster} #leq 15 GeV"};
   std::vector<HistogramPair> cluster_et_histograms;
   cluster_et_histograms.reserve(cluster_et_labels.size());
   for (std::size_t bin = 0; bin < cluster_et_labels.size(); ++bin)
@@ -341,8 +359,9 @@ int plot_collection(TTree* tree,
 
   TCanvas truth_pt_canvas(
       ("c_score_" + collection + "_truth_pt").c_str(),
-      (collection_label + " score comparison by truth pi0 pT").c_str(), 1500, 900);
-  truth_pt_canvas.Divide(3, 2);
+      (collection_label + " score comparison by truth pi0 pT").c_str(), 1350,
+      1350);
+  truth_pt_canvas.Divide(3, 3);
   for (std::size_t bin = 0; bin < truth_pt_histograms.size(); ++bin)
   {
     truth_pt_canvas.cd(static_cast<int>(bin + 1U));
@@ -350,14 +369,20 @@ int plot_collection(TTree* tree,
     draw_panel_label(truth_pt_labels[bin]);
     gPad->RedrawAxis();
   }
-  truth_pt_canvas.cd(6);
+  truth_pt_canvas.cd(7);
   draw_information_panel(
-      truth_pt_histograms.front(), collection_label, "Binned in truth #pi^{0} p_{T}");
+      truth_pt_histograms.front(), collection_label,
+      "Binned in truth #pi^{0} p_{T}", true);
+  truth_pt_canvas.cd(8);
+  draw_information_panel(
+      truth_pt_histograms.front(), collection_label,
+      "Binned in truth #pi^{0} p_{T}", false);
   truth_pt_canvas.SaveAs((output_base + "_truth_pt.pdf").c_str());
 
   TCanvas cluster_et_canvas(
       ("c_score_" + collection + "_cluster_et").c_str(),
-      (collection_label + " score comparison by cluster ET").c_str(), 1500, 1200);
+      (collection_label + " score comparison by cluster ET").c_str(), 1350,
+      1350);
   cluster_et_canvas.Divide(3, 3);
   for (std::size_t bin = 0; bin < cluster_et_histograms.size(); ++bin)
   {
@@ -366,11 +391,16 @@ int plot_collection(TTree* tree,
     draw_panel_label(cluster_et_labels[bin]);
     gPad->RedrawAxis();
   }
-  cluster_et_canvas.cd(8);
+  cluster_et_canvas.cd(7);
   const std::string cluster_binning_text =
       "Binned in " + collection_label + " cluster E_{T}";
   draw_information_panel(
-      cluster_et_histograms.front(), collection_label, cluster_binning_text.c_str());
+      cluster_et_histograms.front(), collection_label,
+      cluster_binning_text.c_str(), true);
+  cluster_et_canvas.cd(8);
+  draw_information_panel(
+      cluster_et_histograms.front(), collection_label,
+      cluster_binning_text.c_str(), false);
   cluster_et_canvas.SaveAs((output_base + "_cluster_et.pdf").c_str());
 
   std::cout << "PlotScoreComparison (" << collection_label
@@ -387,10 +417,11 @@ int plot_collection(TTree* tree,
 }  // namespace
 
 int PlotScoreComparison(
-    // const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
-    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_5to15GeV_etapm1.root",
+    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60_newBDTprediction.root",
+    // const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_5to15GeV_etapm1.root",
     // const std::string input_path = "PhotonAnalysisTree/output/merged/100segments_Jet5.root",
-    const std::string output_base = "PhotonAnalysisTree/output/plots/score_comparison")
+    const std::string output_base =
+        "PhotonAnalysisTree/output/plots/score_comparison/score_comparison")
 {
   SetsPhenixStyle();
   TH1::AddDirectory(false);
@@ -410,9 +441,11 @@ int PlotScoreComparison(
   }
 
   const int nosplit_status =
-      plot_collection(tree, "nosplit", output_base + "_nosplit");
+      plot_collection(tree, "nosplit",
+                      collection_output_base(output_base, "nosplit"));
   const int split_status =
-      plot_collection(tree, "split", output_base + "_split");
+      plot_collection(tree, "split",
+                      collection_output_base(output_base, "split"));
 
   return nosplit_status == 0 && split_status == 0 ? 0 : 1;
 }

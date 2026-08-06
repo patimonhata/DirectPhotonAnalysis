@@ -2,11 +2,9 @@
 set -eo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) # the absolute path to the directory in which this script is placed.
-input_file=${1:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
-split_bdt_output=${2:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
-both_bdt_output=${3:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
-split_score_output=${4:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
-final_output=${5:?usage: run_add_scores.sh INPUT SPLIT_BDT_OUTPUT BOTH_BDT_OUTPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [ONNX_MODEL]}
+usage="usage: run_add_scores.sh INPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [SPLIT_ONNX_MODEL] [NOSPLIT_ONNX_MODEL]"
+input_file=${1:?$usage}
+final_output=${2:?$usage}
 
 if [[ ! -f "$input_file" ]]; then
   echo "Input file does not exist: $input_file" >&2
@@ -31,10 +29,10 @@ if [[ ! -w "$final_directory" ]]; then
   exit 1
 fi
 
-split_bdt_model=${6:-/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_split_single_tmva.root}
-nosplit_bdt_model=${7:-/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_nosplit_single_tmva.root}
-split_onnx_model=${8:-$module_dir/models/best_model.onnx}
-nosplit_onnx_model=${9:-$module_dir/models/best_model.onnx}
+split_bdt_model=${3:-/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_split_single_tmva.root}
+nosplit_bdt_model=${4:-/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_nosplit_single_tmva.root}
+split_onnx_model=${5:-$module_dir/models/best_model.onnx}
+nosplit_onnx_model=${6:-$module_dir/models/best_model.onnx}
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"

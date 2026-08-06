@@ -66,24 +66,22 @@ root -l -b -q \
 
 ## scoreを追加する
 
-inputは変更せず、BDT追加fileと最終fileを別々に作ります。
+入力ROOT fileの`event_tree`へBDT/gamma score branchを直接追加し、全段と最終検証が成功した後に`_scored.root`へrenameします。途中で失敗した場合は入力ファイルを元DSTから作り直してください。
 
 ```bash
 ./PhotonAnalysisTree/run_add_scores.sh \
   PhotonAnalysisTree/output/root/photon_analysis_tree_000000.root \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_000000_with_split_bdt.root \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_000000_with_both_bdt.root \
   PhotonAnalysisTree/output/root/photon_analysis_tree_000000_scored.root
 ```
 
-wrapperは最後に`check_scored_tree.C`を実行し、cluster、tower、pair、score vectorの長さに加え、`metadata` TTreeが実際に読めること、event数とsource file IDが一致することを検証します。scored ROOT fileのtop-level objectは`event_tree`と`metadata`だけです。adapterのcluster数、valid数、malformed数などの集計は標準出力（Condor log）だけに記録します。既存outputは上書きしません。Condorで多数jobを同時実行してもACLiCの共有build fileが競合しないよう、score macroは各process内でloadします。
+wrapperは最後に`check_scored_tree.C`を実行し、cluster、tower、pair、score vectorの長さに加え、`metadata` TTreeが実際に読めること、event数とsource file IDが一致することを検証します。scored ROOT fileのtop-level objectは`event_tree`と`metadata`だけです。adapterのcluster数、valid数、malformed数などの集計は標準出力（Condor log）だけに記録します。既存の最終outputは上書きせず、score/valid branchが既にある入力もエラーにします。Condorで多数jobを同時実行してもACLiCの共有build fileが競合しないよう、score macroは各process内でloadします。
 
 NO_SPLIT clusterで学習したBDTは`run_add_scores.sh`の第2段でNO_SPLIT clusterへ適用します。default modelは`model_base_v3E_nosplit_single_tmva.root`です。必要に応じて独立macroとしても実行できます。
 
 ```bash
 root -l -b \
   -e '.L PhotonAnalysisTree/macro/add_nosplit_bdt.C' \
-  -e 'gSystem->Exit(add_nosplit_bdt("input.root", "output.root"));'
+  -e 'gSystem->Exit(add_nosplit_bdt("input.root"));'
 ```
 
 このmacroが追加するのは`nosplit_cluster_bdt_base_v3E_score`と`nosplit_cluster_bdt_base_v3E_valid`です。入力featureの定義と順序は既存のSPLIT学習版macroと同一ですが、値はすべて`nosplit_cluster_*` branchから取得します。
@@ -93,7 +91,7 @@ SPLIT clusterで学習したONNX modelが用意できた後は、model pathを�
 ```bash
 root -l -b \
   -e '.L PhotonAnalysisTree/macro/add_split_gamma_onnx.C' \
-  -e 'gSystem->Exit(add_split_gamma_onnx("input.root", "output.root", "split_model.onnx"));'
+  -e 'gSystem->Exit(add_split_gamma_onnx("input.root", "split_model.onnx"));'
 ```
 
 入力にはschema version 2以降の`split_tower_*` branchが必要です。SPLITでは同じtowerが複数clusterへ分配され得るため、point featureのenergyには未分配の`split_tower_energy`ではなく、RawClusterに保存された割当energy `split_tower_cluster_value`を使います。
@@ -139,11 +137,11 @@ condor_submit run_tree.job
 condor_submit run_add_scores.job
 ```
 
-job数やoffsetを変更する場合はsubmit時に上書きできます。
+`run_tree.job`のjob数とoffsetはsubmit時に上書きできます。`run_add_scores.job`はdefaultで5000 jobをqueueするため、job数を変える場合はjob file末尾の`Queue 5000`を編集し、offsetだけをsubmit時に上書きします。
 
 ```bash
 condor_submit -append "n_jobs = 100" -append "job_offset = 500" run_tree.job
-condor_submit -append "n_jobs = 100" -append "job_offset = 500" run_add_scores.job
+condor_submit -append "job_offset = 500" run_add_scores.job
 ```
 
 - `run_tree.sh`, `run_tree.job`: DSTからbase TTreeを生成

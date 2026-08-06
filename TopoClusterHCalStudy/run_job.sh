@@ -30,7 +30,7 @@ if [[ -e "$output_file" ]]; then
 fi
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n "${SPHENIX_RELEASE:-ana}"
-export LD_LIBRARY_PATH="$study_dir/install/lib64:$study_dir/install/lib:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="$study_dir/install/lib:$study_dir/install/lib64:${LD_LIBRARY_PATH:-}"
 export ROOT_INCLUDE_PATH="$study_dir/install/include:${ROOT_INCLUDE_PATH:-}"
 
 root -l -b -q \

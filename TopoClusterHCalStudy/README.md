@@ -49,6 +49,8 @@ cd /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy
 ./src/build.sh
 ```
 
+`build.sh`は`src/autogen.sh`、`make`、`make install`を順に実行し、headerを`install/include/topoclusterhcalstudy/`、libraryを`install/lib/`へinstallします。
+
 既定releaseは既存ジョブと同じ`ana`です。固定releaseに変更する場合は、buildと実行の両方で同じ値を指定します。
 
 ```bash

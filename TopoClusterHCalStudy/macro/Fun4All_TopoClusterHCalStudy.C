@@ -2,7 +2,7 @@
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <fun4all/Fun4AllServer.h>
 
-#include <TopoClusterHCalTree.h>
+#include <topoclusterhcalstudy/TopoClusterHCalTree.h>
 
 #include <TSystem.h>
 

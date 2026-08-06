@@ -14,6 +14,7 @@ Single-particle gun DSTを1回だけ読み、truth、SPLIT cluster、NO_SPLIT cl
 - `split_*`: `CLUSTERINFO_CEMC`、shower shape、全cluster pair、cluster constituent tower
 - `nosplit_*`: `CLUSTERINFO_CEMC_NO_SPLIT`、shower shape、全cluster pair、cluster constituent tower
 - `split_cluster_bdt_base_v3E_*`: SPLIT clusterで学習した`base_v3E` BDTをSPLIT clusterへ適用
+- `split_cluster_bdt_ppg15v1_*`: low-pT sampleを加えて学習したPPG15v1 BDTをSPLIT clusterへ適用
 - `nosplit_cluster_bdt_base_v3E_*`: NO_SPLIT clusterで学習した`base_v3E` BDTをNO_SPLIT clusterへ適用
 - `nosplit_cluster_p_gamma*`: 同梱ONNX modelが後段で追加
 - `split_cluster_p_gamma*`: 将来のSPLIT学習ONNX modelを`add_split_gamma_onnx.C`で追加
@@ -76,7 +77,9 @@ root -l -b -q \
 
 wrapperは最後に`check_scored_tree.C`を実行し、cluster、tower、pair、score vectorの長さに加え、`metadata` TTreeが実際に読めること、event数とsource file IDが一致することを検証します。scored ROOT fileのtop-level objectは`event_tree`と`metadata`だけです。adapterのcluster数、valid数、malformed数などの集計は標準出力（Condor log）だけに記録します。既存の最終outputは上書きせず、score/valid branchが既にある入力もエラーにします。Condorで多数jobを同時実行してもACLiCの共有build fileが競合しないよう、score macroは各process内でloadします。
 
-NO_SPLIT clusterで学習したBDTは`run_add_scores.sh`の第2段でNO_SPLIT clusterへ適用します。default modelは`model_base_v3E_nosplit_single_tmva.root`です。必要に応じて独立macroとしても実行できます。
+`add_split_bdt_ppg15v1.C`は既存SPLIT BDTと同じ11 featureを使い、low-pT sampleを追加したモデルの出力を`split_cluster_bdt_ppg15v1_score`、入力・shower shape・推論が有効かを`split_cluster_bdt_ppg15v1_valid`へ保存します。wrapperの第7引数でdefault model pathを上書きできます。
+
+NO_SPLIT clusterで学習したBDTも`run_add_scores.sh`内でNO_SPLIT clusterへ適用します。default modelは`model_base_v3E_nosplit_single_tmva.root`です。必要に応じて独立macroとしても実行できます。
 
 ```bash
 root -l -b \
@@ -124,7 +127,7 @@ model path、SHA-256、score branch、feature schema、domain warning、event数
 
 ONNX modelは`n_cluster == 1`のNO_SPLIT eventだけで学習されています。adapterはmulti-cluster eventもclusterごとに評価しますが、そのscoreは学習条件外なので物理解析で使う前に別途validationが必要です。
 
-BDT modelのdocumented performance binはcluster ET 6 GeVからです。それより低いETのscoreはsoftware上は計算されますが、性能保証範囲外です。
+既存`base_v3E` BDT modelのdocumented performance binはcluster ET 6 GeVからです。それより低いETのscoreはsoftware上は計算されますが、性能保証範囲外です。PPG15v1 modelは同じfeatureを使い、よりlow-pTのsampleを含めて学習しています。
 
 ## HTCondor production
 

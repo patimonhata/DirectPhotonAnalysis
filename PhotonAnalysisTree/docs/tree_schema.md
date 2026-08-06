@@ -78,6 +78,8 @@ NO_SPLIT collectionではtower keyはevent内で一意です。SPLIT collection�
 |---|---|
 | `split_cluster_bdt_base_v3E_score` | SPLIT clusterで学習し、SPLIT clusterへ適用したphoton-ID BDT output |
 | `split_cluster_bdt_base_v3E_valid` | finite input and valid shower shape |
+| `split_cluster_bdt_ppg15v1_score` | low-pT sampleを加えて学習したPPG15v1 photon-ID BDT output |
+| `split_cluster_bdt_ppg15v1_valid` | 上記scoreのfinite input and valid shower shape |
 | `nosplit_cluster_bdt_base_v3E_score` | NO_SPLIT clusterで学習し、NO_SPLIT clusterへ適用したphoton-ID BDT output |
 | `nosplit_cluster_bdt_base_v3E_valid` | 上記scoreのfinite input and valid shower shape |
 | `nosplit_cluster_p_gamma` | ONNX direct-gamma probability |

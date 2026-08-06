@@ -1,0 +1,20 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/run_job.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
+request_memory     = 2GB
+Priority           = 20
+job_lease_duration = 86400
+
+n_events           = 0
+job_index          = $(Process)
+output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/condor
+
+Output             = $(output_directory)/topocluster_$INT(job_index,%04d).out
+Error              = $(output_directory)/topocluster_$INT(job_index,%04d).err
+Log                = /tmp/ryotaro-TopoClusterHCalStudy_$INT(job_index,%04d).log
+Arguments          = "$INT(job_index) $(n_events)"
+
+Queue 1000

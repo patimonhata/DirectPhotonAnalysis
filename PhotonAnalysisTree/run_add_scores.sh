@@ -15,23 +15,25 @@ nosplit_onnx_model=${9:-$module_dir/models/best_model.onnx}
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"
 
-# root -l -b -q \
-#   -e ".L $module_dir/macro/add_split_bdt.C" \
-#   -e "gSystem->Exit(add_split_bdt(\"$input_file\",\"$split_bdt_output\",\"$split_bdt_model\"));"
-# root -l -b -q \
-#   -e ".L $module_dir/macro/add_nosplit_bdt.C" \
-  #  -e "gSystem->Exit(add_nosplit_bdt(\"$split_bdt_output\",\"$both_bdt_output\",\"$nosplit_bdt_model\"));"
-# root -l -b -q \
-#   -e ".L $module_dir/macro/add_split_gamma_onnx.C" \
-#   # -e "gSystem->Exit(add_split_gamma_onnx(\"$both_bdt_output\",\"$split_score_output\",\"$split_onnx_model\"));"
-#   -e "gSystem->Exit(add_split_gamma_onnx(\"$split_bdt_output\",\"$final_output\",\"$split_onnx_model\"));"
-# root -l -b -q \
-#   -e ".L $module_dir/macro/add_nosplit_gamma_onnx.C" \
-#   -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$split_score_output\",\"$final_output\",\"$nosplit_onnx_model\"));"
-# root -l -b -q \
-#   -e ".L $module_dir/macro/check_scored_tree.C" \
-#   -e "gSystem->Exit(check_scored_tree(\"$final_output\"));"
-
+#for single gun
 root -l -b -q \
-   -e ".L $module_dir/macro/add_split_gamma_onnx.C" \
-   -e "gSystem->Exit(add_split_gamma_onnx(\"$split_bdt_output\",\"$final_output\",\"$split_onnx_model\"));"
+  -e ".L $module_dir/macro/add_split_bdt.C" \
+  -e "gSystem->Exit(add_split_bdt(\"$input_file\",\"$split_bdt_output\",\"$split_bdt_model\"));"
+root -l -b -q \
+  -e ".L $module_dir/macro/add_nosplit_bdt.C" \
+   -e "gSystem->Exit(add_nosplit_bdt(\"$split_bdt_output\",\"$both_bdt_output\",\"$nosplit_bdt_model\"));"
+root -l -b -q \
+  -e ".L $module_dir/macro/add_split_gamma_onnx.C" \
+  -e "gSystem->Exit(add_split_gamma_onnx(\"$both_bdt_output\",\"$split_score_output\",\"$split_onnx_model\"));"
+  # -e "gSystem->Exit(add_split_gamma_onnx(\"$split_bdt_output\",\"$final_output\",\"$split_onnx_model\"));"
+root -l -b -q \
+  -e ".L $module_dir/macro/add_nosplit_gamma_onnx.C" \
+  -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$split_score_output\",\"$final_output\",\"$nosplit_onnx_model\"));"
+root -l -b -q \
+  -e ".L $module_dir/macro/check_scored_tree.C" \
+  -e "gSystem->Exit(check_scored_tree(\"$final_output\"));"
+
+# for pythia
+# root -l -b -q \
+#    -e ".L $module_dir/macro/add_split_gamma_onnx.C" \
+#    -e "gSystem->Exit(add_split_gamma_onnx(\"$split_bdt_output\",\"$final_output\",\"$split_onnx_model\"));"

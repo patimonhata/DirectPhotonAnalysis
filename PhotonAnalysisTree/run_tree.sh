@@ -20,6 +20,6 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 
 # SingleGun:
-# root -l -b -q "$module_dir/macro/Fun4All_PhotonAnalysisTree.C(${process_id},${n_events})"
+root -l -b -q "$module_dir/macro/Fun4All_PhotonAnalysisTree.C(${process_id},${n_events})"
 # Pythia Jet5:
-root -l -b -q "$module_dir/macro/Fun4All_PhotonAnalysisTreePythia.C(${process_id},${n_events})"
+# root -l -b -q "$module_dir/macro/Fun4All_PhotonAnalysisTreePythia.C(${process_id},${n_events})"

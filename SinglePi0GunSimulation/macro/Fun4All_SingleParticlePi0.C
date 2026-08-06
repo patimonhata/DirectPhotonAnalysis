@@ -42,18 +42,12 @@ void ensure_dir(const std::string& path);
 int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=false) {
   // const int nEvents = 5;
   bool runTruth = false;
-  std::string particle_name = "pi0";
+  std::string particle_name = "gamma";
 
   std::ostringstream pid;
   pid << std::setw(6) << std::setfill('0') << processID;
   std::string pid_str = pid.str();
 
-  // char cwd[PATH_MAX];
-  // char* cwd_result = getcwd(cwd, sizeof(cwd));
-  // if ( cwd_result == nullptr ) {
-	//   std::cerr << "Failed to get current working directory!" << std::endl;
-	//   return EXIT_FAILURE;
-  // }
 
   std::error_code ec;
   std::filesystem::path cwd = std::filesystem::current_path(ec);
@@ -64,34 +58,34 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
 
   // std::string baseDir(cwd);
   std::string baseDir("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output");
-  std::string outDir  = baseDir + "/DST_" + particle_name + "_10GeV_eta0";
-  std::string outDir2 = baseDir + "/ana_" + particle_name;
-  std::string outDir3 = baseDir + "/jobtime_" + particle_name;
+  std::string outDir  = baseDir + "/DST_" + particle_name + "_25to35GeV_etapm1_vertexpm60";
   ensure_dir(outDir);
-  ensure_dir(outDir2);
-  ensure_dir(outDir3);
-  ensure_dir(outDir + "/qa");
   
   Fun4AllServer *fun4allServer = Fun4AllServer::instance();
 
   //Opt to print all random seed used for debugging reproducibility. Comment out to reduce stdout prints.
-  PHRandomSeed::Verbosity(1);
+  // PHRandomSeed::Verbosity(1);
 
   recoConsts *rc = recoConsts::instance();
-  Input::VERBOSITY = 10;
+  // Input::VERBOSITY = 10;
+  Input::VERBOSITY = 0;
   Input::SIMPLE = true;
   InputInit();  // This creates the input generator(s)
 
-  INPUTGENERATOR::SimpleEventGenerator[0]->add_particles(particle_name, 1);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_function(PHG4SimpleEventGenerator::Gaus,
-                                                                            PHG4SimpleEventGenerator::Gaus,
-                                                                            PHG4SimpleEventGenerator::Gaus);
+  // INPUTGENERATOR::SimpleEventGenerator[0]->add_particles(particle_name, 1);
+  INPUTGENERATOR::SimpleEventGenerator[0]->add_particles(22, 1);
+  // INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_function(PHG4SimpleEventGenerator::Gaus,
+  //                                                                           PHG4SimpleEventGenerator::Gaus,
+  //                                                                           PHG4SimpleEventGenerator::Gaus);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_function(PHG4SimpleEventGenerator::Uniform,
+                                                                            PHG4SimpleEventGenerator::Uniform,
+                                                                            PHG4SimpleEventGenerator::Uniform);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_mean(0., 0., 0.);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_width(0., 0., 0.);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(0., 0.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_width(0., 0., 60.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(-1.0, 1.0);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(3., 15.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(25., 35.);
 
   // register all input generators with Fun4All
   InputRegister();
@@ -122,7 +116,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   Enable::HCALIN_ABSORBER = true;
   Enable::HCALIN_CELL =  true;
   Enable::HCALIN_TOWER =  true;
-  // Enable::HCALIN_CLUSTER =  true;
+  Enable::HCALIN_CLUSTER =  true;
   // Enable::HCALIN_EVAL =  true;
   // Enable::HCALIN_QA =  true;
 
@@ -130,10 +124,11 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   Enable::HCALOUT_ABSORBER = true;
   Enable::HCALOUT_CELL =  true;
   Enable::HCALOUT_TOWER =  true;
-  // Enable::HCALOUT_CLUSTER = false;
+  Enable::HCALOUT_CLUSTER = true;
   // Enable::HCALOUT_EVAL =  false;
   // Enable::HCALOUT_QA =  false;
 
+  Enable::TOPOCLUSTER = true;
   Enable::GLOBAL_RECO = true;
 
   Enable::CDB = true;
@@ -194,7 +189,6 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
     outputName += "reconstructed";
   }
   outputName += "Info_" + pid_str + ".root";
-  std::string outputName2 = outDir2 + "/ana_" + pid_str + "ClusterBuilder_5events.root";
 
   Fun4AllDstOutputManager *out = new Fun4AllDstOutputManager("DSTOUT", outputName);
   fun4allServer->registerOutputManager(out);

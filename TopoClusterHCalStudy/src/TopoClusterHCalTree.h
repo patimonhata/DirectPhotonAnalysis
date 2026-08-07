@@ -3,7 +3,6 @@
 
 #include <fun4all/SubsysReco.h>
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -18,11 +17,8 @@ class TopoClusterHCalTree : public SubsysReco
   ~TopoClusterHCalTree() override;
 
   void set_output_file_name(const std::string &value) { output_file_name_ = value; }
-  void set_input_file_name(const std::string &value) { input_file_name_ = value; }
   void set_topocluster_node_name(const std::string &value) { topocluster_node_name_ = value; }
-  void set_sample_name(const std::string &value) { sample_name_ = value; }
   void set_sample_id(unsigned int value) { sample_id_ = value; }
-  void set_job_index(unsigned int value) { job_index_ = value; }
   void set_process_id(unsigned int value) { process_id_ = value; }
 
   int Init(PHCompositeNode *topNode) override;
@@ -35,15 +31,11 @@ class TopoClusterHCalTree : public SubsysReco
   void close_output_file();
 
   std::string output_file_name_ = "topocluster_hcal_tree.root";
-  std::string input_file_name_;
   std::string topocluster_node_name_ = "TOPOCLUSTER_ALLCALO";
-  std::string sample_name_ = "unknown";
 
   unsigned int sample_id_ = 0;
-  unsigned int job_index_ = 0;
   unsigned int process_id_ = 0;
   unsigned int event_ = 0;
-  std::uint64_t event_uid_ = 0;
   unsigned int n_topocluster_ = 0;
 
   std::vector<unsigned int> topocluster_id_;

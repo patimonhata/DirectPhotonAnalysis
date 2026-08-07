@@ -8,7 +8,6 @@
 #include <phool/getClass.h>
 
 #include <TFile.h>
-#include <TNamed.h>
 #include <TTree.h>
 
 #include <cmath>
@@ -37,8 +36,7 @@ int TopoClusterHCalTree::Init(PHCompositeNode * /*topNode*/)
   tree_ = new TTree("topocluster_tree", "All-calorimeter TopoCluster energy components");
   create_branches();
 
-  std::cout << Name() << "::Init - input: " << input_file_name_ << '\n'
-            << Name() << "::Init - node: " << topocluster_node_name_ << '\n'
+  std::cout << Name() << "::Init - node: " << topocluster_node_name_ << '\n'
             << Name() << "::Init - output: " << output_file_name_ << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -50,8 +48,7 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
   auto *clusters = findNode::getClass<RawClusterContainer>(topNode, topocluster_node_name_);
   if (!clusters)
   {
-    std::cerr << Name() << "::process_event - missing RawClusterContainer node "
-              << topocluster_node_name_ << std::endl;
+    std::cerr << Name() << "::process_event - missing RawClusterContainer node " << topocluster_node_name_ << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
@@ -75,8 +72,7 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
     const RawCluster *cluster = cluster_iter->second;
     if (!cluster)
     {
-      std::cerr << Name() << "::process_event - null cluster pointer in "
-                << topocluster_node_name_ << std::endl;
+      std::cerr << Name() << "::process_event - null cluster pointer in " << topocluster_node_name_ << std::endl;
       return Fun4AllReturnCodes::ABORTRUN;
     }
 
@@ -95,8 +91,7 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
       const float contribution = tower_iter->second;
       if (!std::isfinite(contribution))
       {
-        std::cerr << Name() << "::process_event - non-finite tower contribution in cluster "
-                  << cluster->get_id() << std::endl;
+        std::cerr << Name() << "::process_event - non-finite tower contribution in cluster " << cluster->get_id() << std::endl;
         return Fun4AllReturnCodes::ABORTRUN;
       }
 
@@ -139,10 +134,6 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
   }
 
   n_topocluster_ = static_cast<unsigned int>(topocluster_id_.size());
-  const std::uint32_t source_id = ((sample_id_ & 0x1U) << 31U) |
-                                  (job_index_ & 0x7fffffffU);
-  event_uid_ = (static_cast<std::uint64_t>(source_id) << 32U) |
-               static_cast<std::uint64_t>(event_);
   tree_->Fill();
   ++event_;
   return Fun4AllReturnCodes::EVENT_OK;
@@ -157,9 +148,6 @@ int TopoClusterHCalTree::End(PHCompositeNode * /*topNode*/)
 
   output_file_->cd();
   tree_->Write();
-  TNamed("input_file", input_file_name_.c_str()).Write();
-  TNamed("sample", sample_name_.c_str()).Write();
-  TNamed("topocluster_node", topocluster_node_name_.c_str()).Write();
   close_output_file();
 
   std::cout << Name() << "::End - wrote " << event_ << " events to "
@@ -170,10 +158,8 @@ int TopoClusterHCalTree::End(PHCompositeNode * /*topNode*/)
 void TopoClusterHCalTree::create_branches()
 {
   tree_->Branch("sample_id", &sample_id_);
-  tree_->Branch("job_index", &job_index_);
   tree_->Branch("process_id", &process_id_);
   tree_->Branch("event", &event_);
-  tree_->Branch("event_uid", &event_uid_);
   tree_->Branch("n_topocluster", &n_topocluster_);
 
   tree_->Branch("topocluster_id", &topocluster_id_);

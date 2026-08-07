@@ -30,10 +30,8 @@ Tree名は`topocluster_tree`、1 entryは1 eventです。energyの単位はGeV�
 | branch | 型 | 内容 |
 | --- | --- | --- |
 | `sample_id` | `unsigned int` | `0=gamma`, `1=pi0` |
-| `job_index` | `unsigned int` | sample内のCondor `process_shift` |
 | `process_id` | `unsigned int` | 入力DSTの6桁file番号 |
 | `event` | `unsigned int` | DST内の0始まりevent番号 |
-| `event_uid` | `unsigned long long` | sample、process ID、eventから作るUID |
 | `n_topocluster` | `unsigned int` | event内のall-calorimeter TopoCluster数 |
 | `topocluster_id` | `vector<unsigned int>` | `RawCluster::get_id()` |
 | `emcal_energy` | `vector<float>` | CEMC tower contributionの和 |
@@ -44,14 +42,6 @@ Tree名は`topocluster_tree`、1 entryは1 eventです。energyの単位はGeV�
 | `other_calo_energy` | `vector<float>` | 想定外のcalorimeter IDを持つcontributionの和 |
 | `energy_residual` | `vector<float>` | `topocluster_energy`から全component和を引いた値 |
 | `<calo>_ntower` | `vector<unsigned int>` | 各componentを構成するtower数 |
-
-`event_uid`の上位32 bitには次の`source_id`を使い、gammaとpi0で同じ
-process IDを使っても衝突しないようにします。
-
-```cpp
-source_id = (sample_id << 31U) | process_id;
-event_uid = (static_cast<unsigned long long>(source_id) << 32U) | event;
-```
 
 ## Build
 

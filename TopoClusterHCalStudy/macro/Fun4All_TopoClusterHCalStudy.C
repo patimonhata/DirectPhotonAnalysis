@@ -37,20 +37,16 @@ int Fun4All_TopoClusterHCalStudy(
   const std::string input_file = input_directory + "/DST_single_" + sample + "_reconstructedInfo_" + process_tag + ".root";
   const std::string output_file = output_file_override.empty() ? output_directory + "/topocluster_hcal_" + sample + "_" + process_tag + ".root" : output_file_override;
 
-  if (!std::filesystem::is_regular_file(input_file))
-  {
-    std::cerr << "Fun4All_TopoClusterHCalStudy - input does not exist: "
-              << input_file << std::endl;
+  if (!std::filesystem::is_regular_file(input_file)) {
+    std::cerr << "Fun4All_TopoClusterHCalStudy - input does not exist: " << input_file << std::endl;
     return EXIT_FAILURE;
   }
 
   const std::filesystem::path output_path(output_file);
   std::error_code directory_error;
   std::filesystem::create_directories(output_path.parent_path(), directory_error);
-  if (directory_error)
-  {
-    std::cerr << "Fun4All_TopoClusterHCalStudy - could not create output directory: "
-              << directory_error.message() << std::endl;
+  if (directory_error) {
+    std::cerr << "Fun4All_TopoClusterHCalStudy - could not create output directory: " << directory_error.message() << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -63,12 +59,9 @@ int Fun4All_TopoClusterHCalStudy(
 
   const bool is_pi0 = sample == "pi0";
   auto *tree_maker = new TopoClusterHCalTree("TopoClusterHCalTree");
-  tree_maker->set_input_file_name(input_file);
   tree_maker->set_output_file_name(output_file);
   tree_maker->set_topocluster_node_name("TOPOCLUSTER_ALLCALO");
-  tree_maker->set_sample_name(sample);
   tree_maker->set_sample_id(is_pi0 ? 1U : 0U);
-  tree_maker->set_job_index(static_cast<unsigned int>(process_id));
   tree_maker->set_process_id(static_cast<unsigned int>(process_id));
   server->registerSubsystem(tree_maker);
 

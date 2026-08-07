@@ -26,10 +26,6 @@ fi
 
 printf -v process_tag '%06d' "$process_id"
 output_file="$study_dir/output/root/topocluster_hcal_${sample}_${process_tag}.root"
-if [[ -e "$output_file" ]]; then
-  echo "Refusing to overwrite existing output: $output_file" >&2
-  exit 3
-fi
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n "${SPHENIX_RELEASE:-ana}"
 export LD_LIBRARY_PATH="$study_dir/install/lib:$study_dir/install/lib64:${LD_LIBRARY_PATH:-}"

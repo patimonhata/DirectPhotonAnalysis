@@ -29,19 +29,13 @@ Tree名は`topocluster_tree`、1 entryは1 eventです。energyの単位はGeV�
 
 | branch | 型 | 内容 |
 | --- | --- | --- |
-| `sample_id` | `unsigned int` | `0=gamma`, `1=pi0` |
 | `process_id` | `unsigned int` | 入力DSTの6桁file番号 |
 | `event` | `unsigned int` | DST内の0始まりevent番号 |
 | `n_topocluster` | `unsigned int` | event内のall-calorimeter TopoCluster数 |
-| `topocluster_id` | `vector<unsigned int>` | `RawCluster::get_id()` |
 | `emcal_energy` | `vector<float>` | CEMC tower contributionの和 |
 | `hcalin_energy` | `vector<float>` | inner HCAL tower contributionの和 |
 | `hcalout_energy` | `vector<float>` | outer HCAL tower contributionの和 |
 | `hcal_total_energy` | `vector<float>` | `hcalin_energy + hcalout_energy` |
-| `topocluster_energy` | `vector<float>` | `RawCluster::get_energy()` |
-| `other_calo_energy` | `vector<float>` | 想定外のcalorimeter IDを持つcontributionの和 |
-| `energy_residual` | `vector<float>` | `topocluster_energy`から全component和を引いた値 |
-| `<calo>_ntower` | `vector<unsigned int>` | 各componentを構成するtower数 |
 
 ## Build
 
@@ -95,7 +89,7 @@ gammaとpi0の必要なjobが揃った後に実行します。file数は固定�
 ./merge_outputs.sh
 ```
 
-gamma、pi0、および両sampleを合わせた3 filesを`output/merge`に作ります。
+gammaとpi0それぞれのmerged fileを`output/merge`に作ります。
 
 ## 二次元相関の例
 

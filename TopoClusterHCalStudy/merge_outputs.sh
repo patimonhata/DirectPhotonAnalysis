@@ -19,8 +19,7 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n "${SPHENIX_RELEASE:-ana}"
 
 gamma_output="$merge_dir/topocluster_hcal_gamma_merged.root"
 pi0_output="$merge_dir/topocluster_hcal_pi0_merged.root"
-combined_output="$merge_dir/topocluster_hcal_gamma_pi0_merged.root"
-for output in "$gamma_output" "$pi0_output" "$combined_output"; do
+for output in "$gamma_output" "$pi0_output"; do
   if [[ -e "$output" ]]; then
     echo "Refusing to overwrite existing merge output: $output" >&2
     exit 3
@@ -30,4 +29,3 @@ done
 echo "Merging ${#gamma_files[@]} gamma files and ${#pi0_files[@]} pi0 files"
 hadd "$gamma_output" "${gamma_files[@]}"
 hadd "$pi0_output" "${pi0_files[@]}"
-hadd "$combined_output" "$gamma_output" "$pi0_output"

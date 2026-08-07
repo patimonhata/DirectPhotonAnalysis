@@ -53,18 +53,10 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
   }
 
   const std::size_t capacity = clusters->size();
-  topocluster_id_.reserve(capacity);
   emcal_energy_.reserve(capacity);
   hcalin_energy_.reserve(capacity);
   hcalout_energy_.reserve(capacity);
   hcal_total_energy_.reserve(capacity);
-  other_calo_energy_.reserve(capacity);
-  topocluster_energy_.reserve(capacity);
-  energy_residual_.reserve(capacity);
-  emcal_ntower_.reserve(capacity);
-  hcalin_ntower_.reserve(capacity);
-  hcalout_ntower_.reserve(capacity);
-  other_calo_ntower_.reserve(capacity);
 
   const RawClusterContainer::ConstRange cluster_range = clusters->getClusters();
   for (auto cluster_iter = cluster_range.first; cluster_iter != cluster_range.second; ++cluster_iter)
@@ -79,11 +71,6 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
     float emcal_energy = 0.0F;
     float hcalin_energy = 0.0F;
     float hcalout_energy = 0.0F;
-    float other_calo_energy = 0.0F;
-    unsigned int emcal_ntower = 0;
-    unsigned int hcalin_ntower = 0;
-    unsigned int hcalout_ntower = 0;
-    unsigned int other_calo_ntower = 0;
 
     const RawCluster::TowerConstRange tower_range = cluster->get_towers();
     for (auto tower_iter = tower_range.first; tower_iter != tower_range.second; ++tower_iter)
@@ -99,41 +86,25 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
       {
       case RawTowerDefs::CEMC:
         emcal_energy += contribution;
-        ++emcal_ntower;
         break;
       case RawTowerDefs::HCALIN:
         hcalin_energy += contribution;
-        ++hcalin_ntower;
         break;
       case RawTowerDefs::HCALOUT:
         hcalout_energy += contribution;
-        ++hcalout_ntower;
         break;
       default:
-        other_calo_energy += contribution;
-        ++other_calo_ntower;
         break;
       }
     }
 
-    const float hcal_total_energy = hcalin_energy + hcalout_energy;
-    const float component_sum = emcal_energy + hcal_total_energy + other_calo_energy;
-
-    topocluster_id_.push_back(static_cast<unsigned int>(cluster->get_id()));
     emcal_energy_.push_back(emcal_energy);
     hcalin_energy_.push_back(hcalin_energy);
     hcalout_energy_.push_back(hcalout_energy);
-    hcal_total_energy_.push_back(hcal_total_energy);
-    other_calo_energy_.push_back(other_calo_energy);
-    topocluster_energy_.push_back(cluster->get_energy());
-    energy_residual_.push_back(cluster->get_energy() - component_sum);
-    emcal_ntower_.push_back(emcal_ntower);
-    hcalin_ntower_.push_back(hcalin_ntower);
-    hcalout_ntower_.push_back(hcalout_ntower);
-    other_calo_ntower_.push_back(other_calo_ntower);
+    hcal_total_energy_.push_back(hcalin_energy + hcalout_energy);
   }
 
-  n_topocluster_ = static_cast<unsigned int>(topocluster_id_.size());
+  n_topocluster_ = static_cast<unsigned int>(emcal_energy_.size());
   tree_->Fill();
   ++event_;
   return Fun4AllReturnCodes::EVENT_OK;
@@ -157,41 +128,23 @@ int TopoClusterHCalTree::End(PHCompositeNode * /*topNode*/)
 
 void TopoClusterHCalTree::create_branches()
 {
-  tree_->Branch("sample_id", &sample_id_);
   tree_->Branch("process_id", &process_id_);
   tree_->Branch("event", &event_);
   tree_->Branch("n_topocluster", &n_topocluster_);
 
-  tree_->Branch("topocluster_id", &topocluster_id_);
   tree_->Branch("emcal_energy", &emcal_energy_);
   tree_->Branch("hcalin_energy", &hcalin_energy_);
   tree_->Branch("hcalout_energy", &hcalout_energy_);
   tree_->Branch("hcal_total_energy", &hcal_total_energy_);
-  tree_->Branch("other_calo_energy", &other_calo_energy_);
-  tree_->Branch("topocluster_energy", &topocluster_energy_);
-  tree_->Branch("energy_residual", &energy_residual_);
-
-  tree_->Branch("emcal_ntower", &emcal_ntower_);
-  tree_->Branch("hcalin_ntower", &hcalin_ntower_);
-  tree_->Branch("hcalout_ntower", &hcalout_ntower_);
-  tree_->Branch("other_calo_ntower", &other_calo_ntower_);
 }
 
 void TopoClusterHCalTree::reset_event()
 {
   n_topocluster_ = 0;
-  topocluster_id_.clear();
   emcal_energy_.clear();
   hcalin_energy_.clear();
   hcalout_energy_.clear();
   hcal_total_energy_.clear();
-  other_calo_energy_.clear();
-  topocluster_energy_.clear();
-  energy_residual_.clear();
-  emcal_ntower_.clear();
-  hcalin_ntower_.clear();
-  hcalout_ntower_.clear();
-  other_calo_ntower_.clear();
 }
 
 void TopoClusterHCalTree::close_output_file()

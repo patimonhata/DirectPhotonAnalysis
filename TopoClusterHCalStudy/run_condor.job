@@ -10,7 +10,7 @@ job_lease_duration = 86400
 
 runnumber          = 0
 n_events           = 0
-sample             = gamma
+sample             = pi0
 input_directory    = /sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_gamma_25to35GeV_etapm1_vertexpm60
 job_offset         = 0
 process_shift      = $(Process) + $(job_offset)

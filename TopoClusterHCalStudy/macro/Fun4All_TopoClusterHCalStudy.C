@@ -57,11 +57,9 @@ int Fun4All_TopoClusterHCalStudy(
   input_manager->AddFile(input_file);
   server->registerInputManager(input_manager);
 
-  const bool is_pi0 = sample == "pi0";
   auto *tree_maker = new TopoClusterHCalTree("TopoClusterHCalTree");
   tree_maker->set_output_file_name(output_file);
   tree_maker->set_topocluster_node_name("TOPOCLUSTER_ALLCALO");
-  tree_maker->set_sample_id(is_pi0 ? 1U : 0U);
   tree_maker->set_process_id(static_cast<unsigned int>(process_id));
   server->registerSubsystem(tree_maker);
 

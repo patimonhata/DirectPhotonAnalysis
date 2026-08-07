@@ -6,11 +6,12 @@ root_dir="$study_dir/output/root"
 merge_dir="$study_dir/output/merge"
 
 mkdir -p "$merge_dir"
+shopt -s nullglob
 
 gamma_files=("$root_dir"/topocluster_hcal_gamma_*.root)
 pi0_files=("$root_dir"/topocluster_hcal_pi0_*.root)
-if ((${#gamma_files[@]} != 500 || ${#pi0_files[@]} != 500)); then
-  echo "Expected 500 gamma and 500 pi0 files; found ${#gamma_files[@]} and ${#pi0_files[@]}" >&2
+if ((${#gamma_files[@]} == 0 || ${#pi0_files[@]} == 0)); then
+  echo "Need at least one gamma and one pi0 file; found ${#gamma_files[@]} and ${#pi0_files[@]}" >&2
   exit 2
 fi
 
@@ -26,6 +27,7 @@ for output in "$gamma_output" "$pi0_output" "$combined_output"; do
   fi
 done
 
+echo "Merging ${#gamma_files[@]} gamma files and ${#pi0_files[@]} pi0 files"
 hadd "$gamma_output" "${gamma_files[@]}"
 hadd "$pi0_output" "${pi0_files[@]}"
 hadd "$combined_output" "$gamma_output" "$pi0_output"

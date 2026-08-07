@@ -139,7 +139,9 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
   }
 
   n_topocluster_ = static_cast<unsigned int>(topocluster_id_.size());
-  event_uid_ = (static_cast<std::uint64_t>(job_index_) << 32U) |
+  const std::uint32_t source_id = ((sample_id_ & 0x1U) << 31U) |
+                                  (job_index_ & 0x7fffffffU);
+  event_uid_ = (static_cast<std::uint64_t>(source_id) << 32U) |
                static_cast<std::uint64_t>(event_);
   tree_->Fill();
   ++event_;

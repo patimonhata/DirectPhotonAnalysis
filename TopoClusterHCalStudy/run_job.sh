@@ -2,27 +2,29 @@
 set -eo pipefail
 
 study_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-job_index=${1:?usage: run_job.sh JOB_INDEX [N_EVENTS]}
-n_events=${2:-0}
+process_id=${1:?usage: run_job.sh PROCESS_ID SAMPLE INPUT_DIRECTORY [N_EVENTS]}
+sample=${2:?usage: run_job.sh PROCESS_ID SAMPLE INPUT_DIRECTORY [N_EVENTS]}
+input_directory=${3:?usage: run_job.sh PROCESS_ID SAMPLE INPUT_DIRECTORY [N_EVENTS]}
+n_events=${4:-0}
 
-if ! [[ "$job_index" =~ ^[0-9]+$ ]] || ((job_index >= 1000)); then
-  echo "JOB_INDEX must be an integer in [0,999]" >&2
+if ! [[ "$process_id" =~ ^[0-9]+$ ]]; then
+  echo "PROCESS_ID must be a non-negative integer" >&2
+  exit 2
+fi
+if [[ "$sample" != "gamma" && "$sample" != "pi0" ]]; then
+  echo "SAMPLE must be gamma or pi0" >&2
   exit 2
 fi
 if ! [[ "$n_events" =~ ^[0-9]+$ ]]; then
   echo "N_EVENTS must be a non-negative integer" >&2
   exit 2
 fi
-
-if ((job_index < 500)); then
-  sample=gamma
-  process_id=$job_index
-else
-  sample=pi0
-  process_id=$((job_index - 500))
+if [[ ! -d "$input_directory" ]]; then
+  echo "INPUT_DIRECTORY does not exist: $input_directory" >&2
+  exit 2
 fi
-printf -v process_tag '%06d' "$process_id"
 
+printf -v process_tag '%06d' "$process_id"
 output_file="$study_dir/output/root/topocluster_hcal_${sample}_${process_tag}.root"
 if [[ -e "$output_file" ]]; then
   echo "Refusing to overwrite existing output: $output_file" >&2
@@ -34,4 +36,4 @@ export LD_LIBRARY_PATH="$study_dir/install/lib:$study_dir/install/lib64:${LD_LIB
 export ROOT_INCLUDE_PATH="$study_dir/install/include:${ROOT_INCLUDE_PATH:-}"
 
 root -l -b -q \
-  "$study_dir/macro/Fun4All_TopoClusterHCalStudy.C(${job_index},${n_events})"
+  "$study_dir/macro/Fun4All_TopoClusterHCalStudy.C(${process_id},${n_events},\"${sample}\",\"${input_directory}\",\"${study_dir}/output/root\")"

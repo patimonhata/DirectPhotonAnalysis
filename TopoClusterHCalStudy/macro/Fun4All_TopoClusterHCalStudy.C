@@ -17,36 +17,25 @@ R__LOAD_LIBRARY(libg4dst.so)
 R__LOAD_LIBRARY(libTopoClusterHCalStudy.so)
 
 int Fun4All_TopoClusterHCalStudy(
-    const int job_index = 0,
+    const int process_id = 0,
     const int n_events = 0,
-    const std::string project_root = "/sphenix/user/ryotaro/DirectPhotonAnalysis",
+    const std::string sample = "gamma",
+    const std::string input_directory =  "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_gamma_25to35GeV_etapm1_vertexpm60",
+    const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/root",
     const std::string output_file_override = "")
 {
-  constexpr int files_per_sample = 500;
-  if (job_index < 0 || job_index >= 2 * files_per_sample || n_events < 0)
+  if (process_id < 0 || n_events < 0 || (sample != "gamma" && sample != "pi0"))
   {
-    std::cerr << "Fun4All_TopoClusterHCalStudy - JOB_INDEX must be in [0,999] "
-              << "and N_EVENTS must be non-negative" << std::endl;
+    std::cerr << "Fun4All_TopoClusterHCalStudy - PROCESS_ID and N_EVENTS must be non-negative, and SAMPLE must be gamma or pi0" << std::endl;
     return EXIT_FAILURE;
   }
-
-  const bool is_pi0 = job_index >= files_per_sample;
-  const int process_id = is_pi0 ? job_index - files_per_sample : job_index;
-  const std::string sample = is_pi0 ? "pi0" : "gamma";
 
   std::ostringstream process_tag_stream;
   process_tag_stream << std::setw(6) << std::setfill('0') << process_id;
   const std::string process_tag = process_tag_stream.str();
 
-  const std::string study_directory = project_root + "/TopoClusterHCalStudy";
-  const std::string input_directory =
-      project_root + "/SinglePi0GunSimulation/output/DST_" + sample +
-      "_25to35GeV_etapm1_vertexpm60";
-  const std::string input_file = input_directory + "/DST_single_" + sample +
-      "_reconstructedInfo_" + process_tag + ".root";
-  const std::string output_file = output_file_override.empty()
-      ? study_directory + "/output/root/topocluster_hcal_" + sample + "_" + process_tag + ".root"
-      : output_file_override;
+  const std::string input_file = input_directory + "/DST_single_" + sample + "_reconstructedInfo_" + process_tag + ".root";
+  const std::string output_file = output_file_override.empty() ? output_directory + "/topocluster_hcal_" + sample + "_" + process_tag + ".root" : output_file_override;
 
   if (!std::filesystem::is_regular_file(input_file))
   {
@@ -72,17 +61,19 @@ int Fun4All_TopoClusterHCalStudy(
   input_manager->AddFile(input_file);
   server->registerInputManager(input_manager);
 
+  const bool is_pi0 = sample == "pi0";
   auto *tree_maker = new TopoClusterHCalTree("TopoClusterHCalTree");
   tree_maker->set_input_file_name(input_file);
   tree_maker->set_output_file_name(output_file);
   tree_maker->set_topocluster_node_name("TOPOCLUSTER_ALLCALO");
   tree_maker->set_sample_name(sample);
   tree_maker->set_sample_id(is_pi0 ? 1U : 0U);
-  tree_maker->set_job_index(static_cast<unsigned int>(job_index));
+  tree_maker->set_job_index(static_cast<unsigned int>(process_id));
   tree_maker->set_process_id(static_cast<unsigned int>(process_id));
   server->registerSubsystem(tree_maker);
 
   std::cout << "Fun4All_TopoClusterHCalStudy - sample: " << sample << '\n'
+            << "Fun4All_TopoClusterHCalStudy - process ID: " << process_id << '\n'
             << "Fun4All_TopoClusterHCalStudy - input: " << input_file << '\n'
             << "Fun4All_TopoClusterHCalStudy - output: " << output_file << std::endl;
 

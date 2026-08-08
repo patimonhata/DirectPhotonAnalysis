@@ -8,7 +8,6 @@ request_memory     = 2GB
 Priority           = 20
 job_lease_duration = 86400
 
-runnumber          = 0
 n_events           = 0
 sample             = gamma
 input_directory    = /sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_$(sample)_35to45GeV_etapm1_vertexpm60
@@ -16,9 +15,9 @@ job_offset         = 0
 process_shift      = $(Process) + $(job_offset)
 output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/condor
 
-Output             = $(output_directory)/$(sample)_$(runnumber)_$INT(process_shift,%06d).out
-Error              = $(output_directory)/$(sample)_$(runnumber)_$INT(process_shift,%06d).err
-Log                = /tmp/ryotaro-TopoClusterHCalStudy_$(sample)_$(runnumber)_$INT(process_shift,%06d).log
+Output             = $(output_directory)/$(sample)_$INT(process_shift,%06d).out
+Error              = $(output_directory)/$(sample)_$INT(process_shift,%06d).err
+Log                = /tmp/ryotaro-TopoClusterHCalStudy_$(sample)_$INT(process_shift,%06d).log
 Arguments          = "$INT(process_shift) $(sample) $(input_directory) $(n_events)"
 
 Queue 5000

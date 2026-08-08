@@ -16,6 +16,11 @@
 #include <cmath>
 #include <iostream>
 
+namespace
+{
+constexpr const char *topocluster_node_name = "TOPOCLUSTER_ALLCALO";
+}
+
 TopoClusterHCalTree::TopoClusterHCalTree(const std::string &name)
   : SubsysReco(name)
 {
@@ -39,7 +44,7 @@ int TopoClusterHCalTree::Init(PHCompositeNode * /*topNode*/)
   tree_ = new TTree("topocluster_tree", "All-calorimeter TopoCluster energy components");
   create_branches();
 
-  std::cout << Name() << "::Init - node: " << topocluster_node_name_ << '\n'
+  std::cout << Name() << "::Init - node: " << topocluster_node_name << '\n'
             << Name() << "::Init - output: " << output_file_name_ << std::endl;
   return Fun4AllReturnCodes::EVENT_OK;
 }
@@ -48,10 +53,10 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
 {
   reset_event();
 
-  auto *clusters = findNode::getClass<RawClusterContainer>(topNode, topocluster_node_name_);
+  auto *clusters = findNode::getClass<RawClusterContainer>(topNode, topocluster_node_name);
   if (!clusters)
   {
-    std::cerr << Name() << "::process_event - missing RawClusterContainer node " << topocluster_node_name_ << std::endl;
+    std::cerr << Name() << "::process_event - missing RawClusterContainer node " << topocluster_node_name << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
@@ -134,7 +139,7 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
     const RawCluster *cluster = cluster_iter->second;
     if (!cluster)
     {
-      std::cerr << Name() << "::process_event - null cluster pointer in " << topocluster_node_name_ << std::endl;
+      std::cerr << Name() << "::process_event - null cluster pointer in " << topocluster_node_name << std::endl;
       return Fun4AllReturnCodes::ABORTRUN;
     }
 

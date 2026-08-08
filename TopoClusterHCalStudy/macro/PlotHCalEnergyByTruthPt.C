@@ -1,7 +1,7 @@
 #include <TCanvas.h>
-#include <TChain.h>
+#include <TFile.h>
+#include <TTree.h>
 #include <TH1D.h>
-#include <TLatex.h>
 #include <TLegend.h>
 #include <TStyle.h>
 
@@ -26,74 +26,56 @@ constexpr double hcal_energy_min = 0.0;
 constexpr double hcal_energy_max = 3.0;
 
 using HistogramArray = std::array<std::unique_ptr<TH1D>, n_truth_pt_bins>;
-using CountArray = std::array<Long64_t, n_truth_pt_bins>;
 
-bool load_chain(TChain &chain, const std::string &input_pattern)
+bool load_hcal_energy_tree(
+    TFile &file,
+    TTree *&tree,
+    const std::string &input_file)
 {
-  if (chain.Add(input_pattern.c_str()) == 0)
+  if (file.IsZombie())
   {
-    std::cerr << "PlotHCalEnergyByTruthPt - no input files matched: "
-              << input_pattern << std::endl;
+    std::cerr << "PlotHCalEnergyByTruthPt - could not open input file: "
+              << input_file << std::endl;
     return false;
   }
 
-  if (chain.GetEntries() <= 0 || !chain.GetBranch("truth_pt") ||
-      !chain.GetBranch("truth_eta") ||
-      !chain.GetBranch("truth_energy_asymmetry") ||
-      !chain.GetBranch("emcal_energy") ||
-      !chain.GetBranch("hcal_total_energy"))
+  file.GetObject("topocluster_tree", tree);
+  if (!tree || tree->GetEntries() <= 0 || !tree->GetBranch("truth_pt") ||
+      !tree->GetBranch("truth_eta") ||
+      !tree->GetBranch("truth_energy_asymmetry") ||
+      !tree->GetBranch("emcal_energy") ||
+      !tree->GetBranch("hcal_total_energy"))
   {
-    std::cerr << "PlotHCalEnergyByTruthPt - missing entries or required branches in: "
-              << input_pattern << std::endl;
+    std::cerr << "PlotHCalEnergyByTruthPt - missing tree, entries, or required branches in: "
+              << input_file << std::endl;
     return false;
   }
   return true;
 }
 
-bool determine_truth_pt_minimum(
-    TChain &gamma_chain,
-    TChain &pi0_chain,
-    int &truth_pt_minimum)
-{
-  const double observed_minimum = std::min(
-      gamma_chain.GetMinimum("truth_pt"),
-      pi0_chain.GetMinimum("truth_pt"));
-  const double observed_maximum = std::max(
-      gamma_chain.GetMaximum("truth_pt"),
-      pi0_chain.GetMaximum("truth_pt"));
+bool determine_truth_pt_minimum(TTree &gamma_tree, TTree &pi0_tree, int &truth_pt_minimum) {
+  const double observed_minimum = std::min(gamma_tree.GetMinimum("truth_pt"), pi0_tree.GetMinimum("truth_pt"));
+  const double observed_maximum = std::max(gamma_tree.GetMaximum("truth_pt"), pi0_tree.GetMaximum("truth_pt"));
 
-  if (observed_minimum >= 25.0 && observed_maximum <= 35.0)
-  {
+  if (observed_minimum >= 25.0 && observed_maximum <= 35.0) {
     truth_pt_minimum = 25;
-  }
-  else if (observed_minimum >= 35.0 && observed_maximum <= 45.0)
-  {
+  } else if (observed_minimum >= 35.0 && observed_maximum <= 45.0) {
     truth_pt_minimum = 35;
-  }
-  else
-  {
+  } else {
     std::cerr << "PlotHCalEnergyByTruthPt - expected truth pT range 25-35 or 35-45 GeV, observed "
               << observed_minimum << "-" << observed_maximum << " GeV"
               << std::endl;
     return false;
   }
 
-  std::cout << "PlotHCalEnergyByTruthPt - observed truth pT range: "
-            << observed_minimum << "-" << observed_maximum << " GeV"
-            << std::endl;
+  std::cout << "PlotHCalEnergyByTruthPt - observed truth pT range: " << observed_minimum << "-" << observed_maximum << " GeV" << std::endl;
   return true;
 }
 
-void create_histograms(
-    HistogramArray &histograms,
-    const std::string &sample,
-    const int truth_pt_minimum)
-{
-  for (int bin = 0; bin < n_truth_pt_bins; ++bin)
-  {
+void create_histograms(HistogramArray &histograms, const std::string &sample, const int truth_pt_minimum) {
+  for (int bin = 0; bin < n_truth_pt_bins; ++bin) {
     const int pt_low = truth_pt_minimum + bin;
-    const std::string name = sample + "_hcal_energy_pt_" +
-        std::to_string(pt_low) + "_" + std::to_string(pt_low + 1);
+    const std::string name = sample + "_hcal_energy_pt_" + std::to_string(pt_low) + "_" + std::to_string(pt_low + 1);
     histograms[bin] = std::make_unique<TH1D>(
         name.c_str(),
         "",
@@ -106,9 +88,8 @@ void create_histograms(
 }
 
 bool fill_histograms(
-    TChain &chain,
+    TTree &tree,
     HistogramArray &histograms,
-    CountArray &counts,
     const int truth_pt_minimum,
     const double truth_abs_eta_minimum,
     const double truth_abs_eta_maximum,
@@ -121,68 +102,54 @@ bool fill_histograms(
   float truth_energy_asymmetry = -1.0F;
   std::vector<float> *emcal_energy = nullptr;
   std::vector<float> *hcal_total_energy = nullptr;
-  chain.SetBranchAddress("truth_pt", &truth_pt);
-  chain.SetBranchAddress("truth_eta", &truth_eta);
-  chain.SetBranchAddress("truth_energy_asymmetry", &truth_energy_asymmetry);
-  chain.SetBranchAddress("emcal_energy", &emcal_energy);
-  chain.SetBranchAddress("hcal_total_energy", &hcal_total_energy);
+  tree.SetBranchAddress("truth_pt", &truth_pt);
+  tree.SetBranchAddress("truth_eta", &truth_eta);
+  tree.SetBranchAddress("truth_energy_asymmetry", &truth_energy_asymmetry);
+  tree.SetBranchAddress("emcal_energy", &emcal_energy);
+  tree.SetBranchAddress("hcal_total_energy", &hcal_total_energy);
 
-  const Long64_t n_entries = chain.GetEntries();
-  for (Long64_t entry = 0; entry < n_entries; ++entry)
-  {
-    chain.GetEntry(entry);
+  const Long64_t n_entries = tree.GetEntries();
+  for (Long64_t entry = 0; entry < n_entries; ++entry) {
+    tree.GetEntry(entry);
     const double truth_abs_eta = std::abs(truth_eta);
-    if (truth_abs_eta < truth_abs_eta_minimum || truth_abs_eta >= truth_abs_eta_maximum)
-    {
+    if (truth_abs_eta < truth_abs_eta_minimum || truth_abs_eta >= truth_abs_eta_maximum) {
       continue;
     }
     if (apply_truth_energy_asymmetry_cut &&
-        (truth_energy_asymmetry < truth_energy_asymmetry_minimum ||
-         truth_energy_asymmetry >= truth_energy_asymmetry_maximum))
-    {
+        (truth_energy_asymmetry < truth_energy_asymmetry_minimum || truth_energy_asymmetry >= truth_energy_asymmetry_maximum)) {
       continue;
     }
-    const int bin = static_cast<int>(
-        std::floor((truth_pt - truth_pt_minimum) / truth_pt_bin_width));
-    if (bin < 0 || bin >= n_truth_pt_bins)
-    {
+    const int bin = static_cast<int>(std::floor((truth_pt - truth_pt_minimum) / truth_pt_bin_width));
+    if (bin < 0 || bin >= n_truth_pt_bins) {
       continue;
     }
-    if (!emcal_energy || !hcal_total_energy ||
-        emcal_energy->size() != hcal_total_energy->size())
-    {
-      std::cerr << "PlotHCalEnergyByTruthPt - inconsistent cluster vectors at entry "
-                << entry << std::endl;
-      chain.ResetBranchAddresses();
+    if (!emcal_energy || !hcal_total_energy || emcal_energy->size() != hcal_total_energy->size()) {
+      std::cerr << "PlotHCalEnergyByTruthPt - inconsistent cluster vectors at entry " << entry << std::endl;
+      tree.ResetBranchAddresses();
       return false;
     }
 
-    for (std::size_t cluster = 0; cluster < emcal_energy->size(); ++cluster)
-    {
-      if (emcal_energy->at(cluster) <= emcal_energy_threshold)
-      {
+    for (std::size_t cluster = 0; cluster < emcal_energy->size(); ++cluster) {
+      if (emcal_energy->at(cluster) <= emcal_energy_threshold) {
         continue;
       }
       histograms[bin]->Fill(hcal_total_energy->at(cluster));
-      ++counts[bin];
     }
   }
-  chain.ResetBranchAddresses();
+  tree.ResetBranchAddresses();
 
-  for (int bin = 0; bin < n_truth_pt_bins; ++bin)
-  {
+  for (int bin = 0; bin < n_truth_pt_bins; ++bin) {
+    const double count = histograms[bin]->GetEntries();
     const double integral = histograms[bin]->Integral();
-    if (counts[bin] <= 0 || integral <= 0.0)
-    {
+    if (count <= 0.0 || integral <= 0.0) {
       const double pt_low = truth_pt_minimum + bin * truth_pt_bin_width;
       const double pt_high = pt_low + truth_pt_bin_width;
-      std::cerr << "PlotHCalEnergyByTruthPt - no selected TopoClusters for truth pT bin "
-                << pt_low << "-" << pt_high << " GeV" << std::endl;
+      std::cerr << "PlotHCalEnergyByTruthPt - no selected TopoClusters for truth pT bin " << pt_low << "-" << pt_high << " GeV" << std::endl;
       return false;
     }
     // Normalize to every selected cluster, including the overflow above the
     // displayed 3 GeV range, so the visible shapes retain their tail fraction.
-    histograms[bin]->Scale(1.0 / static_cast<double>(counts[bin]));
+    histograms[bin]->Scale(1.0 / count);
   }
   return true;
 }
@@ -190,8 +157,6 @@ bool fill_histograms(
 void draw_panel(
     TH1D &gamma_histogram,
     TH1D &pi0_histogram,
-    const Long64_t gamma_count,
-    const Long64_t pi0_count,
     const int pt_low,
     const double truth_abs_eta_minimum,
     const double truth_abs_eta_maximum,
@@ -202,20 +167,14 @@ void draw_panel(
   gPad->SetRightMargin(0.04);
   gPad->SetBottomMargin(0.14);
   gPad->SetTopMargin(0.10);
-  // gPad->SetLogy();
 
-  gamma_histogram.SetTitle(Form(
-      "%d #leq p_{T}^{truth} < %d GeV;E_{HCalIn}^{cluster} + E_{HCalOut}^{cluster} [GeV];Normalized TopoClusters",
-      pt_low,
-      pt_low + 1));
+  gamma_histogram.SetTitle(Form("%d #leq p_{T}^{truth} < %d GeV;E_{HCalIn}^{cluster} + E_{HCalOut}^{cluster} [GeV];Normalized TopoClusters", pt_low, pt_low + 1));
   gamma_histogram.SetLineColor(kAzure + 2);
   gamma_histogram.SetLineWidth(3);
   pi0_histogram.SetLineColor(kOrange + 7);
   pi0_histogram.SetLineWidth(3);
 
-  const double common_maximum = std::max(
-      gamma_histogram.GetMaximum(),
-      pi0_histogram.GetMaximum());
+  const double common_maximum = std::max(gamma_histogram.GetMaximum(), pi0_histogram.GetMaximum());
   gamma_histogram.SetMinimum(1.0e-4);
   gamma_histogram.SetMaximum(2.5 * common_maximum);
   gamma_histogram.GetXaxis()->CenterTitle();
@@ -240,21 +199,15 @@ void draw_panel(
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(0.038);
-  legend.AddEntry(
-      &gamma_histogram,
-      Form("Single #gamma (N=%lld)", gamma_count),
-      "l");
-  legend.AddEntry(
-      &pi0_histogram,
-      Form("Single #pi^{0} (N=%lld)", pi0_count),
-      "l");
+  legend.AddEntry(&gamma_histogram, Form("Single #gamma (N=%.0f)", gamma_histogram.GetEntries()), "l");
+  legend.AddEntry(&pi0_histogram, Form("Single #pi^{0} (N=%.0f)", pi0_histogram.GetEntries()), "l");
   legend.DrawClone();
 }
 }  // namespace
 
 int PlotHCalEnergyByTruthPt(
-    const std::string gamma_input_pattern = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/35to45GeV/topocluster_hcal_gamma_merged.root",
-    const std::string pi0_input_pattern = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/35to45GeV/topocluster_hcal_pi0_merged.root",
+    const std::string gamma_input_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/35to45GeV/topocluster_hcal_gamma_merged.root",
+    const std::string pi0_input_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/35to45GeV/topocluster_hcal_pi0_merged.root",
     const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/plot/35to45GeV",
     const double truth_abs_eta_minimum = 0.0,
     const double truth_abs_eta_maximum = 0.1,
@@ -278,40 +231,31 @@ int PlotHCalEnergyByTruthPt(
   const std::filesystem::path output_path(output_directory);
   std::error_code directory_error;
   std::filesystem::create_directories(output_path, directory_error);
-  if (directory_error)
-  {
-    std::cerr << "PlotHCalEnergyByTruthPt - could not create output directory: "
-              << directory_error.message() << std::endl;
+  if (directory_error) {
+    std::cerr << "PlotHCalEnergyByTruthPt - could not create output directory: " << directory_error.message() << std::endl;
     return EXIT_FAILURE;
   }
 
-  TChain gamma_chain("topocluster_tree");
-  TChain pi0_chain("topocluster_tree");
-  if (!load_chain(gamma_chain, gamma_input_pattern) ||
-      !load_chain(pi0_chain, pi0_input_pattern))
-  {
+  TFile gamma_file(gamma_input_file.c_str(), "READ");
+  TFile pi0_file(pi0_input_file.c_str(), "READ");
+  TTree *gamma_tree = nullptr;
+  TTree *pi0_tree = nullptr;
+  if (!load_hcal_energy_tree(gamma_file, gamma_tree, gamma_input_file) || !load_hcal_energy_tree(pi0_file, pi0_tree, pi0_input_file)) {
     return EXIT_FAILURE;
   }
 
   int truth_pt_minimum = 0;
-  if (!determine_truth_pt_minimum(
-          gamma_chain,
-          pi0_chain,
-          truth_pt_minimum))
-  {
+  if (!determine_truth_pt_minimum(*gamma_tree, *pi0_tree, truth_pt_minimum)) {
     return EXIT_FAILURE;
   }
 
   HistogramArray gamma_histograms;
   HistogramArray pi0_histograms;
-  CountArray gamma_counts{};
-  CountArray pi0_counts{};
   create_histograms(gamma_histograms, "gamma", truth_pt_minimum);
   create_histograms(pi0_histograms, "pi0", truth_pt_minimum);
   if (!fill_histograms(
-          gamma_chain,
+          *gamma_tree,
           gamma_histograms,
-          gamma_counts,
           truth_pt_minimum,
           truth_abs_eta_minimum,
           truth_abs_eta_maximum,
@@ -319,9 +263,8 @@ int PlotHCalEnergyByTruthPt(
           truth_energy_asymmetry_minimum,
           truth_energy_asymmetry_maximum) ||
       !fill_histograms(
-          pi0_chain,
+          *pi0_tree,
           pi0_histograms,
-          pi0_counts,
           truth_pt_minimum,
           truth_abs_eta_minimum,
           truth_abs_eta_maximum,
@@ -333,21 +276,14 @@ int PlotHCalEnergyByTruthPt(
   }
 
   gStyle->SetOptStat(0);
-  TCanvas canvas(
-      "hcal_energy_by_truth_pt",
-      "HCAL energy by truth pT",
-      2000,
-      1400);
+  TCanvas canvas("hcal_energy_by_truth_pt", "HCAL energy by truth pT", 2000, 1400);
   canvas.Divide(5, 2, 0.001, 0.001);
 
-  for (int bin = 0; bin < n_truth_pt_bins; ++bin)
-  {
+  for (int bin = 0; bin < n_truth_pt_bins; ++bin) {
     canvas.cd(bin + 1);
     draw_panel(
         *gamma_histograms[bin],
         *pi0_histograms[bin],
-        gamma_counts[bin],
-        pi0_counts[bin],
         truth_pt_minimum + bin,
         truth_abs_eta_minimum,
         truth_abs_eta_maximum,
@@ -360,22 +296,15 @@ int PlotHCalEnergyByTruthPt(
   std::replace(eta_tag.begin(), eta_tag.end(), '.', 'p');
   std::string asymmetry_tag = Form("%.3gto%.3g", truth_energy_asymmetry_minimum, truth_energy_asymmetry_maximum);
   std::replace(asymmetry_tag.begin(), asymmetry_tag.end(), '.', 'p');
-  const std::string output_file =
-      (output_path /
-       ("hcal_total_energy_truth_pt_" +
-        std::to_string(truth_pt_minimum) + "to" +
-        std::to_string(truth_pt_maximum) +
-        "_abseta_" + eta_tag +
-        "_pi0ae_" + asymmetry_tag + ".pdf"))
-          .string();
+  const std::string output_file = (output_path / ("hcal_total_energy_truth_pt_" + std::to_string(truth_pt_minimum) + "to" + std::to_string(truth_pt_maximum) + "_abseta_" + eta_tag + "_pi0ae_" + asymmetry_tag + ".pdf")).string();
   canvas.SaveAs(output_file.c_str());
 
-  for (int bin = 0; bin < n_truth_pt_bins; ++bin)
-  {
+  for (int bin = 0; bin < n_truth_pt_bins; ++bin) {
     std::cout << "PlotHCalEnergyByTruthPt - "
               << truth_pt_minimum + bin << "-"
               << truth_pt_minimum + bin + 1 << " GeV: gamma="
-              << gamma_counts[bin] << ", pi0=" << pi0_counts[bin]
+              << gamma_histograms[bin]->GetEntries()
+              << ", pi0=" << pi0_histograms[bin]->GetEntries()
               << std::endl;
   }
   std::cout << "PlotHCalEnergyByTruthPt - output: "

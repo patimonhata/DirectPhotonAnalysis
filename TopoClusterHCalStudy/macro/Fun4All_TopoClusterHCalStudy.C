@@ -21,11 +21,9 @@ int Fun4All_TopoClusterHCalStudy(
     const int n_events = 0,
     const std::string sample = "gamma",
     const std::string input_directory =  "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_gamma_25to35GeV_etapm1_vertexpm60",
-    const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/root",
-    const std::string output_file_override = "")
+    const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/root")
 {
-  if (process_id < 0 || n_events < 0 || (sample != "gamma" && sample != "pi0"))
-  {
+  if (process_id < 0 || n_events < 0 || (sample != "gamma" && sample != "pi0")) {
     std::cerr << "Fun4All_TopoClusterHCalStudy - PROCESS_ID and N_EVENTS must be non-negative, and SAMPLE must be gamma or pi0" << std::endl;
     return EXIT_FAILURE;
   }
@@ -35,7 +33,7 @@ int Fun4All_TopoClusterHCalStudy(
   const std::string process_tag = process_tag_stream.str();
 
   const std::string input_file = input_directory + "/DST_single_" + sample + "_reconstructedInfo_" + process_tag + ".root";
-  const std::string output_file = output_file_override.empty() ? output_directory + "/topocluster_hcal_" + sample + "_" + process_tag + ".root" : output_file_override;
+  const std::string output_file = output_directory + "/topocluster_hcal_" + sample + "_" + process_tag + ".root";
 
   if (!std::filesystem::is_regular_file(input_file)) {
     std::cerr << "Fun4All_TopoClusterHCalStudy - input does not exist: " << input_file << std::endl;
@@ -59,7 +57,6 @@ int Fun4All_TopoClusterHCalStudy(
 
   auto *tree_maker = new TopoClusterHCalTree("TopoClusterHCalTree");
   tree_maker->set_output_file_name(output_file);
-  tree_maker->set_topocluster_node_name("TOPOCLUSTER_ALLCALO");
   tree_maker->set_process_id(static_cast<unsigned int>(process_id));
   server->registerSubsystem(tree_maker);
 
@@ -75,10 +72,8 @@ int Fun4All_TopoClusterHCalStudy(
   // run(0) consumes the sole input through EOF and reports ABORTEVENT (-1).
   const bool run_ok = run_status == Fun4AllReturnCodes::EVENT_OK ||
       (n_events == 0 && run_status == Fun4AllReturnCodes::ABORTEVENT);
-  if (!run_ok || end_status != Fun4AllReturnCodes::EVENT_OK)
-  {
-    std::cerr << "Fun4All_TopoClusterHCalStudy - failed (run=" << run_status
-              << ", End=" << end_status << ')' << std::endl;
+  if (!run_ok || end_status != Fun4AllReturnCodes::EVENT_OK) {
+    std::cerr << "Fun4All_TopoClusterHCalStudy - failed (run=" << run_status << ", End=" << end_status << ')' << std::endl;
     gSystem->Exit(EXIT_FAILURE);
     return EXIT_FAILURE;
   }

@@ -24,9 +24,6 @@ if [[ ! -d "$input_directory" ]]; then
   exit 2
 fi
 
-printf -v process_tag '%06d' "$process_id"
-output_file="$study_dir/output/root/topocluster_hcal_${sample}_${process_tag}.root"
-
 source /opt/sphenix/core/bin/sphenix_setup.sh -n "${SPHENIX_RELEASE:-ana}"
 export LD_LIBRARY_PATH="$study_dir/install/lib:$study_dir/install/lib64:${LD_LIBRARY_PATH:-}"
 export ROOT_INCLUDE_PATH="$study_dir/install/include:${ROOT_INCLUDE_PATH:-}"

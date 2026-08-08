@@ -36,6 +36,9 @@ class TopoClusterHCalTree : public SubsysReco
   unsigned int event_ = 0;
   unsigned int n_topocluster_ = 0;
   float truth_pt_ = 0.0F;
+  float truth_eta_ = 0.0F;
+  float truth_vertex_z_ = 0.0F;
+  float truth_energy_asymmetry_ = -1.0F;
 
   std::vector<float> emcal_energy_;
   std::vector<float> hcalin_energy_;

@@ -6,6 +6,7 @@
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <g4main/PHG4Particle.h>
 #include <g4main/PHG4TruthInfoContainer.h>
+#include <g4main/PHG4VtxPoint.h>
 #include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
 
@@ -69,11 +70,56 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
   }
 
   const PHG4Particle *primary = primary_range.first->second;
-  truth_pt_ = std::hypot(primary->get_px(), primary->get_py());
-  if (!std::isfinite(truth_pt_))
+  const PHG4VtxPoint *primary_vertex = truth->GetVtx(primary->get_vtx_id());
+  if (!primary_vertex || !std::isfinite(primary_vertex->get_z()))
   {
-    std::cerr << Name() << "::process_event - non-finite primary truth pT" << std::endl;
+    std::cerr << Name() << "::process_event - missing or invalid primary truth vertex" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
+  }
+  truth_vertex_z_ = primary_vertex->get_z();
+  truth_pt_ = std::hypot(primary->get_px(), primary->get_py());
+  if (!std::isfinite(truth_pt_) || truth_pt_ <= 0.0F)
+  {
+    std::cerr << Name() << "::process_event - invalid primary truth pT" << std::endl;
+    return Fun4AllReturnCodes::ABORTRUN;
+  }
+  truth_eta_ = std::asinh(primary->get_pz() / truth_pt_);
+  if (!std::isfinite(truth_eta_))
+  {
+    std::cerr << Name() << "::process_event - non-finite primary truth eta" << std::endl;
+    return Fun4AllReturnCodes::ABORTRUN;
+  }
+
+  if (primary->get_pid() == 111)
+  {
+    const PHG4Particle *decay_photons[2] = {nullptr, nullptr};
+    unsigned int photon_count = 0;
+    const auto particle_range = truth->GetParticleRange();
+    for (auto particle_iter = particle_range.first; particle_iter != particle_range.second; ++particle_iter)
+    {
+      const PHG4Particle *daughter = particle_iter->second;
+      if (!daughter ||
+          daughter->get_parent_id() != primary->get_track_id() ||
+          daughter->get_pid() != 22)
+      {
+        continue;
+      }
+      if (photon_count < 2)
+      {
+        decay_photons[photon_count] = daughter;
+      }
+      ++photon_count;
+    }
+    if (photon_count == 2)
+    {
+      const double energy_1 = decay_photons[0]->get_e();
+      const double energy_2 = decay_photons[1]->get_e();
+      const double energy_sum = energy_1 + energy_2;
+      if (std::isfinite(energy_1) && std::isfinite(energy_2) && energy_sum > 0.0)
+      {
+        truth_energy_asymmetry_ = std::abs(energy_1 - energy_2) / energy_sum;
+      }
+    }
   }
 
   const std::size_t capacity = clusters->size();
@@ -156,6 +202,9 @@ void TopoClusterHCalTree::create_branches()
   tree_->Branch("event", &event_);
   tree_->Branch("n_topocluster", &n_topocluster_);
   tree_->Branch("truth_pt", &truth_pt_);
+  tree_->Branch("truth_eta", &truth_eta_);
+  tree_->Branch("truth_vertex_z", &truth_vertex_z_);
+  tree_->Branch("truth_energy_asymmetry", &truth_energy_asymmetry_);
 
   tree_->Branch("emcal_energy", &emcal_energy_);
   tree_->Branch("hcalin_energy", &hcalin_energy_);
@@ -167,6 +216,9 @@ void TopoClusterHCalTree::reset_event()
 {
   n_topocluster_ = 0;
   truth_pt_ = 0.0F;
+  truth_eta_ = 0.0F;
+  truth_vertex_z_ = 0.0F;
+  truth_energy_asymmetry_ = -1.0F;
   emcal_energy_.clear();
   hcalin_energy_.clear();
   hcalout_energy_.clear();

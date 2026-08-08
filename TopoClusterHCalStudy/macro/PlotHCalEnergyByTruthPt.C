@@ -13,6 +13,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -20,7 +21,7 @@ constexpr int n_truth_pt_bins = 10;
 constexpr double truth_pt_bin_width = 1.0;
 constexpr double emcal_energy_threshold = 10.0;
 
-constexpr int n_hcal_energy_bins = 120;
+constexpr int n_hcal_energy_bins = 30;
 constexpr double hcal_energy_min = 0.0;
 constexpr double hcal_energy_max = 3.0;
 
@@ -37,6 +38,8 @@ bool load_chain(TChain &chain, const std::string &input_pattern)
   }
 
   if (chain.GetEntries() <= 0 || !chain.GetBranch("truth_pt") ||
+      !chain.GetBranch("truth_eta") ||
+      !chain.GetBranch("truth_energy_asymmetry") ||
       !chain.GetBranch("emcal_energy") ||
       !chain.GetBranch("hcal_total_energy"))
   {
@@ -106,12 +109,21 @@ bool fill_histograms(
     TChain &chain,
     HistogramArray &histograms,
     CountArray &counts,
-    const int truth_pt_minimum)
+    const int truth_pt_minimum,
+    const double truth_abs_eta_minimum,
+    const double truth_abs_eta_maximum,
+    const bool apply_truth_energy_asymmetry_cut,
+    const double truth_energy_asymmetry_minimum,
+    const double truth_energy_asymmetry_maximum)
 {
   float truth_pt = 0.0F;
+  float truth_eta = 0.0F;
+  float truth_energy_asymmetry = -1.0F;
   std::vector<float> *emcal_energy = nullptr;
   std::vector<float> *hcal_total_energy = nullptr;
   chain.SetBranchAddress("truth_pt", &truth_pt);
+  chain.SetBranchAddress("truth_eta", &truth_eta);
+  chain.SetBranchAddress("truth_energy_asymmetry", &truth_energy_asymmetry);
   chain.SetBranchAddress("emcal_energy", &emcal_energy);
   chain.SetBranchAddress("hcal_total_energy", &hcal_total_energy);
 
@@ -119,6 +131,17 @@ bool fill_histograms(
   for (Long64_t entry = 0; entry < n_entries; ++entry)
   {
     chain.GetEntry(entry);
+    const double truth_abs_eta = std::abs(truth_eta);
+    if (truth_abs_eta < truth_abs_eta_minimum || truth_abs_eta >= truth_abs_eta_maximum)
+    {
+      continue;
+    }
+    if (apply_truth_energy_asymmetry_cut &&
+        (truth_energy_asymmetry < truth_energy_asymmetry_minimum ||
+         truth_energy_asymmetry >= truth_energy_asymmetry_maximum))
+    {
+      continue;
+    }
     const int bin = static_cast<int>(
         std::floor((truth_pt - truth_pt_minimum) / truth_pt_bin_width));
     if (bin < 0 || bin >= n_truth_pt_bins)
@@ -157,7 +180,9 @@ bool fill_histograms(
                 << pt_low << "-" << pt_high << " GeV" << std::endl;
       return false;
     }
-    histograms[bin]->Scale(1.0 / integral);
+    // Normalize to every selected cluster, including the overflow above the
+    // displayed 3 GeV range, so the visible shapes retain their tail fraction.
+    histograms[bin]->Scale(1.0 / static_cast<double>(counts[bin]));
   }
   return true;
 }
@@ -167,13 +192,17 @@ void draw_panel(
     TH1D &pi0_histogram,
     const Long64_t gamma_count,
     const Long64_t pi0_count,
-    const int pt_low)
+    const int pt_low,
+    const double truth_abs_eta_minimum,
+    const double truth_abs_eta_maximum,
+    const double truth_energy_asymmetry_minimum,
+    const double truth_energy_asymmetry_maximum)
 {
   gPad->SetLeftMargin(0.15);
   gPad->SetRightMargin(0.04);
   gPad->SetBottomMargin(0.14);
   gPad->SetTopMargin(0.10);
-  gPad->SetLogy();
+  // gPad->SetLogy();
 
   gamma_histogram.SetTitle(Form(
       "%d #leq p_{T}^{truth} < %d GeV;E_{HCalIn}^{cluster} + E_{HCalOut}^{cluster} [GeV];Normalized TopoClusters",
@@ -200,8 +229,14 @@ void draw_panel(
   gamma_histogram.Draw("HIST");
   pi0_histogram.Draw("HIST SAME");
 
-  TLegend legend(0.48, 0.67, 0.94, 0.89);
-  legend.SetHeader(Form("E_{EMCal}^{cluster} > %.0f GeV", emcal_energy_threshold));
+  TLegend legend(0.38, 0.57, 0.94, 0.89);
+  legend.SetHeader(Form(
+      "#splitline{%.2g #leq |#eta^{truth}| < %.2g, E_{EMCal}^{cluster} > %.0f GeV}{#pi^{0}: %.2g #leq A_{E}^{truth} < %.2g}",
+      truth_abs_eta_minimum,
+      truth_abs_eta_maximum,
+      emcal_energy_threshold,
+      truth_energy_asymmetry_minimum,
+      truth_energy_asymmetry_maximum));
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(0.038);
@@ -218,10 +253,28 @@ void draw_panel(
 }  // namespace
 
 int PlotHCalEnergyByTruthPt(
-    const std::string gamma_input_pattern = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/25to35GeV/topocluster_hcal_gamma_merged.root",
-    const std::string pi0_input_pattern = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/25to35GeV/topocluster_hcal_pi0_merged.root",
-    const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/plot/25to35GeV")
+    const std::string gamma_input_pattern = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/35to45GeV/topocluster_hcal_gamma_merged.root",
+    const std::string pi0_input_pattern = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/merge/35to45GeV/topocluster_hcal_pi0_merged.root",
+    const std::string output_directory = "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/plot/35to45GeV",
+    const double truth_abs_eta_minimum = 0.0,
+    const double truth_abs_eta_maximum = 0.1,
+    const double truth_energy_asymmetry_minimum = 0.0,
+    const double truth_energy_asymmetry_maximum = 1.)
 {
+  if (!std::isfinite(truth_abs_eta_minimum) ||
+      !std::isfinite(truth_abs_eta_maximum) ||
+      truth_abs_eta_minimum < 0.0 ||
+      truth_abs_eta_maximum <= truth_abs_eta_minimum ||
+      !std::isfinite(truth_energy_asymmetry_minimum) ||
+      !std::isfinite(truth_energy_asymmetry_maximum) ||
+      truth_energy_asymmetry_minimum < 0.0 ||
+      truth_energy_asymmetry_maximum > 1.0 ||
+      truth_energy_asymmetry_maximum <= truth_energy_asymmetry_minimum)
+  {
+    std::cerr << "PlotHCalEnergyByTruthPt - invalid truth eta or energy asymmetry range" << std::endl;
+    return EXIT_FAILURE;
+  }
+
   const std::filesystem::path output_path(output_directory);
   std::error_code directory_error;
   std::filesystem::create_directories(output_path, directory_error);
@@ -259,12 +312,22 @@ int PlotHCalEnergyByTruthPt(
           gamma_chain,
           gamma_histograms,
           gamma_counts,
-          truth_pt_minimum) ||
+          truth_pt_minimum,
+          truth_abs_eta_minimum,
+          truth_abs_eta_maximum,
+          false,
+          truth_energy_asymmetry_minimum,
+          truth_energy_asymmetry_maximum) ||
       !fill_histograms(
           pi0_chain,
           pi0_histograms,
           pi0_counts,
-          truth_pt_minimum))
+          truth_pt_minimum,
+          truth_abs_eta_minimum,
+          truth_abs_eta_maximum,
+          true,
+          truth_energy_asymmetry_minimum,
+          truth_energy_asymmetry_maximum))
   {
     return EXIT_FAILURE;
   }
@@ -285,15 +348,25 @@ int PlotHCalEnergyByTruthPt(
         *pi0_histograms[bin],
         gamma_counts[bin],
         pi0_counts[bin],
-        truth_pt_minimum + bin);
+        truth_pt_minimum + bin,
+        truth_abs_eta_minimum,
+        truth_abs_eta_maximum,
+        truth_energy_asymmetry_minimum,
+        truth_energy_asymmetry_maximum);
   }
 
   const int truth_pt_maximum = truth_pt_minimum + n_truth_pt_bins;
+  std::string eta_tag = Form("%.3gto%.3g", truth_abs_eta_minimum, truth_abs_eta_maximum);
+  std::replace(eta_tag.begin(), eta_tag.end(), '.', 'p');
+  std::string asymmetry_tag = Form("%.3gto%.3g", truth_energy_asymmetry_minimum, truth_energy_asymmetry_maximum);
+  std::replace(asymmetry_tag.begin(), asymmetry_tag.end(), '.', 'p');
   const std::string output_file =
       (output_path /
        ("hcal_total_energy_truth_pt_" +
         std::to_string(truth_pt_minimum) + "to" +
-        std::to_string(truth_pt_maximum) + ".pdf"))
+        std::to_string(truth_pt_maximum) +
+        "_abseta_" + eta_tag +
+        "_pi0ae_" + asymmetry_tag + ".pdf"))
           .string();
   canvas.SaveAs(output_file.c_str());
 

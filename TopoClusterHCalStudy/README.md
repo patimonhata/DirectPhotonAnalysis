@@ -33,6 +33,9 @@ Tree名は`topocluster_tree`、1 entryは1 eventです。energyの単位はGeV�
 | `event` | `unsigned int` | DST内の0始まりevent番号 |
 | `n_topocluster` | `unsigned int` | event内のall-calorimeter TopoCluster数 |
 | `truth_pt` | `float` | primary gammaまたはpi0のtruth transverse momentum [GeV] |
+| `truth_eta` | `float` | primary gammaまたはpi0のtruth pseudorapidity |
+| `truth_vertex_z` | `float` | primary gammaまたはpi0の生成vertex z座標 [cm] |
+| `truth_energy_asymmetry` | `float` | pi0直系2光子の`|E1-E2|/(E1+E2)`。gammaまたは2光子を特定できないpi0では`-1` |
 | `emcal_energy` | `vector<float>` | CEMC tower contributionの和 |
 | `hcalin_energy` | `vector<float>` | inner HCAL tower contributionの和 |
 | `hcalout_energy` | `vector<float>` | outer HCAL tower contributionの和 |
@@ -104,7 +107,10 @@ topocluster_tree->Draw("hcal_total_energy:emcal_energy", "", "colz");
 
 `truth_pt`の範囲を25--35 GeVまたは35--45 GeVから自動判定し、1 GeV幅の
 10パネルにgammaとpi0の規格化分布を重ねます。acceptance端のHCAL-only
-TopoClusterを除くため、`emcal_energy > 10 GeV`を要求します。
+TopoClusterを除くため、`emcal_energy > 10 GeV`を要求します。デフォルトでは
+`|truth_eta| < 0.1`も要求し、第4・第5引数で絶対eta範囲を変更できます。
+pi0にはデフォルトで`0 <= truth_energy_asymmetry < 0.2`を要求し、第6・第7引数で
+範囲を変更できます。gammaにはenergy-asymmetry cutを適用しません。
 
 ```bash
 root -l -b -q 'macro/PlotHCalEnergyByTruthPt.C()'
@@ -113,6 +119,6 @@ root -l -b -q 'macro/PlotHCalEnergyByTruthPt.C()'
 出力名はtruth pT範囲に応じて次のいずれかです。
 
 ```text
-output/plot/hcal_total_energy_truth_pt_25to35.pdf
-output/plot/hcal_total_energy_truth_pt_35to45.pdf
+output/plot/hcal_total_energy_truth_pt_25to35_abseta_0to0p1_pi0ae_0to0p2.pdf
+output/plot/hcal_total_energy_truth_pt_35to45_abseta_0to0p1_pi0ae_0to0p2.pdf
 ```

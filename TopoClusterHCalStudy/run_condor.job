@@ -3,7 +3,7 @@ Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalS
 Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/run_job.sh
 
 PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
-concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
+concurrency_limits = CONCURRENCY_LIMIT_DEFAULT
 request_memory     = 2GB
 Priority           = 20
 job_lease_duration = 86400
@@ -11,7 +11,7 @@ job_lease_duration = 86400
 runnumber          = 0
 n_events           = 0
 sample             = gamma
-input_directory    = /sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_$(sample)_25to35GeV_etapm1_vertexpm60
+input_directory    = /sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_$(sample)_35to45GeV_etapm1_vertexpm60
 job_offset         = 0
 process_shift      = $(Process) + $(job_offset)
 output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/TopoClusterHCalStudy/output/condor
@@ -21,4 +21,4 @@ Error              = $(output_directory)/$(sample)_$(runnumber)_$INT(process_shi
 Log                = /tmp/ryotaro-TopoClusterHCalStudy_$(sample)_$(runnumber)_$INT(process_shift,%06d).log
 Arguments          = "$INT(process_shift) $(sample) $(input_directory) $(n_events)"
 
-Queue 500
+Queue 5000

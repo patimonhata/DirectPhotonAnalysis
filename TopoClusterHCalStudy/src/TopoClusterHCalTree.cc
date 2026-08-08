@@ -4,6 +4,8 @@
 #include <calobase/RawClusterContainer.h>
 #include <calobase/RawTowerDefs.h>
 #include <fun4all/Fun4AllReturnCodes.h>
+#include <g4main/PHG4Particle.h>
+#include <g4main/PHG4TruthInfoContainer.h>
 #include <phool/PHCompositeNode.h>
 #include <phool/getClass.h>
 
@@ -49,6 +51,28 @@ int TopoClusterHCalTree::process_event(PHCompositeNode *topNode)
   if (!clusters)
   {
     std::cerr << Name() << "::process_event - missing RawClusterContainer node " << topocluster_node_name_ << std::endl;
+    return Fun4AllReturnCodes::ABORTRUN;
+  }
+
+  auto *truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, "G4TruthInfo");
+  if (!truth)
+  {
+    std::cerr << Name() << "::process_event - missing PHG4TruthInfoContainer node G4TruthInfo" << std::endl;
+    return Fun4AllReturnCodes::ABORTRUN;
+  }
+
+  const auto primary_range = truth->GetPrimaryParticleRange();
+  if (primary_range.first == primary_range.second || !primary_range.first->second)
+  {
+    std::cerr << Name() << "::process_event - missing primary truth particle" << std::endl;
+    return Fun4AllReturnCodes::ABORTRUN;
+  }
+
+  const PHG4Particle *primary = primary_range.first->second;
+  truth_pt_ = std::hypot(primary->get_px(), primary->get_py());
+  if (!std::isfinite(truth_pt_))
+  {
+    std::cerr << Name() << "::process_event - non-finite primary truth pT" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
@@ -131,6 +155,7 @@ void TopoClusterHCalTree::create_branches()
   tree_->Branch("process_id", &process_id_);
   tree_->Branch("event", &event_);
   tree_->Branch("n_topocluster", &n_topocluster_);
+  tree_->Branch("truth_pt", &truth_pt_);
 
   tree_->Branch("emcal_energy", &emcal_energy_);
   tree_->Branch("hcalin_energy", &hcalin_energy_);
@@ -141,6 +166,7 @@ void TopoClusterHCalTree::create_branches()
 void TopoClusterHCalTree::reset_event()
 {
   n_topocluster_ = 0;
+  truth_pt_ = 0.0F;
   emcal_energy_.clear();
   hcalin_energy_.clear();
   hcalout_energy_.clear();

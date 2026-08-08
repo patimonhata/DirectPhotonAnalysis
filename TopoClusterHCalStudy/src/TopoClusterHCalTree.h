@@ -35,6 +35,7 @@ class TopoClusterHCalTree : public SubsysReco
   unsigned int process_id_ = 0;
   unsigned int event_ = 0;
   unsigned int n_topocluster_ = 0;
+  float truth_pt_ = 0.0F;
 
   std::vector<float> emcal_energy_;
   std::vector<float> hcalin_energy_;

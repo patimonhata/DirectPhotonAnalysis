@@ -24,6 +24,7 @@ libTopoClusterHCalStudy_la_LIBADD = \
   -lphool \
   -lSubsysReco \
   -lfun4all \
+  -lg4dst \
   -lcalo_io
 
 BUILT_SOURCES = testexternals.cc

@@ -32,6 +32,7 @@ Tree名は`topocluster_tree`、1 entryは1 eventです。energyの単位はGeV�
 | `process_id` | `unsigned int` | 入力DSTの6桁file番号 |
 | `event` | `unsigned int` | DST内の0始まりevent番号 |
 | `n_topocluster` | `unsigned int` | event内のall-calorimeter TopoCluster数 |
+| `truth_pt` | `float` | primary gammaまたはpi0のtruth transverse momentum [GeV] |
 | `emcal_energy` | `vector<float>` | CEMC tower contributionの和 |
 | `hcalin_energy` | `vector<float>` | inner HCAL tower contributionの和 |
 | `hcalout_energy` | `vector<float>` | outer HCAL tower contributionの和 |
@@ -97,4 +98,21 @@ ROOTではvector branch同士の同じindexが対応するため、次のよう�
 
 ```cpp
 topocluster_tree->Draw("hcal_total_energy:emcal_energy", "", "colz");
+```
+
+## truth pT別HCAL energy分布
+
+`truth_pt`の範囲を25--35 GeVまたは35--45 GeVから自動判定し、1 GeV幅の
+10パネルにgammaとpi0の規格化分布を重ねます。acceptance端のHCAL-only
+TopoClusterを除くため、`emcal_energy > 10 GeV`を要求します。
+
+```bash
+root -l -b -q 'macro/PlotHCalEnergyByTruthPt.C()'
+```
+
+出力名はtruth pT範囲に応じて次のいずれかです。
+
+```text
+output/plot/hcal_total_energy_truth_pt_25to35.pdf
+output/plot/hcal_total_energy_truth_pt_35to45.pdf
 ```

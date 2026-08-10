@@ -20,10 +20,12 @@ int Fun4All_PhotonAnalysisTree(
     const int process_id = 0,
     const int n_events = 0,
     const std::string input_directory =
-        "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_3to15GeV_etapm1_vertexpm60",
+        "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_eta_3to15GeV_etapm1_vertexpm60",
+        // "/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SinglePi0GunSimulation/output/newDST_pi0_5to15GeV_etapm1/",
     const std::string output_directory =
         "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/root",
-    const int expected_primary_pdg = 111)
+    // const int expected_primary_pdg = 111)
+    const int expected_primary_pdg = 221)
 {
   if (process_id < 0 || n_events < 0 ||
       (expected_primary_pdg != 22 && expected_primary_pdg != 111 && expected_primary_pdg != 221))
@@ -35,7 +37,8 @@ int Fun4All_PhotonAnalysisTree(
   std::ostringstream id;
   id << std::setw(6) << std::setfill('0') << process_id;
   const std::string id_string = id.str();
-  const std::string input_file = input_directory + "/DST_single_pi0_reconstructedInfo_" + id_string + ".root";
+  // const std::string input_file = input_directory + "/DST_single_pi0_reconstructedInfo_" + id_string + ".root";
+  const std::string input_file = input_directory + "/DST_single_eta_reconstructedInfo_" + id_string + ".root";
   const std::string output_file = output_directory + "/photon_analysis_tree_" + id_string + ".root";
 
   Fun4AllServer* server = Fun4AllServer::instance();

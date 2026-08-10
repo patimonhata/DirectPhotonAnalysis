@@ -42,7 +42,7 @@ void ensure_dir(const std::string& path);
 int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=false) {
   // const int nEvents = 5;
   bool runTruth = false;
-  std::string particle_name = "gamma";
+  std::string particle_name = "pi0";
 
   std::ostringstream pid;
   pid << std::setw(6) << std::setfill('0') << processID;
@@ -72,8 +72,8 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   Input::SIMPLE = true;
   InputInit();  // This creates the input generator(s)
 
-  // INPUTGENERATOR::SimpleEventGenerator[0]->add_particles(particle_name, 1);
-  INPUTGENERATOR::SimpleEventGenerator[0]->add_particles(22, 1);
+  INPUTGENERATOR::SimpleEventGenerator[0]->add_particles(particle_name, 1);
+  // INPUTGENERATOR::SimpleEventGenerator[0]->add_particles(22, 1);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_function(PHG4SimpleEventGenerator::Gaus,
   //                                                                           PHG4SimpleEventGenerator::Gaus,
   //                                                                           PHG4SimpleEventGenerator::Gaus);

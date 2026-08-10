@@ -71,7 +71,8 @@ macroは4つのstream prefixを付けたbasenameを各input managerへ登録し�
 file lookupへ渡します。出力名は
 `pythia_photon_analysis_tree_<input suffix without .root>.root`です。
 G4 truth、`PHHepMCGenEventMap`、SPLIT clusterは必須、NO_SPLIT clusterはoptionalです。
-wrapperはsingle-particle版と分離しています。
+wrapperはsingle-particle版と分離しており、生成後に`check_pythia_tree.C`で
+schema version、branch alignment、contributor offsetとfractionを検証します。
 
 ```bash
 ./PhotonAnalysisTree/run_tree_pythia.sh \

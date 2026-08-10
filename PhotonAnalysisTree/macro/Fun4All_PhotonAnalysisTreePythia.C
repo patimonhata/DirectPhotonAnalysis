@@ -103,7 +103,9 @@ int Fun4All_PhotonAnalysisTreePythia(
   const int end_status = server->End();
   delete server;
 
-  const bool run_ok = run_status == Fun4AllReturnCodes::EVENT_OK || (n_events == 0 && run_status == Fun4AllReturnCodes::ABORTEVENT);
+  const bool run_ok =
+      run_status == Fun4AllReturnCodes::EVENT_OK ||
+      (n_events == 0 && run_status == Fun4AllReturnCodes::ABORTPROCESSING);
   if (!run_ok || end_status != Fun4AllReturnCodes::EVENT_OK) {
     std::cerr << "Fun4All_PhotonAnalysisTreePythia - failed (run=" << run_status << ", End=" << end_status << ")" << std::endl;
     gSystem->Exit(EXIT_FAILURE);

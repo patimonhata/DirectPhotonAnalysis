@@ -31,3 +31,6 @@ export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPh
 # Fun4All resolves each DST through its basename. The macro adds the four
 # stream-specific prefixes to this common input suffix.
 root -l -b -q "$module_dir/macro/Fun4All_PhotonAnalysisTreePythia.C(\"${input_suffix}\",${n_events},\"${output_directory}\")"
+
+# Reject incomplete or internally inconsistent schema-v4 output.
+root -l -b -q "$module_dir/macro/check_pythia_tree.C(\"${output_file}\")"

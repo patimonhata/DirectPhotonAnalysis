@@ -9,13 +9,13 @@ Priority           = 20
 job_lease_duration = 86400
 
 n_events           = 0
-job_offset         = 0
-process_id         = $(Process) + $(job_offset)
-output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
+tree_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/root
+log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
 
-Output             = $(output_directory)/pythia_tree_$INT(process_id,%06d).out
-Error              = $(output_directory)/pythia_tree_$INT(process_id,%06d).err
-Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-tree_$INT(process_id,%06d).log
-Arguments          = "$INT(process_id) $(n_events)"
+Output             = $(log_directory)/pythia_tree_$(ClusterId).$(ProcId).out
+Error              = $(log_directory)/pythia_tree_$(ClusterId).$(ProcId).err
+Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-tree_$(ClusterId).$(ProcId).log
+Arguments          = "$(input_suffix) $(n_events) $(tree_output_directory)"
 
-Queue 1000
+# One manifest row is one synchronized four-stream DST file set.
+Queue input_suffix from input/jet5/segments_copy.list

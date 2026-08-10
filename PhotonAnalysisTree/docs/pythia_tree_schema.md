@@ -50,9 +50,9 @@ energy.
    `TowerInfo::get_showerEdepMap()`. If that map was stripped in an older DST
    layout, use the corresponding legacy `RawTower::get_g4showers()` map.
    A nonempty cluster with neither provenance map is invalid rather than a
-   The event is retained with that cluster's truth `valid=0`, and the metadata
-   `n_events_invalid_truth` counter is incremented.
-   valid zero-contributor match. This is not a first-hit-only match.
+   valid zero-contributor match. The event is retained with that cluster's truth
+   `valid=0`, and the metadata `n_events_invalid_truth` counter is incremented.
+   This is not a first-hit-only match.
 3. Resolve each shower with `PHG4TruthInfoContainer::GetShower()`.
 4. Use the official `CaloTruthEval::get_primary_particle(PHG4Shower*)` to
    follow that shower to its G4 primary. Contributions from every descendant

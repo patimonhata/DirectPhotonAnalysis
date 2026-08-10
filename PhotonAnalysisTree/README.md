@@ -63,20 +63,26 @@ basenameで登録し、schema version 4の専用treeを作ります。
 
 ```bash
 root -l -b -q \
-  'PhotonAnalysisTree/macro/Fun4All_PhotonAnalysisTreePythia.C(0,0)'
+  'PhotonAnalysisTree/macro/Fun4All_PhotonAnalysisTreePythia.C("pythia8_Jet5-0000000028-000000.root",0)'
 ```
 
-第1引数はsegment ID、第2引数はevent数（`0`は全event）です。4 fileは実行directoryから
-basenameで読めるようにするか、streamごとのdirectoryを環境変数で指定します。出力名は
-`pythia_photon_analysis_tree_<segment>.root`です。G4 truth、`PHHepMCGenEventMap`、
-SPLIT clusterは必須、NO_SPLIT clusterはoptionalです。wrapperはsingle-particle版と分離しています。
+第1引数はstream prefixを除いた共通suffix、第2引数はevent数（`0`は全event）です。
+macroは4つのstream prefixを付けたbasenameを各input managerへ登録し、Fun4Allの
+file lookupへ渡します。出力名は
+`pythia_photon_analysis_tree_<input suffix without .root>.root`です。
+G4 truth、`PHHepMCGenEventMap`、SPLIT clusterは必須、NO_SPLIT clusterはoptionalです。
+wrapperはsingle-particle版と分離しています。
 
 ```bash
-export PHOTON_TREE_PYTHIA_CALO_DIR=/path/to/calocluster
-export PHOTON_TREE_PYTHIA_MBD_DIR=/path/to/mbd_epd
-export PHOTON_TREE_PYTHIA_TRUTH_JET_DIR=/path/to/truth_jet
-export PHOTON_TREE_PYTHIA_G4HITS_DIR=/path/to/g4hits
-./PhotonAnalysisTree/run_tree_pythia.sh 0 0
+./PhotonAnalysisTree/run_tree_pythia.sh \
+  pythia8_Jet5-0000000028-000000.root 0
+```
+
+`input/jet5`の4つのstream別listからCondor用の共通suffix manifestを生成するには
+次を実行します。4リストの行数、順序、suffixが一致しない場合は生成に失敗します。
+
+```bash
+./PhotonAnalysisTree/make_pythia_input_manifest.sh
 ```
 
 ## scoreを追加する
@@ -150,6 +156,7 @@ ONNX modelは`n_cluster == 1`のNO_SPLIT eventだけで学習されています�
 ```bash
 cd /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
 condor_submit run_tree.job
+condor_submit run_tree_pythia.job
 # tree jobsの完了後
 condor_submit run_add_scores.job
 ```
@@ -163,7 +170,9 @@ condor_submit -append "job_offset = 500" run_add_scores.job
 
 - `run_tree.sh`, `run_tree.job`: single-particle DSTからbase TTreeを生成
 - `run_tree_pythia.sh`, `run_tree_pythia.job`: Pythia 4-stream DSTからschema 4 treeを生成
+- `make_pythia_input_manifest.sh`: 4つのstream別listを検証して共通suffix manifestを生成
 - `run_add_scores.sh`, `run_add_scores.job`: BDT/gamma score branchを追加して検証
 - `make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
 
-`run_tree_pythia.job`はPythia Jet5のsegment 0--999をdefaultでqueueします。
+`run_tree_pythia.job`は`input/jet5/segments.list`を`queue ... from`で読み、
+manifestの1行につき1つの同期した4-stream DST jobを生成します。

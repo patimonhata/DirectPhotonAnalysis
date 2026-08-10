@@ -28,7 +28,7 @@ if(NOT PI0RECONSTRUCTION_INCLUDE_DIR OR NOT PI0RECONSTRUCTION_LIBRARY)
   message(FATAL_ERROR "Build and install ../../Pi0Reconstruction before PhotonAnalysisTree")
 endif()
 
-foreach(library phool SubsysReco fun4all calo_io g4dst)
+foreach(library phool SubsysReco fun4all calo_io g4dst g4eval phhepmc HepMC)
   string(TOUPPER "${library}" library_upper)
   find_library(
     ${library_upper}_LIBRARY
@@ -39,7 +39,14 @@ foreach(library phool SubsysReco fun4all calo_io g4dst)
   list(APPEND SPHENIX_LIBRARIES "${${library_upper}_LIBRARY}")
 endforeach()
 
-add_library(PhotonAnalysisTree SHARED PhotonAnalysisTree.cc)
+add_library(
+  PhotonAnalysisTree SHARED
+  HepMCPhotonClassifier.cc
+  PhotonAnalysisTree.cc
+  PhotonTreeCommon.cc
+  PythiaClusterTruthMatcher.cc
+  PythiaPhotonAnalysisTree.cc
+)
 target_include_directories(
   PhotonAnalysisTree
   PUBLIC
@@ -87,5 +94,15 @@ target_link_libraries(Pi0GammaOnnx PRIVATE "${ONNXRUNTIME_LIBRARY}")
 target_compile_options(Pi0GammaOnnx PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
-install(FILES PhotonAnalysisTree.h Pi0GammaOnnx.h ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h DESTINATION include)
+install(
+  FILES
+    HepMCPhotonClassifier.h
+    PhotonAnalysisTree.h
+    PhotonTreeCommon.h
+    Pi0GammaOnnx.h
+    PythiaClusterTruthMatcher.h
+    PythiaPhotonAnalysisTree.h
+    ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h
+  DESTINATION include
+)
 install(FILES ../models/best_model.onnx ../models/onnx_metadata.json DESTINATION ${CMAKE_INSTALL_DATADIR}/PhotonAnalysisTree/models)

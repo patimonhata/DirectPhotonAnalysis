@@ -1,5 +1,9 @@
 # PhotonAnalysisTree
 
+Pythia DSTには別frontendの`PythiaPhotonAnalysisTree`を使います。cluster/tower/shower-shape
+処理はsingle-particle版と共有しますが、event truthは複数primaryを前提としたcluster contributor
+schemaです。詳細は[docs/pythia_tree_schema.md](docs/pythia_tree_schema.md)を参照してください。
+
 Single-particle gun DSTを1回だけ読み、truth、SPLIT cluster、NO_SPLIT cluster、再構成gamma pairを同じ`event_tree`へ保存するFun4All subsystemです。`event_tree`は1 entry = 1 input eventです。
 
 ## なぜ独立ディレクトリか
@@ -50,7 +54,7 @@ buildは次を作ります。
 直接ROOT macroを呼ぶ場合は、input/output directoryとexpected primary PDGも変更できます。
 
 Pythia Jet5では同じsegment IDを持つ次の4 streamを、それぞれ別のinput managerへ
-basenameで登録します。
+basenameで登録し、schema version 4の専用treeを作ります。
 
 - `DST_CALO_CLUSTER`
 - `DST_MBD_EPD`
@@ -62,8 +66,18 @@ root -l -b -q \
   'PhotonAnalysisTree/macro/Fun4All_PhotonAnalysisTreePythia.C(0,0)'
 ```
 
-第1引数はsegment ID、第2引数はevent数（`0`は全event）です。出力名は
-`photon_analysis_tree_<segment>.root`です。Truth nodeは必須、NO_SPLIT clusterはoptionalです。
+第1引数はsegment ID、第2引数はevent数（`0`は全event）です。4 fileは実行directoryから
+basenameで読めるようにするか、streamごとのdirectoryを環境変数で指定します。出力名は
+`pythia_photon_analysis_tree_<segment>.root`です。G4 truth、`PHHepMCGenEventMap`、
+SPLIT clusterは必須、NO_SPLIT clusterはoptionalです。wrapperはsingle-particle版と分離しています。
+
+```bash
+export PHOTON_TREE_PYTHIA_CALO_DIR=/path/to/calocluster
+export PHOTON_TREE_PYTHIA_MBD_DIR=/path/to/mbd_epd
+export PHOTON_TREE_PYTHIA_TRUTH_JET_DIR=/path/to/truth_jet
+export PHOTON_TREE_PYTHIA_G4HITS_DIR=/path/to/g4hits
+./PhotonAnalysisTree/run_tree_pythia.sh 0 0
+```
 
 ## scoreを追加する
 
@@ -147,8 +161,9 @@ condor_submit -append "n_jobs = 100" -append "job_offset = 500" run_tree.job
 condor_submit -append "job_offset = 500" run_add_scores.job
 ```
 
-- `run_tree.sh`, `run_tree.job`: DSTからbase TTreeを生成
+- `run_tree.sh`, `run_tree.job`: single-particle DSTからbase TTreeを生成
+- `run_tree_pythia.sh`, `run_tree_pythia.job`: Pythia 4-stream DSTからschema 4 treeを生成
 - `run_add_scores.sh`, `run_add_scores.job`: BDT/gamma score branchを追加して検証
 - `make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
 
-`run_tree.job`はPythia Jet5のsegment 0--999をdefaultでqueueします。
+`run_tree_pythia.job`はPythia Jet5のsegment 0--999をdefaultでqueueします。

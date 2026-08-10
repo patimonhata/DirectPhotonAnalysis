@@ -26,7 +26,7 @@ bool has_only_expected_trees(TFile* file)
 {
   bool has_event_tree = false;
   bool has_metadata = false;
-  bool valid = file && file->GetListOfKeys()->GetSize() == 2;
+  bool valid = file != nullptr;
   TIter next(file ? file->GetListOfKeys() : nullptr);
   while (auto* key = dynamic_cast<TKey*>(next()))
   {

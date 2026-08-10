@@ -98,10 +98,12 @@ const std::array<std::string, n_event_components> event_component_labels = {
 
 struct EventComponentHistograms {
   std::unique_ptr<TH1D> reference;
+  std::unique_ptr<TH1D> in_acceptance;
   std::unique_ptr<TH1D> selected;
   std::array<std::unique_ptr<TH1D>, n_event_components> component;
   std::array<std::unique_ptr<TH1D>, n_event_components> fraction;
   Long64_t n_reference = 0;
+  Long64_t n_in_acceptance = 0;
   Long64_t n_selected = 0;
   std::array<Long64_t, n_event_components> n_component = {};
   Long64_t n_malformed = 0;
@@ -112,9 +114,11 @@ struct EventComponentHistograms {
 // require a selected reconstructed anchor cluster.
 struct TruthPi0ComponentHistograms {
   std::unique_ptr<TH1D> reference;
+  std::unique_ptr<TH1D> in_truth_eta;
   std::array<std::unique_ptr<TH1D>, n_event_components> component;
   std::array<std::unique_ptr<TH1D>, n_event_components> fraction;
   Long64_t n_reference = 0;
+  Long64_t n_in_truth_eta = 0;
   std::array<Long64_t, n_event_components> n_component = {};
   Long64_t n_malformed = 0;
 };
@@ -451,6 +455,7 @@ EventComponentHistograms make_component_histograms(const std::string &prefix,
     return histogram;
   };
   histograms.reference = make("reference");
+  histograms.in_acceptance = make("in_acceptance");
   histograms.selected = make("selected");
   for (std::size_t component = 0; component < n_event_components; ++component) {
     histograms.component[component] = make(event_component_names[component]);
@@ -483,6 +488,7 @@ make_truth_pi0_component_histograms(const std::string &prefix,
     return histogram;
   };
   histograms.reference = make("reference");
+  histograms.in_truth_eta = make("in_truth_eta");
   for (std::size_t component = 0; component < n_event_components; ++component) {
     histograms.component[component] =
         make(truth_pi0_component_names[component]);
@@ -715,6 +721,12 @@ void fill_pair_selection_stages(
   }
 }
 
+void fill_event_component_reference(EventComponentHistograms &histograms,
+                                    const double truth_alpha) {
+  ++histograms.n_reference;
+  histograms.reference->Fill(truth_alpha);
+}
+
 void fill_event_components(
     EventComponentHistograms &histograms, const double truth_alpha,
     const double truth_pt, const std::vector<double> &truth_daughter_pt,
@@ -725,8 +737,8 @@ void fill_event_components(
     const double merged_delta_r_cut, const double merged_response_min,
     const double merged_response_max, const double individual_response_min,
     const double individual_response_max) {
-  ++histograms.n_reference;
-  histograms.reference->Fill(truth_alpha);
+  ++histograms.n_in_acceptance;
+  histograms.in_acceptance->Fill(truth_alpha);
   if (!valid_collection_shape(branches) || truth_daughter_pt.size() != 2U ||
       truth_eta.size() != 2U || truth_phi.size() != 2U || !(truth_pt > 0.0) ||
       !(truth_daughter_pt[0] > 0.0) || !(truth_daughter_pt[1] > 0.0)) {
@@ -806,7 +818,8 @@ void fill_event_components(
 
 void fill_truth_pi0_components(
     TruthPi0ComponentHistograms &histograms, const double truth_alpha,
-    const double truth_pt, const std::vector<double> &truth_daughter_pt,
+    const bool passes_truth_eta, const double truth_pt,
+    const std::vector<double> &truth_daughter_pt,
     const std::vector<double> &truth_eta, const std::vector<double> &truth_phi,
     const CollectionBranches &branches, const double min_cluster_energy,
     const double delta_r_cut, const double merged_delta_r_cut,
@@ -815,6 +828,12 @@ void fill_truth_pi0_components(
     const double individual_response_max) {
   ++histograms.n_reference;
   histograms.reference->Fill(truth_alpha);
+
+  if (!passes_truth_eta) {
+    return;
+  }
+  ++histograms.n_in_truth_eta;
+  histograms.in_truth_eta->Fill(truth_alpha);
 
   EventComponent classification = EventComponent::other_anchor;
   if (!valid_collection_shape(branches) || truth_daughter_pt.size() != 2U ||
@@ -892,8 +911,8 @@ void make_truth_pi0_component_fractions(TruthPi0ComponentHistograms &histograms,
                 .c_str())));
     histograms.fraction[component]->SetDirectory(nullptr);
     histograms.fraction[component]->Divide(
-        histograms.component[component].get(), histograms.reference.get(), 1.0,
-        1.0, "B");
+        histograms.component[component].get(), histograms.in_truth_eta.get(),
+        1.0, 1.0, "B");
   }
 }
 void make_component_fractions(EventComponentHistograms &histograms,
@@ -1241,6 +1260,8 @@ void draw_component_information(
   legend.SetTextSize(0.040);
   if (!fractions) {
     legend.AddEntry(histograms.reference.get(),
+                    "Truth #pi^{0} #rightarrow #gamma#gamma", "lep");
+    legend.AddEntry(histograms.in_acceptance.get(),
                     "Truth #pi^{0} #rightarrow #gamma#gamma in acceptance",
                     "lep");
     legend.AddEntry(histograms.selected.get(), "Events with selected cluster",
@@ -1283,6 +1304,8 @@ void draw_component_counts(
     current.reference->SetMaximum(current.reference->GetMaximum() > 0.0
                                       ? 1.30 * current.reference->GetMaximum()
                                       : 1.0);
+    set_point_style(*current.in_acceptance, TColor::GetColor("#17BECF"),
+                    kOpenSquare);
     set_point_style(
         *current.selected,
         core_condition_colors[condition_index(CoreCondition::selected)],
@@ -1301,6 +1324,7 @@ void draw_component_counts(
     current.reference->Draw("E1");
     stacks.back()->Draw("HIST SAME");
     current.selected->Draw("E1 SAME");
+    current.in_acceptance->Draw("E1 SAME");
     current.reference->Draw("E1 SAME");
     TLatex panel;
     panel.SetNDC();
@@ -1419,7 +1443,11 @@ void draw_truth_pi0_component_information(
   legend.SetTextSize(0.038);
   if (!fractions) {
     legend.AddEntry(histograms.reference.get(),
-                    "Generated #pi^{0} with |#eta_{truth}| < cut", "lep");
+                    "Generated #pi^{0} #rightarrow #gamma#gamma", "lep");
+    legend.AddEntry(histograms.in_truth_eta.get(),
+                    "Generated #pi^{0} #rightarrow #gamma#gamma with "
+                    "|#eta_{truth}^{#pi^{0}}| < cut",
+                    "lep");
   }
   for (std::size_t component = 0; component < n_event_components; ++component) {
     legend.AddEntry(fractions ? histograms.fraction[component].get()
@@ -1458,6 +1486,10 @@ void draw_truth_pi0_component_counts(
     current.reference->SetMaximum(current.reference->GetMaximum() > 0.0
                                       ? 1.30 * current.reference->GetMaximum()
                                       : 1.0);
+    set_point_style(
+        *current.in_truth_eta,
+        core_condition_colors[condition_index(CoreCondition::selected)],
+        event_count_markers[condition_index(CoreCondition::selected)]);
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
       style_component_histogram(*current.component[component],
@@ -1473,6 +1505,7 @@ void draw_truth_pi0_component_counts(
     }
     current.reference->Draw("E1");
     stacks.back()->Draw("HIST SAME");
+    current.in_truth_eta->Draw("E1 SAME");
     current.reference->Draw("E1 SAME");
     TLatex panel;
     panel.SetNDC();
@@ -1703,6 +1736,7 @@ void write_component_histograms(
   output.cd();
   for (EventComponentHistograms &current : histograms) {
     current.reference->Write();
+    current.in_acceptance->Write();
     current.selected->Write();
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
@@ -1717,6 +1751,7 @@ void write_truth_pi0_component_histograms(
   output.cd();
   for (TruthPi0ComponentHistograms &current : histograms) {
     current.reference->Write();
+    current.in_truth_eta->Write();
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
       current.component[component]->Write();
@@ -1758,17 +1793,21 @@ bool print_component_summary(
     for (const Long64_t count : current.n_component) {
       component_sum += count;
     }
-    closure_ok &= component_sum == current.n_selected;
+    const bool bin_ok = component_sum == current.n_selected &&
+                        current.n_selected <= current.n_in_acceptance &&
+                        current.n_in_acceptance <= current.n_reference;
+    closure_ok &= bin_ok;
     std::cout
         << label << " " << truth_pt_labels[bin]
-        << " reference/selected/correct/merged/individual/other/malformed = "
-        << current.n_reference << "/" << current.n_selected;
+        << " reference/acceptance/selected/correct/merged/individual/other/"
+           "malformed = "
+        << current.n_reference << "/" << current.n_in_acceptance << "/"
+        << current.n_selected;
     for (const Long64_t count : current.n_component) {
       std::cout << "/" << count;
     }
-    std::cout << "/" << current.n_malformed << " closure="
-              << (component_sum == current.n_selected ? "OK" : "FAIL")
-              << std::endl;
+    std::cout << "/" << current.n_malformed
+              << " nesting/closure=" << (bin_ok ? "OK" : "FAIL") << std::endl;
   }
   return closure_ok;
 }
@@ -1783,16 +1822,18 @@ bool print_truth_pi0_component_summary(
     for (const Long64_t count : current.n_component) {
       component_sum += count;
     }
-    const bool bin_ok = component_sum == current.n_reference;
+    const bool bin_ok = component_sum == current.n_in_truth_eta &&
+                        current.n_in_truth_eta <= current.n_reference;
     closure_ok &= bin_ok;
     std::cout << label << " " << truth_pt_labels[bin]
-              << " reference/separated/merged/individual/none/malformed = "
-              << current.n_reference;
+              << " reference/truth_eta/separated/merged/individual/none/"
+                 "malformed = "
+              << current.n_reference << "/" << current.n_in_truth_eta;
     for (const Long64_t count : current.n_component) {
       std::cout << "/" << count;
     }
     std::cout << "/" << current.n_malformed
-              << " closure=" << (bin_ok ? "OK" : "FAIL") << std::endl;
+              << " nesting/closure=" << (bin_ok ? "OK" : "FAIL") << std::endl;
   }
   return closure_ok;
 }
@@ -2010,7 +2051,7 @@ int PlotConditionalPartnerEfficiency(
     const double merged_response_max = 1.5,
     const double individual_response_min = 0.5,
     const double individual_response_max = 1.5,
-    const double min_cluster_energy = 0.5, const double truth_eta_max = 0.7) {
+    const double min_cluster_energy = 0.3, const double truth_eta_max = 0.7) {
   if (input_path.empty() || output_base.empty() || !(anchor_eta_max > 0.0) ||
       !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||
       !(delta_r_cut > 0.0) || !(merged_delta_r_cut > 0.0) ||
@@ -2159,20 +2200,22 @@ int PlotConditionalPartnerEfficiency(
       continue;
     }
 
-    if (std::abs(truth_pi0_eta) < truth_eta_max) {
-      fill_truth_pi0_components(
-          split_truth_pi0_components[bin], truth_alpha, truth_pt,
-          *truth_daughter_pt, *truth_eta, *truth_phi, split, min_cluster_energy,
-          delta_r_cut, merged_delta_r_cut, merged_response_min,
-          merged_response_max, individual_response_min,
-          individual_response_max);
-      fill_truth_pi0_components(
-          nosplit_truth_pi0_components[bin], truth_alpha, truth_pt,
-          *truth_daughter_pt, *truth_eta, *truth_phi, nosplit,
-          min_cluster_energy, delta_r_cut, merged_delta_r_cut,
-          merged_response_min, merged_response_max, individual_response_min,
-          individual_response_max);
-    }
+    fill_event_component_reference(split_components[bin], truth_alpha);
+    fill_event_component_reference(nosplit_components[bin], truth_alpha);
+
+    const bool passes_truth_eta = std::abs(truth_pi0_eta) < truth_eta_max;
+    fill_truth_pi0_components(split_truth_pi0_components[bin], truth_alpha,
+                              passes_truth_eta, truth_pt, *truth_daughter_pt,
+                              *truth_eta, *truth_phi, split, min_cluster_energy,
+                              delta_r_cut, merged_delta_r_cut,
+                              merged_response_min, merged_response_max,
+                              individual_response_min, individual_response_max);
+    fill_truth_pi0_components(
+        nosplit_truth_pi0_components[bin], truth_alpha, passes_truth_eta,
+        truth_pt, *truth_daughter_pt, *truth_eta, *truth_phi, nosplit,
+        min_cluster_energy, delta_r_cut, merged_delta_r_cut,
+        merged_response_min, merged_response_max, individual_response_min,
+        individual_response_max);
 
     // Preserve the original acceptance requirements for the existing plot
     // families. They are deliberately not part of the new truth-pi0

@@ -106,6 +106,25 @@ struct EventComponentHistograms {
   std::array<Long64_t, n_event_components> n_component = {};
   Long64_t n_malformed = 0;
 };
+
+// Reconstruction topologies for every generated pi0 in the requested truth
+// acceptance. Unlike EventComponentHistograms, these histograms do not first
+// require a selected reconstructed anchor cluster.
+struct TruthPi0ComponentHistograms {
+  std::unique_ptr<TH1D> reference;
+  std::array<std::unique_ptr<TH1D>, n_event_components> component;
+  std::array<std::unique_ptr<TH1D>, n_event_components> fraction;
+  Long64_t n_reference = 0;
+  std::array<Long64_t, n_event_components> n_component = {};
+  Long64_t n_malformed = 0;
+};
+
+const std::array<std::string, n_event_components> truth_pi0_component_names = {
+    "separated_pair_candidate", "merged_candidate",
+    "individual_cluster_no_pair", "no_matched_topology"};
+const std::array<std::string, n_event_components> truth_pi0_component_labels = {
+    "Two separated clusters", "Merged-cluster candidate",
+    "Individual-#gamma cluster, no pair", "No matched topology"};
 constexpr std::size_t n_cut_stages = 4U;
 
 struct CutStageHistograms {
@@ -451,6 +470,37 @@ make_truth_pt_component_histograms(const std::string &prefix,
   return histograms;
 }
 
+TruthPi0ComponentHistograms
+make_truth_pi0_component_histograms(const std::string &prefix,
+                                    const int asymmetry_nbins) {
+  TruthPi0ComponentHistograms histograms;
+  const auto make = [&](const std::string &suffix) {
+    auto histogram = std::make_unique<TH1D>(
+        ("h_" + prefix + "_" + suffix).c_str(), "", asymmetry_nbins, 0.0, 1.0);
+    histogram->SetDirectory(nullptr);
+    histogram->Sumw2();
+    histogram->SetStats(false);
+    return histogram;
+  };
+  histograms.reference = make("reference");
+  for (std::size_t component = 0; component < n_event_components; ++component) {
+    histograms.component[component] =
+        make(truth_pi0_component_names[component]);
+  }
+  return histograms;
+}
+
+std::vector<TruthPi0ComponentHistograms>
+make_truth_pt_truth_pi0_component_histograms(const std::string &prefix,
+                                             const int asymmetry_nbins) {
+  std::vector<TruthPi0ComponentHistograms> histograms;
+  histograms.reserve(truth_pt_labels.size());
+  for (std::size_t bin = 0; bin < truth_pt_labels.size(); ++bin) {
+    histograms.push_back(make_truth_pi0_component_histograms(
+        prefix + "_truth_pt_" + std::to_string(bin), asymmetry_nbins));
+  }
+  return histograms;
+}
 CutStageHistograms
 make_cut_stage_histograms(const std::string &prefix,
                           const std::array<std::string, n_cut_stages> &suffixes,
@@ -754,6 +804,98 @@ void fill_event_components(
   histograms.component[component]->Fill(truth_alpha);
 }
 
+void fill_truth_pi0_components(
+    TruthPi0ComponentHistograms &histograms, const double truth_alpha,
+    const double truth_pt, const std::vector<double> &truth_daughter_pt,
+    const std::vector<double> &truth_eta, const std::vector<double> &truth_phi,
+    const CollectionBranches &branches, const double min_cluster_energy,
+    const double delta_r_cut, const double merged_delta_r_cut,
+    const double merged_response_min, const double merged_response_max,
+    const double individual_response_min,
+    const double individual_response_max) {
+  ++histograms.n_reference;
+  histograms.reference->Fill(truth_alpha);
+
+  EventComponent classification = EventComponent::other_anchor;
+  if (!valid_collection_shape(branches) || truth_daughter_pt.size() != 2U ||
+      truth_eta.size() != 2U || truth_phi.size() != 2U || !(truth_pt > 0.0) ||
+      !(truth_daughter_pt[0] > 0.0) || !(truth_daughter_pt[1] > 0.0)) {
+    ++histograms.n_malformed;
+  } else {
+    const MatchResult pair_match =
+        match_event(truth_eta, truth_phi, branches, min_cluster_energy);
+    const bool separated_pair =
+        pair_match.valid &&
+        std::max(pair_match.delta_r0, pair_match.delta_r1) < delta_r_cut;
+
+    if (separated_pair) {
+      classification = EventComponent::correct_pair;
+    } else {
+      bool has_merged_candidate = false;
+      for (std::size_t cluster = 0; cluster < branches.cluster_et->size();
+           ++cluster) {
+        if (!valid_cluster(branches, cluster)) {
+          continue;
+        }
+        const double delta_r0 = delta_r(truth_eta[0], truth_phi[0],
+                                        branches.cluster_eta->at(cluster),
+                                        branches.cluster_phi->at(cluster));
+        const double delta_r1 = delta_r(truth_eta[1], truth_phi[1],
+                                        branches.cluster_eta->at(cluster),
+                                        branches.cluster_phi->at(cluster));
+        const double response = branches.cluster_et->at(cluster) / truth_pt;
+        has_merged_candidate |=
+            std::max(delta_r0, delta_r1) < merged_delta_r_cut &&
+            response >= merged_response_min && response <= merged_response_max;
+      }
+
+      if (has_merged_candidate) {
+        classification = EventComponent::merged_candidate;
+      } else {
+        bool has_individual_cluster = false;
+        for (std::size_t cluster = 0; cluster < branches.cluster_et->size();
+             ++cluster) {
+          if (!valid_cluster(branches, cluster)) {
+            continue;
+          }
+          for (std::size_t gamma = 0; gamma < 2U; ++gamma) {
+            const double cluster_delta_r =
+                delta_r(truth_eta[gamma], truth_phi[gamma],
+                        branches.cluster_eta->at(cluster),
+                        branches.cluster_phi->at(cluster));
+            const double response =
+                branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
+            has_individual_cluster |= cluster_delta_r < delta_r_cut &&
+                                      response >= individual_response_min &&
+                                      response <= individual_response_max;
+          }
+        }
+        if (has_individual_cluster) {
+          classification = EventComponent::individual_anchor;
+        }
+      }
+    }
+  }
+
+  const std::size_t component = static_cast<std::size_t>(classification);
+  ++histograms.n_component[component];
+  histograms.component[component]->Fill(truth_alpha);
+}
+
+void make_truth_pi0_component_fractions(TruthPi0ComponentHistograms &histograms,
+                                        const std::string &prefix) {
+  for (std::size_t component = 0; component < n_event_components; ++component) {
+    histograms.fraction[component].reset(
+        static_cast<TH1D *>(histograms.component[component]->Clone(
+            ("h_" + prefix + "_fraction_" +
+             truth_pi0_component_names[component])
+                .c_str())));
+    histograms.fraction[component]->SetDirectory(nullptr);
+    histograms.fraction[component]->Divide(
+        histograms.component[component].get(), histograms.reference.get(), 1.0,
+        1.0, "B");
+  }
+}
 void make_component_fractions(EventComponentHistograms &histograms,
                               const std::string &prefix) {
   for (std::size_t component = 0; component < n_event_components; ++component) {
@@ -1231,6 +1373,178 @@ void draw_component_fractions(
   canvas.SaveAs(output_path.c_str());
 }
 
+void draw_truth_pi0_component_information(
+    TruthPi0ComponentHistograms &histograms,
+    const std::string &collection_label, const bool fractions,
+    const double truth_eta_max, const double min_cluster_energy,
+    const double delta_r_cut, const double merged_delta_r_cut,
+    const double merged_response_min, const double merged_response_max,
+    const double individual_response_min, const double individual_response_max,
+    const bool conditions) {
+  if (conditions) {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.SetTextSize(0.036);
+    label.DrawLatex(0.08, 0.95, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(0.08, 0.89,
+                    ("Single #pi^{0} gun, " + collection_label +
+                     (fractions ? ", truth-denominator fractions"
+                                : ", truth-denominator components"))
+                        .c_str());
+    label.DrawLatex(
+        0.08, 0.83,
+        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
+             truth_eta_max));
+    label.DrawLatex(0.08, 0.77,
+                    Form("Separated: E_{cluster} #geq %.3g GeV, #DeltaR < %.3f",
+                         min_cluster_energy, delta_r_cut));
+    label.DrawLatex(0.08, 0.71,
+                    Form("Merged: max #DeltaR < %.3f, %.1f < "
+                         "E_{T}^{cluster}/p_{T}^{#pi^{0}} < %.1f",
+                         merged_delta_r_cut, merged_response_min,
+                         merged_response_max));
+    label.DrawLatex(0.08, 0.65,
+                    Form("Individual: #DeltaR < %.3f, %.1f < "
+                         "E_{T}^{cluster}/p_{T}^{#gamma} < %.1f",
+                         delta_r_cut, individual_response_min,
+                         individual_response_max));
+    label.DrawLatex(
+        0.08, 0.59,
+        "Exclusive priority: separated > merged > individual > none");
+    return;
+  }
+
+  TLegend legend(0.08, 0.15, 0.96, 0.85);
+  legend.SetTextSize(0.038);
+  if (!fractions) {
+    legend.AddEntry(histograms.reference.get(),
+                    "Generated #pi^{0} with |#eta_{truth}| < cut", "lep");
+  }
+  for (std::size_t component = 0; component < n_event_components; ++component) {
+    legend.AddEntry(fractions ? histograms.fraction[component].get()
+                              : histograms.component[component].get(),
+                    truth_pi0_component_labels[component].c_str(),
+                    fractions ? "lep" : "f");
+  }
+  legend.DrawClone();
+}
+
+void draw_truth_pi0_component_counts(
+    std::vector<TruthPi0ComponentHistograms> &histograms,
+    const std::string &collection_label, const std::string &output_path,
+    const double truth_eta_max, const double min_cluster_energy,
+    const double delta_r_cut, const double merged_delta_r_cut,
+    const double merged_response_min, const double merged_response_max,
+    const double individual_response_min,
+    const double individual_response_max) {
+  const std::array<std::size_t, n_event_components> stack_order = {0, 1, 2, 3};
+  TCanvas canvas(("c_truth_pi0_event_components_" + collection_label).c_str(),
+                 "Reconstruction topologies for central truth pi0 by truth pT",
+                 canvas_width, canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
+  std::vector<std::unique_ptr<THStack>> stacks;
+  stacks.reserve(histograms.size());
+  for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
+    canvas.cd(static_cast<int>(bin + 1U));
+    TruthPi0ComponentHistograms &current = histograms[bin];
+    set_point_style(
+        *current.reference,
+        core_condition_colors[condition_index(CoreCondition::reference)],
+        event_count_markers[condition_index(CoreCondition::reference)]);
+    current.reference->GetXaxis()->SetTitle("Truth #alpha");
+    current.reference->GetYaxis()->SetTitle("Generated #pi^{0}");
+    current.reference->SetMinimum(0.0);
+    current.reference->SetMaximum(current.reference->GetMaximum() > 0.0
+                                      ? 1.30 * current.reference->GetMaximum()
+                                      : 1.0);
+    for (std::size_t component = 0; component < n_event_components;
+         ++component) {
+      style_component_histogram(*current.component[component],
+                                event_component_colors[component],
+                                event_component_count_markers[component]);
+    }
+    stacks.push_back(std::make_unique<THStack>(
+        ("stack_truth_pi0_" + collection_label + "_" + std::to_string(bin))
+            .c_str(),
+        ""));
+    for (const std::size_t component : stack_order) {
+      stacks.back()->Add(current.component[component].get());
+    }
+    current.reference->Draw("E1");
+    stacks.back()->Draw("HIST SAME");
+    current.reference->Draw("E1 SAME");
+    TLatex panel;
+    panel.SetNDC();
+    panel.SetTextAlign(13);
+    panel.SetTextSize(0.045);
+    panel.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
+    gPad->RedrawAxis();
+  }
+  canvas.cd(conditions_pad);
+  draw_truth_pi0_component_information(
+      histograms.front(), collection_label, false, truth_eta_max,
+      min_cluster_energy, delta_r_cut, merged_delta_r_cut, merged_response_min,
+      merged_response_max, individual_response_min, individual_response_max,
+      true);
+  canvas.cd(legend_pad);
+  draw_truth_pi0_component_information(
+      histograms.front(), collection_label, false, truth_eta_max,
+      min_cluster_energy, delta_r_cut, merged_delta_r_cut, merged_response_min,
+      merged_response_max, individual_response_min, individual_response_max,
+      false);
+  canvas.SaveAs(output_path.c_str());
+}
+
+void draw_truth_pi0_component_fractions(
+    std::vector<TruthPi0ComponentHistograms> &histograms,
+    const std::string &collection_label, const std::string &output_path,
+    const double truth_eta_max, const double min_cluster_energy,
+    const double delta_r_cut, const double merged_delta_r_cut,
+    const double merged_response_min, const double merged_response_max,
+    const double individual_response_min,
+    const double individual_response_max) {
+  TCanvas canvas(
+      ("c_truth_pi0_event_component_fractions_" + collection_label).c_str(),
+      "Reconstruction-topology fractions for central truth pi0 by truth pT",
+      canvas_width, canvas_height);
+  canvas.Divide(canvas_columns, canvas_rows);
+  for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
+    canvas.cd(static_cast<int>(bin + 1U));
+    TruthPi0ComponentHistograms &current = histograms[bin];
+    for (std::size_t component = 0; component < n_event_components;
+         ++component) {
+      TH1D &fraction = *current.fraction[component];
+      style_component_histogram(fraction, event_component_colors[component],
+                                event_component_ratio_markers[component], 2,
+                                0.9);
+      fraction.SetFillStyle(0);
+      fraction.GetYaxis()->SetTitle("Fraction of central truth #pi^{0}");
+      fraction.SetMinimum(0.0);
+      fraction.SetMaximum(1.05);
+      fraction.Draw(component == 0U ? "E1" : "E1 SAME");
+    }
+    TLatex panel;
+    panel.SetNDC();
+    panel.SetTextAlign(13);
+    panel.SetTextSize(0.045);
+    panel.DrawLatex(0.18, 0.92, truth_pt_labels[bin].c_str());
+    gPad->RedrawAxis();
+  }
+  canvas.cd(conditions_pad);
+  draw_truth_pi0_component_information(
+      histograms.front(), collection_label, true, truth_eta_max,
+      min_cluster_energy, delta_r_cut, merged_delta_r_cut, merged_response_min,
+      merged_response_max, individual_response_min, individual_response_max,
+      true);
+  canvas.cd(legend_pad);
+  draw_truth_pi0_component_information(
+      histograms.front(), collection_label, true, truth_eta_max,
+      min_cluster_energy, delta_r_cut, merged_delta_r_cut, merged_response_min,
+      merged_response_max, individual_response_min, individual_response_max,
+      false);
+  canvas.SaveAs(output_path.c_str());
+}
 void draw_cut_stage_information(
     CutStageHistograms &histograms, const std::string &collection_label,
     const bool pair_family, const double min_cluster_energy,
@@ -1398,6 +1712,18 @@ void write_component_histograms(
   }
 }
 
+void write_truth_pi0_component_histograms(
+    TFile &output, std::vector<TruthPi0ComponentHistograms> &histograms) {
+  output.cd();
+  for (TruthPi0ComponentHistograms &current : histograms) {
+    current.reference->Write();
+    for (std::size_t component = 0; component < n_event_components;
+         ++component) {
+      current.component[component]->Write();
+      current.fraction[component]->Write();
+    }
+  }
+}
 void write_histograms(TFile &output, std::vector<StageHistograms> &histograms) {
   output.cd();
   for (StageHistograms &current : histograms) {
@@ -1447,6 +1773,29 @@ bool print_component_summary(
   return closure_ok;
 }
 
+bool print_truth_pi0_component_summary(
+    const std::string &label,
+    const std::vector<TruthPi0ComponentHistograms> &histograms) {
+  bool closure_ok = true;
+  for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
+    const TruthPi0ComponentHistograms &current = histograms[bin];
+    Long64_t component_sum = 0;
+    for (const Long64_t count : current.n_component) {
+      component_sum += count;
+    }
+    const bool bin_ok = component_sum == current.n_reference;
+    closure_ok &= bin_ok;
+    std::cout << label << " " << truth_pt_labels[bin]
+              << " reference/separated/merged/individual/none/malformed = "
+              << current.n_reference;
+    for (const Long64_t count : current.n_component) {
+      std::cout << "/" << count;
+    }
+    std::cout << "/" << current.n_malformed
+              << " closure=" << (bin_ok ? "OK" : "FAIL") << std::endl;
+  }
+  return closure_ok;
+}
 void draw_reco_et_information(RecoEtHistograms &histograms,
                               const std::string &collection_label,
                               const bool retention,
@@ -1647,8 +1996,12 @@ bool print_reco_et_summary(const std::string &label,
 } // namespace
 
 int PlotConditionalPartnerEfficiency(
-    const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
-    const std::string output_base = "PhotonAnalysisTree/output/plots/conditional_efficiency/conditional_partner_et3to5",
+    const std::string input_path =
+        "PhotonAnalysisTree/output/merged/"
+        "100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
+    const std::string output_base =
+        "PhotonAnalysisTree/output/plots/conditional_efficiency/"
+        "conditional_partner_et3to5",
     const double anchor_eta_max = 0.7, const double anchor_et_min = 3.0,
     const double anchor_et_max = 5.0, const double delta_r_cut = 0.03,
     const double mass_window_min = 0.10, const double mass_window_max = 0.18,
@@ -1657,7 +2010,7 @@ int PlotConditionalPartnerEfficiency(
     const double merged_response_max = 1.5,
     const double individual_response_min = 0.5,
     const double individual_response_max = 1.5,
-    const double min_cluster_energy = 0.5) {
+    const double min_cluster_energy = 0.5, const double truth_eta_max = 0.7) {
   if (input_path.empty() || output_base.empty() || !(anchor_eta_max > 0.0) ||
       !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||
       !(delta_r_cut > 0.0) || !(merged_delta_r_cut > 0.0) ||
@@ -1665,7 +2018,7 @@ int PlotConditionalPartnerEfficiency(
         merged_response_min < merged_response_max) ||
       !(individual_response_min >= 0.0 &&
         individual_response_min < individual_response_max) ||
-      !(min_cluster_energy >= 0.0) ||
+      !(min_cluster_energy >= 0.0) || !(truth_eta_max > 0.0) ||
       !(mass_window_min >= 0.0 && mass_window_min < mass_window_max) ||
       asymmetry_nbins <= 0) {
     std::cerr << "PlotConditionalPartnerEfficiency - invalid argument"
@@ -1689,6 +2042,7 @@ int PlotConditionalPartnerEfficiency(
   unsigned char truth_is_pi0_to_2gamma = 0;
   unsigned char truth_both_gamma_in_acceptance = 0;
   double truth_pt = -999.0;
+  double truth_pi0_eta = -999.0;
   double truth_alpha = -999.0;
   std::vector<double> *truth_eta = nullptr;
   std::vector<double> *truth_phi = nullptr;
@@ -1724,6 +2078,7 @@ int PlotConditionalPartnerEfficiency(
   bind("truth_is_pi0_to_2gamma", &truth_is_pi0_to_2gamma);
   bind("truth_both_gamma_in_acceptance", &truth_both_gamma_in_acceptance);
   bind("truth_pt", &truth_pt);
+  bind("truth_eta", &truth_pi0_eta);
   bind("truth_pair_e_asym", &truth_alpha);
   bind("truth_daughter_pt", &truth_daughter_pt);
   bind("truth_daughter_eta", &truth_eta);
@@ -1749,6 +2104,12 @@ int PlotConditionalPartnerEfficiency(
   std::vector<EventComponentHistograms> nosplit_components =
       make_truth_pt_component_histograms("nosplit_event_component",
                                          asymmetry_nbins);
+  std::vector<TruthPi0ComponentHistograms> split_truth_pi0_components =
+      make_truth_pt_truth_pi0_component_histograms(
+          "split_central_truth_pi0_component", asymmetry_nbins);
+  std::vector<TruthPi0ComponentHistograms> nosplit_truth_pi0_components =
+      make_truth_pt_truth_pi0_component_histograms(
+          "nosplit_central_truth_pi0_component", asymmetry_nbins);
   const std::array<std::string, n_cut_stages> event_stage_suffixes = {
       "truth", "cluster_energy", "central_cluster", "selected_cluster"};
   const std::array<std::string, n_cut_stages> pair_stage_suffixes = {
@@ -1780,24 +2141,45 @@ int PlotConditionalPartnerEfficiency(
                 << tree->GetEntries() << std::endl;
     }
     tree->GetEntry(entry);
-    if (!truth_valid || !truth_is_pi0_to_2gamma ||
-        !truth_both_gamma_in_acceptance) {
+    if (!truth_valid || !truth_is_pi0_to_2gamma) {
       continue;
     }
     if (!std::isfinite(truth_alpha) || truth_alpha < 0.0 || truth_alpha > 1.0 ||
-        !truth_eta || !truth_phi || !truth_daughter_pt ||
-        !truth_projection_valid || truth_eta->size() != 2U ||
+        !std::isfinite(truth_pi0_eta) || !truth_eta || !truth_phi ||
+        !truth_daughter_pt || truth_eta->size() != 2U ||
         truth_phi->size() != 2U || truth_daughter_pt->size() != 2U ||
         !std::isfinite(truth_daughter_pt->at(0)) ||
-        !std::isfinite(truth_daughter_pt->at(1)) ||
-        truth_projection_valid->size() != 2U ||
-        !truth_projection_valid->at(0) || !truth_projection_valid->at(1)) {
+        !std::isfinite(truth_daughter_pt->at(1))) {
       ++invalid_truth_shape;
       continue;
     }
     const std::size_t bin = find_truth_pt_bin(truth_pt);
     if (bin >= truth_pt_labels.size()) {
       ++truth_pt_outside_bins;
+      continue;
+    }
+
+    if (std::abs(truth_pi0_eta) < truth_eta_max) {
+      fill_truth_pi0_components(
+          split_truth_pi0_components[bin], truth_alpha, truth_pt,
+          *truth_daughter_pt, *truth_eta, *truth_phi, split, min_cluster_energy,
+          delta_r_cut, merged_delta_r_cut, merged_response_min,
+          merged_response_max, individual_response_min,
+          individual_response_max);
+      fill_truth_pi0_components(
+          nosplit_truth_pi0_components[bin], truth_alpha, truth_pt,
+          *truth_daughter_pt, *truth_eta, *truth_phi, nosplit,
+          min_cluster_energy, delta_r_cut, merged_delta_r_cut,
+          merged_response_min, merged_response_max, individual_response_min,
+          individual_response_max);
+    }
+
+    // Preserve the original acceptance requirements for the existing plot
+    // families. They are deliberately not part of the new truth-pi0
+    // denominator above.
+    if (!truth_both_gamma_in_acceptance || !truth_projection_valid ||
+        truth_projection_valid->size() != 2U ||
+        !truth_projection_valid->at(0) || !truth_projection_valid->at(1)) {
       continue;
     }
     if (!fill_reco_et_histograms(split_reco_et, bin, truth_alpha, split,
@@ -1869,6 +2251,12 @@ int PlotConditionalPartnerEfficiency(
     make_component_fractions(nosplit_components[bin],
                              "nosplit_event_component_truth_pt_" +
                                  std::to_string(bin));
+    make_truth_pi0_component_fractions(
+        split_truth_pi0_components[bin],
+        "split_central_truth_pi0_component_truth_pt_" + std::to_string(bin));
+    make_truth_pi0_component_fractions(
+        nosplit_truth_pi0_components[bin],
+        "nosplit_central_truth_pi0_component_truth_pt_" + std::to_string(bin));
   }
   const std::string split_output_base =
       collection_output_base(output_base, "split");
@@ -1927,6 +2315,31 @@ int PlotConditionalPartnerEfficiency(
       };
   draw_components(split_components, split_output_base, "SPLIT");
   draw_components(nosplit_components, nosplit_output_base, "NO_SPLIT");
+  const auto draw_truth_pi0_components =
+      [truth_eta_max, min_cluster_energy, delta_r_cut, merged_delta_r_cut,
+       merged_response_min, merged_response_max, individual_response_min,
+       individual_response_max](
+          std::vector<TruthPi0ComponentHistograms> &components,
+          const std::string &collection_base, const std::string &label) {
+        draw_truth_pi0_component_counts(
+            components, label,
+            collection_base +
+                "_central_truth_pi0_event_components_truth_pt.pdf",
+            truth_eta_max, min_cluster_energy, delta_r_cut, merged_delta_r_cut,
+            merged_response_min, merged_response_max, individual_response_min,
+            individual_response_max);
+        draw_truth_pi0_component_fractions(
+            components, label,
+            collection_base +
+                "_central_truth_pi0_event_component_fractions_truth_pt.pdf",
+            truth_eta_max, min_cluster_energy, delta_r_cut, merged_delta_r_cut,
+            merged_response_min, merged_response_max, individual_response_min,
+            individual_response_max);
+      };
+  draw_truth_pi0_components(split_truth_pi0_components, split_output_base,
+                            "SPLIT");
+  draw_truth_pi0_components(nosplit_truth_pi0_components, nosplit_output_base,
+                            "NO_SPLIT");
   draw_cut_stages(split_event_stages, "SPLIT", false,
                   split_output_base + "_event_selection_stages_truth_pt.pdf",
                   min_cluster_energy, anchor_eta_max, anchor_et_min,
@@ -1975,6 +2388,8 @@ int PlotConditionalPartnerEfficiency(
   TNamed source("input_path", input_path.c_str());
   write_component_histograms(output, split_components);
   write_component_histograms(output, nosplit_components);
+  write_truth_pi0_component_histograms(output, split_truth_pi0_components);
+  write_truth_pi0_component_histograms(output, nosplit_truth_pi0_components);
   write_cut_stage_histograms(output, split_event_stages);
   write_cut_stage_histograms(output, split_pair_stages);
   write_cut_stage_histograms(output, nosplit_event_stages);
@@ -1982,6 +2397,7 @@ int PlotConditionalPartnerEfficiency(
   write_reco_et_histograms(output, split_reco_et);
   write_reco_et_histograms(output, nosplit_reco_et);
   TParameter<double> stored_eta_max("anchor_eta_max", anchor_eta_max);
+  TParameter<double> stored_truth_eta_max("truth_pi0_eta_max", truth_eta_max);
   TParameter<double> stored_et_min("anchor_et_min", anchor_et_min);
   TParameter<double> stored_et_max("anchor_et_max", anchor_et_max);
   TParameter<double> stored_delta_r("delta_r_cut", delta_r_cut);
@@ -1999,6 +2415,7 @@ int PlotConditionalPartnerEfficiency(
   TParameter<double> stored_individual_response_max("individual_response_max",
                                                     individual_response_max);
   stored_eta_max.Write();
+  stored_truth_eta_max.Write();
   TParameter<double> stored_min_cluster_energy("analysis_min_cluster_energy",
                                                min_cluster_energy);
   stored_et_min.Write();
@@ -2021,6 +2438,11 @@ int PlotConditionalPartnerEfficiency(
   const bool component_closure_ok =
       print_component_summary("SPLIT component", split_components) &&
       print_component_summary("NO_SPLIT component", nosplit_components);
+  const bool truth_pi0_component_closure_ok =
+      print_truth_pi0_component_summary("SPLIT central truth pi0 component",
+                                        split_truth_pi0_components) &&
+      print_truth_pi0_component_summary("NO_SPLIT central truth pi0 component",
+                                        nosplit_truth_pi0_components);
   const bool reco_et_selection_ok =
       print_reco_et_summary("SPLIT reco-ET", split_reco_et) &&
       print_reco_et_summary("NO_SPLIT reco-ET", nosplit_reco_et);
@@ -2040,7 +2462,7 @@ int PlotConditionalPartnerEfficiency(
   std::cout << "Reco-ET malformed SPLIT / NO_SPLIT collections = "
             << split_reco_et_malformed << " / " << nosplit_reco_et_malformed
             << std::endl;
-  std::cout << "Wrote " << output_base << ".root and twenty PDF plots"
+  std::cout << "Wrote " << output_base << ".root and twenty-four PDF plots"
             << std::endl;
   Long64_t malformed = invalid_truth_shape + split_reco_et_malformed +
                        nosplit_reco_et_malformed;
@@ -2055,6 +2477,12 @@ int PlotConditionalPartnerEfficiency(
       malformed += histograms.n_malformed;
     }
   }
+  for (const auto *family :
+       {&split_truth_pi0_components, &nosplit_truth_pi0_components}) {
+    for (const TruthPi0ComponentHistograms &histograms : *family) {
+      malformed += histograms.n_malformed;
+    }
+  }
   for (const auto *family : {&split_event_stages, &split_pair_stages,
                              &nosplit_event_stages, &nosplit_pair_stages}) {
     for (const CutStageHistograms &histograms : *family) {
@@ -2062,7 +2490,7 @@ int PlotConditionalPartnerEfficiency(
     }
   }
   return malformed == 0 && component_closure_ok && cut_stage_nesting_ok &&
-                 reco_et_selection_ok
+                 reco_et_selection_ok && truth_pi0_component_closure_ok
              ? 0
              : 7;
 }

@@ -88,7 +88,7 @@ schema version、branch alignment、contributor offsetとfractionを検証しま
 
 ## scoreを追加する
 
-入力ROOT fileの`event_tree`へBDT/gamma score branchを直接追加し、全段と最終検証が成功した後に`_scored.root`へrenameします。途中で失敗した場合は入力ファイルを元DSTから作り直してください。
+single-particle用`run_add_scores.sh`は入力ROOT fileの`event_tree`へBDT/gamma score branchを直接追加し、全段と最終検証が成功した後に`_scored.root`へrenameします。途中で失敗した場合は入力ファイルを元DSTから作り直してください。
 
 ```bash
 ./PhotonAnalysisTree/run_add_scores.sh \
@@ -97,6 +97,30 @@ schema version、branch alignment、contributor offsetとfractionを検証しま
 ```
 
 wrapperは最後に`check_scored_tree.C`を実行し、cluster、tower、pair、score vectorの長さに加え、`metadata` TTreeが実際に読めること、event数とsource file IDが一致することを検証します。scored ROOT fileのtop-level objectは`event_tree`と`metadata`だけです。adapterのcluster数、valid数、malformed数などの集計は標準出力（Condor log）だけに記録します。既存の最終outputは上書きせず、score/valid branchが既にある入力もエラーにします。Condorで多数jobを同時実行してもACLiCの共有build fileが競合しないよう、score macroは各process内でloadします。
+
+Pythia schema version 4にはsplit専用wrapperを使います。第3引数には
+split clusterで学習したONNX modelを必ず明示します。
+
+```bash
+./PhotonAnalysisTree/run_add_scores_pythia.sh \
+  PhotonAnalysisTree/output/root/pythia_photon_analysis_tree_pythia8_Jet5-0000000028-000000.root \
+  PhotonAnalysisTree/output/root/pythia_photon_analysis_tree_pythia8_Jet5-0000000028-000000_scored.root \
+  /path/to/split_model.onnx
+```
+
+このwrapperは入力を変更せず、最終outputと同じdirectoryの一時コピーへ次のbranchだけを
+追加します。
+
+- `split_cluster_bdt_base_v3E_{score,valid}`
+- `split_cluster_bdt_ppg15v1_{score,valid}`
+- `split_cluster_p_gamma{,_valid}`
+
+変更前後に`check_pythia_tree.C`、最後に`check_pythia_scored_tree.C`を実行し、
+全検証成功後だけ一時ファイルを最終outputへrenameします。no-split score branchは
+作りません。専用Condor jobでは、split modelがまだない間の暫定設定として、
+NO_SPLIT・1 cluster条件で学習された同梱`models/best_model.onnx`を明示的に指定します。
+このONNX scoreは学習domain外であり、物理解析へ使用する前に別途validationが必要です。
+wrapperを直接呼ぶ場合は引き続き第3引数でmodel pathを明示します。
 
 `add_split_bdt_ppg15v1.C`は既存SPLIT BDTと同じ11 featureを使い、low-pT sampleを追加したモデルの出力を`split_cluster_bdt_ppg15v1_score`、入力・shower shape・推論が有効かを`split_cluster_bdt_ppg15v1_valid`へ保存します。wrapperの第7引数でdefault model pathを上書きできます。
 
@@ -160,6 +184,8 @@ condor_submit run_tree.job
 condor_submit run_tree_pythia.job
 # tree jobsの完了後
 condor_submit run_add_scores.job
+# manifestの先頭から1 jobだけsubmit
+condor_submit -append "manifest_slice = [0:1]" -maxjobs 1 run_add_scores_pythia.job
 ```
 
 `run_tree.job`のjob数とoffsetはsubmit時に上書きできます。`run_add_scores.job`はdefaultで5000 jobをqueueするため、job数を変える場合はjob file末尾の`Queue 5000`を編集し、offsetだけをsubmit時に上書きします。
@@ -169,10 +195,17 @@ condor_submit -append "n_jobs = 100" -append "job_offset = 500" run_tree.job
 condor_submit -append "job_offset = 500" run_add_scores.job
 ```
 
+Pythia scoringを段階的に増やす場合はmanifestとsliceをsubmit時に上書きできます。
+
+```bash
+condor_submit -append "input_manifest = input/jet5/segments.list" -append "manifest_slice = [0:10]" -maxjobs 10 run_add_scores_pythia.job
+```
+
 - `run_tree.sh`, `run_tree.job`: single-particle DSTからbase TTreeを生成
 - `run_tree_pythia.sh`, `run_tree_pythia.job`: Pythia 4-stream DSTからschema 4 treeを生成
 - `make_pythia_input_manifest.sh`: 4つのstream別listを検証して共通suffix manifestを生成
 - `run_add_scores.sh`, `run_add_scores.job`: BDT/gamma score branchを追加して検証
+- `run_add_scores_pythia.sh`, `run_add_scores_pythia.job`: Pythia schema 4 treeへsplit scoreだけをtransactionalに追加して検証
 - `make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
 
 `run_tree_pythia.job`は`input/jet5/segments.list`を`queue ... from`で読み、

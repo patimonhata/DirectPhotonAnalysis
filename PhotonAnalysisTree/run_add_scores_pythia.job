@@ -1,0 +1,33 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/run_add_scores_pythia.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
+request_memory     = 4GB
+Priority           = 20
+job_lease_duration = 86400
+
+tree_directory     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/root
+log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
+input_manifest     = input/jet5/segments_copy.list
+manifest_slice     = [0:]
+
+# Temporary physics-domain mismatch: this model was trained on one-cluster
+# NO_SPLIT events, but is explicitly applied to Pythia SPLIT clusters until a
+# dedicated SPLIT model is available.
+split_onnx_model   = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/best_model.onnx
+
+input_stem         = $SUBSTR(input_suffix,0,-5)
+input_file         = $(tree_directory)/pythia_photon_analysis_tree_$(input_stem).root
+final_output_file  = $(tree_directory)/pythia_photon_analysis_tree_$(input_stem)_scored.root
+
+Output             = $(log_directory)/pythia_scores_$(ClusterId).$(ProcId).out
+Error              = $(log_directory)/pythia_scores_$(ClusterId).$(ProcId).err
+Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-scores_$(ClusterId).$(ProcId).log
+Arguments          = "$(input_file) $(final_output_file) $(split_onnx_model)"
+
+# One manifest row is one Pythia base tree. Override input_manifest and
+# manifest_slice with condor_submit -append when scaling up.
+Queue input_suffix from $(manifest_slice) $(input_manifest)

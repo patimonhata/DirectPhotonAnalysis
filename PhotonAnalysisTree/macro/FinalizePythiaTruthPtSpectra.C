@@ -163,7 +163,7 @@ double smallest_positive_bin(const std::vector<TH1D*>& histograms)
 }
 
 int FinalizePythiaTruthPtSpectra(
-    const std::string partial_pattern = "output/truth_pt_partial/partial_*.root",
+    const std::string partial_pattern = "output/truth_pt_partial/prompt_eta07_unweighted/partial_*.root",
     const std::string output_base = "output/plots/minbias_truth_pt_prompt_eta07",
     const Long64_t expected_manifest_begin = 0,
     const Long64_t expected_manifest_end = -1)

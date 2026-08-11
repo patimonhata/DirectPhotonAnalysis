@@ -34,6 +34,5 @@ Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) 
 #   200,000 files:
 #     condor_submit -append "total_files = 200000" -append "n_chunks = 400" -maxjobs 400 run_truth_pt_partial_pythia.job
 #   Continue from the existing first 40,000 files through 200,000:
-#     condor_submit -append "total_files = 200000" -append "chunk_offset = 80" \
-#       -append "n_chunks = 320" -maxjobs 320 run_truth_pt_partial_pythia.job
+#     condor_submit -append "total_files = 200000" -append "chunk_offset = 80" -append "n_chunks = 320" -maxjobs 320 run_truth_pt_partial_pythia.job
 Queue $(n_chunks)

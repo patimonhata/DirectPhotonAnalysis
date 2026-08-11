@@ -3,6 +3,7 @@
 
 #include <fun4all/SubsysReco.h>
 
+#include "Pi0ClusterTruthMatcher.h"
 #include "PhotonTreeCommon.h"
 
 #include <string>
@@ -10,8 +11,12 @@
 
 class PHCompositeNode;
 class PHG4Particle;
+class PHG4CellContainer;
+class PHG4HitContainer;
 class PHG4TruthInfoContainer;
+class RawTowerContainer;
 class RawTowerGeomContainer;
+class TowerInfoContainer;
 class TFile;
 class TTree;
 
@@ -30,6 +35,9 @@ class PhotonAnalysisTree : public SubsysReco
   void set_source_file_id(unsigned int value) { source_file_id_ = value; }
   void set_expected_primary_pdg(int value) { expected_primary_pdg_ = value; }
   void set_truth_node_name(const std::string& value) { truth_node_name_ = value; }
+  void set_raw_truth_tower_node_name(const std::string& value) { raw_truth_tower_node_name_ = value; }
+  void set_truth_cell_node_name(const std::string& value) { truth_cell_node_name_ = value; }
+  void set_truth_hit_node_name(const std::string& value) { truth_hit_node_name_ = value; }
   void set_tower_node_name(const std::string& value) { tower_node_name_ = value; }
   void set_tower_geom_node_name(const std::string& value) { tower_geom_node_name_ = value; }
   void set_split_cluster_node_name(const std::string& value) { split_cluster_node_name_ = value; }
@@ -43,7 +51,7 @@ class PhotonAnalysisTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 3;
+  static constexpr int schema_version_ = 4;
   static constexpr double invalid_double_ = photon_tree::kInvalidDouble;
   static constexpr int invalid_int_ = photon_tree::kInvalidInt;
   static constexpr double default_cemc_radius_ = 95.0;
@@ -53,6 +61,14 @@ class PhotonAnalysisTree : public SubsysReco
   void close_output_file();
   void reset_event();
   bool fill_truth(PHG4TruthInfoContainer* truth, RawTowerGeomContainer* geometry);
+  void fill_pi0_truth_collection(const photon_tree::FilledCollection& reco,
+                                 TowerInfoContainer* towers,
+                                 RawTowerContainer* raw_truth_towers,
+                                 PHG4CellContainer* truth_cells,
+                                 PHG4HitContainer* truth_hits,
+                                 PHG4TruthInfoContainer* truth,
+                                 bool allocate_split_tower_energy,
+                                 photon_tree::Pi0ClusterTruthCollection& output) const;
 
   static double radius(double x, double y);
   static double eta_from_xyz(double x, double y, double z);
@@ -69,6 +85,9 @@ class PhotonAnalysisTree : public SubsysReco
   std::string input_file_name_;
   std::string output_file_name_ = "photon_analysis_tree.root";
   std::string truth_node_name_ = "G4TruthInfo";
+  std::string raw_truth_tower_node_name_ = "TOWER_CALIB_CEMC";
+  std::string truth_cell_node_name_ = "G4CELL_CEMC";
+  std::string truth_hit_node_name_ = "G4HIT_CEMC";
   std::string tower_node_name_ = "TOWERINFO_CALIB_CEMC";
   std::string tower_geom_node_name_ = "TOWERGEOM_CEMC";
   std::string split_cluster_node_name_ = "CLUSTERINFO_CEMC";
@@ -86,6 +105,10 @@ class PhotonAnalysisTree : public SubsysReco
   int shower_shape_algorithm_version_ = ShowerShapeCalculator::kAlgorithmVersion;
   int shower_shape_patch_side_ = ShowerShapeCalculator::kPatchSide;
   photon_tree::PhotonTreeCommon common_;
+  photon_tree::Pi0ClusterTruthMatcher pi0_truth_matcher_;
+  int pi0_truth_matching_algorithm_version_ = photon_tree::Pi0ClusterTruthMatcher::kAlgorithmVersion;
+  photon_tree::Pi0ClusterTruthCollection split_truth_;
+  photon_tree::Pi0ClusterTruthCollection nosplit_truth_;
 
   TFile* output_file_ = nullptr;
   TTree* event_tree_ = nullptr;

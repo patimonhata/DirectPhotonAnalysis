@@ -2,12 +2,15 @@
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
+#include <calobase/RawTowerContainer.h>
 #include <calobase/RawTowerDefs.h>
 #include <calobase/RawTowerGeom.h>
 #include <calobase/RawTowerGeomContainer.h>
 #include <calobase/TowerInfo.h>
 #include <calobase/TowerInfoContainer.h>
 #include <calobase/TowerInfoDefs.h>
+#include <g4detectors/PHG4CellContainer.h>
+#include <g4main/PHG4HitContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <g4main/PHG4Particle.h>
 #include <g4main/PHG4TruthInfoContainer.h>
@@ -87,6 +90,12 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
 
   auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
   auto* towers = findNode::getClass<TowerInfoContainer>(topNode, tower_node_name_);
+  auto* raw_truth_towers =
+      findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
+  auto* truth_cells =
+      findNode::getClass<PHG4CellContainer>(topNode, truth_cell_node_name_);
+  auto* truth_hits =
+      findNode::getClass<PHG4HitContainer>(topNode, truth_hit_node_name_);
   auto* geometry = findNode::getClass<RawTowerGeomContainer>(topNode, tower_geom_node_name_);
   auto* split_clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   auto* nosplit_clusters = findNode::getClass<RawClusterContainer>(topNode, nosplit_cluster_node_name_);
@@ -128,6 +137,14 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
     std::cout << "PhotonAnalysisTree::process_event - invalid cluster/tower content in event "
               << b_event_in_file_ << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
+  }
+
+  fill_pi0_truth_collection(common_.split(), towers, raw_truth_towers,
+                            truth_cells, truth_hits, truth, true, split_truth_);
+  if (nosplit_clusters)
+  {
+    fill_pi0_truth_collection(common_.nosplit(), towers, raw_truth_towers,
+                              truth_cells, truth_hits, truth, false, nosplit_truth_);
   }
 
   event_tree_->Fill();
@@ -282,6 +299,41 @@ bool PhotonAnalysisTree::fill_truth(PHG4TruthInfoContainer* truth, RawTowerGeomC
   return true;
 }
 
+void PhotonAnalysisTree::fill_pi0_truth_collection(
+    const photon_tree::FilledCollection& reco,
+    TowerInfoContainer* towers,
+    RawTowerContainer* raw_truth_towers,
+    PHG4CellContainer* truth_cells,
+    PHG4HitContainer* truth_hits,
+    PHG4TruthInfoContainer* truth,
+    bool allocate_split_tower_energy,
+    photon_tree::Pi0ClusterTruthCollection& output) const
+{
+  output.clear();
+  std::array<int, 2> direct_gamma_track_ids = {invalid_int_, invalid_int_};
+  if (b_truth_is_pi0_to_2gamma_ && b_truth_daughter_track_id_.size() == 2U)
+  {
+    direct_gamma_track_ids[0] = b_truth_daughter_track_id_[0];
+    direct_gamma_track_ids[1] = b_truth_daughter_track_id_[1];
+  }
+  const float gamma0_energy =
+      b_truth_daughter_e_.size() == 2U && b_truth_daughter_e_[0] > 0.0
+          ? static_cast<float>(b_truth_daughter_e_[0])
+          : 0.0F;
+  const float gamma1_energy =
+      b_truth_daughter_e_.size() == 2U && b_truth_daughter_e_[1] > 0.0
+          ? static_cast<float>(b_truth_daughter_e_[1])
+          : 0.0F;
+  for (const RawCluster* cluster : reco.ordered_clusters)
+  {
+    output.append(
+        pi0_truth_matcher_.match(cluster, towers, raw_truth_towers,
+                                 truth_cells, truth_hits, truth,
+                                 direct_gamma_track_ids, allocate_split_tower_energy),
+        gamma0_energy, gamma1_energy);
+  }
+}
+
 void PhotonAnalysisTree::reset_event()
 {
   b_source_file_id_ = 0;
@@ -318,6 +370,8 @@ void PhotonAnalysisTree::reset_event()
   b_truth_m_gg_ = invalid_double_;
   b_truth_pair_e_asym_ = invalid_double_;
   common_.clear_event();
+  split_truth_.clear();
+  nosplit_truth_.clear();
 }
 
 void PhotonAnalysisTree::create_trees()
@@ -372,6 +426,8 @@ void PhotonAnalysisTree::create_trees()
   event_tree_->Branch("store_shower_shape_tower_patch", &store_shower_shape_tower_patch_);
   common_.create_collection_branches(event_tree_, "split", common_.split().data, true);
   common_.create_collection_branches(event_tree_, "nosplit", common_.nosplit().data, true);
+  split_truth_.create_branches(event_tree_, "split");
+  nosplit_truth_.create_branches(event_tree_, "nosplit");
 
   metadata_tree_ = new TTree("metadata", "One entry per source DST");
   metadata_tree_->Branch("schema_version", &metadata_schema_version_);
@@ -380,6 +436,9 @@ void PhotonAnalysisTree::create_trees()
   metadata_tree_->Branch("source_file_id", &source_file_id_);
   metadata_tree_->Branch("expected_primary_pdg", &expected_primary_pdg_);
   metadata_tree_->Branch("truth_node", &truth_node_name_);
+  metadata_tree_->Branch("raw_truth_tower_node", &raw_truth_tower_node_name_);
+  metadata_tree_->Branch("truth_cell_node", &truth_cell_node_name_);
+  metadata_tree_->Branch("truth_hit_node", &truth_hit_node_name_);
   metadata_tree_->Branch("tower_node", &tower_node_name_);
   metadata_tree_->Branch("tower_geom_node", &tower_geom_node_name_);
   metadata_tree_->Branch("split_cluster_node", &split_cluster_node_name_);
@@ -388,6 +447,8 @@ void PhotonAnalysisTree::create_trees()
   metadata_tree_->Branch("require_nosplit_cluster_node", &require_nosplit_cluster_node_);
   metadata_tree_->Branch("cluster_ordering", &cluster_ordering_);
   metadata_tree_->Branch("acceptance_eta_max", &acceptance_eta_max_);
+  metadata_tree_->Branch("pi0_truth_matching_algorithm_version",
+                         &pi0_truth_matching_algorithm_version_);
   metadata_tree_->Branch("n_events_processed", &n_events_processed_);
   metadata_tree_->Branch("n_events_written", &n_events_written_);
   metadata_tree_->Branch("n_events_invalid_truth", &n_events_invalid_truth_);

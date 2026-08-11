@@ -1,6 +1,6 @@
 # TTree schema
 
-Schema version: 3. Energy/momentumはGeV、positionはcm、angleはradianです。invalid scalar/scoreは`-999`、valid flagは`0`です。
+Schema version: 4. Energy/momentumはGeV、positionはcm、angleはradianです。invalid scalar/scoreは`-999`、valid flagは`0`です。
 
 ## Index contract
 
@@ -53,6 +53,33 @@ Truth projection and acceptance reproduce the definitions used by`TruthAnalysis/
 | `<c>_pair_m_gg`, `<c>_pair_e_asym` | reconstructed pair quantities |
 
 SPLITは`CLUSTERINFO_CEMC`、NO_SPLITは`CLUSTERINFO_CEMC_NO_SPLIT`です。同名のkinematic branchを共通化しないのは、両collectionが一般に異なるcluster個数・ID・energyを持つためです。
+
+## Single-pi0 energy-contribution matching
+
+`<c>`は`split`または`nosplit`です。各vectorは`<c>_cluster_*`と同じ長さ・順序です。
+
+| Branch | Meaning |
+|---|---|
+| `<c>_cluster_truth_match_valid` | constituent towerからcell/hit provenanceを完全に取得できた |
+| `<c>_cluster_truth_total_edep` | cluster constituent towersに属する全G4 hit energy deposit |
+| `<c>_cluster_truth_gamma0/1_edep` | direct daughter gamma 0/1の子孫trackによるdeposit |
+| `<c>_cluster_truth_other_edep` | direct daughter gamma 0/1へ遡れないdeposit |
+| `<c>_cluster_truth_gamma0/1_fraction` | gamma deposit / total deposit |
+| `<c>_cluster_truth_other_fraction` | other deposit / total deposit |
+| `<c>_cluster_truth_gamma0/1_recovery` | gamma deposit / direct daughter truth energy |
+
+`TOWER_CALIB_CEMC -> G4CELL_CEMC -> G4HIT_CEMC`を辿り、各hitの
+`track_id`からG4 ancestryを遡って`truth_daughter_track_id[0/1]`へ最初に
+到達したgammaへ、cellのhit mapに記録されたdepositを割り当てます。
+single-pi0 gunでは2本のgammaが同じprimary showerを共有するため、
+shower IDだけでは両者を分離できません。
+
+SPLIT collectionではPythia matcherと同様に、各tower depositへ
+`clamp(cluster tower value / calibrated TowerInfo energy, 0, 1)`を掛けます。
+NO_SPLIT collectionではtower deposit全量を使います。既存DSTに
+`TOWER_CALIB_CEMC`、`G4CELL_CEMC`、`G4HIT_CEMC`が残っていればsimulation
+DSTの再生成は不要ですが、このbranchを追加したPhotonAnalysisTreeは再生成が必要です。
+いずれかの対応付けが欠けるclusterでは`truth_match_valid=0`になります。
 
 `require_nosplit_cluster_node=false`で実行し、入力DSTにNO_SPLIT nodeがない場合は、`nosplit_ncluster=0`、`nosplit_ntower=0`、すべての`nosplit_*` vectorが空になります。SPLIT collection、calibrated tower、tower geometryは常に必須です。
 

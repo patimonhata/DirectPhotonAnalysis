@@ -1806,6 +1806,133 @@ void draw_truth_pi0_component_counts(
   canvas.SaveAs(output_path.c_str());
 }
 
+void draw_truth_pi0_component_counts_vs_truth_pt(
+    const std::vector<TruthPi0ComponentHistograms> &histograms,
+    const std::string &collection_label, const std::string &output_path,
+    const double truth_eta_max, const double min_cluster_energy,
+    const double delta_r_cut, const double merged_delta_r_cut,
+    const double merged_response_min, const double merged_response_max,
+    const double individual_response_min,
+    const double individual_response_max) {
+  if (histograms.size() != n_truth_pt_bins) {
+    std::cerr << "Cannot draw truth-pT component stack for "
+              << collection_label << ": expected " << n_truth_pt_bins
+              << " bins, got " << histograms.size() << std::endl;
+    return;
+  }
+
+  const std::string name_suffix =
+      collection_label == "SPLIT" ? "split" : "nosplit";
+  TH1D total(("h_" + name_suffix +
+              "_central_truth_pi0_component_total_vs_truth_pt")
+                 .c_str(),
+             "", static_cast<int>(n_truth_pt_bins), truth_pt_edges.data());
+  total.SetDirectory(nullptr);
+  total.Sumw2();
+  total.SetStats(false);
+
+  std::array<std::unique_ptr<TH1D>, n_event_components> components;
+  for (std::size_t component = 0; component < n_event_components;
+       ++component) {
+    components[component] = std::make_unique<TH1D>(
+        ("h_" + name_suffix + "_central_truth_pi0_" +
+         truth_pi0_component_names[component] + "_vs_truth_pt")
+            .c_str(),
+        "", static_cast<int>(n_truth_pt_bins), truth_pt_edges.data());
+    components[component]->SetDirectory(nullptr);
+    components[component]->SetStats(false);
+    style_component_histogram(*components[component],
+                              event_component_colors[component],
+                              event_component_count_markers[component]);
+  }
+
+  for (std::size_t bin = 0; bin < n_truth_pt_bins; ++bin) {
+    const int root_bin = static_cast<int>(bin + 1U);
+    const double total_count =
+        static_cast<double>(histograms[bin].n_in_truth_eta);
+    total.SetBinContent(root_bin, total_count);
+    total.SetBinError(root_bin, std::sqrt(total_count));
+    for (std::size_t component = 0; component < n_event_components;
+         ++component) {
+      components[component]->SetBinContent(
+          root_bin,
+          static_cast<double>(histograms[bin].n_component[component]));
+    }
+  }
+
+  set_point_style(
+      total,
+      core_condition_colors[condition_index(CoreCondition::selected)],
+      event_count_markers[condition_index(CoreCondition::selected)], 1, 0.9);
+  total.GetXaxis()->SetTitle("Truth p_{T}^{#pi^{0}} [GeV]");
+  total.GetYaxis()->SetTitle("Generated #pi^{0} / 2 GeV");
+  total.SetMinimum(0.0);
+  total.SetMaximum(total.GetMaximum() > 0.0 ? 1.75 * total.GetMaximum() : 1.0);
+
+  THStack stack(("stack_" + name_suffix +
+                 "_central_truth_pi0_components_vs_truth_pt")
+                    .c_str(),
+                "");
+  for (std::size_t component = 0; component < n_event_components;
+       ++component) {
+    stack.Add(components[component].get());
+  }
+
+  TCanvas canvas(("c_" + name_suffix +
+                  "_central_truth_pi0_components_vs_truth_pt")
+                     .c_str(),
+                 "Central truth pi0 reconstruction topologies vs truth pT",
+                 1100, 800);
+  canvas.SetLeftMargin(0.12);
+  canvas.SetRightMargin(0.04);
+  canvas.SetBottomMargin(0.12);
+  canvas.SetTopMargin(0.04);
+  total.Draw("E1");
+  stack.Draw("HIST SAME");
+  total.Draw("E1 SAME");
+
+  TLatex label;
+  label.SetNDC();
+  label.SetTextAlign(13);
+  label.SetTextSize(0.032);
+  label.DrawLatex(0.15, 0.93, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(
+      0.15, 0.88,
+      ("Single #pi^{0} gun, " + collection_label +
+       "; truth #alpha integrated")
+          .c_str());
+  label.DrawLatex(
+      0.15, 0.83,
+      Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
+           truth_eta_max));
+  label.DrawLatex(
+      0.15, 0.78,
+      Form("Separated: E_{cluster} #geq %.3g GeV, #DeltaR < %.3f",
+           min_cluster_energy, delta_r_cut));
+  label.DrawLatex(
+      0.15, 0.73,
+      Form("Merged: max #DeltaR < %.3f, %.1f < E_{T}^{cluster}/p_{T}^{#pi^{0}} < %.1f",
+           merged_delta_r_cut, merged_response_min, merged_response_max));
+  label.DrawLatex(
+      0.15, 0.68,
+      Form("Individual: #DeltaR < %.3f, %.1f < E_{T}^{cluster}/p_{T}^{#gamma} < %.1f",
+           delta_r_cut, individual_response_min, individual_response_max));
+
+  TLegend legend(0.59, 0.67, 0.95, 0.94);
+  legend.SetBorderSize(0);
+  legend.SetFillStyle(0);
+  legend.SetTextSize(0.030);
+  legend.AddEntry(&total, "Generated #pi^{0} in truth acceptance", "lep");
+  for (std::size_t component = 0; component < n_event_components;
+       ++component) {
+    legend.AddEntry(components[component].get(),
+                    truth_pi0_component_labels[component].c_str(), "f");
+  }
+  legend.DrawClone();
+  gPad->RedrawAxis();
+  canvas.SaveAs(output_path.c_str());
+}
+
 void draw_truth_pi0_component_fractions(
     std::vector<TruthPi0ComponentHistograms> &histograms,
     const std::string &collection_label, const std::string &output_path,
@@ -2936,6 +3063,13 @@ int PlotConditionalPartnerEfficiency(
             truth_eta_max, min_cluster_energy, delta_r_cut, merged_delta_r_cut,
             merged_response_min, merged_response_max, individual_response_min,
             individual_response_max);
+        draw_truth_pi0_component_counts_vs_truth_pt(
+            components, label,
+            collection_base +
+                "_central_truth_pi0_event_components_vs_truth_pt.pdf",
+            truth_eta_max, min_cluster_energy, delta_r_cut, merged_delta_r_cut,
+            merged_response_min, merged_response_max, individual_response_min,
+            individual_response_max);
         draw_truth_pi0_component_fractions(
             components, label,
             collection_base +
@@ -3138,7 +3272,7 @@ int PlotConditionalPartnerEfficiency(
             << split_reco_et_malformed << " / " << nosplit_reco_et_malformed
             << std::endl;
   std::cout << "Wrote " << output_base << ".root and "
-            << (has_energy_contribution_branches ? 32 : 24) << " PDF plots"
+            << (has_energy_contribution_branches ? 34 : 26) << " PDF plots"
             << std::endl;
   Long64_t malformed = invalid_truth_shape + split_reco_et_malformed +
                        nosplit_reco_et_malformed;

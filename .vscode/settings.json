@@ -1,3 +1,18 @@
 {
-    "cmake.ignoreCMakeListsMissing": true
+    "cmake.ignoreCMakeListsMissing": true,
+
+    "C_Cpp.files.exclude": {
+        "**/.git": true,
+        "**/output": true,
+        "**/build": true,
+        "**/install": true,
+        "**/autom4te.cache": true
+    },
+
+    "search.exclude": {
+        "**/output": true,
+        "**/build": true,
+        "**/install": true,
+        "**/autom4te.cache": true
+    }
 }

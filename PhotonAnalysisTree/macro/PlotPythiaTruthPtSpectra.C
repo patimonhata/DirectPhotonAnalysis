@@ -124,10 +124,10 @@ int PlotPythiaTruthPtSpectra(
     return 3;
   }
 
-  TH1D direct_photon("h_direct_photon_truth_pt", "", n_bins, 0.0, pt_max);
+  TH1D prompt_photon("h_prompt_photon_truth_pt", "", n_bins, 0.0, pt_max);
   TH1D pi0("h_pi0_truth_pt", "", n_bins, 0.0, pt_max);
   TH1D pi0_decay_photon("h_pi0_decay_photon_truth_pt", "", n_bins, 0.0, pt_max);
-  for (TH1D* histogram : {&direct_photon, &pi0, &pi0_decay_photon})
+  for (TH1D* histogram : {&prompt_photon, &pi0, &pi0_decay_photon})
   {
     histogram->Sumw2();
     histogram->SetStats(false);
@@ -136,14 +136,14 @@ int PlotPythiaTruthPtSpectra(
     histogram->GetYaxis()->SetTitle(
         use_event_weight ? "Weighted particles / (GeV/#it{c})" : "Particles / (GeV/#it{c})");
   }
-  direct_photon.SetLineColor(kRed + 1);
-  direct_photon.SetLineWidth(3);
+  prompt_photon.SetLineColor(kRed + 1);
+  prompt_photon.SetLineWidth(3);
   pi0.SetLineColor(kBlue + 1);
   pi0.SetLineWidth(3);
   pi0_decay_photon.SetLineColor(kGreen + 2);
   pi0_decay_photon.SetLineWidth(3);
 
-  ULong64_t n_direct_photon = 0ULL;
+  ULong64_t n_prompt_photon = 0ULL;
   ULong64_t n_pi0 = 0ULL;
   ULong64_t n_pi0_decay_photon = 0ULL;
   ULong64_t malformed_events = 0ULL;
@@ -188,10 +188,10 @@ int PlotPythiaTruthPtSpectra(
         continue;
       }
       if ((*photon_classification_valid)[particle] &&
-          (*photon_category)[particle] == 1)
+          ((*photon_category)[particle] == 1 || (*photon_category)[particle] == 2))
       {
-        direct_photon.Fill((*photon_pt)[particle], weight);
-        ++n_direct_photon;
+        prompt_photon.Fill((*photon_pt)[particle], weight);
+        ++n_prompt_photon;
       }
     }
     for (std::size_t particle = 0; particle < n_pi0_event; ++particle)
@@ -220,22 +220,22 @@ int PlotPythiaTruthPtSpectra(
     return 4;
   }
 
-  for (TH1D* histogram : {&direct_photon, &pi0, &pi0_decay_photon})
+  for (TH1D* histogram : {&prompt_photon, &pi0, &pi0_decay_photon})
   {
     histogram->Scale(1.0, "width");
   }
   const double maximum = std::max(
-      {direct_photon.GetMaximum(), pi0.GetMaximum(), pi0_decay_photon.GetMaximum()});
-  direct_photon.SetMinimum(0.5);
-  direct_photon.SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
+      {prompt_photon.GetMaximum(), pi0.GetMaximum(), pi0_decay_photon.GetMaximum()});
+  prompt_photon.SetMinimum(0.5);
+  prompt_photon.SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
 
   TCanvas canvas("c_pythia_truth_pt_spectra", "Pythia truth pT spectra", 1000, 800);
   canvas.SetLogy();
-  direct_photon.Draw("HIST");
+  prompt_photon.Draw("HIST");
   pi0.Draw("HIST SAME");
   pi0_decay_photon.Draw("HIST SAME");
   TLegend legend(0.55, 0.64, 0.89, 0.84);
-  legend.AddEntry(&direct_photon, "Direct #gamma (2#rightarrow2)", "l");
+  legend.AddEntry(&prompt_photon, "Prompt #gamma (direct + fragmentation)", "l");
   legend.AddEntry(&pi0, "Last-copy #pi^{0}", "l");
   legend.AddEntry(&pi0_decay_photon, "#gamma from #pi^{0}", "l");
   legend.Draw();
@@ -251,13 +251,13 @@ int PlotPythiaTruthPtSpectra(
   canvas.SaveAs((output_base + ".pdf").c_str());
 
   TFile histogram_file((output_base + ".root").c_str(), "RECREATE");
-  direct_photon.Write();
+  prompt_photon.Write();
   pi0.Write();
   pi0_decay_photon.Write();
   histogram_file.Close();
 
-  std::cout << "PlotPythiaTruthPtSpectra - files/events/direct photons/pi0/pi0 decay photons = "
-            << n_files << "/" << tree.GetEntries() << "/" << n_direct_photon << "/"
+  std::cout << "PlotPythiaTruthPtSpectra - files/events/prompt photons/pi0/pi0 decay photons = "
+            << n_files << "/" << tree.GetEntries() << "/" << n_prompt_photon << "/"
             << n_pi0 << "/" << n_pi0_decay_photon << std::endl;
   std::cout << "Wrote " << output_base << ".pdf and " << output_base << ".root" << std::endl;
   return 0;

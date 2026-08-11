@@ -211,7 +211,7 @@ condor_submit -append "input_manifest = input/jet5/segments.list" -append "manif
 ## Minimum-bias truth pT spectra
 
 cluster reconstructionを必要としないtruth粒子数の測定には、G4Hits DSTだけを読む軽量な
-`PythiaTruthSpectrumTree`を使います。direct photonとpi0はsignal HepMC eventから、
+`PythiaTruthSpectrumTree`を使います。prompt photon候補とpi0はsignal HepMC eventから、
 このDetroit productionでGeant4側に委譲されたpi0 decay photonは`G4TruthInfo`から保存します。
 詳細な粒子定義とbranchは`docs/pythia_truth_spectrum_schema.md`を参照してください。
 
@@ -236,12 +236,50 @@ queueします。`-maxjobs`は切り詰めではなく誤投入防止です。
 condor_submit -maxjobs 1000 run_truth_spectrum_pythia.job
 ```
 
-生成ROOT filesを直接TChainへ読み、raw count densityを描けます。defaultはeta cutなしです。
-最後から2つ目の引数を`0.7`にすると`|eta_truth| < 0.7`を3粒子種へ適用します。
+少数の生成ROOT filesなら直接TChainへ読み、count densityを描けます。photonは
+classifier category 1 (direct)または2 (fragmentation)のprompt photonです。defaultは
+eta cutなしで、最後から2つ目の引数を`0.7`にすると`|eta_truth| < 0.7`を3粒子種へ適用します。
 
 ```bash
 root -l -b -q 'macro/PlotPythiaTruthPtSpectra.C("output/truth_root/pythia_truth_spectrum_tree_*.root","output/plots/minbias_truth_pt",100,20.0,-1.0,false)'
 ```
+
+数万files以上では、1 processで全fileを開かずmap-reduce型で処理します。defaultは
+先頭40,000 truth treesを500 filesずつ、80 partial jobsへ分割します。
+
+```bash
+condor_submit -maxjobs 80 run_truth_pt_partial_pythia.job
+```
+
+全200,000 filesを最初から処理する場合:
+
+```bash
+condor_submit \
+  -append "total_files = 200000" \
+  -append "n_chunks = 400" \
+  -maxjobs 400 \
+  run_truth_pt_partial_pythia.job
+```
+
+先頭40,000 filesのpartialが完成済みなら、chunk 80から残りだけを追加できます。
+
+```bash
+condor_submit \
+  -append "total_files = 200000" \
+  -append "chunk_offset = 80" \
+  -append "n_chunks = 320" \
+  -maxjobs 320 \
+  run_truth_pt_partial_pythia.job
+```
+
+partialの範囲・解析条件を検証して統合し、最後にbin幅で規格化してplotします。
+`expected_manifest_end`を指定するため、partialの欠落も検出します。
+
+```bash
+root -l -b -q 'macro/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/prompt_eta07_unweighted/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07",0,40000)'
+```
+
+詳細は`docs/pythia_truth_pt_map_reduce.md`を参照してください。
 
 `run_tree_pythia.job`は`input/jet5/segments.list`を`queue ... from`で読み、
 manifestの1行につき1つの同期した4-stream DST jobを生成します。

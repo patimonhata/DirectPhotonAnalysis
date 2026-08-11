@@ -38,8 +38,9 @@ non-photon-copy production vertex. When that vertex has exactly one parent,
 `origin_parent_pdg` and `origin_parent_barcode` identify it. This prevents an
 intermediate photon-to-photon copy from hiding the physical origin.
 
-The direct-photon spectrum uses final HepMC photon `pt` with valid classifier
-category 1. It does not infer directness from G4 PDG alone.
+The spectrum tools define prompt photons as final HepMC photons with a valid
+classifier category of either 1 (direct 2-to-2) or 2 (fragmentation). They do
+not infer promptness from G4 PDG alone. Category 3 decay photons are excluded.
 
 ## HepMC pi0
 

@@ -20,12 +20,12 @@ int Fun4All_PhotonAnalysisTree(
     const int process_id = 0,
     const int n_events = 0,
     const std::string input_directory =
-        "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_eta_3to15GeV_etapm1_vertexpm60",
+        "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_3to15GeV_etapm1_vertexpm60",
         // "/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SinglePi0GunSimulation/output/newDST_pi0_5to15GeV_etapm1/",
     const std::string output_directory =
         "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/root",
-    // const int expected_primary_pdg = 111)
-    const int expected_primary_pdg = 221)
+    const int expected_primary_pdg = 111)
+    // const int expected_primary_pdg = 221)
 {
   if (process_id < 0 || n_events < 0 ||
       (expected_primary_pdg != 22 && expected_primary_pdg != 111 && expected_primary_pdg != 221))
@@ -37,8 +37,8 @@ int Fun4All_PhotonAnalysisTree(
   std::ostringstream id;
   id << std::setw(6) << std::setfill('0') << process_id;
   const std::string id_string = id.str();
-  // const std::string input_file = input_directory + "/DST_single_pi0_reconstructedInfo_" + id_string + ".root";
-  const std::string input_file = input_directory + "/DST_single_eta_reconstructedInfo_" + id_string + ".root";
+  const std::string input_file = input_directory + "/DST_single_pi0_reconstructedInfo_" + id_string + ".root";
+  // const std::string input_file = input_directory + "/DST_single_eta_reconstructedInfo_" + id_string + ".root";
   const std::string output_file = output_directory + "/photon_analysis_tree_" + id_string + ".root";
 
   Fun4AllServer* server = Fun4AllServer::instance();
@@ -55,6 +55,9 @@ int Fun4All_PhotonAnalysisTree(
   tree_maker->set_expected_primary_pdg(expected_primary_pdg);
   tree_maker->set_truth_node_name("G4TruthInfo");
   tree_maker->set_tower_node_name("TOWERINFO_CALIB_CEMC");
+  tree_maker->set_raw_truth_tower_node_name("TOWER_CALIB_CEMC");
+  tree_maker->set_truth_cell_node_name("G4CELL_CEMC");
+  tree_maker->set_truth_hit_node_name("G4HIT_CEMC");
   tree_maker->set_tower_geom_node_name("TOWERGEOM_CEMC");
   tree_maker->set_split_cluster_node_name("CLUSTERINFO_CEMC");
   tree_maker->set_nosplit_cluster_node_name("CLUSTERINFO_CEMC_NO_SPLIT");

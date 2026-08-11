@@ -39,7 +39,7 @@ foreach(library phool SubsysReco fun4all calo_io g4dst)
   list(APPEND SPHENIX_LIBRARIES "${${library_upper}_LIBRARY}")
 endforeach()
 
-add_library(PhotonAnalysisTree SHARED PhotonAnalysisTree.cc)
+add_library(PhotonAnalysisTree SHARED PhotonAnalysisTree.cc Pi0ClusterTruthMatcher.cc)
 target_include_directories(
   PhotonAnalysisTree
   PUBLIC
@@ -87,5 +87,5 @@ target_link_libraries(Pi0GammaOnnx PRIVATE "${ONNXRUNTIME_LIBRARY}")
 target_compile_options(Pi0GammaOnnx PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
-install(FILES PhotonAnalysisTree.h Pi0GammaOnnx.h ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h DESTINATION include)
+install(FILES PhotonAnalysisTree.h Pi0ClusterTruthMatcher.h Pi0GammaOnnx.h ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h DESTINATION include)
 install(FILES ../models/best_model.onnx ../models/onnx_metadata.json DESTINATION ${CMAKE_INSTALL_DATADIR}/PhotonAnalysisTree/models)

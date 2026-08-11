@@ -2,12 +2,15 @@
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
+#include <calobase/RawTowerContainer.h>
 #include <calobase/RawTowerDefs.h>
 #include <calobase/RawTowerGeom.h>
 #include <calobase/RawTowerGeomContainer.h>
 #include <calobase/TowerInfo.h>
 #include <calobase/TowerInfoContainer.h>
 #include <calobase/TowerInfoDefs.h>
+#include <g4detectors/PHG4CellContainer.h>
+#include <g4main/PHG4HitContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <g4main/PHG4Particle.h>
 #include <g4main/PHG4TruthInfoContainer.h>
@@ -87,6 +90,12 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
 
   auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
   auto* towers = findNode::getClass<TowerInfoContainer>(topNode, tower_node_name_);
+  auto* raw_truth_towers =
+      findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
+  auto* truth_cells =
+      findNode::getClass<PHG4CellContainer>(topNode, truth_cell_node_name_);
+  auto* truth_hits =
+      findNode::getClass<PHG4HitContainer>(topNode, truth_hit_node_name_);
   auto* geometry = findNode::getClass<RawTowerGeomContainer>(topNode, tower_geom_node_name_);
   auto* split_clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   auto* nosplit_clusters = findNode::getClass<RawClusterContainer>(topNode, nosplit_cluster_node_name_);
@@ -112,10 +121,12 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
     ++n_events_invalid_truth_;
   }
   const bool split_valid =
-      fill_collection(split_clusters, towers, geometry, true, false, split_);
+      fill_collection(split_clusters, towers, raw_truth_towers, truth_cells, truth_hits, truth, geometry,
+                      true, false, true, split_);
   const bool nosplit_valid =
       !nosplit_clusters ||
-      fill_collection(nosplit_clusters, towers, geometry, true, true, nosplit_);
+      fill_collection(nosplit_clusters, towers, raw_truth_towers, truth_cells, truth_hits, truth, geometry,
+                      true, true, false, nosplit_);
   if (!split_valid || !nosplit_valid)
   {
     ++n_events_invalid_detector_;
@@ -277,9 +288,14 @@ bool PhotonAnalysisTree::fill_truth(PHG4TruthInfoContainer* truth, RawTowerGeomC
 
 bool PhotonAnalysisTree::fill_collection(RawClusterContainer* clusters,
                                          TowerInfoContainer* towers,
+                                         RawTowerContainer* raw_truth_towers,
+                                         PHG4CellContainer* truth_cells,
+                                         PHG4HitContainer* truth_hits,
+                                         PHG4TruthInfoContainer* truth,
                                          RawTowerGeomContainer* geometry,
                                          bool include_towers,
                                          bool require_unique_tower_keys,
+                                         bool allocate_split_tower_energy,
                                          ClusterCollection& output)
 {
   std::vector<const RawCluster*> ordered_clusters;
@@ -308,6 +324,12 @@ bool PhotonAnalysisTree::fill_collection(RawClusterContainer* clusters,
     }
     return lhs->get_id() < rhs->get_id();
   });
+  std::array<int, 2> direct_gamma_track_ids = {invalid_int_, invalid_int_};
+  if (b_truth_is_pi0_to_2gamma_ && b_truth_daughter_track_id_.size() == 2U)
+  {
+    direct_gamma_track_ids[0] = b_truth_daughter_track_id_[0];
+    direct_gamma_track_ids[1] = b_truth_daughter_track_id_[1];
+  }
 
   std::set<unsigned int> seen_tower_keys;
   for (std::size_t cluster_index = 0; cluster_index < ordered_clusters.size(); ++cluster_index)
@@ -344,6 +366,35 @@ bool PhotonAnalysisTree::fill_collection(RawClusterContainer* clusters,
     output.cluster_px.push_back(px);
     output.cluster_py.push_back(py);
     output.cluster_pz.push_back(pz);
+
+    const photon_tree::Pi0ClusterTruthMatch truth_match =
+        pi0_truth_matcher_.match(cluster, towers, raw_truth_towers,
+                                 truth_cells, truth_hits, truth,
+                                 direct_gamma_track_ids,
+                                 allocate_split_tower_energy);
+    output.truth_match_valid.push_back(truth_match.valid ? 1U : 0U);
+    output.truth_total_edep.push_back(truth_match.total_edep);
+    output.truth_gamma0_edep.push_back(truth_match.gamma_edep[0]);
+    output.truth_gamma1_edep.push_back(truth_match.gamma_edep[1]);
+    output.truth_other_edep.push_back(truth_match.other_edep);
+    const float inverse_total =
+        truth_match.total_edep > 0.0F ? 1.0F / truth_match.total_edep : 0.0F;
+    output.truth_gamma0_fraction.push_back(truth_match.gamma_edep[0] * inverse_total);
+    output.truth_gamma1_fraction.push_back(truth_match.gamma_edep[1] * inverse_total);
+    output.truth_other_fraction.push_back(truth_match.other_edep * inverse_total);
+    const float gamma0_energy =
+        b_truth_daughter_e_.size() == 2U && b_truth_daughter_e_[0] > 0.0
+            ? static_cast<float>(b_truth_daughter_e_[0])
+            : 0.0F;
+    const float gamma1_energy =
+        b_truth_daughter_e_.size() == 2U && b_truth_daughter_e_[1] > 0.0
+            ? static_cast<float>(b_truth_daughter_e_[1])
+            : 0.0F;
+    output.truth_gamma0_recovery.push_back(
+        gamma0_energy > 0.0F ? truth_match.gamma_edep[0] / gamma0_energy : 0.0F);
+    output.truth_gamma1_recovery.push_back(
+        gamma1_energy > 0.0F ? truth_match.gamma_edep[1] / gamma1_energy : 0.0F);
+
     append_shower_shape(shower_shape_calculator_.calculate(*cluster, *towers), output);
 
     if (!include_towers)
@@ -553,6 +604,9 @@ void PhotonAnalysisTree::create_trees()
   metadata_tree_->Branch("expected_primary_pdg", &expected_primary_pdg_);
   metadata_tree_->Branch("truth_node", &truth_node_name_);
   metadata_tree_->Branch("tower_node", &tower_node_name_);
+  metadata_tree_->Branch("raw_truth_tower_node", &raw_truth_tower_node_name_);
+  metadata_tree_->Branch("truth_cell_node", &truth_cell_node_name_);
+  metadata_tree_->Branch("truth_hit_node", &truth_hit_node_name_);
   metadata_tree_->Branch("tower_geom_node", &tower_geom_node_name_);
   metadata_tree_->Branch("split_cluster_node", &split_cluster_node_name_);
   metadata_tree_->Branch("nosplit_cluster_node", &nosplit_cluster_node_name_);
@@ -560,6 +614,8 @@ void PhotonAnalysisTree::create_trees()
   metadata_tree_->Branch("require_nosplit_cluster_node", &require_nosplit_cluster_node_);
   metadata_tree_->Branch("cluster_ordering", &cluster_ordering_);
   metadata_tree_->Branch("acceptance_eta_max", &acceptance_eta_max_);
+  metadata_tree_->Branch("pi0_truth_matching_algorithm_version",
+                         &pi0_truth_matching_algorithm_version_);
   metadata_tree_->Branch("n_events_processed", &n_events_processed_);
   metadata_tree_->Branch("n_events_written", &n_events_written_);
   metadata_tree_->Branch("n_events_invalid_truth", &n_events_invalid_truth_);
@@ -584,6 +640,16 @@ void PhotonAnalysisTree::create_collection_branches(const std::string& prefix,
   event_tree_->Branch(name("cluster_px").c_str(), &c.cluster_px);
   event_tree_->Branch(name("cluster_py").c_str(), &c.cluster_py);
   event_tree_->Branch(name("cluster_pz").c_str(), &c.cluster_pz);
+  event_tree_->Branch(name("cluster_truth_match_valid").c_str(), &c.truth_match_valid);
+  event_tree_->Branch(name("cluster_truth_total_edep").c_str(), &c.truth_total_edep);
+  event_tree_->Branch(name("cluster_truth_gamma0_edep").c_str(), &c.truth_gamma0_edep);
+  event_tree_->Branch(name("cluster_truth_gamma1_edep").c_str(), &c.truth_gamma1_edep);
+  event_tree_->Branch(name("cluster_truth_other_edep").c_str(), &c.truth_other_edep);
+  event_tree_->Branch(name("cluster_truth_gamma0_fraction").c_str(), &c.truth_gamma0_fraction);
+  event_tree_->Branch(name("cluster_truth_gamma1_fraction").c_str(), &c.truth_gamma1_fraction);
+  event_tree_->Branch(name("cluster_truth_other_fraction").c_str(), &c.truth_other_fraction);
+  event_tree_->Branch(name("cluster_truth_gamma0_recovery").c_str(), &c.truth_gamma0_recovery);
+  event_tree_->Branch(name("cluster_truth_gamma1_recovery").c_str(), &c.truth_gamma1_recovery);
   event_tree_->Branch(name("cluster_shower_valid").c_str(), &c.shower_valid);
   event_tree_->Branch(name("cluster_shower_full_containment").c_str(), &c.shower_full_containment);
   event_tree_->Branch(name("cluster_shower_edge_padded").c_str(), &c.shower_edge_padded);

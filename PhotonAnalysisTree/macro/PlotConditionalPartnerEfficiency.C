@@ -11,6 +11,7 @@
 #include <TLegend.h>
 #include <TNamed.h>
 #include <TParameter.h>
+#include <TPad.h>
 #include <TSystem.h>
 #include <TTree.h>
 
@@ -26,27 +27,40 @@
 
 namespace {
 constexpr double pi = 3.14159265358979323846;
-const std::vector<double> truth_pt_edges = {3.0, 5.0, 7.0, 9.0,
-                                            11.0, 13.0, 15.0};
-constexpr std::size_t n_truth_pt_bins = 6U;
+const std::vector<double> truth_pt_edges = {3.0, 4.0, 5.0,  6.0,  7.0,
+                                            8.0, 9.0, 10.0, 11.0, 12.0,
+                                            13.0, 14.0, 15.0};
+constexpr std::size_t n_truth_pt_bins = 12U;
 const std::array<std::string, n_truth_pt_bins> truth_pt_labels = {
-    "3 #leq p_{T}^{truth} < 5 GeV", "5 #leq p_{T}^{truth} < 7 GeV",
-    "7 #leq p_{T}^{truth} < 9 GeV",
-    "9 #leq p_{T}^{truth} < 11 GeV", "11 #leq p_{T}^{truth} < 13 GeV",
-    "13 #leq p_{T}^{truth} #leq 15 GeV"};
+    "3 #leq p_{T}^{truth} < 4 GeV", "4 #leq p_{T}^{truth} < 5 GeV",
+    "5 #leq p_{T}^{truth} < 6 GeV", "6 #leq p_{T}^{truth} < 7 GeV",
+    "7 #leq p_{T}^{truth} < 8 GeV", "8 #leq p_{T}^{truth} < 9 GeV",
+    "9 #leq p_{T}^{truth} < 10 GeV", "10 #leq p_{T}^{truth} < 11 GeV",
+    "11 #leq p_{T}^{truth} < 12 GeV", "12 #leq p_{T}^{truth} < 13 GeV",
+    "13 #leq p_{T}^{truth} < 14 GeV",
+    "14 #leq p_{T}^{truth} #leq 15 GeV"};
 const std::array<std::string, n_truth_pt_bins> reco_et_labels = {
-    "3 #leq E_{T}^{cluster} < 5 GeV",
-    "5 #leq E_{T}^{cluster} < 7 GeV",
-    "7 #leq E_{T}^{cluster} < 9 GeV",
-    "9 #leq E_{T}^{cluster} < 11 GeV",
-    "11 #leq E_{T}^{cluster} < 13 GeV",
-    "13 #leq E_{T}^{cluster} #leq 15 GeV"};
+    "3 #leq E_{T}^{cluster} < 4 GeV",
+    "4 #leq E_{T}^{cluster} < 5 GeV",
+    "5 #leq E_{T}^{cluster} < 6 GeV",
+    "6 #leq E_{T}^{cluster} < 7 GeV",
+    "7 #leq E_{T}^{cluster} < 8 GeV",
+    "8 #leq E_{T}^{cluster} < 9 GeV",
+    "9 #leq E_{T}^{cluster} < 10 GeV",
+    "10 #leq E_{T}^{cluster} < 11 GeV",
+    "11 #leq E_{T}^{cluster} < 12 GeV",
+    "12 #leq E_{T}^{cluster} < 13 GeV",
+    "13 #leq E_{T}^{cluster} < 14 GeV",
+    "14 #leq E_{T}^{cluster} #leq 15 GeV"};
 constexpr int canvas_columns = 3;
-constexpr int canvas_rows = 3;
+constexpr int canvas_rows = 6;
 constexpr int canvas_width = 1350;
-constexpr int canvas_height = 1350;
-constexpr int conditions_pad = static_cast<int>(n_truth_pt_bins) + 1;
-constexpr int legend_pad = conditions_pad + 1;
+constexpr int canvas_height = 2700;
+constexpr int plot_rows =
+    (static_cast<int>(n_truth_pt_bins) + canvas_columns - 1) / canvas_columns;
+constexpr int conditions_pad = 1;
+constexpr int legend_pad = 2;
+constexpr int first_plot_pad = 3;
 
 struct CollectionBranches {
   std::vector<double> *cluster_e = nullptr;
@@ -229,6 +243,40 @@ void set_point_style(TH1D &histogram, const int color, const int marker,
   histogram.SetMarkerSize(marker_size);
   histogram.SetLineStyle(line_style);
   histogram.SetLineWidth(2);
+}
+
+void divide_panel_canvas(TCanvas &canvas) {
+  canvas.cd();
+  const double header_bottom =
+      1.0 - 1.0 / static_cast<double>(canvas_rows);
+  const double column_width = 1.0 / static_cast<double>(canvas_columns);
+  const double plot_row_height =
+      header_bottom / static_cast<double>(plot_rows);
+
+  const auto add_pad = [&](const int number, const std::string &suffix,
+                           const double x_low, const double y_low,
+                           const double x_high, const double y_high) {
+    const std::string name = std::string(canvas.GetName()) + "_" + suffix;
+    auto *pad =
+        new TPad(name.c_str(), "", x_low, y_low, x_high, y_high);
+    pad->SetNumber(number);
+    pad->Draw();
+  };
+
+  add_pad(conditions_pad, "conditions", 0.0, header_bottom,
+          2.0 * column_width, 1.0);
+  add_pad(legend_pad, "legend", 2.0 * column_width, header_bottom, 1.0,
+          1.0);
+  for (std::size_t bin = 0; bin < n_truth_pt_bins; ++bin) {
+    const int row = static_cast<int>(bin) / canvas_columns;
+    const int column = static_cast<int>(bin) % canvas_columns;
+    const double x_low = column * column_width;
+    const double x_high = (column + 1) * column_width;
+    const double y_high = header_bottom - row * plot_row_height;
+    const double y_low = y_high - plot_row_height;
+    add_pad(first_plot_pad + static_cast<int>(bin),
+            "plot_" + std::to_string(bin), x_low, y_low, x_high, y_high);
+  }
 }
 
 double wrap_delta_phi(double value) {
@@ -1378,9 +1426,9 @@ void draw_counts(std::vector<StageHistograms> &histograms,
       ("c_counts_" + collection_label + (event_family ? "_event" : "_cluster"))
           .c_str(),
       "Conditional counts by truth pT", canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     StageHistograms &current = histograms[bin];
     style_counts(current, event_family);
     current.reference->SetMinimum(0.0);
@@ -1420,9 +1468,9 @@ void draw_efficiencies(std::vector<StageHistograms> &histograms,
                      .c_str(),
                  "Conditional efficiencies by truth pT", canvas_width,
                  canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     TH1D *matched = histograms[bin].efficiency_matched.get();
     TH1D *removed = histograms[bin].efficiency_removed.get();
     const auto &markers =
@@ -1543,11 +1591,11 @@ void draw_component_counts(
   TCanvas canvas(("c_event_components_" + collection_label).c_str(),
                  "Selected-event components by truth pT", canvas_width,
                  canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   std::vector<std::unique_ptr<THStack>> stacks;
   stacks.reserve(histograms.size());
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     EventComponentHistograms &current = histograms[bin];
     set_point_style(
         *current.reference,
@@ -1614,9 +1662,9 @@ void draw_component_fractions(
   TCanvas canvas(("c_event_component_fractions_" + collection_label).c_str(),
                  "Selected-event component fractions by truth pT", canvas_width,
                  canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     EventComponentHistograms &current = histograms[bin];
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
@@ -1747,11 +1795,11 @@ void draw_truth_pi0_component_counts(
   TCanvas canvas(("c_truth_pi0_event_components_" + collection_label).c_str(),
                  "Reconstruction topologies for central truth pi0 by truth pT",
                  canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   std::vector<std::unique_ptr<THStack>> stacks;
   stacks.reserve(histograms.size());
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     TruthPi0ComponentHistograms &current = histograms[bin];
     set_point_style(
         *current.reference,
@@ -1865,7 +1913,7 @@ void draw_truth_pi0_component_counts_vs_truth_pt(
       core_condition_colors[condition_index(CoreCondition::selected)],
       event_count_markers[condition_index(CoreCondition::selected)], 1, 0.9);
   total.GetXaxis()->SetTitle("Truth p_{T}^{#pi^{0}} [GeV]");
-  total.GetYaxis()->SetTitle("Generated #pi^{0} / 2 GeV");
+  total.GetYaxis()->SetTitle("Generated #pi^{0} / 1 GeV");
   total.SetMinimum(0.0);
   total.SetMaximum(total.GetMaximum() > 0.0 ? 1.75 * total.GetMaximum() : 1.0);
 
@@ -1947,9 +1995,9 @@ void draw_truth_pi0_component_fractions(
       ("c_truth_pi0_event_component_fractions_" + collection_label).c_str(),
       "Reconstruction-topology fractions for central truth pi0 by truth pT",
       canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     TruthPi0ComponentHistograms &current = histograms[bin];
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
@@ -1991,9 +2039,9 @@ void draw_topology_confusion(
   TCanvas canvas(("c_topology_confusion_" + collection_label).c_str(),
                  "DeltaR versus energy-contribution topology",
                  canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     TH2D &confusion = *histograms[bin].confusion;
     confusion.GetXaxis()->SetTitle("#DeltaR category");
     confusion.GetYaxis()->SetTitle("Energy-contribution category");
@@ -2048,9 +2096,9 @@ void draw_topology_fraction_differences(
   TCanvas canvas(("c_topology_fraction_difference_" + collection_label).c_str(),
                  "Energy-contribution minus DeltaR topology fractions",
                  canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     double maximum = 0.05;
     for (const auto &difference : histograms[bin].fraction_difference) {
       maximum = std::max(maximum,
@@ -2189,9 +2237,9 @@ void draw_cut_stages(std::vector<CutStageHistograms> &histograms,
                   (pair_family ? "_pair_stages" : "_event_stages"))
                      .c_str(),
                  "Selection stages by truth pT", canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
-    canvas.cd(static_cast<int>(bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(bin));
     for (std::size_t stage = 0; stage < n_cut_stages; ++stage) {
       TH1D &histogram = *histograms[bin].stage[stage];
       set_point_style(histogram, colors[stage], markers[stage]);
@@ -2450,17 +2498,20 @@ void draw_reco_et_truth_pt_stack(std::vector<RecoEtHistograms> &histograms,
   // A dedicated ordered palette prevents truth-pT bins from borrowing the
   // categorical colors used for selections and event classifications.
   const std::array<int, n_truth_pt_bins> colors = {
-      TColor::GetColor("#440154"), TColor::GetColor("#414487"),
-      TColor::GetColor("#2A788E"), TColor::GetColor("#22A884"),
-      TColor::GetColor("#7AD151"), TColor::GetColor("#FDE725")};
+      TColor::GetColor("#440154"), TColor::GetColor("#482173"),
+      TColor::GetColor("#433E85"), TColor::GetColor("#38588C"),
+      TColor::GetColor("#2D708E"), TColor::GetColor("#25858E"),
+      TColor::GetColor("#1E9B8A"), TColor::GetColor("#2BB07F"),
+      TColor::GetColor("#51C56A"), TColor::GetColor("#85D54A"),
+      TColor::GetColor("#C2DF23"), TColor::GetColor("#FDE725")};
   TCanvas canvas(("c_reco_et_truth_pt_stack_" + collection_label).c_str(),
                  "Truth-pT contributions in reconstructed-ET panels",
                  canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   std::vector<std::unique_ptr<THStack>> stacks;
   stacks.reserve(histograms.size());
   for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
-    canvas.cd(static_cast<int>(reco_bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(reco_bin));
     RecoEtHistograms &current = histograms[reco_bin];
     TH1D &total =
         *current.selection[selection_index(ClusterSelection::min_energy_eta)];
@@ -2512,9 +2563,9 @@ void draw_reco_et_retentions(std::vector<RecoEtHistograms> &histograms,
   TCanvas canvas(("c_reco_et_retention_" + collection_label).c_str(),
                  "Cluster-selection retention in reconstructed-ET panels",
                  canvas_width, canvas_height);
-  canvas.Divide(canvas_columns, canvas_rows);
+  divide_panel_canvas(canvas);
   for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
-    canvas.cd(static_cast<int>(reco_bin + 1U));
+    canvas.cd(first_plot_pad + static_cast<int>(reco_bin));
     for (std::size_t retention = 0; retention < n_cluster_retentions;
          ++retention) {
       TH1D &histogram = *histograms[reco_bin].retention[retention];

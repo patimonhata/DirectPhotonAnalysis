@@ -982,56 +982,60 @@ EventComponent classify_truth_pi0_energy_contribution(
     }
   }
 
-  double best_pair_recovery = -1.0;
-  for (std::size_t cluster0 = 0; cluster0 < branches.cluster_e->size(); ++cluster0) {
-    if (!passes_min_cluster_energy(branches, cluster0, min_cluster_energy) ||
-        !has_gamma_contribution(branches, cluster0, 0U,
-                                min_contribution_fraction)) {
-      continue;
-    }
-    for (std::size_t cluster1 = 0; cluster1 < branches.cluster_e->size(); ++cluster1) {
-      if (cluster0 == cluster1 ||
-          !passes_min_cluster_energy(branches, cluster1, min_cluster_energy) ||
-          !has_gamma_contribution(branches, cluster1, 1U,
+  // Match each daughter independently before applying topology-specific cuts.
+  // This prevents a secondary split-off cluster from creating an arbitrary pair.
+  constexpr std::size_t invalid_cluster =
+      std::numeric_limits<std::size_t>::max();
+  std::array<std::size_t, 2> maximum_deposit_cluster = {
+      invalid_cluster, invalid_cluster};
+  std::array<float, 2> maximum_deposit = {-1.0F, -1.0F};
+  for (std::size_t gamma = 0; gamma < 2U; ++gamma) {
+    for (std::size_t cluster = 0; cluster < branches.cluster_e->size(); ++cluster) {
+      if (!valid_cluster(branches, cluster) ||
+          !has_gamma_contribution(branches, cluster, gamma,
                                   min_contribution_fraction)) {
         continue;
       }
-      const double recovery =
-          branches.truth_gamma0_recovery->at(cluster0) +
-          branches.truth_gamma1_recovery->at(cluster1);
-      best_pair_recovery = std::max(best_pair_recovery, recovery);
+      const float deposit =
+          gamma == 0U ? branches.truth_gamma0_edep->at(cluster)
+                      : branches.truth_gamma1_edep->at(cluster);
+      if (deposit > maximum_deposit[gamma]) {
+        maximum_deposit[gamma] = deposit;
+        maximum_deposit_cluster[gamma] = cluster;
+      }
     }
   }
-  if (best_pair_recovery >= 0.0) {
+
+  const bool gamma0_matched = maximum_deposit_cluster[0] != invalid_cluster;
+  const bool gamma1_matched = maximum_deposit_cluster[1] != invalid_cluster;
+  if (gamma0_matched && gamma1_matched &&
+      maximum_deposit_cluster[0] != maximum_deposit_cluster[1] &&
+      passes_min_cluster_energy(branches, maximum_deposit_cluster[0],
+                                min_cluster_energy) &&
+      passes_min_cluster_energy(branches, maximum_deposit_cluster[1],
+                                min_cluster_energy)) {
     return EventComponent::correct_pair;
   }
 
-  for (std::size_t cluster = 0; cluster < branches.cluster_et->size(); ++cluster) {
-    if (!valid_cluster(branches, cluster)) {
-      continue;
-    }
+  if (gamma0_matched && gamma1_matched &&
+      maximum_deposit_cluster[0] == maximum_deposit_cluster[1]) {
+    const std::size_t cluster = maximum_deposit_cluster[0];
     const double response = branches.cluster_et->at(cluster) / truth_pt;
-    if (has_gamma_contribution(branches, cluster, 0U,
-                               min_contribution_fraction) &&
-        has_gamma_contribution(branches, cluster, 1U,
-                               min_contribution_fraction) &&
-        response >= merged_response_min && response <= merged_response_max) {
+    if (response >= merged_response_min && response <= merged_response_max) {
       return EventComponent::merged_candidate;
     }
   }
-  for (std::size_t cluster = 0; cluster < branches.cluster_et->size(); ++cluster) {
-    if (!valid_cluster(branches, cluster)) {
+
+  for (std::size_t gamma = 0; gamma < 2U; ++gamma) {
+    const std::size_t cluster = maximum_deposit_cluster[gamma];
+    if (cluster == invalid_cluster) {
       continue;
     }
-    for (std::size_t gamma = 0; gamma < 2U; ++gamma) {
-      const double response =
-          branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
-      if (has_gamma_contribution(branches, cluster, gamma,
-                                 min_contribution_fraction) &&
-          response >= individual_response_min &&
-          response <= individual_response_max) {
-        return EventComponent::individual_anchor;
-      }
+    const double response =
+        branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
+    if (response >= individual_response_min &&
+        response <= individual_response_max) {
+      return EventComponent::individual_anchor;
     }
   }
   return EventComponent::other_anchor;
@@ -1675,17 +1679,19 @@ void draw_truth_pi0_component_information(
     if (use_energy_contribution) {
       label.DrawLatex(
           0.08, 0.77,
-          Form("Separated: distinct E_{cluster} #geq %.3g GeV, f_{#gamma} > %.3g",
-               min_cluster_energy, min_contribution_fraction));
+          Form("Match each #gamma to maximum-E_{dep} cluster, f_{#gamma} > %.3g",
+               min_contribution_fraction));
       label.DrawLatex(
           0.08, 0.71,
-          Form("Merged: both #gamma contribute, %.1f < "
-               "E_{T}^{cluster}/p_{T}^{#pi^{0}} < %.1f",
-               merged_response_min, merged_response_max));
+          Form("Separated: distinct matches, E_{cluster} #geq %.3g GeV",
+               min_cluster_energy));
       label.DrawLatex(
           0.08, 0.65,
-          Form("Individual: one #gamma contributes, %.1f < "
-               "E_{T}^{cluster}/p_{T}^{#gamma} < %.1f",
+          Form("Merged: same match, %.1f < E_{T}^{cluster}/p_{T}^{#pi^{0}} < %.1f",
+               merged_response_min, merged_response_max));
+      label.DrawLatex(
+          0.08, 0.59,
+          Form("Individual: selected match, %.1f < E_{T}^{cluster}/p_{T}^{#gamma} < %.1f",
                individual_response_min, individual_response_max));
     } else {
       label.DrawLatex(0.08, 0.77,
@@ -1703,7 +1709,7 @@ void draw_truth_pi0_component_information(
                            individual_response_max));
     }
     label.DrawLatex(
-        0.08, 0.59,
+        0.08, use_energy_contribution ? 0.53 : 0.59,
         "Exclusive priority: separated > merged > individual > none");
     return;
   }
@@ -1885,7 +1891,7 @@ void draw_topology_confusion(
   conditions.DrawLatex(0.08, 0.78, "Event-by-event topology comparison");
   conditions.DrawLatex(
       0.08, 0.70,
-      Form("Energy match: E_{dep} > 0 and f_{#gamma} > %.3g",
+      Form("Energy match: per-#gamma maximum E_{dep}, f_{#gamma} > %.3g",
            min_contribution_fraction));
   conditions.DrawLatex(0.08, 0.62,
                        "Priority: separated > merged > individual > none");
@@ -1954,7 +1960,7 @@ void draw_topology_fraction_differences(
                        "Energy-contribution fraction minus #DeltaR fraction");
   conditions.DrawLatex(
       0.08, 0.70,
-      Form("Energy match: E_{dep} > 0 and f_{#gamma} > %.3g",
+      Form("Energy match: per-#gamma maximum E_{dep}, f_{#gamma} > %.3g",
            min_contribution_fraction));
   canvas.cd(legend_pad);
   TLegend legend(0.08, 0.18, 0.96, 0.82);

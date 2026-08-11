@@ -1,0 +1,29 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/run_truth_spectrum_pythia.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
+request_memory     = 2GB
+Priority           = 20
+job_lease_duration = 86400
+
+n_events           = 0
+tree_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/truth_root
+log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
+input_manifest     = input/minimum_bias/segments.list
+# Python-style half-open slice: the default queues exactly rows 0..999.
+manifest_slice     = [0:1000]
+
+Output             = $(log_directory)/pythia_truth_$(ProcId).out
+Error              = $(log_directory)/pythia_truth_$(ProcId).err
+Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-truth_$(ProcId).log
+Arguments          = "$(input_suffix) $(n_events) $(tree_output_directory)"
+
+# -maxjobs is a submit-time guard and does not truncate this queue. Keep the
+# slice and -maxjobs consistent, e.g.
+#   condor_submit -maxjobs 1000 run_truth_spectrum_pythia.job
+# For a one-job smoke test:
+#   condor_submit -append "manifest_slice = [0:1]" -maxjobs 1 run_truth_spectrum_pythia.job
+Queue input_suffix from $(manifest_slice) $(input_manifest)

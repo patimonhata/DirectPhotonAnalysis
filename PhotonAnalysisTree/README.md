@@ -208,5 +208,40 @@ condor_submit -append "input_manifest = input/jet5/segments.list" -append "manif
 - `run_add_scores_pythia.sh`, `run_add_scores_pythia.job`: Pythia schema 4 treeへsplit scoreだけをtransactionalに追加して検証
 - `make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
 
+## Minimum-bias truth pT spectra
+
+cluster reconstructionを必要としないtruth粒子数の測定には、G4Hits DSTだけを読む軽量な
+`PythiaTruthSpectrumTree`を使います。direct photonとpi0はsignal HepMC eventから、
+このDetroit productionでGeant4側に委譲されたpi0 decay photonは`G4TruthInfo`から保存します。
+詳細な粒子定義とbranchは`docs/pythia_truth_spectrum_schema.md`を参照してください。
+
+4 stream listのsuffix同期を検証してfull manifestを作ります。
+
+```bash
+cd /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
+./make_pythia_input_manifest.sh input/minimum_bias input/minimum_bias/segments.list
+```
+
+1 fileの先頭eventだけを確認する場合:
+
+```bash
+./run_truth_spectrum_pythia.sh \
+  pythia8_Detroit-0000000028-000000.root 1 output/truth_root
+```
+
+defaultのCondor jobはmanifestのhalf-open slice `[0:1000]`、つまり先頭1000 filesだけを
+queueします。`-maxjobs`は切り詰めではなく誤投入防止です。
+
+```bash
+condor_submit -maxjobs 1000 run_truth_spectrum_pythia.job
+```
+
+生成ROOT filesを直接TChainへ読み、raw count densityを描けます。defaultはeta cutなしです。
+最後から2つ目の引数を`0.7`にすると`|eta_truth| < 0.7`を3粒子種へ適用します。
+
+```bash
+root -l -b -q 'macro/PlotPythiaTruthPtSpectra.C("output/truth_root/pythia_truth_spectrum_tree_*.root","output/plots/minbias_truth_pt",100,20.0,-1.0,false)'
+```
+
 `run_tree_pythia.job`は`input/jet5/segments.list`を`queue ... from`で読み、
 manifestの1行につき1つの同期した4-stream DST jobを生成します。

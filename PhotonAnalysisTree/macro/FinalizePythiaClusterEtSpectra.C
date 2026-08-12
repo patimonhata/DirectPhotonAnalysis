@@ -240,7 +240,7 @@ int FinalizePythiaClusterEtSpectra(
     const std::string partial_pattern =
         "output/cluster_et_partial/prompt_pi0_eta07/partial_*.root",
     const std::string output_base =
-        "output/plots/minbias_cluster_et_prompt_pi0_eta07",
+        "output/plots/tempminbias_cluster_et_prompt_pi0_eta07",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {
@@ -403,7 +403,7 @@ int FinalizePythiaClusterEtSpectra(
   {
     raw[index]->Draw("HIST SAME");
   }
-  TLegend legend(0.47, 0.57, 0.89, 0.84);
+  TLegend legend(0.47, 0.38, 0.89, 0.65);
   legend.AddEntry(raw[0].get(), "Prompt-#gamma cluster", "l");
   legend.AddEntry(raw[1].get(), "#pi^{0}-origin cluster", "l");
   legend.AddEntry(raw[2].get(), "#pi^{0}: separated", "l");
@@ -413,12 +413,12 @@ int FinalizePythiaClusterEtSpectra(
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  label.DrawLatex(0.18, 0.92, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.18, 0.84, "Pythia8 p+p minimum bias");
+  label.DrawLatex(0.23, 0.92, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(0.23, 0.84, "Pythia8 p+p minimum bias");
   std::ostringstream eta_label;
   eta_label << "|#eta^{truth}| < " << reference.truth_eta_max
             << ", |#eta^{cluster}| < " << reference.cluster_eta_max;
-  label.DrawLatex(0.18, 0.76, eta_label.str().c_str());
+  label.DrawLatex(0.23, 0.76, eta_label.str().c_str());
   canvas.RedrawAxis();
   canvas.SaveAs((output_base + ".pdf").c_str());
 

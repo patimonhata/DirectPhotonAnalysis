@@ -164,7 +164,7 @@ double smallest_positive_bin(const std::vector<TH1D*>& histograms)
 
 int FinalizePythiaTruthPtSpectra(
     const std::string partial_pattern = "output/truth_pt_partial/prompt_eta07_unweighted/partial_*.root",
-    const std::string output_base = "output/plots/minbias_truth_pt_prompt_eta07",
+    const std::string output_base = "output/plots/tempminbias_truth_pt_prompt_eta07",
     const Long64_t expected_manifest_begin = 0,
     const Long64_t expected_manifest_end = -1)
 {
@@ -317,7 +317,7 @@ int FinalizePythiaTruthPtSpectra(
   prompt_raw.Draw("HIST");
   pi0_raw.Draw("HIST SAME");
   pi0_decay_raw.Draw("HIST SAME");
-  TLegend legend(0.50, 0.64, 0.89, 0.84);
+  TLegend legend(0.40, 0.45, 0.79, 0.65);
   legend.AddEntry(&prompt_raw, "Prompt #gamma (direct + frag.)", "l");
   legend.AddEntry(&pi0_raw, "Inclusive #pi^{0}", "l");
   legend.AddEntry(&pi0_decay_raw, "#gamma from #pi^{0}", "l");
@@ -325,11 +325,11 @@ int FinalizePythiaTruthPtSpectra(
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  label.DrawLatex(0.18, 0.92, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.18, 0.84, "Pythia8 p+p minimum bias");
+  label.DrawLatex(0.23, 0.92, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(0.23, 0.84, "Pythia8 p+p MB");
   const std::string selection = reference.max_abs_eta < 0.0
       ? "No #eta selection" : "|#eta^{truth}| < " + std::to_string(reference.max_abs_eta);
-  label.DrawLatex(0.18, 0.76, selection.c_str());
+  label.DrawLatex(0.23, 0.76, selection.c_str());
   canvas.RedrawAxis();
   canvas.SaveAs((output_base + ".pdf").c_str());
 

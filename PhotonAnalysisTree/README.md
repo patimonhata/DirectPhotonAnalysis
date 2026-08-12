@@ -211,9 +211,11 @@ condor_submit -append "input_manifest = input/jet5/segments.list" -append "manif
 ## Minimum-bias truth pT spectra
 
 cluster reconstructionを必要としないtruth粒子数の測定には、G4Hits DSTだけを読む軽量な
-`PythiaTruthSpectrumTree`を使います。prompt photon候補とpi0はsignal HepMC eventから、
-このDetroit productionでGeant4側に委譲されたpi0 decay photonは`G4TruthInfo`から保存します。
-詳細な粒子定義とbranchは`docs/pythia_truth_spectrum_schema.md`を参照してください。
+`PythiaTruthSpectrumTree`を使います。prompt photon候補とpi0はsignal HepMC eventから保存します。
+pi0 decay photonのpT spectrumは、HepMC内で崩壊したpi0由来のfinal photonと、
+Geant4に委譲されたsignal-primary pi0由来のphotonを合算します。HepMC/G4別の
+diagnostic histogramも保存します。詳細な粒子定義とbranchは
+`docs/pythia_truth_spectrum_schema.md`を参照してください。
 
 4 stream listのsuffix同期を検証してfull manifestを作ります。
 
@@ -239,6 +241,7 @@ condor_submit -maxjobs 1000 run_truth_spectrum_pythia.job
 少数の生成ROOT filesなら直接TChainへ読み、count densityを描けます。photonは
 classifier category 1 (direct)または2 (fragmentation)のprompt photonです。defaultは
 eta cutなしで、最後から2つ目の引数を`0.7`にすると`|eta_truth| < 0.7`を3粒子種へ適用します。
+pi0 decay photonの合計とHepMC/G4内訳は同じROOT fileに保存されます。
 
 ```bash
 root -l -b -q 'macro/PlotPythiaTruthPtSpectra.C("output/truth_root/pythia_truth_spectrum_tree_*.root","output/plots/minbias_truth_pt",100,20.0,-1.0,false)'
@@ -276,7 +279,7 @@ partialの範囲・解析条件を検証して統合し、最後にbin幅で規�
 `expected_manifest_end`を指定するため、partialの欠落も検出します。
 
 ```bash
-root -l -b -q 'macro/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/prompt_eta07_unweighted/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07",0,40000)'
+root -l -b -q 'macro/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,40000)'
 ```
 
 詳細は`docs/pythia_truth_pt_map_reduce.md`を参照してください。

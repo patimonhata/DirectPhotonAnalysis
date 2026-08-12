@@ -40,7 +40,11 @@ intermediate photon-to-photon copy from hiding the physical origin.
 
 The spectrum tools define prompt photons as final HepMC photons with a valid
 classifier category of either 1 (direct 2-to-2) or 2 (fragmentation). They do
-not infer promptness from G4 PDG alone. Category 3 decay photons are excluded.
+not infer promptness from G4 PDG alone. Category 3 decay photons are excluded
+from the prompt spectrum. A separate pi0-decay-photon selection uses a valid
+photon copy chain whose first non-photon production vertex has exactly one
+PDG 111 parent. This includes both gamma-gamma and Dalitz decays recorded in
+HepMC.
 
 ## HepMC pi0
 
@@ -56,8 +60,9 @@ their decay is delegated to Geant4, so this value is normally zero.
 
 ## G4 pi0 decay photons
 
-The decay-photon spectrum cannot be obtained from HepMC daughters in this
-production. `truth_pi0_decay_photon_*` therefore selects a G4 secondary only
+The checked Detroit production has no observed HepMC pi0 decay daughters, so
+`truth_pi0_decay_photon_*` stores the complementary G4 component. It selects
+a G4 secondary only
 when all of the following hold:
 
 1. the secondary has PDG 22;
@@ -68,8 +73,13 @@ when all of the following hold:
 The collection stores the photon G4 track ID, parent G4 track ID, parent HepMC
 barcode, validity, and photon `e`, `pt`, `eta`, and `phi`. Requiring the
 immediate parent excludes the many later shower photons that still have a pi0
-ancestor. The plotted decay-photon x coordinate is the G4 daughter photon's
-production `pt`.
+ancestor. The G4 component's x coordinate is the daughter photon's production
+`pt`.
+
+The truth-pT spectrum tools combine this G4 collection with final HepMC photons
+having a valid single-pi0 physical origin. The combined histogram retains the
+name `h_pi0_decay_photon_truth_pt[_raw]`; separate HepMC and G4 component
+histograms are also written for diagnostics.
 
 ## Metadata diagnostics
 

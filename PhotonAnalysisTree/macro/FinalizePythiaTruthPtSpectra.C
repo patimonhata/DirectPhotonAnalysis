@@ -26,6 +26,7 @@ struct PartialMetadata
   std::string path;
   Int_t schema_version = 0;
   std::string photon_selection;
+  std::string pi0_decay_photon_selection;
   std::string manifest_path;
   std::string input_directory;
   Long64_t manifest_begin = -1;
@@ -40,6 +41,8 @@ struct PartialMetadata
   ULong64_t prompt_photon_count = 0ULL;
   ULong64_t pi0_count = 0ULL;
   ULong64_t pi0_decay_photon_count = 0ULL;
+  ULong64_t hepmc_pi0_decay_photon_count = 0ULL;
+  ULong64_t g4_pi0_decay_photon_count = 0ULL;
   ULong64_t malformed_event_count = 0ULL;
   ULong64_t invalid_weight_event_count = 0ULL;
 };
@@ -60,11 +63,13 @@ bool read_metadata(const std::string& path, PartialMetadata& result)
     return false;
   }
   std::string* photon_selection = nullptr;
+  std::string* pi0_decay_photon_selection = nullptr;
   std::string* manifest_path = nullptr;
   std::string* input_directory = nullptr;
   bool ok = true;
   ok &= bind_branch(tree, "schema_version", &result.schema_version);
   ok &= bind_branch(tree, "photon_selection", &photon_selection);
+  ok &= bind_branch(tree, "pi0_decay_photon_selection", &pi0_decay_photon_selection);
   ok &= bind_branch(tree, "manifest_path", &manifest_path);
   ok &= bind_branch(tree, "input_directory", &input_directory);
   ok &= bind_branch(tree, "manifest_begin", &result.manifest_begin);
@@ -79,14 +84,18 @@ bool read_metadata(const std::string& path, PartialMetadata& result)
   ok &= bind_branch(tree, "prompt_photon_count", &result.prompt_photon_count);
   ok &= bind_branch(tree, "pi0_count", &result.pi0_count);
   ok &= bind_branch(tree, "pi0_decay_photon_count", &result.pi0_decay_photon_count);
+  ok &= bind_branch(tree, "hepmc_pi0_decay_photon_count", &result.hepmc_pi0_decay_photon_count);
+  ok &= bind_branch(tree, "g4_pi0_decay_photon_count", &result.g4_pi0_decay_photon_count);
   ok &= bind_branch(tree, "malformed_event_count", &result.malformed_event_count);
   ok &= bind_branch(tree, "invalid_weight_event_count", &result.invalid_weight_event_count);
-  if (!ok || tree->GetEntry(0) <= 0 || !photon_selection || !manifest_path || !input_directory)
+  if (!ok || tree->GetEntry(0) <= 0 || !photon_selection ||
+      !pi0_decay_photon_selection || !manifest_path || !input_directory)
   {
     return false;
   }
   result.path = path;
   result.photon_selection = *photon_selection;
+  result.pi0_decay_photon_selection = *pi0_decay_photon_selection;
   result.manifest_path = *manifest_path;
   result.input_directory = *input_directory;
   return true;
@@ -94,9 +103,13 @@ bool read_metadata(const std::string& path, PartialMetadata& result)
 
 bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
 {
-  return value.schema_version == 1 &&
+  return value.schema_version == 2 &&
       value.photon_selection == "prompt_category_1_or_2" &&
       value.photon_selection == reference.photon_selection &&
+      value.pi0_decay_photon_selection ==
+          "hepmc_final_photon_with_valid_single_pi0_origin_plus_"
+          "g4_immediate_photon_daughter_of_signal_primary_pi0" &&
+      value.pi0_decay_photon_selection == reference.pi0_decay_photon_selection &&
       value.manifest_path == reference.manifest_path &&
       value.input_directory == reference.input_directory &&
       value.n_bins == reference.n_bins &&
@@ -104,6 +117,8 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
       std::abs(value.max_abs_eta - reference.max_abs_eta) < 1e-12 &&
       value.use_event_weight == reference.use_event_weight &&
       value.bin_width_normalized == 0U &&
+      value.pi0_decay_photon_count ==
+          value.hepmc_pi0_decay_photon_count + value.g4_pi0_decay_photon_count &&
       value.files_added == value.manifest_end - value.manifest_begin &&
       value.files_added > 0 && value.events_processed > 0 &&
       value.malformed_event_count == 0ULL && value.invalid_weight_event_count == 0ULL;
@@ -125,6 +140,35 @@ bool compatible_histogram(const TH1D* histogram, const PartialMetadata& metadata
   {
     if (!std::isfinite(histogram->GetBinContent(bin)) ||
         !std::isfinite(histogram->GetBinError(bin)))
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool histogram_sum_matches(
+    const TH1D* total,
+    const TH1D* hepmc,
+    const TH1D* g4)
+{
+  if (!total || !hepmc || !g4 ||
+      std::abs(total->GetEntries() - hepmc->GetEntries() - g4->GetEntries()) > 0.5)
+  {
+    return false;
+  }
+  for (int bin = 0; bin <= total->GetNbinsX() + 1; ++bin)
+  {
+    const double expected_content =
+        hepmc->GetBinContent(bin) + g4->GetBinContent(bin);
+    const double expected_error2 =
+        std::pow(hepmc->GetBinError(bin), 2) + std::pow(g4->GetBinError(bin), 2);
+    const double content_scale = std::max(1.0, std::abs(expected_content));
+    const double error2_scale = std::max(1.0, std::abs(expected_error2));
+    if (std::abs(total->GetBinContent(bin) - expected_content) >
+            1e-10 * content_scale ||
+        std::abs(std::pow(total->GetBinError(bin), 2) - expected_error2) >
+            1e-10 * error2_scale)
     {
       return false;
     }
@@ -163,8 +207,10 @@ double smallest_positive_bin(const std::vector<TH1D*>& histograms)
 }
 
 int FinalizePythiaTruthPtSpectra(
-    const std::string partial_pattern = "output/truth_pt_partial/prompt_eta07_unweighted/partial_*.root",
-    const std::string output_base = "output/plots/tempminbias_truth_pt_prompt_eta07",
+    const std::string partial_pattern =
+        "output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root",
+    const std::string output_base =
+        "output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",
     const Long64_t expected_manifest_begin = 0,
     const Long64_t expected_manifest_end = -1)
 {
@@ -229,7 +275,12 @@ int FinalizePythiaTruthPtSpectra(
   TH1D prompt_raw("h_prompt_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
   TH1D pi0_raw("h_pi0_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
   TH1D pi0_decay_raw("h_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
-  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw})
+  TH1D hepmc_pi0_decay_raw(
+      "h_hepmc_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
+  TH1D g4_pi0_decay_raw(
+      "h_g4_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
+  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw,
+                           &hepmc_pi0_decay_raw, &g4_pi0_decay_raw})
   {
     histogram->Sumw2();
   }
@@ -239,21 +290,34 @@ int FinalizePythiaTruthPtSpectra(
   ULong64_t total_prompt_photons = 0ULL;
   ULong64_t total_pi0 = 0ULL;
   ULong64_t total_pi0_decay_photons = 0ULL;
+  ULong64_t total_hepmc_pi0_decay_photons = 0ULL;
+  ULong64_t total_g4_pi0_decay_photons = 0ULL;
   for (const PartialMetadata& partial : partials)
   {
     TFile input(partial.path.c_str(), "READ");
     TH1D* prompt = nullptr;
     TH1D* pi0 = nullptr;
     TH1D* pi0_decay = nullptr;
+    TH1D* hepmc_pi0_decay = nullptr;
+    TH1D* g4_pi0_decay = nullptr;
     input.GetObject("h_prompt_photon_truth_pt_raw", prompt);
     input.GetObject("h_pi0_truth_pt_raw", pi0);
     input.GetObject("h_pi0_decay_photon_truth_pt_raw", pi0_decay);
+    input.GetObject("h_hepmc_pi0_decay_photon_truth_pt_raw", hepmc_pi0_decay);
+    input.GetObject("h_g4_pi0_decay_photon_truth_pt_raw", g4_pi0_decay);
     if (input.IsZombie() ||
         !compatible_histogram(prompt, partial, partial.prompt_photon_count) ||
         !compatible_histogram(pi0, partial, partial.pi0_count) ||
         !compatible_histogram(pi0_decay, partial, partial.pi0_decay_photon_count) ||
+        !compatible_histogram(hepmc_pi0_decay, partial,
+            partial.hepmc_pi0_decay_photon_count) ||
+        !compatible_histogram(g4_pi0_decay, partial,
+            partial.g4_pi0_decay_photon_count) ||
+        !histogram_sum_matches(pi0_decay, hepmc_pi0_decay, g4_pi0_decay) ||
         prompt_raw.Add(prompt) == false || pi0_raw.Add(pi0) == false ||
-        pi0_decay_raw.Add(pi0_decay) == false)
+        pi0_decay_raw.Add(pi0_decay) == false ||
+        hepmc_pi0_decay_raw.Add(hepmc_pi0_decay) == false ||
+        g4_pi0_decay_raw.Add(g4_pi0_decay) == false)
     {
       std::cerr << "FinalizePythiaTruthPtSpectra - invalid histogram in "
                 << partial.path << std::endl;
@@ -264,6 +328,14 @@ int FinalizePythiaTruthPtSpectra(
     total_prompt_photons += partial.prompt_photon_count;
     total_pi0 += partial.pi0_count;
     total_pi0_decay_photons += partial.pi0_decay_photon_count;
+    total_hepmc_pi0_decay_photons += partial.hepmc_pi0_decay_photon_count;
+    total_g4_pi0_decay_photons += partial.g4_pi0_decay_photon_count;
+  }
+  if (total_pi0_decay_photons !=
+      total_hepmc_pi0_decay_photons + total_g4_pi0_decay_photons)
+  {
+    std::cerr << "FinalizePythiaTruthPtSpectra - inconsistent pi0 decay totals" << std::endl;
+    return 5;
   }
 
   std::unique_ptr<TH1D> prompt_density(
@@ -272,7 +344,14 @@ int FinalizePythiaTruthPtSpectra(
       static_cast<TH1D*>(pi0_raw.Clone("h_pi0_truth_pt_density")));
   std::unique_ptr<TH1D> pi0_decay_density(
       static_cast<TH1D*>(pi0_decay_raw.Clone("h_pi0_decay_photon_truth_pt_density")));
-  for (TH1D* histogram : {prompt_density.get(), pi0_density.get(), pi0_decay_density.get()})
+  std::unique_ptr<TH1D> hepmc_pi0_decay_density(
+      static_cast<TH1D*>(hepmc_pi0_decay_raw.Clone(
+          "h_hepmc_pi0_decay_photon_truth_pt_density")));
+  std::unique_ptr<TH1D> g4_pi0_decay_density(
+      static_cast<TH1D*>(g4_pi0_decay_raw.Clone(
+          "h_g4_pi0_decay_photon_truth_pt_density")));
+  for (TH1D* histogram : {prompt_density.get(), pi0_density.get(), pi0_decay_density.get(),
+                           hepmc_pi0_decay_density.get(), g4_pi0_decay_density.get()})
   {
     histogram->Scale(1.0, "width");
     histogram->SetStats(false);
@@ -286,7 +365,8 @@ int FinalizePythiaTruthPtSpectra(
   pi0_density->SetLineColor(kBlue + 1);
   pi0_decay_density->SetLineColor(kGreen + 2);
 
-  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw})
+  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw,
+                           &hepmc_pi0_decay_raw, &g4_pi0_decay_raw})
   {
     histogram->SetStats(false);
     histogram->SetFillStyle(0);
@@ -341,12 +421,17 @@ int FinalizePythiaTruthPtSpectra(
   prompt_raw.Write();
   pi0_raw.Write();
   pi0_decay_raw.Write();
+  hepmc_pi0_decay_raw.Write();
+  g4_pi0_decay_raw.Write();
   prompt_density->Write();
   pi0_density->Write();
   pi0_decay_density->Write();
+  hepmc_pi0_decay_density->Write();
+  g4_pi0_decay_density->Write();
 
-  Int_t output_schema_version = 1;
+  Int_t output_schema_version = 2;
   std::string photon_selection = reference.photon_selection;
+  std::string pi0_decay_photon_selection = reference.pi0_decay_photon_selection;
   std::string manifest_path = reference.manifest_path;
   std::string input_directory = reference.input_directory;
   Long64_t manifest_begin = partials.front().manifest_begin;
@@ -361,6 +446,7 @@ int FinalizePythiaTruthPtSpectra(
   TTree metadata("metadata", "Final Pythia truth pT metadata");
   metadata.Branch("schema_version", &output_schema_version);
   metadata.Branch("photon_selection", &photon_selection);
+  metadata.Branch("pi0_decay_photon_selection", &pi0_decay_photon_selection);
   metadata.Branch("manifest_path", &manifest_path);
   metadata.Branch("input_directory", &input_directory);
   metadata.Branch("manifest_begin", &manifest_begin);
@@ -377,6 +463,8 @@ int FinalizePythiaTruthPtSpectra(
   metadata.Branch("prompt_photon_count", &total_prompt_photons);
   metadata.Branch("pi0_count", &total_pi0);
   metadata.Branch("pi0_decay_photon_count", &total_pi0_decay_photons);
+  metadata.Branch("hepmc_pi0_decay_photon_count", &total_hepmc_pi0_decay_photons);
+  metadata.Branch("g4_pi0_decay_photon_count", &total_g4_pi0_decay_photons);
   metadata.Fill();
   metadata.Write();
   output.Close();
@@ -385,10 +473,12 @@ int FinalizePythiaTruthPtSpectra(
     return 6;
   }
 
-  std::cout << "FinalizePythiaTruthPtSpectra - partials/files/events/prompt/pi0/pi0 decay = "
+  std::cout << "FinalizePythiaTruthPtSpectra - partials/files/events/prompt/pi0/"
+               "pi0 decay (total/HepMC/G4) = "
             << partial_file_count << "/" << total_input_files << "/" << total_events << "/"
             << total_prompt_photons << "/" << total_pi0 << "/"
-            << total_pi0_decay_photons << std::endl;
+            << total_pi0_decay_photons << "/" << total_hepmc_pi0_decay_photons << "/"
+            << total_g4_pi0_decay_photons << std::endl;
   std::cout << "Wrote " << output_base << ".pdf and " << output_base << ".root" << std::endl;
   return 0;
 }

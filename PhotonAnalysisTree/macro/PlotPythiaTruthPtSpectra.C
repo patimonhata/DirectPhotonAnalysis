@@ -93,6 +93,9 @@ int PlotPythiaTruthPtSpectra(
   std::vector<float>* photon_eta = nullptr;
   std::vector<unsigned char>* photon_classification_valid = nullptr;
   std::vector<int>* photon_category = nullptr;
+  std::vector<unsigned char>* photon_copy_chain_valid = nullptr;
+  std::vector<int>* photon_origin_parent_count = nullptr;
+  std::vector<int>* photon_origin_parent_pdg = nullptr;
   UInt_t truth_pi0_n = 0U;
   std::vector<unsigned char>* pi0_kinematics_valid = nullptr;
   std::vector<float>* pi0_pt = nullptr;
@@ -111,6 +114,9 @@ int PlotPythiaTruthPtSpectra(
   ok &= bind_branch(&tree, "truth_photon_eta", &photon_eta);
   ok &= bind_branch(&tree, "truth_photon_classification_valid", &photon_classification_valid);
   ok &= bind_branch(&tree, "truth_photon_category", &photon_category);
+  ok &= bind_branch(&tree, "truth_photon_copy_chain_valid", &photon_copy_chain_valid);
+  ok &= bind_branch(&tree, "truth_photon_origin_parent_count", &photon_origin_parent_count);
+  ok &= bind_branch(&tree, "truth_photon_origin_parent_pdg", &photon_origin_parent_pdg);
   ok &= bind_branch(&tree, "truth_pi0_n", &truth_pi0_n);
   ok &= bind_branch(&tree, "truth_pi0_kinematics_valid", &pi0_kinematics_valid);
   ok &= bind_branch(&tree, "truth_pi0_pt", &pi0_pt);
@@ -127,7 +133,12 @@ int PlotPythiaTruthPtSpectra(
   TH1D prompt_photon("h_prompt_photon_truth_pt", "", n_bins, 0.0, pt_max);
   TH1D pi0("h_pi0_truth_pt", "", n_bins, 0.0, pt_max);
   TH1D pi0_decay_photon("h_pi0_decay_photon_truth_pt", "", n_bins, 0.0, pt_max);
-  for (TH1D* histogram : {&prompt_photon, &pi0, &pi0_decay_photon})
+  TH1D hepmc_pi0_decay_photon(
+      "h_hepmc_pi0_decay_photon_truth_pt", "", n_bins, 0.0, pt_max);
+  TH1D g4_pi0_decay_photon(
+      "h_g4_pi0_decay_photon_truth_pt", "", n_bins, 0.0, pt_max);
+  for (TH1D* histogram : {&prompt_photon, &pi0, &pi0_decay_photon,
+                           &hepmc_pi0_decay_photon, &g4_pi0_decay_photon})
   {
     histogram->Sumw2();
     histogram->SetStats(false);
@@ -146,6 +157,8 @@ int PlotPythiaTruthPtSpectra(
   ULong64_t n_prompt_photon = 0ULL;
   ULong64_t n_pi0 = 0ULL;
   ULong64_t n_pi0_decay_photon = 0ULL;
+  ULong64_t n_hepmc_pi0_decay_photon = 0ULL;
+  ULong64_t n_g4_pi0_decay_photon = 0ULL;
   ULong64_t malformed_events = 0ULL;
   ULong64_t invalid_weight_events = 0ULL;
   for (Long64_t entry = 0; entry < tree.GetEntries(); ++entry)
@@ -161,7 +174,9 @@ int PlotPythiaTruthPtSpectra(
     const bool photon_aligned =
         aligned(photon_kinematics_valid, n_photon) && aligned(photon_pt, n_photon) &&
         aligned(photon_eta, n_photon) && aligned(photon_classification_valid, n_photon) &&
-        aligned(photon_category, n_photon);
+        aligned(photon_category, n_photon) && aligned(photon_copy_chain_valid, n_photon) &&
+        aligned(photon_origin_parent_count, n_photon) &&
+        aligned(photon_origin_parent_pdg, n_photon);
     const bool pi0_aligned = aligned(pi0_kinematics_valid, n_pi0_event) &&
         aligned(pi0_pt, n_pi0_event) && aligned(pi0_eta, n_pi0_event);
     const bool pi0_decay_photon_aligned =
@@ -193,6 +208,15 @@ int PlotPythiaTruthPtSpectra(
         prompt_photon.Fill((*photon_pt)[particle], weight);
         ++n_prompt_photon;
       }
+      if ((*photon_copy_chain_valid)[particle] &&
+          (*photon_origin_parent_count)[particle] == 1 &&
+          (*photon_origin_parent_pdg)[particle] == 111)
+      {
+        hepmc_pi0_decay_photon.Fill((*photon_pt)[particle], weight);
+        pi0_decay_photon.Fill((*photon_pt)[particle], weight);
+        ++n_hepmc_pi0_decay_photon;
+        ++n_pi0_decay_photon;
+      }
     }
     for (std::size_t particle = 0; particle < n_pi0_event; ++particle)
     {
@@ -208,7 +232,9 @@ int PlotPythiaTruthPtSpectra(
       if ((*pi0_decay_photon_kinematics_valid)[particle] &&
           in_acceptance((*pi0_decay_photon_eta)[particle], max_abs_eta))
       {
+        g4_pi0_decay_photon.Fill((*pi0_decay_photon_pt)[particle], weight);
         pi0_decay_photon.Fill((*pi0_decay_photon_pt)[particle], weight);
+        ++n_g4_pi0_decay_photon;
         ++n_pi0_decay_photon;
       }
     }
@@ -250,11 +276,15 @@ int PlotPythiaTruthPtSpectra(
   prompt_photon.Write();
   pi0.Write();
   pi0_decay_photon.Write();
+  hepmc_pi0_decay_photon.Write();
+  g4_pi0_decay_photon.Write();
   histogram_file.Close();
 
-  std::cout << "PlotPythiaTruthPtSpectra - files/events/prompt photons/pi0/pi0 decay photons = "
+  std::cout << "PlotPythiaTruthPtSpectra - files/events/prompt/pi0/"
+               "pi0 decay (total/HepMC/G4) = "
             << n_files << "/" << tree.GetEntries() << "/" << n_prompt_photon << "/"
-            << n_pi0 << "/" << n_pi0_decay_photon << std::endl;
+            << n_pi0 << "/" << n_pi0_decay_photon << "/"
+            << n_hepmc_pi0_decay_photon << "/" << n_g4_pi0_decay_photon << std::endl;
   std::cout << "Wrote " << output_base << ".pdf and " << output_base << ".root" << std::endl;
   return 0;
 }

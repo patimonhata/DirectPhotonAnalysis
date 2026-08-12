@@ -44,6 +44,7 @@ add_library(
   HepMCPhotonClassifier.cc
   Pi0ClusterTruthMatcher.cc
   PhotonAnalysisTree.cc
+  PythiaClusterEtSpectrum.cc
   PhotonTreeCommon.cc
   PythiaClusterTruthMatcher.cc
   PythiaPhotonAnalysisTree.cc
@@ -104,6 +105,7 @@ install(
     PhotonTreeCommon.h
     Pi0GammaOnnx.h
     PythiaClusterTruthMatcher.h
+    PythiaClusterEtSpectrum.h
     PythiaPhotonAnalysisTree.h
     PythiaTruthSpectrumTree.h
     ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h

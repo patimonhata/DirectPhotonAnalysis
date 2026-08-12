@@ -281,5 +281,9 @@ root -l -b -q 'macro/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/pro
 
 詳細は`docs/pythia_truth_pt_map_reduce.md`を参照してください。
 
+## Minimum-bias cluster E_T spectra
+
+再構成clusterのprompt/pi0起源とseparated/merged/missing topologyは、4 stream DSTを直接読む`PythiaClusterEtSpectrum`でmap-reduceします。各G4 photonを実際の生成vertexからCEMCへ投影するため、displaced decayもcollision vertex近似には戻しません。default cut、pathway定義、実行方法は[docs/pythia_cluster_et_map_reduce.md](docs/pythia_cluster_et_map_reduce.md)を参照してください。最終density histogramの単位は`clusters/GeV`です。
+
 `run_tree_pythia.job`は`input/jet5/segments.list`を`queue ... from`で読み、
 manifestの1行につき1つの同期した4-stream DST jobを生成します。

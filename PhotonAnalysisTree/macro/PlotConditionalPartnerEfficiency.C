@@ -2649,16 +2649,16 @@ int PlotConditionalPartnerEfficiency(
         "100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
     const std::string output_base =
         "PhotonAnalysisTree/output/plots/conditional_efficiency/"
-        "conditional_partner_et3to5",
-    const double anchor_eta_max = 0.7, const double anchor_et_min = 3.0,
-    const double anchor_et_max = 5.0, const double delta_r_cut = 0.03,
+        "conditional_partner_et5to7",
+    const double anchor_eta_max = 0.7, const double anchor_et_min = 5.0,
+    const double anchor_et_max = 7.0, const double delta_r_cut = 0.03,
     const double mass_window_min = 0.10, const double mass_window_max = 0.18,
     const int asymmetry_nbins = 20, const double merged_delta_r_cut = 0.06,
     const double merged_response_min = 0.5,
     const double merged_response_max = 1.5,
     const double individual_response_min = 0.5,
     const double individual_response_max = 1.5,
-    const double min_cluster_energy = 0.5, const double truth_eta_max = 0.7,
+    const double min_cluster_energy = 0.2, const double truth_eta_max = 0.7,
     const double min_contribution_fraction = 0.0) {
   if (input_path.empty() || output_base.empty() || !(anchor_eta_max > 0.0) ||
       !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||

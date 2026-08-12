@@ -376,11 +376,20 @@ int FinalizePythiaClusterEtSpectra(
     density[index]->GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
     density[index]->GetYaxis()->SetTitle("Clusters / GeV");
   }
-  const double maximum = std::max({density[0]->GetMaximum(), density[1]->GetMaximum(),
-      density[2]->GetMaximum(), density[3]->GetMaximum(), density[4]->GetMaximum()});
-  const double minimum = smallest_positive(density);
-  density[0]->SetMinimum(minimum > 0.0 ? 0.5 * minimum : 0.5);
-  density[0]->SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
+  for (std::size_t index = 0; index < raw.size(); ++index)
+  {
+    raw[index]->SetStats(false);
+    raw[index]->SetFillStyle(0);
+    raw[index]->SetLineWidth(index < 2 ? 3 : 2);
+    raw[index]->SetLineColor(colors[index]);
+    raw[index]->GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
+    raw[index]->GetYaxis()->SetTitle("Counts / bin");
+  }
+  const double maximum = std::max({raw[0]->GetMaximum(), raw[1]->GetMaximum(),
+      raw[2]->GetMaximum(), raw[3]->GetMaximum(), raw[4]->GetMaximum()});
+  const double minimum = smallest_positive(raw);
+  raw[0]->SetMinimum(minimum > 0.0 ? 0.5 * minimum : 0.5);
+  raw[0]->SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
 
   if (!make_output_directory(output_base))
   {
@@ -389,17 +398,17 @@ int FinalizePythiaClusterEtSpectra(
   SetsPhenixStyle();
   TCanvas canvas("c_pythia_cluster_et", "Pythia cluster ET spectra", 1000, 800);
   canvas.SetLogy();
-  density[0]->Draw("HIST");
-  for (std::size_t index = 1; index < density.size(); ++index)
+  raw[0]->Draw("HIST");
+  for (std::size_t index = 1; index < raw.size(); ++index)
   {
-    density[index]->Draw("HIST SAME");
+    raw[index]->Draw("HIST SAME");
   }
   TLegend legend(0.47, 0.57, 0.89, 0.84);
-  legend.AddEntry(density[0].get(), "Prompt-#gamma cluster", "l");
-  legend.AddEntry(density[1].get(), "#pi^{0}-origin cluster", "l");
-  legend.AddEntry(density[2].get(), "#pi^{0}: separated", "l");
-  legend.AddEntry(density[3].get(), "#pi^{0}: merged", "l");
-  legend.AddEntry(density[4].get(), "#pi^{0}: missing partner", "l");
+  legend.AddEntry(raw[0].get(), "Prompt-#gamma cluster", "l");
+  legend.AddEntry(raw[1].get(), "#pi^{0}-origin cluster", "l");
+  legend.AddEntry(raw[2].get(), "#pi^{0}: separated", "l");
+  legend.AddEntry(raw[3].get(), "#pi^{0}: merged", "l");
+  legend.AddEntry(raw[4].get(), "#pi^{0}: missing partner", "l");
   legend.Draw();
   TLatex label;
   label.SetNDC();

@@ -134,7 +134,7 @@ int PlotPythiaTruthPtSpectra(
     histogram->SetFillStyle(0);
     histogram->GetXaxis()->SetTitle("Truth p_{T} [GeV/#it{c}]");
     histogram->GetYaxis()->SetTitle(
-        use_event_weight ? "Weighted particles / (GeV/#it{c})" : "Particles / (GeV/#it{c})");
+        use_event_weight ? "Weighted counts / bin" : "Counts / bin");
   }
   prompt_photon.SetLineColor(kRed + 1);
   prompt_photon.SetLineWidth(3);
@@ -220,10 +220,6 @@ int PlotPythiaTruthPtSpectra(
     return 4;
   }
 
-  for (TH1D* histogram : {&prompt_photon, &pi0, &pi0_decay_photon})
-  {
-    histogram->Scale(1.0, "width");
-  }
   const double maximum = std::max(
       {prompt_photon.GetMaximum(), pi0.GetMaximum(), pi0_decay_photon.GetMaximum()});
   prompt_photon.SetMinimum(0.5);

@@ -69,5 +69,6 @@ root -l -b -q \
 
 The final ROOT file contains both raw counts and density histograms. Density is
 computed only after summing all partials by dividing each bin by its width, so
-the plotted y-axis is `clusters/GeV`. Counts are unweighted, matching the
-policy used by `minbias_truth_pt_prompt_eta07.pdf`.
+its unit is `clusters/GeV`. The PDF plots the summed raw histograms with a
+`counts/bin` y-axis. Counts are unweighted, matching the policy used by
+`minbias_truth_pt_prompt_eta07.pdf`.

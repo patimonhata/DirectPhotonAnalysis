@@ -286,12 +286,25 @@ int FinalizePythiaTruthPtSpectra(
   pi0_density->SetLineColor(kBlue + 1);
   pi0_decay_density->SetLineColor(kGreen + 2);
 
-  const double maximum = std::max({prompt_density->GetMaximum(),
-      pi0_density->GetMaximum(), pi0_decay_density->GetMaximum()});
+  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw})
+  {
+    histogram->SetStats(false);
+    histogram->SetFillStyle(0);
+    histogram->SetLineWidth(3);
+    histogram->GetXaxis()->SetTitle("Truth p_{T} [GeV/#it{c}]");
+    histogram->GetYaxis()->SetTitle(reference.use_event_weight
+        ? "Weighted counts / bin" : "Counts / bin");
+  }
+  prompt_raw.SetLineColor(kRed + 1);
+  pi0_raw.SetLineColor(kBlue + 1);
+  pi0_decay_raw.SetLineColor(kGreen + 2);
+
+  const double maximum = std::max({prompt_raw.GetMaximum(),
+      pi0_raw.GetMaximum(), pi0_decay_raw.GetMaximum()});
   const double smallest = smallest_positive_bin(
-      {prompt_density.get(), pi0_density.get(), pi0_decay_density.get()});
-  prompt_density->SetMinimum(smallest > 0.0 ? 0.5 * smallest : 0.5);
-  prompt_density->SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
+      {&prompt_raw, &pi0_raw, &pi0_decay_raw});
+  prompt_raw.SetMinimum(smallest > 0.0 ? 0.5 * smallest : 0.5);
+  prompt_raw.SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
 
   if (!make_output_directory(output_base))
   {
@@ -301,13 +314,13 @@ int FinalizePythiaTruthPtSpectra(
   SetsPhenixStyle();
   TCanvas canvas("c_pythia_truth_pt_spectra", "Pythia truth pT spectra", 1000, 800);
   canvas.SetLogy();
-  prompt_density->Draw("HIST");
-  pi0_density->Draw("HIST SAME");
-  pi0_decay_density->Draw("HIST SAME");
+  prompt_raw.Draw("HIST");
+  pi0_raw.Draw("HIST SAME");
+  pi0_decay_raw.Draw("HIST SAME");
   TLegend legend(0.50, 0.64, 0.89, 0.84);
-  legend.AddEntry(prompt_density.get(), "Prompt #gamma (direct + fragmentation)", "l");
-  legend.AddEntry(pi0_density.get(), "Last-copy #pi^{0}", "l");
-  legend.AddEntry(pi0_decay_density.get(), "#gamma from #pi^{0}", "l");
+  legend.AddEntry(&prompt_raw, "Prompt #gamma (direct + frag.)", "l");
+  legend.AddEntry(&pi0_raw, "Inclusive #pi^{0}", "l");
+  legend.AddEntry(&pi0_decay_raw, "#gamma from #pi^{0}", "l");
   legend.Draw();
   TLatex label;
   label.SetNDC();

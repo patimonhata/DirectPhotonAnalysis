@@ -54,4 +54,5 @@ by manifest range. Before adding histograms it requires:
 It writes both the summed raw histograms and density histograms. Each density
 bin is `raw bin content / bin width`, so its unit is particles/GeV (or weighted
 particles/GeV). This normalization is performed only after all partials have
-been added. It is not an event-count or luminosity normalization.
+been added. It is not an event-count or luminosity normalization. The PDF plots
+the summed raw histograms with a `counts/bin` y-axis.

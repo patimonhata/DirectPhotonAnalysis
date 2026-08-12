@@ -73,7 +73,7 @@ class PythiaTruthSpectrumTree : public SubsysReco
   unsigned long long n_events_processed_ = 0;
   unsigned long long n_events_written_ = 0;
   unsigned long long n_events_invalid_truth_ = 0;
-  unsigned long long n_hepmc_particle_record_ = 0;
+  unsigned long long n_hepmc_particle_record_ = 0; /* TOTAL number of hepmc particle recond in INPUT FILES */
   unsigned long long n_final_photon_ = 0;
   unsigned long long n_terminal_pi0_ = 0;
   unsigned long long n_g4_pi0_decay_photon_ = 0;
@@ -90,7 +90,7 @@ class PythiaTruthSpectrumTree : public SubsysReco
   unsigned char b_event_weight_valid_ = 0;
   double b_event_weight_ = 1.0;
   std::vector<double> b_event_weights_;
-  unsigned int b_hepmc_n_particle_record_ = 0;
+  unsigned int b_hepmc_n_particle_record_ = 0; /* number of hepmc particle recond in a FUN4ALL EVENT */
 
   unsigned int b_truth_photon_n_ = 0;
   std::vector<int> b_truth_photon_barcode_;

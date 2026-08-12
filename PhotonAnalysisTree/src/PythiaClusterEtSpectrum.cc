@@ -354,30 +354,23 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
   auto* clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   const PHHepMCGenEvent* signal_event = event_map ? event_map->get(signal_embedding_id_) : nullptr;
   const HepMC::GenEvent* event = signal_event ? signal_event->getEvent() : nullptr;
-  if (!truth || !event_map || !towers || !geometry || !clusters || !signal_event ||
-      !signal_event->is_simulated() || !event || !truth_matcher_.begin_event(topNode))
-  {
+  if (!truth || !event_map || !towers || !geometry || !clusters || !signal_event || !signal_event->is_simulated() || !event || !truth_matcher_.begin_event(topNode)) {
     ++n_events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
   const HepMC::FourVector& collision = signal_event->get_collision_vertex();
-  if (!std::isfinite(collision.x()) || !std::isfinite(collision.y()) ||
-      !std::isfinite(collision.z()))
-  {
+  if (!std::isfinite(collision.x()) || !std::isfinite(collision.y()) || !std::isfinite(collision.z())) {
     ++n_events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
   std::vector<ClusterRecord> cluster_records;
   const auto cluster_range = clusters->getClusters();
-  for (auto iterator = cluster_range.first; iterator != cluster_range.second; ++iterator)
-  {
+  for (auto iterator = cluster_range.first; iterator != cluster_range.second; ++iterator) {
     const RawCluster* cluster = iterator->second;
-    if (!cluster || !std::isfinite(cluster->get_energy()) ||
-        !std::isfinite(cluster->get_x()) || !std::isfinite(cluster->get_y()) ||
-        !std::isfinite(cluster->get_z()) || cluster->get_energy() < min_cluster_energy_)
-    {
+    if (!cluster || !std::isfinite(cluster->get_energy()) || !std::isfinite(cluster->get_x()) || !std::isfinite(cluster->get_y()) || !std::isfinite(cluster->get_z()) ||
+        cluster->get_energy() < min_cluster_energy_) {
       continue;
     }
     const double dx = cluster->get_x() - collision.x();
@@ -386,8 +379,7 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
     const double distance = std::sqrt(dx * dx + dy * dy + dz * dz);
     const double transverse = std::hypot(dx, dy);
     const double surface_radius = std::hypot(cluster->get_x(), cluster->get_y());
-    if (!(distance > 0.0) || !(transverse > 0.0) || !(surface_radius > 0.0))
-    {
+    if (!(distance > 0.0) || !(transverse > 0.0) || !(surface_radius > 0.0)) {
       continue;
     }
     ClusterRecord record;
@@ -396,32 +388,24 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
     record.eta = std::asinh(dz / transverse);
     record.surface_eta = std::asinh(cluster->get_z() / surface_radius);
     record.surface_phi = std::atan2(cluster->get_y(), cluster->get_x());
-    if (!std::isfinite(record.et) || !(record.et > 0.0) ||
-        !std::isfinite(record.eta) || std::abs(record.eta) >= cluster_eta_max_)
-    {
+    if (!std::isfinite(record.et) || !(record.et > 0.0) || !std::isfinite(record.eta) || std::abs(record.eta) >= cluster_eta_max_) {
       continue;
     }
-    record.truth = truth_matcher_.match(
-        cluster, towers, raw_truth_towers, truth, event_map, true);
+    record.truth = truth_matcher_.match(cluster, towers, raw_truth_towers, truth, event_map, true);
     ++n_cluster_considered_;
-    if (!record.truth.valid)
-    {
+    if (!record.truth.valid) {
       ++n_cluster_invalid_truth_;
     }
     cluster_records.push_back(std::move(record));
   }
 
   std::set<const RawCluster*> pi0_clusters_filled;
-  for (const ClusterRecord& cluster : cluster_records)
-  {
-    if (!cluster.truth.valid || cluster.truth.contributors.empty())
-    {
+  for (const ClusterRecord& cluster : cluster_records) {
+    if (!cluster.truth.valid || cluster.truth.contributors.empty()) {
       continue;
     }
     const photon_tree::TruthContributor& dominant = cluster.truth.contributors.front();
-    if (dominant.embedding_id != signal_embedding_id_ || !dominant.hepmc_valid ||
-        dominant.fraction < dominant_fraction_min_)
-    {
+    if (dominant.embedding_id != signal_embedding_id_ || !dominant.hepmc_valid || dominant.fraction < dominant_fraction_min_) {
       continue;
     }
     const HepMC::GenParticle* particle = contributor_hepmc_particle(dominant, event_map);
@@ -434,32 +418,25 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
       ++n_prompt_cluster_;
     }
     bool from_pi0 = false;
-    if (dominant.g4_pdg_id == 111 && particle && particle->pdg_id() == 111)
-    {
+    if (dominant.g4_pdg_id == 111 && particle && particle->pdg_id() == 111) {
       double parent_eta = 0.0;
-      from_pi0 = finite_eta(particle, parent_eta) &&
-          std::abs(parent_eta) < truth_eta_max_;
-      if (from_pi0)
-      {
+      from_pi0 = finite_eta(particle, parent_eta) && std::abs(parent_eta) < truth_eta_max_;
+      if (from_pi0) {
         ++n_pi0_cluster_g4_decay_;
       }
     }
     else if (dominant.g4_pdg_id == 22)
     {
       const Pi0Origin origin = trace_pi0_origin(particle);
-      if (origin.valid && origin.parent)
-      {
+      if (origin.valid && origin.parent) {
         double parent_eta = 0.0;
-        from_pi0 = finite_eta(origin.parent, parent_eta) &&
-            std::abs(parent_eta) < truth_eta_max_;
-        if (from_pi0)
-        {
+        from_pi0 = finite_eta(origin.parent, parent_eta) && std::abs(parent_eta) < truth_eta_max_;
+        if (from_pi0) {
           ++n_pi0_cluster_generator_decay_;
         }
       }
     }
-    if (from_pi0)
-    {
+    if (from_pi0) {
       h_pi0_->Fill(cluster.et);
       pi0_clusters_filled.insert(cluster.cluster);
       ++n_pi0_cluster_;
@@ -468,11 +445,9 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
 
   std::map<int, std::vector<const PHG4Particle*>> children_by_parent;
   const auto secondary_range = truth->GetSecondaryParticleRange();
-  for (auto iterator = secondary_range.first; iterator != secondary_range.second; ++iterator)
-  {
+  for (auto iterator = secondary_range.first; iterator != secondary_range.second; ++iterator) {
     const PHG4Particle* particle = iterator->second;
-    if (particle)
-    {
+    if (particle) {
       children_by_parent[particle->get_parent_id()].push_back(particle);
     }
   }
@@ -480,121 +455,91 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
   std::vector<Pi0Candidate> candidates;
   std::map<int, std::size_t> generator_candidate_by_barcode;
   const auto primary_range = truth->GetPrimaryParticleRange();
-  for (auto iterator = primary_range.first; iterator != primary_range.second; ++iterator)
-  {
+  for (auto iterator = primary_range.first; iterator != primary_range.second; ++iterator) {
     const PHG4Particle* primary = iterator->second;
-    if (!primary || truth->isEmbeded(primary->get_track_id()) != signal_embedding_id_)
-    {
+    if (!primary || truth->isEmbeded(primary->get_track_id()) != signal_embedding_id_) {
       continue;
     }
-    const HepMC::GenParticle* hepmc_particle =
-        event->barcode_to_particle(primary->get_barcode());
-    if (primary->get_pid() == 111 && hepmc_particle && hepmc_particle->pdg_id() == 111)
-    {
+    const HepMC::GenParticle* hepmc_particle = event->barcode_to_particle(primary->get_barcode());
+    if (primary->get_pid() == 111 && hepmc_particle && hepmc_particle->pdg_id() == 111) {
       const auto found = children_by_parent.find(primary->get_track_id());
-      if (found == children_by_parent.end() || found->second.size() != 2U ||
-          found->second[0]->get_pid() != 22 || found->second[1]->get_pid() != 22)
-      {
+      if (found == children_by_parent.end() || found->second.size() != 2U || found->second[0]->get_pid() != 22 || found->second[1]->get_pid() != 22) {
         ++n_pi0_malformed_daughters_;
         continue;
       }
-      candidates.push_back({Pi0Pathway::g4_primary_decay, hepmc_particle->barcode(),
-                            hepmc_particle, primary, found->second});
+      candidates.push_back({Pi0Pathway::g4_primary_decay, hepmc_particle->barcode(), hepmc_particle, primary, found->second});
       continue;
     }
-    if (primary->get_pid() != 22 || !hepmc_particle || hepmc_particle->pdg_id() != 22)
-    {
+    if (primary->get_pid() != 22 || !hepmc_particle || hepmc_particle->pdg_id() != 22) {
       continue;
     }
     const Pi0Origin origin = trace_pi0_origin(hepmc_particle);
-    if (!origin.valid || !origin.parent)
-    {
+    if (!origin.valid || !origin.parent) {
       continue;
     }
     const int barcode = origin.parent->barcode();
     auto [position, inserted] = generator_candidate_by_barcode.emplace(barcode, candidates.size());
-    if (inserted)
-    {
+    if (inserted) {
       candidates.push_back({Pi0Pathway::generator_decay, barcode, origin.parent, nullptr, {}});
     }
     candidates[position->second].photons.push_back(primary);
   }
 
-  for (auto iterator = secondary_range.first; iterator != secondary_range.second; ++iterator)
-  {
+  for (auto iterator = secondary_range.first; iterator != secondary_range.second; ++iterator) {
     const PHG4Particle* pi0 = iterator->second;
-    if (!pi0 || pi0->get_pid() != 111)
-    {
+    if (!pi0 || pi0->get_pid() != 111) {
       continue;
     }
     const auto found = children_by_parent.find(pi0->get_track_id());
-    if (found == children_by_parent.end() || found->second.size() != 2U ||
-        found->second[0]->get_pid() != 22 || found->second[1]->get_pid() != 22)
-    {
+    if (found == children_by_parent.end() || found->second.size() != 2U || found->second[0]->get_pid() != 22 || found->second[1]->get_pid() != 22) {
       ++n_pi0_malformed_daughters_;
       continue;
     }
     const PHG4Particle* ancestor = pi0;
     std::set<int> visited;
-    while (ancestor && !truth->is_primary(ancestor) &&
-           visited.insert(ancestor->get_track_id()).second)
-    {
+    while (ancestor && !truth->is_primary(ancestor) && visited.insert(ancestor->get_track_id()).second) {
       ancestor = truth->GetParticle(ancestor->get_parent_id());
     }
-    if (!ancestor || !truth->is_primary(ancestor) ||
-        truth->isEmbeded(ancestor->get_track_id()) != signal_embedding_id_)
-    {
+    if (!ancestor || !truth->is_primary(ancestor) || truth->isEmbeded(ancestor->get_track_id()) != signal_embedding_id_) {
       continue;
     }
-    candidates.push_back({Pi0Pathway::g4_secondary_decay,
-                          ancestor->get_track_id(), nullptr, pi0, found->second});
+    candidates.push_back({Pi0Pathway::g4_secondary_decay, ancestor->get_track_id(), nullptr, pi0, found->second});
   }
 
   const double target_radius = cemc_radius(geometry);
-  for (const Pi0Candidate& candidate : candidates)
-  {
+  for (const Pi0Candidate& candidate : candidates) {
     double parent_eta = 0.0;
     bool valid_parent_eta = finite_eta(candidate.parent, parent_eta);
-    if (candidate.g4_parent)
-    {
+    if (candidate.g4_parent) {
       const double parent_pt = particle_pt(candidate.g4_parent);
       valid_parent_eta = parent_pt > 0.0;
       parent_eta = valid_parent_eta
           ? std::asinh(candidate.g4_parent->get_pz() / parent_pt) : 0.0;
     }
-    if (!valid_parent_eta || !std::isfinite(parent_eta) ||
-        std::abs(parent_eta) >= truth_eta_max_)
-    {
+    if (!valid_parent_eta || !std::isfinite(parent_eta) || std::abs(parent_eta) >= truth_eta_max_) {
       continue;
     }
-    if (candidate.photons.size() != 2U)
-    {
+    if (candidate.photons.size() != 2U) {
       ++n_pi0_malformed_daughters_;
       continue;
     }
-    if (candidate.pathway != Pi0Pathway::generator_decay)
-    {
+    if (candidate.pathway != Pi0Pathway::generator_decay) {
       ++n_pi0_candidate_g4_decay_;
-    }
-    else
-    {
+    } else {
       ++n_pi0_candidate_generator_decay_;
     }
     const std::array<Projection, 2> projections = {
         project_photon(candidate.photons[0], truth, target_radius),
         project_photon(candidate.photons[1], truth, target_radius)};
-    if (!projections[0].valid || !projections[1].valid)
-    {
+    if (!projections[0].valid || !projections[1].valid) {
       ++n_pi0_projection_failure_;
       continue;
     }
 
     std::vector<std::size_t> eligible;
-    for (std::size_t index = 0; index < cluster_records.size(); ++index)
-    {
+    for (std::size_t index = 0; index < cluster_records.size(); ++index) {
       const ClusterRecord& cluster = cluster_records[index];
-      if (!cluster.truth.valid)
-      {
+      if (!cluster.truth.valid) {
         continue;
       }
       const bool matching_contributor = std::any_of(
@@ -604,19 +549,15 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
                 contributor_matches_pi0(contributor, candidate.pathway,
                     candidate.parent_barcode, event_map, signal_embedding_id_);
           });
-      if (matching_contributor)
-      {
+      if (matching_contributor) {
         eligible.push_back(index);
       }
     }
 
-    if (candidate.pathway == Pi0Pathway::g4_secondary_decay)
-    {
-      for (const std::size_t index : eligible)
-      {
+    if (candidate.pathway == Pi0Pathway::g4_secondary_decay) {
+      for (const std::size_t index : eligible) {
         const ClusterRecord& cluster = cluster_records[index];
-        if (pi0_clusters_filled.insert(cluster.cluster).second)
-        {
+        if (pi0_clusters_filled.insert(cluster.cluster).second) {
           h_pi0_->Fill(cluster.et);
           ++n_pi0_cluster_;
           ++n_pi0_cluster_g4_decay_;
@@ -626,27 +567,19 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
 
     constexpr std::size_t invalid_index = std::numeric_limits<std::size_t>::max();
     std::array<std::size_t, 2> individual = {invalid_index, invalid_index};
-    std::array<double, 2> individual_distance = {
-        std::numeric_limits<double>::infinity(),
-        std::numeric_limits<double>::infinity()};
-    for (std::size_t photon = 0; photon < 2U; ++photon)
-    {
-      for (const std::size_t index : eligible)
-      {
+    std::array<double, 2> individual_distance = {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity()};
+    for (std::size_t photon = 0; photon < 2U; ++photon) {
+      for (const std::size_t index : eligible) {
         const ClusterRecord& cluster = cluster_records[index];
-        const double distance = delta_r(projections[photon].eta,
-            projections[photon].phi, cluster.surface_eta, cluster.surface_phi);
-        if (distance < separated_delta_r_cut_ && distance < individual_distance[photon])
-        {
+        const double distance = delta_r(projections[photon].eta, projections[photon].phi, cluster.surface_eta, cluster.surface_phi);
+        if (distance < separated_delta_r_cut_ && distance < individual_distance[photon]) {
           individual[photon] = index;
           individual_distance[photon] = distance;
         }
       }
     }
 
-    if (individual[0] != invalid_index && individual[1] != invalid_index &&
-        individual[0] != individual[1])
-    {
+    if (individual[0] != invalid_index && individual[1] != invalid_index && individual[0] != individual[1]) {
       h_pi0_separated_->Fill(cluster_records[individual[0]].et);
       h_pi0_separated_->Fill(cluster_records[individual[1]].et);
       ++n_pi0_separated_;
@@ -657,27 +590,19 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
     std::size_t merged = invalid_index;
     double merged_distance = std::numeric_limits<double>::infinity();
     const double parent_pt = candidate.g4_parent
-        ? particle_pt(candidate.g4_parent)
-        : hepmc_pt(candidate.parent);
-    for (const std::size_t index : eligible)
-    {
+        ? particle_pt(candidate.g4_parent) : hepmc_pt(candidate.parent);
+    for (const std::size_t index : eligible) {
       const ClusterRecord& cluster = cluster_records[index];
-      const double distance0 = delta_r(projections[0].eta, projections[0].phi,
-          cluster.surface_eta, cluster.surface_phi);
-      const double distance1 = delta_r(projections[1].eta, projections[1].phi,
-          cluster.surface_eta, cluster.surface_phi);
+      const double distance0 = delta_r(projections[0].eta, projections[0].phi, cluster.surface_eta, cluster.surface_phi);
+      const double distance1 = delta_r(projections[1].eta, projections[1].phi, cluster.surface_eta, cluster.surface_phi);
       const double maximum_distance = std::max(distance0, distance1);
       const double response = parent_pt > 0.0 ? cluster.et / parent_pt : -1.0;
-      if (maximum_distance < merged_delta_r_cut_ &&
-          response >= response_min_ && response <= response_max_ &&
-          maximum_distance < merged_distance)
-      {
+      if (maximum_distance < merged_delta_r_cut_ && response >= response_min_ && response <= response_max_ && maximum_distance < merged_distance) {
         merged = index;
         merged_distance = maximum_distance;
       }
     }
-    if (merged != invalid_index)
-    {
+    if (merged != invalid_index) {
       h_pi0_merged_->Fill(cluster_records[merged].et);
       ++n_pi0_merged_;
       ++n_pi0_merged_cluster_fill_;
@@ -686,40 +611,31 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
 
     const bool matched0 = individual[0] != invalid_index;
     const bool matched1 = individual[1] != invalid_index;
-    if (matched0 != matched1)
-    {
+    if (matched0 != matched1) {
       const std::size_t photon = matched0 ? 0U : 1U;
       const std::size_t index = individual[photon];
       const double daughter_pt = particle_pt(candidate.photons[photon]);
       const double response = daughter_pt > 0.0
           ? cluster_records[index].et / daughter_pt : -1.0;
-      if (response >= response_min_ && response <= response_max_)
-      {
+      if (response >= response_min_ && response <= response_max_) {
         h_pi0_missing_->Fill(cluster_records[index].et);
         ++n_pi0_missing_;
         ++n_pi0_missing_cluster_fill_;
-      }
-      else
-      {
+      } else {
         ++n_pi0_none_;
       }
       continue;
     }
-    if (matched0 && matched1 && individual[0] == individual[1])
-    {
+    if (matched0 && matched1 && individual[0] == individual[1]) {
       ++n_pi0_ambiguous_;
-    }
-    else
-    {
+    } else {
       ++n_pi0_none_;
     }
   }
 
   ++n_events_written_;
-  if (verbosity_ > 0 && n_events_processed_ % 1000ULL == 0ULL)
-  {
-    std::cout << "PythiaClusterEtSpectrum - processed " << n_events_processed_
-              << " events" << std::endl;
+  if (verbosity_ > 0 && n_events_processed_ % 1000ULL == 0ULL) {
+    std::cout << "PythiaClusterEtSpectrum - processed " << n_events_processed_ << " events" << std::endl;
   }
   return Fun4AllReturnCodes::EVENT_OK;
 }

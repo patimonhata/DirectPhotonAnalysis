@@ -21,40 +21,28 @@ int Fun4All_PythiaTruthSpectrumTree(
 {
   constexpr const char* root_extension = ".root";
   const std::string extension(root_extension);
-  if (input_suffix.empty() || input_suffix.find('/') != std::string::npos ||
-      input_suffix.size() <= extension.size() ||
-      input_suffix.compare(input_suffix.size() - extension.size(), extension.size(), extension) != 0 ||
-      n_events < 0 || output_file.empty())
-  {
+  /* safe guard for input variables */
+  if (input_suffix.empty() || input_suffix.find('/') != std::string::npos || input_suffix.size() <= extension.size() || input_suffix.compare(input_suffix.size() - extension.size(), extension.size(), extension) != 0 || n_events < 0 || output_file.empty()) {
     std::cerr << "Fun4All_PythiaTruthSpectrumTree - invalid argument" << std::endl;
     return EXIT_FAILURE;
   }
 
   const std::size_t segment_separator = input_suffix.rfind('-');
   const std::size_t extension_position = input_suffix.size() - extension.size();
-  if (segment_separator == std::string::npos || segment_separator + 1U >= extension_position)
-  {
-    std::cerr << "Fun4All_PythiaTruthSpectrumTree - suffix has no numeric segment: "
-              << input_suffix << std::endl;
+  if (segment_separator == std::string::npos || segment_separator + 1U >= extension_position) {
+    std::cerr << "Fun4All_PythiaTruthSpectrumTree - suffix has no numeric segment: " << input_suffix << std::endl;
     return EXIT_FAILURE;
   }
-  const std::string segment_text = input_suffix.substr(
-      segment_separator + 1U, extension_position - segment_separator - 1U);
+  const std::string segment_text = input_suffix.substr(segment_separator + 1U, extension_position - segment_separator - 1U);
   std::size_t parsed_characters = 0U;
   unsigned long segment_id = 0UL;
-  try
-  {
+  try {
     segment_id = std::stoul(segment_text, &parsed_characters);
-  }
-  catch (const std::exception&)
-  {
+  } catch (const std::exception&) {
     parsed_characters = 0U;
   }
-  if (parsed_characters != segment_text.size() ||
-      segment_id > std::numeric_limits<unsigned int>::max())
-  {
-    std::cerr << "Fun4All_PythiaTruthSpectrumTree - invalid numeric segment: "
-              << input_suffix << std::endl;
+  if (parsed_characters != segment_text.size() || segment_id > std::numeric_limits<unsigned int>::max()) {
+    std::cerr << "Fun4All_PythiaTruthSpectrumTree - invalid numeric segment: " << input_suffix << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -87,10 +75,8 @@ int Fun4All_PythiaTruthSpectrumTree(
       (n_events == 0 &&
        (run_status == Fun4AllReturnCodes::ABORTPROCESSING ||
         run_status == Fun4AllReturnCodes::ABORTEVENT));
-  if (!run_ok || end_status != Fun4AllReturnCodes::EVENT_OK)
-  {
-    std::cerr << "Fun4All_PythiaTruthSpectrumTree - failed (run=" << run_status
-              << ", End=" << end_status << ")" << std::endl;
+  if (!run_ok || end_status != Fun4AllReturnCodes::EVENT_OK) {
+    std::cerr << "Fun4All_PythiaTruthSpectrumTree - failed (run=" << run_status << ", End=" << end_status << ")" << std::endl;
     gSystem->Exit(EXIT_FAILURE);
     return EXIT_FAILURE;
   }

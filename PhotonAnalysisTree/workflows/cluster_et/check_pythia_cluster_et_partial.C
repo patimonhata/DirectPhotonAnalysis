@@ -55,7 +55,10 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   const std::set<std::string> expected_keys = {
       "h_prompt_cluster_et_raw", "h_pi0_cluster_et_raw",
       "h_pi0_separated_cluster_et_raw", "h_pi0_merged_cluster_et_raw",
-      "h_pi0_missing_cluster_et_raw", "metadata"};
+      "h_pi0_missing_cluster_et_raw",
+      "h_pi0_separated_energy_contribution_cluster_et_raw",
+      "h_pi0_merged_energy_contribution_cluster_et_raw",
+      "h_pi0_missing_energy_contribution_cluster_et_raw", "metadata"};
   std::set<std::string> observed_keys;
   TIter next(input.GetListOfKeys());
   while (TKey* key = dynamic_cast<TKey*>(next()))
@@ -75,12 +78,18 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   TH1D* separated = nullptr;
   TH1D* merged = nullptr;
   TH1D* missing = nullptr;
+  TH1D* energy_separated = nullptr;
+  TH1D* energy_merged = nullptr;
+  TH1D* energy_missing = nullptr;
   input.GetObject("metadata", metadata);
   input.GetObject("h_prompt_cluster_et_raw", prompt);
   input.GetObject("h_pi0_cluster_et_raw", pi0);
   input.GetObject("h_pi0_separated_cluster_et_raw", separated);
   input.GetObject("h_pi0_merged_cluster_et_raw", merged);
   input.GetObject("h_pi0_missing_cluster_et_raw", missing);
+  input.GetObject("h_pi0_separated_energy_contribution_cluster_et_raw", energy_separated);
+  input.GetObject("h_pi0_merged_energy_contribution_cluster_et_raw", energy_merged);
+  input.GetObject("h_pi0_missing_energy_contribution_cluster_et_raw", energy_missing);
   if (!metadata || metadata->GetEntries() != 1)
   {
     return 2;
@@ -95,16 +104,24 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   std::string* pi0_selection = nullptr;
   std::string* topology_priority = nullptr;
   std::string* projection_scheme = nullptr;
+  std::string* raw_truth_tower_node = nullptr;
+  std::string* truth_cell_node = nullptr;
+  std::string* truth_hit_node = nullptr;
+  std::string* energy_topology_priority = nullptr;
+  std::string* energy_matching_scheme = nullptr;
+  std::string* energy_candidate_selection = nullptr;
   long long manifest_begin = -1;
   long long manifest_end = -1;
   int signal_embedding_id = 0;
   int n_bins = 0;
+  int pi0_truth_matching_algorithm_version = 0;
   double et_max = 0.0;
   double truth_eta_max = 0.0;
   double cluster_eta_max = 0.0;
   double min_cluster_energy = 0.0;
   double dominant_fraction_min = 0.0;
   double pi0_contributor_fraction_min = 0.0;
+  double min_energy_contribution_fraction = 0.0;
   double separated_delta_r_cut = 0.0;
   double merged_delta_r_cut = 0.0;
   double response_min = 0.0;
@@ -128,6 +145,14 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   unsigned long long separated_fill_count = 0;
   unsigned long long merged_fill_count = 0;
   unsigned long long missing_fill_count = 0;
+  unsigned long long energy_separated_count = 0;
+  unsigned long long energy_merged_count = 0;
+  unsigned long long energy_missing_count = 0;
+  unsigned long long energy_none_count = 0;
+  unsigned long long energy_match_invalid_count = 0;
+  unsigned long long energy_separated_fill_count = 0;
+  unsigned long long energy_merged_fill_count = 0;
+  unsigned long long energy_missing_fill_count = 0;
 
   bool ok = true;
   ok &= bind(metadata, "schema_version", &schema_version);
@@ -141,6 +166,12 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   ok &= bind(metadata, "pi0_selection", &pi0_selection);
   ok &= bind(metadata, "topology_priority", &topology_priority);
   ok &= bind(metadata, "projection_scheme", &projection_scheme);
+  ok &= bind(metadata, "raw_truth_tower_node", &raw_truth_tower_node);
+  ok &= bind(metadata, "truth_cell_node", &truth_cell_node);
+  ok &= bind(metadata, "truth_hit_node", &truth_hit_node);
+  ok &= bind(metadata, "energy_topology_priority", &energy_topology_priority);
+  ok &= bind(metadata, "energy_matching_scheme", &energy_matching_scheme);
+  ok &= bind(metadata, "energy_candidate_selection", &energy_candidate_selection);
   ok &= bind(metadata, "signal_embedding_id", &signal_embedding_id);
   ok &= bind(metadata, "n_bins", &n_bins);
   ok &= bind(metadata, "et_max", &et_max);
@@ -149,6 +180,8 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   ok &= bind(metadata, "min_cluster_energy", &min_cluster_energy);
   ok &= bind(metadata, "dominant_fraction_min", &dominant_fraction_min);
   ok &= bind(metadata, "pi0_contributor_fraction_min", &pi0_contributor_fraction_min);
+  ok &= bind(metadata, "min_energy_contribution_fraction", &min_energy_contribution_fraction);
+  ok &= bind(metadata, "pi0_truth_matching_algorithm_version", &pi0_truth_matching_algorithm_version);
   ok &= bind(metadata, "separated_delta_r_cut", &separated_delta_r_cut);
   ok &= bind(metadata, "merged_delta_r_cut", &merged_delta_r_cut);
   ok &= bind(metadata, "response_min", &response_min);
@@ -172,12 +205,21 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   ok &= bind(metadata, "pi0_separated_cluster_fill_count", &separated_fill_count);
   ok &= bind(metadata, "pi0_merged_cluster_fill_count", &merged_fill_count);
   ok &= bind(metadata, "pi0_missing_cluster_fill_count", &missing_fill_count);
+  ok &= bind(metadata, "pi0_energy_separated_count", &energy_separated_count);
+  ok &= bind(metadata, "pi0_energy_merged_count", &energy_merged_count);
+  ok &= bind(metadata, "pi0_energy_missing_count", &energy_missing_count);
+  ok &= bind(metadata, "pi0_energy_none_count", &energy_none_count);
+  ok &= bind(metadata, "pi0_energy_match_invalid_count", &energy_match_invalid_count);
+  ok &= bind(metadata, "pi0_energy_separated_cluster_fill_count", &energy_separated_fill_count);
+  ok &= bind(metadata, "pi0_energy_merged_cluster_fill_count", &energy_merged_fill_count);
+  ok &= bind(metadata, "pi0_energy_missing_cluster_fill_count", &energy_missing_fill_count);
   if (!ok || metadata->GetEntry(0) <= 0)
   {
     return 3;
   }
 
-  const bool valid_metadata = schema_version == 1 && manifest_path &&
+  const unsigned long long candidate_count = candidate_g4_count + candidate_generator_count;
+  const bool valid_metadata = schema_version == 2 && manifest_path &&
       !manifest_path->empty() && manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() && last_suffix && !last_suffix->empty() &&
       cluster_collection && *cluster_collection == "split" && prompt_selection &&
@@ -186,18 +228,35 @@ int check_pythia_cluster_et_partial(const std::string input_file)
           "separated_then_merged_then_missing_then_none" &&
       projection_scheme && *projection_scheme ==
           "g4_photon_vertex_and_momentum_to_cemc_cylinder" &&
-      signal_embedding_id == 1 && n_bins > 0 && et_max > 0.0 &&
-      truth_eta_max > 0.0 && cluster_eta_max > 0.0 && min_cluster_energy >= 0.0 &&
+      raw_truth_tower_node && *raw_truth_tower_node == "TOWER_SIM_CEMC" &&
+      truth_cell_node && *truth_cell_node == "G4CELL_CEMC" &&
+      truth_hit_node && *truth_hit_node == "G4HIT_CEMC" &&
+      energy_topology_priority && *energy_topology_priority ==
+          "separated_then_merged_then_missing_then_none" &&
+      energy_matching_scheme && *energy_matching_scheme ==
+          "g4hit_edep_to_direct_pi0_daughter_maximum_deposit" &&
+      energy_candidate_selection && *energy_candidate_selection ==
+          "summed_pi0_daughter_primary_contributor_fraction" &&
+      pi0_truth_matching_algorithm_version == 2 && signal_embedding_id == 1 &&
+      n_bins > 0 && et_max > 0.0 && truth_eta_max > 0.0 &&
+      cluster_eta_max > 0.0 && min_cluster_energy >= 0.0 &&
       dominant_fraction_min >= 0.0 && dominant_fraction_min <= 1.0 &&
       pi0_contributor_fraction_min >= 0.0 && pi0_contributor_fraction_min <= 1.0 &&
+      min_energy_contribution_fraction >= 0.0 &&
+      min_energy_contribution_fraction < 1.0 &&
       separated_delta_r_cut > 0.0 && merged_delta_r_cut >= separated_delta_r_cut &&
       response_min >= 0.0 && response_max > response_min &&
       bin_width_normalized == 0U && events_processed > 0 && events_invalid == 0 &&
       events_written == events_processed && pi0_count == pi0_g4_count + pi0_generator_count &&
       separated_fill_count == 2ULL * separated_count &&
       merged_fill_count == merged_count && missing_fill_count == missing_count &&
-      candidate_g4_count + candidate_generator_count == separated_count + merged_count +
-          missing_count + none_count + ambiguous_count + projection_failure_count;
+      candidate_count == separated_count + merged_count + missing_count + none_count +
+          ambiguous_count + projection_failure_count &&
+      energy_separated_fill_count == 2ULL * energy_separated_count &&
+      energy_merged_fill_count == energy_merged_count &&
+      energy_missing_fill_count == energy_missing_count &&
+      candidate_count == energy_separated_count + energy_merged_count +
+          energy_missing_count + energy_none_count;
   if (!valid_metadata)
   {
     std::cerr << "check_pythia_cluster_et_partial - invalid metadata values"
@@ -208,14 +267,20 @@ int check_pythia_cluster_et_partial(const std::string input_file)
       !valid_histogram(pi0, n_bins, et_max, pi0_count) ||
       !valid_histogram(separated, n_bins, et_max, separated_fill_count) ||
       !valid_histogram(merged, n_bins, et_max, merged_fill_count) ||
-      !valid_histogram(missing, n_bins, et_max, missing_fill_count))
+      !valid_histogram(missing, n_bins, et_max, missing_fill_count) ||
+      !valid_histogram(energy_separated, n_bins, et_max, energy_separated_fill_count) ||
+      !valid_histogram(energy_merged, n_bins, et_max, energy_merged_fill_count) ||
+      !valid_histogram(energy_missing, n_bins, et_max, energy_missing_fill_count))
   {
     std::cerr << "check_pythia_cluster_et_partial - invalid histogram" << std::endl;
     return 5;
   }
-  std::cout << "check_pythia_cluster_et_partial - range/events/prompt/pi0/sep/merged/missing = ["
+  std::cout << "check_pythia_cluster_et_partial - range/events/prompt/pi0"
+            << "/geometric-sep/merged/missing/energy-sep/merged/missing = ["
             << manifest_begin << ":" << manifest_end << "]/" << events_processed
             << "/" << prompt_count << "/" << pi0_count << "/" << separated_fill_count
-            << "/" << merged_fill_count << "/" << missing_fill_count << std::endl;
+            << "/" << merged_fill_count << "/" << missing_fill_count
+            << "/" << energy_separated_fill_count << "/" << energy_merged_fill_count
+            << "/" << energy_missing_fill_count << std::endl;
   return 0;
 }

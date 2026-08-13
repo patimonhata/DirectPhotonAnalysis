@@ -8,9 +8,10 @@ This directory is the complete cluster-ET analysis workflow:
 - `run_partial.sh` and `submit.job`: execute and submit the map jobs.
 
 `PythiaClusterEtSpectrum` reads the synchronized `DST_CALO_CLUSTER`,
-`DST_MBD_EPD`, `DST_TRUTH_JET`, and `G4Hits` streams directly. It writes five
-raw SPLIT-cluster histograms plus one metadata entry; it does not write a large
-per-cluster tree.
+`DST_MBD_EPD`, `DST_TRUTH_JET`, and `G4Hits` streams directly. It writes
+eight raw SPLIT-cluster histograms (two inclusive, three geometrical topology,
+and three energy-deposit topology) plus one metadata entry; it does not write a
+large per-cluster tree.
 
 ## Cluster selections
 
@@ -53,6 +54,30 @@ The exclusive priority is:
    daughter is in `[0.5,1.5]`;
 4. `none` or `ambiguous`: diagnostic counters only.
 
+## Energy-deposit topology
+
+The `G4Hits` production stream contains `G4HIT_CEMC`, but not the intermediate
+`G4CELL_CEMC` or legacy raw truth towers needed by the direct-daughter matcher.
+The map macro reconstructs those two transient nodes with the official
+`PHG4FullProjSpacalCellReco` and `RawTowerBuilder` chain before running the
+analysis. They are not written to the partial output.
+
+Candidate clusters require the summed ancestry-compatible pi0 contributor
+fraction to be at least 0.5. For each candidate cluster, CEMC hit deposits are
+traced through the reconstructed cell and tower maps to the two direct pi0
+daughter track IDs. Each daughter selects the cluster with the largest positive
+deposit; the optional minimum fraction of the cluster truth deposit defaults to
+zero.
+
+The exclusive energy-deposit priority is:
+
+1. `separated`: the two daughters select two different clusters;
+2. `merged`: both select the same cluster and
+   `0.5 <= ET_cluster/pT_pi0 <= 1.5`;
+3. `missing`: otherwise, at least one selected cluster has
+   `0.5 <= ET_cluster/pT_gamma <= 1.5`;
+4. `none`: diagnostic counter only.
+
 Separated pi0s fill two cluster entries. Merged and missing pi0s fill one.
 Pi0s with no matched cluster cannot be represented on a cluster-ET axis.
 
@@ -70,12 +95,17 @@ complete contiguous range with:
 
 ```bash
 root -l -b -q \
-  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_pi0_eta07/partial_*.root","output/plots/minbias_cluster_et_prompt_pi0_eta07",0,200000)'
+  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_pi0_eta07_energy_contribution/partial_*.root","output/plots/newtempminbias_cluster_et_prompt_pi0_eta07",0,200000)'
 ```
 
 
-The final ROOT file contains both raw counts and density histograms. Density is
-computed only after summing all partials by dividing each bin by its width, so
-its unit is `clusters/GeV`. The PDF plots the summed raw histograms with a
-`counts/bin` y-axis. Counts are unweighted, matching the policy used by
+The final ROOT file contains all eight raw-count histograms and their
+bin-width-normalized density copies. Density is computed only after summing all
+partials, so its unit is `clusters/GeV`. The finalizer writes two raw-count
+plots:
+
+- `<output_base>.pdf`: geometrical matching;
+- `<output_base>_energy_contribution.pdf`: energy-deposit matching.
+
+Counts are unweighted, matching the policy used by
 `minbias_truth_pt_prompt_eta07.pdf`.

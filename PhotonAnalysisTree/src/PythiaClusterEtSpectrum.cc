@@ -8,6 +8,8 @@
 #include <calobase/RawTowerContainer.h>
 #include <calobase/TowerInfoContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
+#include <g4detectors/PHG4CellContainer.h>
+#include <g4main/PHG4HitContainer.h>
 #include <g4main/PHG4Particle.h>
 #include <g4main/PHG4TruthInfoContainer.h>
 #include <g4main/PHG4VtxPoint.h>
@@ -324,6 +326,7 @@ int PythiaClusterEtSpectrum::Init(PHCompositeNode* /*topNode*/)
       std::isfinite(min_cluster_energy_) && min_cluster_energy_ >= 0.0 &&
       dominant_fraction_min_ >= 0.0 && dominant_fraction_min_ <= 1.0 &&
       pi0_contributor_fraction_min_ >= 0.0 && pi0_contributor_fraction_min_ <= 1.0 &&
+      min_energy_contribution_fraction_ >= 0.0 && min_energy_contribution_fraction_ < 1.0 &&
       separated_delta_r_cut_ > 0.0 && merged_delta_r_cut_ >= separated_delta_r_cut_ &&
       response_min_ >= 0.0 && response_max_ > response_min_;
   if (!valid)
@@ -350,11 +353,13 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
   auto* event_map = findNode::getClass<PHHepMCGenEventMap>(topNode, hepmc_event_map_node_name_);
   auto* towers = findNode::getClass<TowerInfoContainer>(topNode, tower_node_name_);
   auto* raw_truth_towers = findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
+  auto* truth_cells = findNode::getClass<PHG4CellContainer>(topNode, truth_cell_node_name_);
+  auto* truth_hits = findNode::getClass<PHG4HitContainer>(topNode, truth_hit_node_name_);
   auto* geometry = findNode::getClass<RawTowerGeomContainer>(topNode, tower_geom_node_name_);
   auto* clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   const PHHepMCGenEvent* signal_event = event_map ? event_map->get(signal_embedding_id_) : nullptr;
   const HepMC::GenEvent* event = signal_event ? signal_event->getEvent() : nullptr;
-  if (!truth || !event_map || !towers || !geometry || !clusters || !signal_event || !signal_event->is_simulated() || !event || !truth_matcher_.begin_event(topNode)) {
+  if (!truth || !event_map || !towers || !raw_truth_towers || !truth_cells || !truth_hits || !geometry || !clusters || !signal_event || !signal_event->is_simulated() || !event || !truth_matcher_.begin_event(topNode)) {
     ++n_events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
@@ -528,6 +533,109 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
     } else {
       ++n_pi0_candidate_generator_decay_;
     }
+    constexpr std::size_t invalid_index = std::numeric_limits<std::size_t>::max();
+    const double parent_pt = candidate.g4_parent
+        ? particle_pt(candidate.g4_parent) : hepmc_pt(candidate.parent);
+
+    std::vector<std::size_t> eligible;
+    std::vector<std::size_t> energy_eligible;
+    for (std::size_t index = 0; index < cluster_records.size(); ++index) {
+      const ClusterRecord& cluster = cluster_records[index];
+      if (!cluster.truth.valid) {
+        continue;
+      }
+      bool matching_contributor = false;
+      double matching_fraction = 0.0;
+      for (const photon_tree::TruthContributor& contributor : cluster.truth.contributors) {
+        if (!contributor_matches_pi0(contributor, candidate.pathway,
+                candidate.parent_barcode, event_map, signal_embedding_id_)) {
+          continue;
+        }
+        matching_fraction += contributor.fraction;
+        matching_contributor = matching_contributor ||
+            contributor.fraction >= pi0_contributor_fraction_min_;
+      }
+      if (matching_contributor) {
+        eligible.push_back(index);
+      }
+      if (matching_fraction >= pi0_contributor_fraction_min_) {
+        energy_eligible.push_back(index);
+      }
+    }
+
+    const std::array<int, 2> direct_gamma_track_ids = {
+        candidate.photons[0]->get_track_id(),
+        candidate.photons[1]->get_track_id()};
+    std::array<std::size_t, 2> energy_cluster = {invalid_index, invalid_index};
+    std::array<double, 2> maximum_edep = {-1.0, -1.0};
+    for (const std::size_t index : energy_eligible) {
+      const ClusterRecord& cluster = cluster_records[index];
+      const photon_tree::Pi0ClusterTruthMatch match = pi0_truth_matcher_.match(
+          cluster.cluster, towers, raw_truth_towers, truth_cells, truth_hits,
+          truth, direct_gamma_track_ids, true);
+      if (!match.valid) {
+        ++n_pi0_energy_match_invalid_;
+        continue;
+      }
+      for (std::size_t photon = 0; photon < 2U; ++photon) {
+        const double deposit = match.gamma_edep[photon];
+        const double fraction = match.total_edep > 0.0F
+            ? deposit / match.total_edep : 0.0;
+        if (deposit > 0.0 && fraction > min_energy_contribution_fraction_ &&
+            deposit > maximum_edep[photon]) {
+          energy_cluster[photon] = index;
+          maximum_edep[photon] = deposit;
+        }
+      }
+    }
+
+    bool energy_classified = false;
+    const bool energy_matched0 = energy_cluster[0] != invalid_index;
+    const bool energy_matched1 = energy_cluster[1] != invalid_index;
+    if (energy_matched0 && energy_matched1 &&
+        energy_cluster[0] != energy_cluster[1]) {
+      h_pi0_energy_separated_->Fill(cluster_records[energy_cluster[0]].et);
+      h_pi0_energy_separated_->Fill(cluster_records[energy_cluster[1]].et);
+      ++n_pi0_energy_separated_;
+      n_pi0_energy_separated_cluster_fill_ += 2ULL;
+      energy_classified = true;
+    }
+    else if (energy_matched0 && energy_matched1 &&
+             energy_cluster[0] == energy_cluster[1]) {
+      const double response = parent_pt > 0.0
+          ? cluster_records[energy_cluster[0]].et / parent_pt : -1.0;
+      if (response >= response_min_ && response <= response_max_) {
+        h_pi0_energy_merged_->Fill(cluster_records[energy_cluster[0]].et);
+        ++n_pi0_energy_merged_;
+        ++n_pi0_energy_merged_cluster_fill_;
+        energy_classified = true;
+      }
+    }
+    if (!energy_classified) {
+      std::size_t missing_cluster = invalid_index;
+      double missing_edep = -1.0;
+      for (std::size_t photon = 0; photon < 2U; ++photon) {
+        if (energy_cluster[photon] == invalid_index) {
+          continue;
+        }
+        const double daughter_pt = particle_pt(candidate.photons[photon]);
+        const double response = daughter_pt > 0.0
+            ? cluster_records[energy_cluster[photon]].et / daughter_pt : -1.0;
+        if (response >= response_min_ && response <= response_max_ &&
+            maximum_edep[photon] > missing_edep) {
+          missing_cluster = energy_cluster[photon];
+          missing_edep = maximum_edep[photon];
+        }
+      }
+      if (missing_cluster != invalid_index) {
+        h_pi0_energy_missing_->Fill(cluster_records[missing_cluster].et);
+        ++n_pi0_energy_missing_;
+        ++n_pi0_energy_missing_cluster_fill_;
+      } else {
+        ++n_pi0_energy_none_;
+      }
+    }
+
     const std::array<Projection, 2> projections = {
         project_photon(candidate.photons[0], truth, target_radius),
         project_photon(candidate.photons[1], truth, target_radius)};
@@ -535,25 +643,6 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
       ++n_pi0_projection_failure_;
       continue;
     }
-
-    std::vector<std::size_t> eligible;
-    for (std::size_t index = 0; index < cluster_records.size(); ++index) {
-      const ClusterRecord& cluster = cluster_records[index];
-      if (!cluster.truth.valid) {
-        continue;
-      }
-      const bool matching_contributor = std::any_of(
-          cluster.truth.contributors.begin(), cluster.truth.contributors.end(),
-          [&](const photon_tree::TruthContributor& contributor) {
-            return contributor.fraction >= pi0_contributor_fraction_min_ &&
-                contributor_matches_pi0(contributor, candidate.pathway,
-                    candidate.parent_barcode, event_map, signal_embedding_id_);
-          });
-      if (matching_contributor) {
-        eligible.push_back(index);
-      }
-    }
-
     if (candidate.pathway == Pi0Pathway::g4_secondary_decay) {
       for (const std::size_t index : eligible) {
         const ClusterRecord& cluster = cluster_records[index];
@@ -565,7 +654,6 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
       }
     }
 
-    constexpr std::size_t invalid_index = std::numeric_limits<std::size_t>::max();
     std::array<std::size_t, 2> individual = {invalid_index, invalid_index};
     std::array<double, 2> individual_distance = {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity()};
     for (std::size_t photon = 0; photon < 2U; ++photon) {
@@ -589,8 +677,6 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
 
     std::size_t merged = invalid_index;
     double merged_distance = std::numeric_limits<double>::infinity();
-    const double parent_pt = candidate.g4_parent
-        ? particle_pt(candidate.g4_parent) : hepmc_pt(candidate.parent);
     for (const std::size_t index : eligible) {
       const ClusterRecord& cluster = cluster_records[index];
       const double distance0 = delta_r(projections[0].eta, projections[0].phi, cluster.surface_eta, cluster.surface_phi);
@@ -651,11 +737,14 @@ int PythiaClusterEtSpectrum::End(PHCompositeNode* /*topNode*/)
   output_file_->Write();
   const bool write_error = output_file_->TestBit(TFile::kWriteError);
   close_output();
-  std::cout << "PythiaClusterEtSpectrum - events/prompt/pi0/separated/merged/missing = "
+  std::cout << "PythiaClusterEtSpectrum - events/prompt/pi0/geometric-separated/merged/missing"
+            << "/energy-separated/merged/missing = "
             << n_events_written_ << "/" << n_prompt_cluster_ << "/"
             << n_pi0_cluster_ << "/" << n_pi0_separated_cluster_fill_ << "/"
-            << n_pi0_merged_cluster_fill_ << "/" << n_pi0_missing_cluster_fill_
-            << std::endl;
+            << n_pi0_merged_cluster_fill_ << "/" << n_pi0_missing_cluster_fill_ << "/"
+            << n_pi0_energy_separated_cluster_fill_ << "/"
+            << n_pi0_energy_merged_cluster_fill_ << "/"
+            << n_pi0_energy_missing_cluster_fill_ << std::endl;
   return write_error ? Fun4AllReturnCodes::ABORTRUN : Fun4AllReturnCodes::EVENT_OK;
 }
 
@@ -685,8 +774,12 @@ void PythiaClusterEtSpectrum::create_output()
   h_pi0_separated_ = new TH1D("h_pi0_separated_cluster_et_raw", "", n_bins_, 0.0, et_max_);
   h_pi0_merged_ = new TH1D("h_pi0_merged_cluster_et_raw", "", n_bins_, 0.0, et_max_);
   h_pi0_missing_ = new TH1D("h_pi0_missing_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_pi0_energy_separated_ = new TH1D("h_pi0_separated_energy_contribution_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_pi0_energy_merged_ = new TH1D("h_pi0_merged_energy_contribution_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_pi0_energy_missing_ = new TH1D("h_pi0_missing_energy_contribution_cluster_et_raw", "", n_bins_, 0.0, et_max_);
   for (TH1D* histogram : {h_prompt_, h_pi0_, h_pi0_separated_,
-                          h_pi0_merged_, h_pi0_missing_})
+                          h_pi0_merged_, h_pi0_missing_, h_pi0_energy_separated_,
+                          h_pi0_energy_merged_, h_pi0_energy_missing_})
   {
     histogram->Sumw2();
   }
@@ -705,6 +798,12 @@ void PythiaClusterEtSpectrum::create_output()
   metadata_tree_->Branch("pi0_selection", &pi0_selection_);
   metadata_tree_->Branch("topology_priority", &topology_priority_);
   metadata_tree_->Branch("projection_scheme", &projection_scheme_);
+  metadata_tree_->Branch("raw_truth_tower_node", &raw_truth_tower_node_name_);
+  metadata_tree_->Branch("truth_cell_node", &truth_cell_node_name_);
+  metadata_tree_->Branch("truth_hit_node", &truth_hit_node_name_);
+  metadata_tree_->Branch("energy_topology_priority", &energy_topology_priority_);
+  metadata_tree_->Branch("energy_matching_scheme", &energy_matching_scheme_);
+  metadata_tree_->Branch("energy_candidate_selection", &energy_candidate_selection_);
   metadata_tree_->Branch("signal_embedding_id", &signal_embedding_id_);
   metadata_tree_->Branch("n_bins", &n_bins_);
   metadata_tree_->Branch("et_max", &et_max_);
@@ -713,6 +812,8 @@ void PythiaClusterEtSpectrum::create_output()
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);
   metadata_tree_->Branch("dominant_fraction_min", &dominant_fraction_min_);
   metadata_tree_->Branch("pi0_contributor_fraction_min", &pi0_contributor_fraction_min_);
+  metadata_tree_->Branch("min_energy_contribution_fraction", &min_energy_contribution_fraction_);
+  metadata_tree_->Branch("pi0_truth_matching_algorithm_version", &pi0_truth_matching_algorithm_version_);
   metadata_tree_->Branch("separated_delta_r_cut", &separated_delta_r_cut_);
   metadata_tree_->Branch("merged_delta_r_cut", &merged_delta_r_cut_);
   metadata_tree_->Branch("response_min", &response_min_);
@@ -739,6 +840,14 @@ void PythiaClusterEtSpectrum::create_output()
   metadata_tree_->Branch("pi0_separated_cluster_fill_count", &n_pi0_separated_cluster_fill_);
   metadata_tree_->Branch("pi0_merged_cluster_fill_count", &n_pi0_merged_cluster_fill_);
   metadata_tree_->Branch("pi0_missing_cluster_fill_count", &n_pi0_missing_cluster_fill_);
+  metadata_tree_->Branch("pi0_energy_separated_count", &n_pi0_energy_separated_);
+  metadata_tree_->Branch("pi0_energy_merged_count", &n_pi0_energy_merged_);
+  metadata_tree_->Branch("pi0_energy_missing_count", &n_pi0_energy_missing_);
+  metadata_tree_->Branch("pi0_energy_none_count", &n_pi0_energy_none_);
+  metadata_tree_->Branch("pi0_energy_match_invalid_count", &n_pi0_energy_match_invalid_);
+  metadata_tree_->Branch("pi0_energy_separated_cluster_fill_count", &n_pi0_energy_separated_cluster_fill_);
+  metadata_tree_->Branch("pi0_energy_merged_cluster_fill_count", &n_pi0_energy_merged_cluster_fill_);
+  metadata_tree_->Branch("pi0_energy_missing_cluster_fill_count", &n_pi0_energy_missing_cluster_fill_);
 }
 
 void PythiaClusterEtSpectrum::close_output()
@@ -757,5 +866,8 @@ void PythiaClusterEtSpectrum::close_output()
   h_pi0_separated_ = nullptr;
   h_pi0_merged_ = nullptr;
   h_pi0_missing_ = nullptr;
+  h_pi0_energy_separated_ = nullptr;
+  h_pi0_energy_merged_ = nullptr;
+  h_pi0_energy_missing_ = nullptr;
   metadata_tree_ = nullptr;
 }

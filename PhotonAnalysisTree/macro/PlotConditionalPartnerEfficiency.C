@@ -1861,7 +1861,9 @@ void draw_truth_pi0_component_counts_vs_truth_pt(
     const double delta_r_cut, const double merged_delta_r_cut,
     const double merged_response_min, const double merged_response_max,
     const double individual_response_min,
-    const double individual_response_max) {
+    const double individual_response_max,
+    const bool use_energy_contribution = false,
+    const double min_contribution_fraction = 0.0) {
   if (histograms.size() != n_truth_pt_bins) {
     std::cerr << "Cannot draw truth-pT component stack for "
               << collection_label << ": expected " << n_truth_pt_bins
@@ -1869,8 +1871,11 @@ void draw_truth_pi0_component_counts_vs_truth_pt(
     return;
   }
 
-  const std::string name_suffix =
+  const std::string collection_suffix =
       collection_label == "SPLIT" ? "split" : "nosplit";
+  const std::string name_suffix =
+      collection_suffix +
+      (use_energy_contribution ? "_energy_contribution" : "");
   TH1D total(("h_" + name_suffix +
               "_central_truth_pi0_component_total_vs_truth_pt")
                  .c_str(),
@@ -1915,7 +1920,7 @@ void draw_truth_pi0_component_counts_vs_truth_pt(
   total.GetXaxis()->SetTitle("Truth p_{T}^{#pi^{0}} [GeV]");
   total.GetYaxis()->SetTitle("Generated #pi^{0} / 1 GeV");
   total.SetMinimum(0.0);
-  total.SetMaximum(total.GetMaximum() > 0.0 ? 1.75 * total.GetMaximum() : 1.0);
+  total.SetMaximum(total.GetMaximum() > 0.0 ? 2.50 * total.GetMaximum() : 1.0);
 
   THStack stack(("stack_" + name_suffix +
                  "_central_truth_pi0_components_vs_truth_pt")
@@ -1942,31 +1947,53 @@ void draw_truth_pi0_component_counts_vs_truth_pt(
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  label.SetTextSize(0.032);
+  label.SetTextSize(0.028);
   label.DrawLatex(0.15, 0.93, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(
       0.15, 0.88,
-      ("Single #pi^{0} gun, " + collection_label +
-       "; truth #alpha integrated")
-          .c_str());
+      ("Single #pi^{0} gun, " + collection_label).c_str());
   label.DrawLatex(
       0.15, 0.83,
-      Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
-           truth_eta_max));
+      (std::string(use_energy_contribution ? "Energy-deposit matching"
+                                           : "Geometrical matching") +
+       "; truth #alpha integrated").c_str());
   label.DrawLatex(
       0.15, 0.78,
-      Form("Separated: E_{cluster} #geq %.3g GeV, #DeltaR < %.3f",
-           min_cluster_energy, delta_r_cut));
-  label.DrawLatex(
-      0.15, 0.73,
-      Form("Merged: max #DeltaR < %.3f, %.1f < E_{T}^{cluster}/p_{T}^{#pi^{0}} < %.1f",
-           merged_delta_r_cut, merged_response_min, merged_response_max));
-  label.DrawLatex(
-      0.15, 0.68,
-      Form("Individual: #DeltaR < %.3f, %.1f < E_{T}^{cluster}/p_{T}^{#gamma} < %.1f",
-           delta_r_cut, individual_response_min, individual_response_max));
+      Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
+           truth_eta_max));
+  if (use_energy_contribution) {
+    label.DrawLatex(
+        0.15, 0.65,
+        Form("Match each #gamma to maximum-E_{dep} cluster, f_{#gamma} > %.3g",
+             min_contribution_fraction));
+    label.DrawLatex(
+        0.15, 0.61,
+        Form("Separated: distinct matches, E_{cluster} #geq %.3g GeV",
+             min_cluster_energy));
+    label.DrawLatex(
+        0.15, 0.57,
+        Form("Merged: same match, %.1f #leq E_{T}^{cluster}/p_{T}^{#pi^{0}} #leq %.1f",
+             merged_response_min, merged_response_max));
+    label.DrawLatex(
+        0.15, 0.53,
+        Form("Individual: %.1f #leq E_{T}^{cluster}/p_{T}^{#gamma} #leq %.1f",
+             individual_response_min, individual_response_max));
+  } else {
+    label.DrawLatex(
+        0.15, 0.65,
+        Form("Separated: E_{cluster} #geq %.3g GeV, #DeltaR < %.3f",
+             min_cluster_energy, delta_r_cut));
+    label.DrawLatex(
+        0.15, 0.61,
+        Form("Merged: max #DeltaR < %.3f, %.1f #leq E_{T}^{cluster}/p_{T}^{#pi^{0}} #leq %.1f",
+             merged_delta_r_cut, merged_response_min, merged_response_max));
+    label.DrawLatex(
+        0.15, 0.57,
+        Form("Individual: #DeltaR < %.3f, %.1f #leq E_{T}^{cluster}/p_{T}^{#gamma} #leq %.1f",
+             delta_r_cut, individual_response_min, individual_response_max));
+  }
 
-  TLegend legend(0.59, 0.67, 0.95, 0.94);
+  TLegend legend(0.64, 0.67, 0.95, 0.94);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(0.030);
@@ -3146,6 +3173,14 @@ int PlotConditionalPartnerEfficiency(
               merged_delta_r_cut, merged_response_min, merged_response_max,
               individual_response_min, individual_response_max, true,
               min_contribution_fraction);
+          draw_truth_pi0_component_counts_vs_truth_pt(
+              components, label,
+              collection_base +
+                  "_central_truth_pi0_energy_contribution_event_components_vs_truth_pt.pdf",
+              truth_eta_max, min_cluster_energy, delta_r_cut,
+              merged_delta_r_cut, merged_response_min, merged_response_max,
+              individual_response_min, individual_response_max, true,
+              min_contribution_fraction);
           draw_truth_pi0_component_fractions(
               components, label + ", energy contribution",
               collection_base +
@@ -3323,7 +3358,7 @@ int PlotConditionalPartnerEfficiency(
             << split_reco_et_malformed << " / " << nosplit_reco_et_malformed
             << std::endl;
   std::cout << "Wrote " << output_base << ".root and "
-            << (has_energy_contribution_branches ? 34 : 26) << " PDF plots"
+            << (has_energy_contribution_branches ? 36 : 26) << " PDF plots"
             << std::endl;
   Long64_t malformed = invalid_truth_shape + split_reco_et_malformed +
                        nosplit_reco_et_malformed;

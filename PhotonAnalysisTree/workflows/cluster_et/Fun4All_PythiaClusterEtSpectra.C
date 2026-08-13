@@ -1,6 +1,8 @@
 #include <fun4all/Fun4AllDstInputManager.h>
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <fun4all/Fun4AllServer.h>
+#include <g4calo/RawTowerBuilder.h>
+#include <g4detectors/PHG4FullProjSpacalCellReco.h>
 
 #include <TSystem.h>
 
@@ -14,6 +16,8 @@
 #include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PythiaClusterEtSpectrum.h"
 
 R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libg4detectors.so)
+R__LOAD_LIBRARY(libg4calo.so)
 
 namespace
 {
@@ -38,6 +42,7 @@ int Fun4All_PythiaClusterEtSpectra(
     const double min_cluster_energy = 0.2,
     const double dominant_fraction_min = 0.5,
     const double pi0_contributor_fraction_min = 0.5,
+    const double min_energy_contribution_fraction = 0.0,
     const double separated_delta_r_cut = 0.03,
     const double merged_delta_r_cut = 0.06,
     const double response_min = 0.5,
@@ -102,6 +107,27 @@ int Fun4All_PythiaClusterEtSpectra(
   server->registerInputManager(mbd_input);
   server->registerInputManager(truth_jet_input);
   server->registerInputManager(g4hits_input);
+  const char* calibration_root = std::getenv("CALIBRATIONROOT");
+  if (!calibration_root)
+  {
+    std::cerr << "Fun4All_PythiaClusterEtSpectra - CALIBRATIONROOT is not set"
+              << std::endl;
+    return EXIT_FAILURE;
+  }
+  auto* cemc_cells = new PHG4FullProjSpacalCellReco("CEMCCYLCELLRECO");
+  cemc_cells->Detector("CEMC");
+  cemc_cells->Verbosity(0);
+  cemc_cells->get_light_collection_model().load_data_file(
+      std::string(calibration_root) +
+          "/CEMC/LightCollection/Prototype3Module.xml",
+      "data_grid_light_guide_efficiency", "data_grid_fiber_trans");
+  server->registerSubsystem(cemc_cells);
+  auto* truth_towers = new RawTowerBuilder("CEMCTruthRawTowerBuilder");
+  truth_towers->Detector("CEMC");
+  truth_towers->set_sim_tower_node_prefix("SIM");
+  truth_towers->set_towerinfo(RawTowerBuilder::ProcessTowerType::kRawTowerOnly);
+  truth_towers->Verbosity(0);
+  server->registerSubsystem(truth_towers);
 
   auto* accumulator = new PythiaClusterEtSpectrum("PythiaClusterEtSpectrum");
   accumulator->set_output_file_name(output_file);
@@ -112,7 +138,9 @@ int Fun4All_PythiaClusterEtSpectra(
   accumulator->set_truth_node_name("G4TruthInfo");
   accumulator->set_hepmc_event_map_node_name("PHHepMCGenEventMap");
   accumulator->set_tower_node_name("TOWERINFO_CALIB_CEMC");
-  accumulator->set_raw_truth_tower_node_name("TOWER_CALIB_CEMC");
+  accumulator->set_raw_truth_tower_node_name("TOWER_SIM_CEMC");
+  accumulator->set_truth_cell_node_name("G4CELL_CEMC");
+  accumulator->set_truth_hit_node_name("G4HIT_CEMC");
   accumulator->set_tower_geom_node_name("TOWERGEOM_CEMC");
   accumulator->set_split_cluster_node_name("CLUSTERINFO_CEMC");
   accumulator->set_binning(n_bins, et_max);
@@ -121,6 +149,7 @@ int Fun4All_PythiaClusterEtSpectra(
   accumulator->set_min_cluster_energy(min_cluster_energy);
   accumulator->set_dominant_fraction_min(dominant_fraction_min);
   accumulator->set_pi0_contributor_fraction_min(pi0_contributor_fraction_min);
+  accumulator->set_min_energy_contribution_fraction(min_energy_contribution_fraction);
   accumulator->set_separated_delta_r_cut(separated_delta_r_cut);
   accumulator->set_merged_delta_r_cut(merged_delta_r_cut);
   accumulator->set_response_window(response_min, response_max);

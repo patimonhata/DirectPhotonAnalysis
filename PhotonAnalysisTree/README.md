@@ -238,55 +238,32 @@ queueします。`-maxjobs`は切り詰めではなく誤投入防止です。
 condor_submit -maxjobs 1000 run_truth_spectrum_pythia.job
 ```
 
-少数の生成ROOT filesなら直接TChainへ読み、count densityを描けます。photonは
-classifier category 1 (direct)または2 (fragmentation)のprompt photonです。defaultは
-eta cutなしで、最後から2つ目の引数を`0.7`にすると`|eta_truth| < 0.7`を3粒子種へ適用します。
-pi0 decay photonの合計とHepMC/G4内訳は同じROOT fileに保存されます。
+truth pT spectrumの集計とplotは、`workflows/truth_pt`のmap-reduce workflowを
+使います。photonはclassifier category 1 (direct)または2 (fragmentation)、
+pi0 decay photonはHepMC/G4成分の合計です。defaultは全200,000 truth treesを
+500 filesずつ、400 partial jobsへ分割します。
 
 ```bash
-root -l -b -q 'macro/PlotPythiaTruthPtSpectra.C("output/truth_root/pythia_truth_spectrum_tree_*.root","output/plots/minbias_truth_pt",100,20.0,-1.0,false)'
-```
-
-数万files以上では、1 processで全fileを開かずmap-reduce型で処理します。defaultは
-先頭40,000 truth treesを500 filesずつ、80 partial jobsへ分割します。
-
-```bash
-condor_submit -maxjobs 80 run_truth_pt_partial_pythia.job
-```
-
-全200,000 filesを最初から処理する場合:
-
-```bash
-condor_submit \
-  -append "total_files = 200000" \
-  -append "n_chunks = 400" \
-  -maxjobs 400 \
-  run_truth_pt_partial_pythia.job
-```
-
-先頭40,000 filesのpartialが完成済みなら、chunk 80から残りだけを追加できます。
-
-```bash
-condor_submit \
-  -append "total_files = 200000" \
-  -append "chunk_offset = 80" \
-  -append "n_chunks = 320" \
-  -maxjobs 320 \
-  run_truth_pt_partial_pythia.job
+condor_submit -maxjobs 400 workflows/truth_pt/submit.job
 ```
 
 partialの範囲・解析条件を検証して統合し、最後にbin幅で規格化してplotします。
 `expected_manifest_end`を指定するため、partialの欠落も検出します。
 
 ```bash
-root -l -b -q 'macro/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,40000)'
+root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
-詳細は`docs/pythia_truth_pt_map_reduce.md`を参照してください。
+粒子選択、partial schema、再開方法は
+[truth-pT workflow](workflows/truth_pt/README.md)を参照してください。
 
 ## Minimum-bias cluster E_T spectra
 
-再構成clusterのprompt/pi0起源とseparated/merged/missing topologyは、4 stream DSTを直接読む`PythiaClusterEtSpectrum`でmap-reduceします。各G4 photonを実際の生成vertexからCEMCへ投影するため、displaced decayもcollision vertex近似には戻しません。default cut、pathway定義、実行方法は[docs/pythia_cluster_et_map_reduce.md](docs/pythia_cluster_et_map_reduce.md)を参照してください。最終density histogramの単位は`clusters/GeV`です。
+再構成clusterのprompt/pi0起源とseparated/merged/missing topologyは、
+4 stream DSTを直接読む`workflows/cluster_et`のmap-reduce workflowで処理します。
+default cut、pathway定義、実行方法は
+[cluster-ET workflow](workflows/cluster_et/README.md)を参照してください。
+最終density histogramの単位は`clusters/GeV`です。
 
 `run_tree_pythia.job`は`input/jet5/segments.list`を`queue ... from`で読み、
 manifestの1行につき1つの同期した4-stream DST jobを生成します。

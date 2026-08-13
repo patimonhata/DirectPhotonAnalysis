@@ -1,6 +1,6 @@
 Universe           = vanilla
-Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
-Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/run_cluster_et_partial_pythia.sh
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/cluster_et
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/cluster_et/run_partial.sh
 
 PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
 OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)

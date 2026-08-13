@@ -1,5 +1,12 @@
 # Pythia minimum-bias cluster-ET map-reduce workflow
 
+This directory is the complete cluster-ET analysis workflow:
+
+- `Fun4All_PythiaClusterEtSpectra.C`: map synchronized DST inputs to partial histograms;
+- `check_pythia_cluster_et_partial.C`: validate each partial;
+- `FinalizePythiaClusterEtSpectra.C`: reduce partials and write ROOT/PDF outputs;
+- `run_partial.sh` and `submit.job`: execute and submit the map jobs.
+
 `PythiaClusterEtSpectrum` reads the synchronized `DST_CALO_CLUSTER`,
 `DST_MBD_EPD`, `DST_TRUTH_JET`, and `G4Hits` streams directly. It writes five
 raw SPLIT-cluster histograms plus one metadata entry; it does not write a large
@@ -51,21 +58,21 @@ Pi0s with no matched cluster cannot be represented on a cluster-ET axis.
 
 ## Run and reduce
 
-The Condor pilot defaults process the first 1,000 manifest files in chunks of
-10:
+The Condor defaults process all 200,000 manifest files in chunks of 50:
 
 ```bash
-condor_submit -maxjobs 100 run_cluster_et_partial_pythia.job
+condor_submit -maxjobs 4000 workflows/cluster_et/submit.job
 ```
 
 Each wrapper writes transactionally and runs
-`macro/check_pythia_cluster_et_partial.C` before publishing a partial. Reduce a
-contiguous range with:
+`check_pythia_cluster_et_partial.C` before publishing a partial. Reduce the
+complete contiguous range with:
 
 ```bash
 root -l -b -q \
-  'macro/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_pi0_eta07/partial_*.root","output/plots/minbias_cluster_et_prompt_pi0_eta07",0,1000)'
+  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_pi0_eta07/partial_*.root","output/plots/minbias_cluster_et_prompt_pi0_eta07",0,200000)'
 ```
+
 
 The final ROOT file contains both raw counts and density histograms. Density is
 computed only after summing all partials by dividing each bin by its width, so

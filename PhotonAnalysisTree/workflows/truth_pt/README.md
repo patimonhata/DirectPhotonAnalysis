@@ -1,12 +1,19 @@
 # Pythia truth-pT map-reduce workflow
 
+This directory is the complete truth-pT analysis workflow:
+
+- `AccumulatePythiaTruthPtSpectra.C`: map truth trees to partial histograms;
+- `check_pythia_truth_pt_partial.C`: validate each partial;
+- `FinalizePythiaTruthPtSpectra.C`: reduce partials and write ROOT/PDF outputs;
+- `run_partial.sh` and `submit.job`: execute and submit the map jobs.
+
 ## Particle selection
 
 The photon histogram counts prompt photons. A photon must be in the final
 HepMC photon collection, have valid classifier output, and have category 1
 (direct 2-to-2) or category 2 (fragmentation). Category 3 decay photons are
 not included. The pi0 and pi0-decay-photon definitions are documented in
-`pythia_truth_spectrum_schema.md`.
+`../../docs/pythia_truth_spectrum_schema.md`.
 
 The pi0-decay-photon histogram is the union of two disjoint simulation-stage
 components:
@@ -45,19 +52,33 @@ eta selection, weight policy, the exact pi0-decay selection string, and total
 plus stage-specific particle counts. The checker requires the total histogram
 and count to equal the HepMC and G4 component sums.
 
-`run_truth_pt_partial_pythia.sh` writes transactionally, runs
+`run_partial.sh` writes transactionally, runs
 `check_pythia_truth_pt_partial.C`, and only then renames the output to
 `partial_NNNNNN.root`. Existing partials are never overwritten.
 
-The Condor defaults are 40,000 files, 500 files per partial, and 80 jobs. The
+The Condor defaults are 200,000 files, 500 files per partial, and 400 jobs. The
 schema-v2 default output directory is
-`prompt_eta07_unweighted_inclusive_pi0_decay`, keeping it separate from
-existing schema-v1 partials.
+`truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay`, keeping it
+separate from existing schema-v1 partials.
 `chunk_offset` makes it possible to extend a completed range without
 resubmitting existing chunks. The required relation is:
 
 ```text
 n_chunks = ceil(total_files / files_per_job) - chunk_offset
+```
+
+## Run
+
+From the `PhotonAnalysisTree` directory, submit the full production with:
+
+```bash
+condor_submit -maxjobs 400 workflows/truth_pt/submit.job
+```
+
+Reduce the complete contiguous range with:
+
+```bash
+root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
 ## Reduce and plot step

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -eo pipefail
 
-module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-usage="usage: run_truth_pt_partial_pythia.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST TREE_INPUT_DIRECTORY OUTPUT_DIRECTORY [N_BINS] [PT_MAX] [MAX_ABS_ETA] [USE_EVENT_WEIGHT]"
+workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+usage="usage: workflows/truth_pt/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST TREE_INPUT_DIRECTORY OUTPUT_DIRECTORY [N_BINS] [PT_MAX] [MAX_ABS_ETA] [USE_EVENT_WEIGHT]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
 total_files=${3:?$usage}
@@ -72,9 +72,9 @@ trap cleanup EXIT
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 root -l -b -q \
-  "$module_dir/macro/AccumulatePythiaTruthPtSpectra.C(\"${input_manifest}\",\"${tree_input_directory}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${pt_max},${max_abs_eta},${use_event_weight})"
+  "$workflow_dir/AccumulatePythiaTruthPtSpectra.C(\"${input_manifest}\",\"${tree_input_directory}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${pt_max},${max_abs_eta},${use_event_weight})"
 root -l -b -q \
-  "$module_dir/macro/check_pythia_truth_pt_partial.C(\"${temporary_output}\")"
+  "$workflow_dir/check_pythia_truth_pt_partial.C(\"${temporary_output}\")"
 
 mv -- "$temporary_output" "$final_output"
 temporary_output=

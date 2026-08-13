@@ -1,8 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
-module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-usage="usage: run_cluster_et_partial_pythia.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [ET_MAX] [TRUTH_ETA_MAX] [CLUSTER_ETA_MAX] [MIN_CLUSTER_ENERGY] [DOMINANT_FRACTION_MIN] [PI0_CONTRIBUTOR_FRACTION_MIN] [SEPARATED_DR] [MERGED_DR] [RESPONSE_MIN] [RESPONSE_MAX]"
+workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+module_dir=$(cd "$workflow_dir/../.." && pwd)
+usage="usage: workflows/cluster_et/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [ET_MAX] [TRUTH_ETA_MAX] [CLUSTER_ETA_MAX] [MIN_CLUSTER_ENERGY] [DOMINANT_FRACTION_MIN] [PI0_CONTRIBUTOR_FRACTION_MIN] [SEPARATED_DR] [MERGED_DR] [RESPONSE_MIN] [RESPONSE_MAX]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
 total_files=${3:?$usage}
@@ -65,9 +66,9 @@ trap cleanup EXIT
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 root -l -b -q \
-  "$module_dir/macro/Fun4All_PythiaClusterEtSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${truth_eta_max},${cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${pi0_contributor_fraction_min},${separated_dr},${merged_dr},${response_min},${response_max})"
+  "$workflow_dir/Fun4All_PythiaClusterEtSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${truth_eta_max},${cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${pi0_contributor_fraction_min},${separated_dr},${merged_dr},${response_min},${response_max})"
 root -l -b -q \
-  "$module_dir/macro/check_pythia_cluster_et_partial.C(\"${temporary_output}\")"
+  "$workflow_dir/check_pythia_cluster_et_partial.C(\"${temporary_output}\")"
 
 mv -- "$temporary_output" "$final_output"
 temporary_output=

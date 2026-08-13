@@ -1,6 +1,6 @@
 Universe           = vanilla
-Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
-Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/run_truth_pt_partial_pythia.sh
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/truth_pt
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/truth_pt/run_partial.sh
 
 PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
 OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
@@ -28,11 +28,8 @@ Error              = $(log_directory)/pythia_truth_pt_partial_$(ProcId).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-truth-pt-partial_$(ProcId).log
 Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(tree_input_directory) $(partial_output_directory) $(n_bins) $(pt_max) $(max_abs_eta) $(use_event_weight)"
 
-# n_chunks must equal ceil(total_files / files_per_job) - chunk_offset. Examples:
-#   40,000 files: defaults, then
-#     condor_submit -maxjobs 80 run_truth_pt_partial_pythia.job
-#   200,000 files:
-#     condor_submit -append "total_files = 200000" -append "n_chunks = 400" -maxjobs 400 run_truth_pt_partial_pythia.job
-#   Continue from the existing first 40,000 files through 200,000:
-#     condor_submit -append "total_files = 200000" -append "chunk_offset = 80" -append "n_chunks = 320" -maxjobs 320 run_truth_pt_partial_pythia.job
+# n_chunks must equal ceil(total_files / files_per_job) - chunk_offset.
+# From this directory: condor_submit -maxjobs 400 submit.job
+# To continue after 80 existing chunks:
+#   condor_submit -append "chunk_offset = 80" -append "n_chunks = 320" -maxjobs 320 submit.job
 Queue $(n_chunks)

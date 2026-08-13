@@ -1,14 +1,16 @@
 Universe           = vanilla
-Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
-Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/run_add_scores.sh
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/single_particle
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/single_particle/run_add_scores.sh
 
 PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold        = (ExitBySignal == true) || (ExitCode != 0)
 concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
 request_memory     = 4GB
 Priority           = 20
 job_lease_duration = 86400
 
 job_offset         = 0
+n_jobs            = 5000
 process_id         = $(Process) + $(job_offset)
 tree_directory     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/root
 output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
@@ -21,4 +23,4 @@ Error              = $(output_directory)/scores_$INT(process_id,%06d).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-scores_$INT(process_id,%06d).log
 Arguments          = "$(input_file) $(final_output_file)"
 
-Queue 5000
+Queue $(n_jobs)

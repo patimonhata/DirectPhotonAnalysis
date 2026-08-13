@@ -1,8 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
-module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) # the absolute path to the directory in which this script is placed.
-process_id=${1:?usage: run_tree.sh PROCESS_ID [N_EVENTS]}
+workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+module_dir=$(cd "$workflow_dir/../.." && pwd)
+process_id=${1:?usage: workflows/single_particle/run_tree.sh PROCESS_ID [N_EVENTS]}
 n_events=${2:-0}
 if ! [[ "$process_id" =~ ^[0-9]+$ ]] || ! [[ "$n_events" =~ ^[0-9]+$ ]]; then
   echo "PROCESS_ID and N_EVENTS must be non-negative integers" >&2
@@ -19,7 +20,5 @@ fi
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 
-# SingleGun:
-root -l -b -q "$module_dir/macro/Fun4All_PhotonAnalysisTree.C(${process_id},${n_events})"
-# Pythia Jet5:
-# root -l -b -q "$module_dir/macro/Fun4All_PhotonAnalysisTreePythia.C(${process_id},${n_events})"
+root -l -b -q "$workflow_dir/Fun4All_PhotonAnalysisTree.C(${process_id},${n_events})"
+root -l -b -q -e ".L $workflow_dir/check_tree.C" -e "gSystem->Exit(check_tree(\"$output_file\",true));"

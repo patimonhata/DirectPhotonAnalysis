@@ -77,10 +77,14 @@ int check_scored_tree(const char* input_path)
   std::vector<int>* tower_cluster_index = nullptr;
   std::vector<float>* split_bdt_score = nullptr;
   std::vector<unsigned char>* split_bdt_valid = nullptr;
+  std::vector<float>* split_bdt_ppg15v1_score = nullptr;
+  std::vector<unsigned char>* split_bdt_ppg15v1_valid = nullptr;
   std::vector<float>* nosplit_bdt_score = nullptr;
   std::vector<unsigned char>* nosplit_bdt_valid = nullptr;
-  std::vector<float>* gamma_score = nullptr;
-  std::vector<unsigned char>* gamma_valid = nullptr;
+  std::vector<float>* split_gamma_score = nullptr;
+  std::vector<unsigned char>* split_gamma_valid = nullptr;
+  std::vector<float>* nosplit_gamma_score = nullptr;
+  std::vector<unsigned char>* nosplit_gamma_valid = nullptr;
 
   bool ok = true;
   ok &= bind(tree, "source_file_id", &source_file_id);
@@ -100,10 +104,14 @@ int check_scored_tree(const char* input_path)
   ok &= bind(tree, "nosplit_tower_cluster_index", &tower_cluster_index);
   ok &= bind(tree, "split_cluster_bdt_base_v3E_score", &split_bdt_score);
   ok &= bind(tree, "split_cluster_bdt_base_v3E_valid", &split_bdt_valid);
+  ok &= bind(tree, "split_cluster_bdt_ppg15v1_score", &split_bdt_ppg15v1_score);
+  ok &= bind(tree, "split_cluster_bdt_ppg15v1_valid", &split_bdt_ppg15v1_valid);
   ok &= bind(tree, "nosplit_cluster_bdt_base_v3E_score", &nosplit_bdt_score);
   ok &= bind(tree, "nosplit_cluster_bdt_base_v3E_valid", &nosplit_bdt_valid);
-  ok &= bind(tree, "nosplit_cluster_p_gamma", &gamma_score);
-  ok &= bind(tree, "nosplit_cluster_p_gamma_valid", &gamma_valid);
+  ok &= bind(tree, "split_cluster_p_gamma", &split_gamma_score);
+  ok &= bind(tree, "split_cluster_p_gamma_valid", &split_gamma_valid);
+  ok &= bind(tree, "nosplit_cluster_p_gamma", &nosplit_gamma_score);
+  ok &= bind(tree, "nosplit_cluster_p_gamma_valid", &nosplit_gamma_valid);
   if (!ok)
   {
     std::cerr << "check_scored_tree - missing required branch" << std::endl;
@@ -112,8 +120,10 @@ int check_scored_tree(const char* input_path)
 
   Long64_t malformed = 0;
   Long64_t valid_split_bdt = 0;
+  Long64_t valid_split_bdt_ppg15v1 = 0;
   Long64_t valid_nosplit_bdt = 0;
-  Long64_t valid_gamma = 0;
+  Long64_t valid_split_gamma = 0;
+  Long64_t valid_nosplit_gamma = 0;
   for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
   {
     tree->GetEntry(entry);
@@ -138,25 +148,37 @@ int check_scored_tree(const char* input_path)
         tower_cluster_index && tower_cluster_index->size() == nosplit_ntower &&
         split_bdt_score && split_bdt_score->size() == split_ncluster &&
         split_bdt_valid && split_bdt_valid->size() == split_ncluster &&
+        split_bdt_ppg15v1_score && split_bdt_ppg15v1_score->size() == split_ncluster &&
+        split_bdt_ppg15v1_valid && split_bdt_ppg15v1_valid->size() == split_ncluster &&
         nosplit_bdt_score && nosplit_bdt_score->size() == nosplit_ncluster &&
         nosplit_bdt_valid && nosplit_bdt_valid->size() == nosplit_ncluster &&
-        gamma_score && gamma_score->size() == nosplit_ncluster &&
-        gamma_valid && gamma_valid->size() == nosplit_ncluster;
+        split_gamma_score && split_gamma_score->size() == split_ncluster &&
+        split_gamma_valid && split_gamma_valid->size() == split_ncluster &&
+        nosplit_gamma_score && nosplit_gamma_score->size() == nosplit_ncluster &&
+        nosplit_gamma_valid && nosplit_gamma_valid->size() == nosplit_ncluster;
     if (!event_ok)
     {
       ++malformed;
     }
     valid_split_bdt += split_bdt_valid
         ? std::count(split_bdt_valid->begin(), split_bdt_valid->end(), 1U) : 0;
+    valid_split_bdt_ppg15v1 += split_bdt_ppg15v1_valid
+        ? std::count(split_bdt_ppg15v1_valid->begin(),
+                     split_bdt_ppg15v1_valid->end(), 1U) : 0;
     valid_nosplit_bdt += nosplit_bdt_valid
         ? std::count(nosplit_bdt_valid->begin(), nosplit_bdt_valid->end(), 1U) : 0;
-    valid_gamma += gamma_valid ? std::count(gamma_valid->begin(), gamma_valid->end(), 1U) : 0;
+    valid_split_gamma += split_gamma_valid
+        ? std::count(split_gamma_valid->begin(), split_gamma_valid->end(), 1U) : 0;
+    valid_nosplit_gamma += nosplit_gamma_valid
+        ? std::count(nosplit_gamma_valid->begin(), nosplit_gamma_valid->end(), 1U) : 0;
   }
 
-  std::cout << "check_scored_tree - events/valid_split_bdt/valid_nosplit_bdt/"
-               "valid_gamma/malformed = "
+  std::cout << "check_scored_tree - events/valid_split_bdt/"
+               "valid_split_bdt_ppg15v1/valid_nosplit_bdt/"
+               "valid_split_gamma/valid_nosplit_gamma/malformed = "
             << tree->GetEntries() << "/" << valid_split_bdt << "/"
-            << valid_nosplit_bdt << "/" << valid_gamma << "/"
+            << valid_split_bdt_ppg15v1 << "/" << valid_nosplit_bdt << "/"
+            << valid_split_gamma << "/" << valid_nosplit_gamma << "/"
             << malformed << std::endl;
   std::cout << "check_scored_tree - metadata source/processed/written = "
             << metadata_source_file_id << "/" << n_events_processed << "/"

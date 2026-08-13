@@ -45,11 +45,13 @@ buildは次を作ります。
 
 ## DSTからTTreeを作る
 
+Single-particle固有の実行手順とfile一覧は[workflows/single_particle/README.md](workflows/single_particle/README.md)にまとめています。
+
 ```bash
-./PhotonAnalysisTree/run_tree.sh 0 0
+./PhotonAnalysisTree/workflows/single_particle/run_tree.sh 0 0
 ```
 
-第1引数はsource/process ID、第2引数はevent数です。`0` event指定は全eventです。default inputは依頼時の`newDST_pi0_5to15GeV_etapm1`、default outputは`PhotonAnalysisTree/output/root`です。
+第1引数はsource/process ID、第2引数はevent数です。`0` event指定は全eventです。default inputは`DST_pi0_3to15GeV_etapm1_vertexpm60`、default outputは`PhotonAnalysisTree/output/root`です。
 
 直接ROOT macroを呼ぶ場合は、input/output directoryとexpected primary PDGも変更できます。
 
@@ -88,10 +90,10 @@ schema version、branch alignment、contributor offsetとfractionを検証しま
 
 ## scoreを追加する
 
-single-particle用`run_add_scores.sh`は入力ROOT fileの`event_tree`へBDT/gamma score branchを直接追加し、全段と最終検証が成功した後に`_scored.root`へrenameします。途中で失敗した場合は入力ファイルを元DSTから作り直してください。
+single-particle用wrapperは入力ROOT fileを変更せず、最終outputと同じdirectoryの一時コピーへscore branchを追加します。base treeの事前検証と全scoreの最終検証が成功した場合だけ、一時fileを指定されたfinal outputへrenameします。失敗時は一時fileを削除するため、入力をDSTから作り直す必要はありません。
 
 ```bash
-./PhotonAnalysisTree/run_add_scores.sh \
+./PhotonAnalysisTree/workflows/single_particle/run_add_scores.sh \
   PhotonAnalysisTree/output/root/photon_analysis_tree_000000.root \
   PhotonAnalysisTree/output/root/photon_analysis_tree_000000_scored.root
 ```
@@ -124,7 +126,7 @@ wrapperを直接呼ぶ場合は引き続き第3引数でmodel pathを明示し�
 
 `add_split_bdt_ppg15v1.C`は既存SPLIT BDTと同じ11 featureを使い、low-pT sampleを追加したモデルの出力を`split_cluster_bdt_ppg15v1_score`、入力・shower shape・推論が有効かを`split_cluster_bdt_ppg15v1_valid`へ保存します。wrapperの第7引数でdefault model pathを上書きできます。
 
-NO_SPLIT clusterで学習したBDTも`run_add_scores.sh`内でNO_SPLIT clusterへ適用します。default modelは`model_base_v3E_nosplit_single_tmva.root`です。必要に応じて独立macroとしても実行できます。
+NO_SPLIT clusterで学習したBDTも`workflows/single_particle/run_add_scores.sh`内でNO_SPLIT clusterへ適用します。default modelは`model_base_v3E_nosplit_single_tmva.root`です。必要に応じて独立macroとしても実行できます。
 
 ```bash
 root -l -b \
@@ -159,7 +161,7 @@ hadd -f PhotonAnalysisTree/output/merged/all.root \
 merge後にdataset全体の生成条件を`manifest.json`へ記録します。scriptはROOTのkey構成、event/metadata数、model SHA-256を検証してからmanifestを作ります。
 
 ```bash
-./PhotonAnalysisTree/make_dataset_manifest.sh
+./PhotonAnalysisTree/workflows/single_particle/make_dataset_manifest.sh
 ```
 
 default出力は`PhotonAnalysisTree/output/merged/manifest.json`です。引数は`SCORED_DIR MERGED_ROOT MANIFEST_JSON BDT_MODEL ONNX_MODEL`の順で、省略できます。既存manifestを意図的に更新する場合だけ`FORCE=1`を指定します。
@@ -176,23 +178,23 @@ ONNX modelは`n_cluster == 1`のNO_SPLIT eventだけで学習されています�
 
 ## HTCondor production
 
-実行scriptとjob fileは`PhotonAnalysisTree`直下にあります。
+single-particle用の実行scriptとsubmit fileは`workflows/single_particle`にあります。Pythia用fileは`PhotonAnalysisTree`直下に残しています。
 
 ```bash
 cd /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
-condor_submit run_tree.job
+condor_submit workflows/single_particle/submit_tree.job
 condor_submit run_tree_pythia.job
 # tree jobsの完了後
-condor_submit run_add_scores.job
+condor_submit workflows/single_particle/submit_scores.job
 # manifestの先頭から1 jobだけsubmit
 condor_submit -append "manifest_slice = [0:1]" -maxjobs 1 run_add_scores_pythia.job
 ```
 
-`run_tree.job`のjob数とoffsetはsubmit時に上書きできます。`run_add_scores.job`はdefaultで5000 jobをqueueするため、job数を変える場合はjob file末尾の`Queue 5000`を編集し、offsetだけをsubmit時に上書きします。
+`workflows/single_particle/submit_tree.job`のjob数とoffsetはsubmit時に上書きできます。両submit fileともdefaultは5000 jobで、`n_jobs`と`job_offset`をsubmit時に上書きできます。
 
 ```bash
-condor_submit -append "n_jobs = 100" -append "job_offset = 500" run_tree.job
-condor_submit -append "job_offset = 500" run_add_scores.job
+condor_submit -append "n_jobs = 100" -append "job_offset = 500" workflows/single_particle/submit_tree.job
+condor_submit -append "job_offset = 500" workflows/single_particle/submit_scores.job
 ```
 
 Pythia scoringを段階的に増やす場合はmanifestとsliceをsubmit時に上書きできます。
@@ -201,12 +203,12 @@ Pythia scoringを段階的に増やす場合はmanifestとsliceをsubmit時に�
 condor_submit -append "input_manifest = input/jet5/segments.list" -append "manifest_slice = [0:10]" -maxjobs 10 run_add_scores_pythia.job
 ```
 
-- `run_tree.sh`, `run_tree.job`: single-particle DSTからbase TTreeを生成
+- `workflows/single_particle/run_tree.sh`, `workflows/single_particle/submit_tree.job`: single-particle DSTからbase TTreeを生成
 - `run_tree_pythia.sh`, `run_tree_pythia.job`: Pythia 4-stream DSTからschema 4 treeを生成
 - `make_pythia_input_manifest.sh`: 4つのstream別listを検証して共通suffix manifestを生成
-- `run_add_scores.sh`, `run_add_scores.job`: BDT/gamma score branchを追加して検証
+- `workflows/single_particle/run_add_scores.sh`, `workflows/single_particle/submit_scores.job`: BDT/gamma score branchを追加して検証
 - `run_add_scores_pythia.sh`, `run_add_scores_pythia.job`: Pythia schema 4 treeへsplit scoreだけをtransactionalに追加して検証
-- `make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
+- `workflows/single_particle/make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
 
 ## Minimum-bias truth pT spectra
 

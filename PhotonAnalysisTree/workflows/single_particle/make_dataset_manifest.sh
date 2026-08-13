@@ -1,7 +1,8 @@
 #!/bin/bash
 set -eo pipefail
 
-module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+module_dir=$(cd "$workflow_dir/../.." && pwd)
 scored_dir=${1:-$module_dir/output/root}
 merged_file=${2:-$module_dir/output/merged/all.root}
 manifest_file=${3:-$module_dir/output/merged/manifest.json}

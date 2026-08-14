@@ -1,4 +1,4 @@
-# Pythia minimum-bias pi0-compatible cluster multiplicity workflow
+# Pythia primary/generator pi0-compatible cluster multiplicity workflow
 
 This workflow measures, for each selected truth pi0, how many SPLIT CEMC
 clusters satisfy
@@ -13,10 +13,9 @@ output directory. The four thresholds are evaluated in one DST pass:
 
 ## Selection
 
-The truth-pi0 construction and contributor ancestry rules match
-`PythiaClusterEtSpectrum`: transported G4-primary pi0 decays, G4-secondary pi0
-decays traced to a signal primary ancestor, and generator-level pi0 decays
-represented by their two G4-primary photons are included.
+The selected truth pi0 population contains only transported G4-primary pi0
+decays and generator-level pi0 decays represented by their two G4-primary
+photons. Pi0s created as G4 secondaries during detector transport are excluded.
 
 The defaults require `|eta_truth_pi0| < 0.7` and
 `|eta_cluster| < 0.7`. Clusters must have finite energy and position and valid
@@ -36,7 +35,7 @@ Each partial contains:
 
 - the pi0-by-pi0 cluster multiplicity for all four thresholds;
 - multiplicity versus truth pi0 pT;
-- multiplicity split into G4-primary, G4-secondary, and generator pathways;
+- multiplicity split into G4-primary and generator pathways;
 - the maximum and second-largest compatible fraction per pi0;
 - compatible fraction versus reconstructed cluster energy;
 - one metadata entry with selection definitions and counters.
@@ -72,7 +71,7 @@ Reduce the complete pilot range with:
 
 ```bash
 root -l -b -q \
-  'workflows/pi0_cluster_multiplicity/FinalizePythiaPi0ClusterMultiplicity.C("output/pi0_cluster_multiplicity_partial/pilot_eta07_no_cluster_energy_cut/partial_*.root","output/plots/pi0_cluster_multiplicity_eta07_no_cluster_energy_cut",0,100)'
+  'workflows/pi0_cluster_multiplicity/FinalizePythiaPi0ClusterMultiplicity.C("output/pi0_cluster_multiplicity_partial/pilot_primary_generator_eta07_no_cluster_energy_cut/partial_*.root","output/plots/pi0_cluster_multiplicity_primary_generator_eta07_no_cluster_energy_cut",0,100)'
 ```
 
 For full production, change `total_files`, `files_per_job`, `n_chunks`, and the

@@ -39,8 +39,7 @@ namespace
 enum class Pi0Pathway : int
 {
   g4_primary_decay = 0,
-  g4_secondary_decay = 1,
-  generator_decay = 2
+  generator_decay = 1
 };
 
 struct Pi0Origin
@@ -167,10 +166,6 @@ bool contributor_matches_pi0(const photon_tree::TruthContributor& contributor,
   }
   const HepMC::GenParticle* particle =
       contributor_hepmc_particle(contributor, event_map);
-  if (candidate.pathway == Pi0Pathway::g4_secondary_decay)
-  {
-    return contributor.g4_track_id == candidate.parent_key;
-  }
   if (candidate.pathway == Pi0Pathway::g4_primary_decay)
   {
     return contributor.g4_pdg_id == 111 && particle &&
@@ -190,8 +185,8 @@ const char* threshold_tag(std::size_t index)
 
 const char* pathway_tag(std::size_t index)
 {
-  static constexpr std::array<const char*, 3> tags = {
-      "g4_primary", "g4_secondary", "generator"};
+  static constexpr std::array<const char*, 2> tags = {
+      "g4_primary", "generator"};
   return tags.at(index);
 }
 }
@@ -301,6 +296,8 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
     cluster_records.push_back(std::move(record));
   }
 
+  // Secondary particles are inspected only as daughters of a G4-primary pi0;
+  // G4-secondary pi0s themselves are not candidates.
   std::map<int, std::vector<const PHG4Particle*>> children_by_parent;
   const auto secondary_range = truth->GetSecondaryParticleRange();
   for (auto iterator = secondary_range.first; iterator != secondary_range.second;
@@ -363,38 +360,6 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
     candidates[insertion.first->second].photons.push_back(primary);
   }
 
-  for (auto iterator = secondary_range.first; iterator != secondary_range.second;
-       ++iterator)
-  {
-    const PHG4Particle* pi0 = iterator->second;
-    if (!pi0 || pi0->get_pid() != 111)
-    {
-      continue;
-    }
-    const auto found = children_by_parent.find(pi0->get_track_id());
-    if (found == children_by_parent.end() || found->second.size() != 2U ||
-        found->second[0]->get_pid() != 22 ||
-        found->second[1]->get_pid() != 22)
-    {
-      ++n_pi0_malformed_daughters_;
-      continue;
-    }
-    const PHG4Particle* ancestor = pi0;
-    std::set<int> visited;
-    while (ancestor && !truth->is_primary(ancestor) &&
-           visited.insert(ancestor->get_track_id()).second)
-    {
-      ancestor = truth->GetParticle(ancestor->get_parent_id());
-    }
-    if (!ancestor || !truth->is_primary(ancestor) ||
-        truth->isEmbeded(ancestor->get_track_id()) != signal_embedding_id_)
-    {
-      continue;
-    }
-    candidates.push_back({Pi0Pathway::g4_secondary_decay,
-        ancestor->get_track_id(), nullptr, pi0, found->second});
-  }
-
   for (const Pi0Candidate& candidate : candidates)
   {
     double parent_eta = 0.0;
@@ -429,10 +394,6 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
     if (candidate.pathway == Pi0Pathway::g4_primary_decay)
     {
       ++n_pi0_candidate_g4_primary_;
-    }
-    else if (candidate.pathway == Pi0Pathway::g4_secondary_decay)
-    {
-      ++n_pi0_candidate_g4_secondary_;
     }
     else
     {
@@ -614,8 +575,6 @@ void PythiaPi0ClusterMultiplicity::create_output()
   metadata_tree_->Branch("pi0_candidate_count", &n_pi0_candidate_);
   metadata_tree_->Branch("pi0_candidate_g4_primary_count",
                          &n_pi0_candidate_g4_primary_);
-  metadata_tree_->Branch("pi0_candidate_g4_secondary_count",
-                         &n_pi0_candidate_g4_secondary_);
   metadata_tree_->Branch("pi0_candidate_generator_count",
                          &n_pi0_candidate_generator_);
   metadata_tree_->Branch("pi0_malformed_daughters_count",

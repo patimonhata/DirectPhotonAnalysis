@@ -57,7 +57,6 @@ struct PartialMetadata
   unsigned long long cluster_invalid_truth = 0;
   unsigned long long candidate_count = 0;
   unsigned long long candidate_g4_primary = 0;
-  unsigned long long candidate_g4_secondary = 0;
   unsigned long long candidate_generator = 0;
   unsigned long long malformed_daughters = 0;
   unsigned long long pair_evaluated = 0;
@@ -123,8 +122,6 @@ bool read_metadata(const std::string& path, PartialMetadata& value)
   ok &= bind(tree, "pi0_candidate_count", &value.candidate_count);
   ok &= bind(tree, "pi0_candidate_g4_primary_count",
              &value.candidate_g4_primary);
-  ok &= bind(tree, "pi0_candidate_g4_secondary_count",
-             &value.candidate_g4_secondary);
   ok &= bind(tree, "pi0_candidate_generator_count",
              &value.candidate_generator);
   ok &= bind(tree, "pi0_malformed_daughters_count",
@@ -133,7 +130,8 @@ bool read_metadata(const std::string& path, PartialMetadata& value)
              &value.pair_evaluated);
   ok &= bind(tree, "pi0_cluster_pair_positive_count",
              &value.pair_positive);
-  if (!ok || tree->GetEntry(0) <= 0 || !manifest_path || !first_suffix ||
+  if (!ok || tree->GetEntry(0) <= 0 || value.schema_version != 2 ||
+      !manifest_path || !first_suffix ||
       !last_suffix || !cluster_collection || !pi0_selection ||
       !cluster_selection || !fraction_definition || !zero_threshold_definition)
   {
@@ -199,8 +197,8 @@ std::vector<std::string> histogram_names()
       "h_pi0_compatible_fraction_vs_cluster_energy_raw"};
   const std::array<std::string, 4> thresholds = {
       "0p0", "0p1", "0p3", "0p5"};
-  const std::array<std::string, 3> pathways = {
-      "g4_primary", "g4_secondary", "generator"};
+  const std::array<std::string, 2> pathways = {
+      "g4_primary", "generator"};
   for (const std::string& threshold : thresholds)
   {
     result.push_back(
@@ -227,10 +225,6 @@ unsigned long long expected_entries(const std::string& name,
   {
     return metadata.candidate_g4_primary;
   }
-  if (name.find("_g4_secondary_raw") != std::string::npos)
-  {
-    return metadata.candidate_g4_secondary;
-  }
   if (name.find("_generator_raw") != std::string::npos)
   {
     return metadata.candidate_generator;
@@ -253,9 +247,9 @@ bool make_output_directory(const std::string& output_base)
 
 int FinalizePythiaPi0ClusterMultiplicity(
     const std::string partial_pattern =
-        "output/pi0_cluster_multiplicity_partial/pilot_eta07_no_cluster_energy_cut/partial_*.root",
+        "output/pi0_cluster_multiplicity_partial/pilot_primary_generator_eta07_no_cluster_energy_cut/partial_*.root",
     const std::string output_base =
-        "output/plots/pi0_cluster_multiplicity_eta07_no_cluster_energy_cut",
+        "output/plots/pi0_cluster_multiplicity_primary_generator_eta07_no_cluster_energy_cut",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {
@@ -322,7 +316,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
   total.events_processed = total.events_written = total.events_invalid = 0;
   total.cluster_considered = total.cluster_invalid_truth = 0;
   total.candidate_count = total.candidate_g4_primary =
-      total.candidate_g4_secondary = total.candidate_generator = 0;
+      total.candidate_generator = 0;
   total.malformed_daughters = total.pair_evaluated = total.pair_positive = 0;
 
   for (const PartialMetadata& partial : partials)
@@ -364,7 +358,6 @@ int FinalizePythiaPi0ClusterMultiplicity(
     total.cluster_invalid_truth += partial.cluster_invalid_truth;
     total.candidate_count += partial.candidate_count;
     total.candidate_g4_primary += partial.candidate_g4_primary;
-    total.candidate_g4_secondary += partial.candidate_g4_secondary;
     total.candidate_generator += partial.candidate_generator;
     total.malformed_daughters += partial.malformed_daughters;
     total.pair_evaluated += partial.pair_evaluated;
@@ -515,7 +508,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
   }
   summary.Write();
 
-  int output_schema_version = 1;
+  int output_schema_version = 2;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -556,8 +549,6 @@ int FinalizePythiaPi0ClusterMultiplicity(
   metadata.Branch("pi0_candidate_count", &total.candidate_count);
   metadata.Branch("pi0_candidate_g4_primary_count",
                   &total.candidate_g4_primary);
-  metadata.Branch("pi0_candidate_g4_secondary_count",
-                  &total.candidate_g4_secondary);
   metadata.Branch("pi0_candidate_generator_count",
                   &total.candidate_generator);
   metadata.Branch("pi0_malformed_daughters_count",

@@ -68,9 +68,9 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 1;
+  static constexpr int schema_version_ = 2;
   static constexpr std::size_t threshold_count_ = 4U;
-  static constexpr std::size_t pathway_count_ = 3U;
+  static constexpr std::size_t pathway_count_ = 2U;
 
   void create_output_directory() const;
   void create_output();
@@ -87,7 +87,7 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
   std::string split_cluster_node_name_ = "CLUSTERINFO_CEMC";
   std::string cluster_collection_ = "split";
   std::string pi0_selection_ =
-      "g4_pi0_decay_including_secondary_or_generator_photon_with_pi0_origin";
+      "g4_primary_pi0_decay_or_generator_photon_pair_with_hepmc_pi0_origin";
   std::string cluster_selection_ =
       "finite_cluster_kinematics_and_eta_acceptance_without_energy_threshold";
   std::string fraction_definition_ =
@@ -124,7 +124,6 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
   unsigned long long n_cluster_invalid_truth_ = 0;
   unsigned long long n_pi0_candidate_ = 0;
   unsigned long long n_pi0_candidate_g4_primary_ = 0;
-  unsigned long long n_pi0_candidate_g4_secondary_ = 0;
   unsigned long long n_pi0_candidate_generator_ = 0;
   unsigned long long n_pi0_malformed_daughters_ = 0;
   unsigned long long n_pi0_cluster_pair_evaluated_ = 0;

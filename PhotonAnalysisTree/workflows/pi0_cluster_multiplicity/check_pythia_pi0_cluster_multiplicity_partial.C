@@ -68,8 +68,8 @@ std::set<std::string> expected_keys()
       "h_pi0_compatible_fraction_vs_cluster_energy_raw"};
   const std::array<std::string, 4> thresholds = {
       "0p0", "0p1", "0p3", "0p5"};
-  const std::array<std::string, 3> pathways = {
-      "g4_primary", "g4_secondary", "generator"};
+  const std::array<std::string, 2> pathways = {
+      "g4_primary", "generator"};
   for (const std::string& threshold : thresholds)
   {
     result.insert("h_pi0_cluster_multiplicity_fmin_" + threshold + "_raw");
@@ -143,7 +143,6 @@ int check_pythia_pi0_cluster_multiplicity_partial(
   unsigned long long cluster_invalid_truth = 0;
   unsigned long long candidate_count = 0;
   unsigned long long candidate_g4_primary = 0;
-  unsigned long long candidate_g4_secondary = 0;
   unsigned long long candidate_generator = 0;
   unsigned long long malformed_daughters = 0;
   unsigned long long pair_evaluated = 0;
@@ -182,8 +181,6 @@ int check_pythia_pi0_cluster_multiplicity_partial(
   ok &= bind(metadata, "pi0_candidate_count", &candidate_count);
   ok &= bind(metadata, "pi0_candidate_g4_primary_count",
              &candidate_g4_primary);
-  ok &= bind(metadata, "pi0_candidate_g4_secondary_count",
-             &candidate_g4_secondary);
   ok &= bind(metadata, "pi0_candidate_generator_count", &candidate_generator);
   ok &= bind(metadata, "pi0_malformed_daughters_count", &malformed_daughters);
   ok &= bind(metadata, "pi0_cluster_pair_evaluated_count", &pair_evaluated);
@@ -195,7 +192,7 @@ int check_pythia_pi0_cluster_multiplicity_partial(
 
   const std::array<double, 4> expected_thresholds = {0.0, 0.1, 0.3, 0.5};
   const bool valid_metadata =
-      schema_version == 1 && manifest_path && !manifest_path->empty() &&
+      schema_version == 2 && manifest_path && !manifest_path->empty() &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() && last_suffix &&
       !last_suffix->empty() && cluster_collection &&
@@ -211,8 +208,7 @@ int check_pythia_pi0_cluster_multiplicity_partial(
       cluster_energy_cut_applied == 0U && thresholds == expected_thresholds &&
       events_written + events_invalid == events_processed &&
       cluster_invalid_truth <= cluster_considered &&
-      candidate_count == candidate_g4_primary + candidate_g4_secondary +
-          candidate_generator &&
+      candidate_count == candidate_g4_primary + candidate_generator &&
       pair_positive <= pair_evaluated;
   if (!valid_metadata)
   {
@@ -223,10 +219,10 @@ int check_pythia_pi0_cluster_multiplicity_partial(
 
   const std::array<std::string, 4> threshold_tags = {
       "0p0", "0p1", "0p3", "0p5"};
-  const std::array<std::string, 3> pathway_tags = {
-      "g4_primary", "g4_secondary", "generator"};
-  const std::array<unsigned long long, 3> pathway_entries = {
-      candidate_g4_primary, candidate_g4_secondary, candidate_generator};
+  const std::array<std::string, 2> pathway_tags = {
+      "g4_primary", "generator"};
+  const std::array<unsigned long long, 2> pathway_entries = {
+      candidate_g4_primary, candidate_generator};
   for (const std::string& threshold : threshold_tags)
   {
     TH1D* multiplicity = nullptr;

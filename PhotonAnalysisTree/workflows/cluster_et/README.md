@@ -21,29 +21,25 @@ dominant truth-contribution fraction of at least 0.5.
 
 - Prompt clusters have a dominant G4-primary photon whose HepMC classifier
   category is direct (1) or fragmentation (2), with `|eta_truth| < 0.7`.
-- Pi0-origin clusters include three production pathways. A HepMC pi0 transported
+- Pi0-origin clusters include two production pathways. A HepMC pi0 transported
   into Geant4 is identified through its matching G4 primary. A pi0 decayed by
   the generator is identified through the G4-primary photon and its HepMC
-  photon-copy chain. A secondary pi0 produced after a transported long-lived
-  particle travels is identified by tracing that pi0 back to the contributing
-  signal G4 primary and then using its own two G4 photon daughters. The eta cut
-  is applied to the parent pi0. The reduced truth record has no creator-process
-  label, so the secondary category includes both displaced decays and secondary
-  pi0 production in material; this limitation is retained in the metadata
-  selection string and should be treated as a systematic choice.
+  photon-copy chain. The eta cut is applied to the parent pi0. G4-secondary
+  pi0s produced during detector transport are excluded from both the inclusive
+  pi0-origin histogram and all topology classifications.
 
 Pathway-specific counters are retained so that the Detroit-production
 assumption can be checked rather than imposed.
 
 ## Geometry and topology
 
-For every signal pi0 with exactly two photon daughters, including secondary
-pi0s from displaced parent decays, each G4 photon is
+For every selected G4-primary or generator-decayed signal pi0 with exactly two
+photon daughters, each G4 photon is
 projected from its own `PHG4VtxPoint` along its momentum to the CEMC cylinder.
-This preserves displaced decays. The projected surface `(eta,phi)` is compared
-with the RawCluster centroid expressed in the same detector-origin coordinate.
-Only clusters containing an ancestry-compatible pi0 contribution above the
-configured fraction are candidates.
+The projected surface `(eta,phi)` is compared with the RawCluster centroid
+expressed in the same detector-origin coordinate. Only clusters containing an
+ancestry-compatible contribution from that selected pi0 above the configured
+fraction are candidates.
 
 The exclusive priority is:
 
@@ -95,7 +91,7 @@ complete contiguous range with:
 
 ```bash
 root -l -b -q \
-  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_pi0_eta07_energy_contribution/partial_*.root","output/plots/newtempminbias_cluster_et_prompt_pi0_eta07",0,200000)'
+  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_primary_generator_pi0_eta07_energy_contribution_0p3/partial_*.root","output/plots/cluster_et_prompt_primary_generator_pi0_eta07",0,200000)'
 ```
 
 

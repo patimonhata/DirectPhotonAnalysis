@@ -43,8 +43,7 @@ namespace
 enum class Pi0Pathway : int
 {
   g4_primary_decay = 1,
-  g4_secondary_decay = 2,
-  generator_decay = 3
+  generator_decay = 2
 };
 
 struct Pi0Origin
@@ -290,10 +289,6 @@ bool contributor_matches_pi0(const photon_tree::TruthContributor& contributor,
   }
   const HepMC::GenParticle* particle =
       contributor_hepmc_particle(contributor, event_map);
-  if (pathway == Pi0Pathway::g4_secondary_decay)
-  {
-    return contributor.g4_track_id == parent_barcode;
-  }
   if (pathway == Pi0Pathway::g4_primary_decay)
   {
     return contributor.g4_pdg_id == 111 && particle &&
@@ -404,7 +399,6 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
     cluster_records.push_back(std::move(record));
   }
 
-  std::set<const RawCluster*> pi0_clusters_filled;
   for (const ClusterRecord& cluster : cluster_records) {
     if (!cluster.truth.valid || cluster.truth.contributors.empty()) {
       continue;
@@ -443,11 +437,12 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
     }
     if (from_pi0) {
       h_pi0_->Fill(cluster.et);
-      pi0_clusters_filled.insert(cluster.cluster);
       ++n_pi0_cluster_;
     }
   }
 
+  // G4 secondaries are inspected only to recover the photon daughters of a
+  // selected G4-primary pi0. A G4-secondary pi0 is not itself a candidate.
   std::map<int, std::vector<const PHG4Particle*>> children_by_parent;
   const auto secondary_range = truth->GetSecondaryParticleRange();
   for (auto iterator = secondary_range.first; iterator != secondary_range.second; ++iterator) {
@@ -488,27 +483,6 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
       candidates.push_back({Pi0Pathway::generator_decay, barcode, origin.parent, nullptr, {}});
     }
     candidates[position->second].photons.push_back(primary);
-  }
-
-  for (auto iterator = secondary_range.first; iterator != secondary_range.second; ++iterator) {
-    const PHG4Particle* pi0 = iterator->second;
-    if (!pi0 || pi0->get_pid() != 111) {
-      continue;
-    }
-    const auto found = children_by_parent.find(pi0->get_track_id());
-    if (found == children_by_parent.end() || found->second.size() != 2U || found->second[0]->get_pid() != 22 || found->second[1]->get_pid() != 22) {
-      ++n_pi0_malformed_daughters_;
-      continue;
-    }
-    const PHG4Particle* ancestor = pi0;
-    std::set<int> visited;
-    while (ancestor && !truth->is_primary(ancestor) && visited.insert(ancestor->get_track_id()).second) {
-      ancestor = truth->GetParticle(ancestor->get_parent_id());
-    }
-    if (!ancestor || !truth->is_primary(ancestor) || truth->isEmbeded(ancestor->get_track_id()) != signal_embedding_id_) {
-      continue;
-    }
-    candidates.push_back({Pi0Pathway::g4_secondary_decay, ancestor->get_track_id(), nullptr, pi0, found->second});
   }
 
   const double target_radius = cemc_radius(geometry);
@@ -643,17 +617,6 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
       ++n_pi0_projection_failure_;
       continue;
     }
-    if (candidate.pathway == Pi0Pathway::g4_secondary_decay) {
-      for (const std::size_t index : eligible) {
-        const ClusterRecord& cluster = cluster_records[index];
-        if (pi0_clusters_filled.insert(cluster.cluster).second) {
-          h_pi0_->Fill(cluster.et);
-          ++n_pi0_cluster_;
-          ++n_pi0_cluster_g4_decay_;
-        }
-      }
-    }
-
     std::array<std::size_t, 2> individual = {invalid_index, invalid_index};
     std::array<double, 2> individual_distance = {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity()};
     for (std::size_t photon = 0; photon < 2U; ++photon) {

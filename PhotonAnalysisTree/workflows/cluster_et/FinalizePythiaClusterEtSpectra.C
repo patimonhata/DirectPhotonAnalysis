@@ -231,7 +231,7 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
   const unsigned long long candidate_count =
       value.pi0_candidate_g4_decay_count +
       value.pi0_candidate_generator_decay_count;
-  return value.schema_version == 2 &&
+  return value.schema_version == 3 &&
       value.manifest_path == reference.manifest_path &&
       value.cluster_collection == reference.cluster_collection &&
       value.prompt_selection == reference.prompt_selection &&
@@ -625,7 +625,7 @@ int FinalizePythiaClusterEtSpectra(
     density[index]->Write();
   }
 
-  int output_schema_version = 2;
+  int output_schema_version = 3;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count =

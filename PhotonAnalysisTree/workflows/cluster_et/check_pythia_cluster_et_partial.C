@@ -219,11 +219,13 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   }
 
   const unsigned long long candidate_count = candidate_g4_count + candidate_generator_count;
-  const bool valid_metadata = schema_version == 2 && manifest_path &&
+  const bool valid_metadata = schema_version == 3 && manifest_path &&
       !manifest_path->empty() && manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() && last_suffix && !last_suffix->empty() &&
       cluster_collection && *cluster_collection == "split" && prompt_selection &&
       *prompt_selection == "dominant_prompt_category_1_or_2" && pi0_selection &&
+      *pi0_selection ==
+          "g4_primary_pi0_decay_or_generator_photon_with_hepmc_pi0_origin" &&
       topology_priority && *topology_priority ==
           "separated_then_merged_then_missing_then_none" &&
       projection_scheme && *projection_scheme ==

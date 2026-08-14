@@ -65,7 +65,7 @@ class PythiaClusterEtSpectrum : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 2;
+  static constexpr int schema_version_ = 3;
 
   void create_output_directory() const;
   void create_output();
@@ -85,7 +85,7 @@ class PythiaClusterEtSpectrum : public SubsysReco
   std::string split_cluster_node_name_ = "CLUSTERINFO_CEMC";
   std::string cluster_collection_ = "split";
   std::string prompt_selection_ = "dominant_prompt_category_1_or_2";
-  std::string pi0_selection_ = "g4_pi0_decay_including_secondary_or_generator_photon_with_pi0_origin";
+  std::string pi0_selection_ = "g4_primary_pi0_decay_or_generator_photon_with_hepmc_pi0_origin";
   std::string topology_priority_ = "separated_then_merged_then_missing_then_none";
   std::string projection_scheme_ = "g4_photon_vertex_and_momentum_to_cemc_cylinder";
   std::string energy_topology_priority_ = "separated_then_merged_then_missing_then_none";

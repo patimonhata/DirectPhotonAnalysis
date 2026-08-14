@@ -341,9 +341,9 @@ double smallest_positive(
 
 int FinalizePythiaClusterEtSpectra(
     const std::string partial_pattern =
-        "output/cluster_et_partial/prompt_pi0_eta07_energy_contribution/partial_*.root",
+        "output/cluster_et_partial_jet3/prompt_primary_generator_pi0_eta07_energy_contribution_primary_0p3/partial_*.root",
     const std::string output_base =
-        "output/plots/newnewtempminbias_cluster_et_prompt_pi0_eta07",
+        "output/plots/cluster_et_jet3_prompt_primary_generator_pi0_eta07_0p3",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {
@@ -566,7 +566,8 @@ int FinalizePythiaClusterEtSpectra(
         }
         const double minimum = smallest_positive(raw, indices);
         raw[indices[0]]->SetMinimum(minimum > 0.0 ? 0.5 * minimum : 0.5);
-        raw[indices[0]]->SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
+        // raw[indices[0]]->SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
+        raw[indices[0]]->SetMaximum(1e10);
 
         TCanvas canvas(canvas_name.c_str(), "Pythia cluster ET spectra",
                        1000, 800);

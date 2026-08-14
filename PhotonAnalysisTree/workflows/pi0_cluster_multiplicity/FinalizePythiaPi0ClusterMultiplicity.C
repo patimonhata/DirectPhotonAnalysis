@@ -249,7 +249,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
     const std::string partial_pattern =
         "output/pi0_cluster_multiplicity_partial/pilot_primary_generator_eta07_no_cluster_energy_cut/partial_*.root",
     const std::string output_base =
-        "output/plots/pi0_cluster_multiplicity_primary_generator_eta07_no_cluster_energy_cut",
+        "output/plots/pi0_cluster_multiplicity_primary_generator_eta07_no_cluster_energy_cut_primary_0p3",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {

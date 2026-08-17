@@ -312,9 +312,9 @@ double smallest_positive(
 
 int FinalizePythiaPi0AnchorClusterSpectra(
     const std::string partial_pattern =
-        "output/pi0_anchor_topology_partial/pilot_eta07_full_partner_fgamma0p3/partial_*.root",
+        "output/pi0_anchor_topology_partial/eta07_full_partner_fgamma0p3_jet5/partial_*.root",
     const std::string output_base =
-        "output/plots/pi0_anchor_topology_eta07_full_partner_fgamma0p3",
+        "output/plots/pi0_anchor_topology/jet5/eta07_full_partner_fgamma0p3",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {

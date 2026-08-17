@@ -207,17 +207,12 @@ double smallest_positive_bin(const std::vector<TH1D*>& histograms)
 }
 
 int FinalizePythiaTruthPtSpectra(
-    const std::string partial_pattern =
-        "output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root",
-    const std::string output_base =
-        "output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",
+    const std::string partial_pattern = "output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root",
+    const std::string output_base = "output/plots/turth_pT/minbias_prompt_eta07_inclusive_pi0_decay",
     const Long64_t expected_manifest_begin = 0,
     const Long64_t expected_manifest_end = -1)
 {
-  if (partial_pattern.empty() || output_base.empty() || expected_manifest_begin < 0 ||
-      expected_manifest_end < -1 ||
-      (expected_manifest_end >= 0 && expected_manifest_end <= expected_manifest_begin))
-  {
+  if (partial_pattern.empty() || output_base.empty() || expected_manifest_begin < 0 || expected_manifest_end < -1 || (expected_manifest_end >= 0 && expected_manifest_end <= expected_manifest_begin)) {
     std::cerr << "FinalizePythiaTruthPtSpectra - invalid argument" << std::endl;
     return 1;
   }
@@ -225,24 +220,19 @@ int FinalizePythiaTruthPtSpectra(
   TChain partial_chain("metadata");
   const int matched_files = partial_chain.Add(partial_pattern.c_str());
   const TObjArray* file_elements = partial_chain.GetListOfFiles();
-  if (matched_files <= 0 || !file_elements || file_elements->GetEntries() <= 0)
-  {
-    std::cerr << "FinalizePythiaTruthPtSpectra - no partial files matched "
-              << partial_pattern << std::endl;
+  if (matched_files <= 0 || !file_elements || file_elements->GetEntries() <= 0) {
+    std::cerr << "FinalizePythiaTruthPtSpectra - no partial files matched " << partial_pattern << std::endl;
     return 2;
   }
 
   std::vector<PartialMetadata> partials;
   std::set<std::string> unique_paths;
-  for (int index = 0; index < file_elements->GetEntries(); ++index)
-  {
+  for (int index = 0; index < file_elements->GetEntries(); ++index) {
     const TObject* element = file_elements->At(index);
     const std::string path = element ? element->GetTitle() : "";
     PartialMetadata metadata;
-    if (path.empty() || !unique_paths.insert(path).second || !read_metadata(path, metadata))
-    {
-      std::cerr << "FinalizePythiaTruthPtSpectra - invalid or duplicate partial: "
-                << path << std::endl;
+    if (path.empty() || !unique_paths.insert(path).second || !read_metadata(path, metadata)) {
+      std::cerr << "FinalizePythiaTruthPtSpectra - invalid or duplicate partial: " << path << std::endl;
       return 3;
     }
     partials.push_back(metadata);
@@ -253,10 +243,8 @@ int FinalizePythiaTruthPtSpectra(
 
   const PartialMetadata& reference = partials.front();
   Long64_t next_begin = expected_manifest_begin;
-  for (const PartialMetadata& partial : partials)
-  {
-    if (!compatible(partial, reference) || partial.manifest_begin != next_begin)
-    {
+  for (const PartialMetadata& partial : partials) {
+    if (!compatible(partial, reference) || partial.manifest_begin != next_begin) {
       std::cerr << "FinalizePythiaTruthPtSpectra - incompatible, missing, or overlapping range at "
                 << partial.path << "; expected begin " << next_begin << ", observed ["
                 << partial.manifest_begin << ":" << partial.manifest_end << "]" << std::endl;
@@ -264,10 +252,8 @@ int FinalizePythiaTruthPtSpectra(
     }
     next_begin = partial.manifest_end;
   }
-  if (expected_manifest_end >= 0 && next_begin != expected_manifest_end)
-  {
-    std::cerr << "FinalizePythiaTruthPtSpectra - final manifest end mismatch: "
-              << next_begin << " != " << expected_manifest_end << std::endl;
+  if (expected_manifest_end >= 0 && next_begin != expected_manifest_end) {
+    std::cerr << "FinalizePythiaTruthPtSpectra - final manifest end mismatch: " << next_begin << " != " << expected_manifest_end << std::endl;
     return 4;
   }
 
@@ -275,13 +261,9 @@ int FinalizePythiaTruthPtSpectra(
   TH1D prompt_raw("h_prompt_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
   TH1D pi0_raw("h_pi0_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
   TH1D pi0_decay_raw("h_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
-  TH1D hepmc_pi0_decay_raw(
-      "h_hepmc_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
-  TH1D g4_pi0_decay_raw(
-      "h_g4_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
-  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw,
-                           &hepmc_pi0_decay_raw, &g4_pi0_decay_raw})
-  {
+  TH1D hepmc_pi0_decay_raw("h_hepmc_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
+  TH1D g4_pi0_decay_raw("h_g4_pi0_decay_photon_truth_pt_raw", "", reference.n_bins, 0.0, reference.pt_max);
+  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw, &hepmc_pi0_decay_raw, &g4_pi0_decay_raw}) {
     histogram->Sumw2();
   }
 
@@ -292,8 +274,7 @@ int FinalizePythiaTruthPtSpectra(
   ULong64_t total_pi0_decay_photons = 0ULL;
   ULong64_t total_hepmc_pi0_decay_photons = 0ULL;
   ULong64_t total_g4_pi0_decay_photons = 0ULL;
-  for (const PartialMetadata& partial : partials)
-  {
+  for (const PartialMetadata& partial : partials) {
     TFile input(partial.path.c_str(), "READ");
     TH1D* prompt = nullptr;
     TH1D* pi0 = nullptr;
@@ -319,8 +300,7 @@ int FinalizePythiaTruthPtSpectra(
         hepmc_pi0_decay_raw.Add(hepmc_pi0_decay) == false ||
         g4_pi0_decay_raw.Add(g4_pi0_decay) == false)
     {
-      std::cerr << "FinalizePythiaTruthPtSpectra - invalid histogram in "
-                << partial.path << std::endl;
+      std::cerr << "FinalizePythiaTruthPtSpectra - invalid histogram in " << partial.path << std::endl;
       return 5;
     }
     total_input_files += partial.files_added;
@@ -331,63 +311,45 @@ int FinalizePythiaTruthPtSpectra(
     total_hepmc_pi0_decay_photons += partial.hepmc_pi0_decay_photon_count;
     total_g4_pi0_decay_photons += partial.g4_pi0_decay_photon_count;
   }
-  if (total_pi0_decay_photons !=
-      total_hepmc_pi0_decay_photons + total_g4_pi0_decay_photons)
-  {
+  if (total_pi0_decay_photons != total_hepmc_pi0_decay_photons + total_g4_pi0_decay_photons) {
     std::cerr << "FinalizePythiaTruthPtSpectra - inconsistent pi0 decay totals" << std::endl;
     return 5;
   }
 
-  std::unique_ptr<TH1D> prompt_density(
-      static_cast<TH1D*>(prompt_raw.Clone("h_prompt_photon_truth_pt_density")));
-  std::unique_ptr<TH1D> pi0_density(
-      static_cast<TH1D*>(pi0_raw.Clone("h_pi0_truth_pt_density")));
-  std::unique_ptr<TH1D> pi0_decay_density(
-      static_cast<TH1D*>(pi0_decay_raw.Clone("h_pi0_decay_photon_truth_pt_density")));
-  std::unique_ptr<TH1D> hepmc_pi0_decay_density(
-      static_cast<TH1D*>(hepmc_pi0_decay_raw.Clone(
-          "h_hepmc_pi0_decay_photon_truth_pt_density")));
-  std::unique_ptr<TH1D> g4_pi0_decay_density(
-      static_cast<TH1D*>(g4_pi0_decay_raw.Clone(
-          "h_g4_pi0_decay_photon_truth_pt_density")));
-  for (TH1D* histogram : {prompt_density.get(), pi0_density.get(), pi0_decay_density.get(),
-                           hepmc_pi0_decay_density.get(), g4_pi0_decay_density.get()})
-  {
+  std::unique_ptr<TH1D> prompt_density(static_cast<TH1D*>(prompt_raw.Clone("h_prompt_photon_truth_pt_density")));
+  std::unique_ptr<TH1D> pi0_density(static_cast<TH1D*>(pi0_raw.Clone("h_pi0_truth_pt_density")));
+  std::unique_ptr<TH1D> pi0_decay_density(static_cast<TH1D*>(pi0_decay_raw.Clone("h_pi0_decay_photon_truth_pt_density")));
+  std::unique_ptr<TH1D> hepmc_pi0_decay_density(static_cast<TH1D*>(hepmc_pi0_decay_raw.Clone("h_hepmc_pi0_decay_photon_truth_pt_density")));
+  std::unique_ptr<TH1D> g4_pi0_decay_density(static_cast<TH1D*>(g4_pi0_decay_raw.Clone("h_g4_pi0_decay_photon_truth_pt_density")));
+  for (TH1D* histogram : {prompt_density.get(), pi0_density.get(), pi0_decay_density.get(), hepmc_pi0_decay_density.get(), g4_pi0_decay_density.get()}) {
     histogram->Scale(1.0, "width");
     histogram->SetStats(false);
     histogram->SetFillStyle(0);
     histogram->SetLineWidth(3);
     histogram->GetXaxis()->SetTitle("Truth p_{T} [GeV/#it{c}]");
-    histogram->GetYaxis()->SetTitle(reference.use_event_weight
-        ? "Weighted particles / (GeV/#it{c})" : "Particles / (GeV/#it{c})");
+    histogram->GetYaxis()->SetTitle(reference.use_event_weight ? "Weighted particles / (GeV/#it{c})" : "Particles / (GeV/#it{c})");
   }
   prompt_density->SetLineColor(kRed + 1);
   pi0_density->SetLineColor(kBlue + 1);
   pi0_decay_density->SetLineColor(kGreen + 2);
 
-  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw,
-                           &hepmc_pi0_decay_raw, &g4_pi0_decay_raw})
-  {
+  for (TH1D* histogram : {&prompt_raw, &pi0_raw, &pi0_decay_raw, &hepmc_pi0_decay_raw, &g4_pi0_decay_raw}) {
     histogram->SetStats(false);
     histogram->SetFillStyle(0);
     histogram->SetLineWidth(3);
     histogram->GetXaxis()->SetTitle("Truth p_{T} [GeV/#it{c}]");
-    histogram->GetYaxis()->SetTitle(reference.use_event_weight
-        ? "Weighted counts / bin" : "Counts / bin");
+    histogram->GetYaxis()->SetTitle(reference.use_event_weight ? "Weighted counts / bin" : "Counts / bin");
   }
   prompt_raw.SetLineColor(kRed + 1);
   pi0_raw.SetLineColor(kBlue + 1);
   pi0_decay_raw.SetLineColor(kGreen + 2);
 
-  const double maximum = std::max({prompt_raw.GetMaximum(),
-      pi0_raw.GetMaximum(), pi0_decay_raw.GetMaximum()});
-  const double smallest = smallest_positive_bin(
-      {&prompt_raw, &pi0_raw, &pi0_decay_raw});
+  const double maximum = std::max({prompt_raw.GetMaximum(), pi0_raw.GetMaximum(), pi0_decay_raw.GetMaximum()});
+  const double smallest = smallest_positive_bin({&prompt_raw, &pi0_raw, &pi0_decay_raw});
   prompt_raw.SetMinimum(smallest > 0.0 ? 0.5 * smallest : 0.5);
   prompt_raw.SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
 
-  if (!make_output_directory(output_base))
-  {
+  if (!make_output_directory(output_base)) {
     std::cerr << "FinalizePythiaTruthPtSpectra - cannot create output directory" << std::endl;
     return 6;
   }
@@ -414,8 +376,7 @@ int FinalizePythiaTruthPtSpectra(
   canvas.SaveAs((output_base + ".pdf").c_str());
 
   TFile output((output_base + ".root").c_str(), "RECREATE");
-  if (output.IsZombie())
-  {
+  if (output.IsZombie()) {
     return 6;
   }
   prompt_raw.Write();
@@ -468,8 +429,7 @@ int FinalizePythiaTruthPtSpectra(
   metadata.Fill();
   metadata.Write();
   output.Close();
-  if (output.TestBit(TFile::kWriteError))
-  {
+  if (output.TestBit(TFile::kWriteError)) {
     return 6;
   }
 

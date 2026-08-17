@@ -341,9 +341,9 @@ double smallest_positive(
 
 int FinalizePythiaClusterEtSpectra(
     const std::string partial_pattern =
-        "output/cluster_et_partial_jet3/prompt_primary_generator_pi0_eta07_energy_contribution_primary_0p3/partial_*.root",
+        "output/cluster_et_partial_jet3/prompt_primary_generator_pi0_eta07_energy_contribution_anchor_0p3/partial_*.root",
     const std::string output_base =
-        "output/plots/cluster_et_jet3_prompt_primary_generator_pi0_eta07_0p3",
+        "output/plots/cluster_et_prompt_primary_generator_pi0_eta07_anchor_0p3",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {

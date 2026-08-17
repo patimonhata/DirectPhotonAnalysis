@@ -231,7 +231,10 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
       anchor_pi0_fraction_min_ >= 0.0 &&
       anchor_pi0_fraction_min_ <= 1.0 &&
       min_energy_contribution_fraction_ >= 0.0 &&
-      min_energy_contribution_fraction_ < 1.0;
+      min_energy_contribution_fraction_ < 1.0 &&
+      std::isfinite(min_photon_energy_recovery_) &&
+      min_photon_energy_recovery_ >= 0.0 &&
+      min_photon_energy_recovery_ <= 1.0;
   if (!valid)
   {
     std::cerr << "PythiaPi0AnchorClusterSpectrum::Init - invalid configuration"
@@ -552,9 +555,13 @@ int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
     const std::array<int, 2> direct_gamma_track_ids = {
         candidate.photons[0]->get_track_id(),
         candidate.photons[1]->get_track_id()};
+    const std::array<double, 2> truth_gamma_energy = {
+        candidate.photons[0]->get_e(),
+        candidate.photons[1]->get_e()};
     std::array<std::size_t, 2> best_cluster = {
         invalid_index, invalid_index};
     std::array<double, 2> maximum_edep = {-1.0, -1.0};
+    std::array<double, 2> reconstructed_photon_energy = {0.0, 0.0};
 
     for (std::size_t cluster_index = 0;
          cluster_index < cluster_records.size(); ++cluster_index)
@@ -580,8 +587,21 @@ int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
         {
           best_cluster[photon] = cluster_index;
           maximum_edep[photon] = deposit;
+          reconstructed_photon_energy[photon] =
+              cluster.cluster->get_energy() * fraction;
         }
       }
+    }
+    std::array<bool, 2> recovered = {false, false};
+    for (std::size_t photon = 0; photon < 2U; ++photon)
+    {
+      recovered[photon] =
+          best_cluster[photon] != invalid_index &&
+          std::isfinite(truth_gamma_energy[photon]) &&
+          std::isfinite(reconstructed_photon_energy[photon]) &&
+          truth_gamma_energy[photon] > 0.0 &&
+          reconstructed_photon_energy[photon] / truth_gamma_energy[photon] >=
+              min_photon_energy_recovery_;
     }
 
     for (const std::size_t anchor_position :
@@ -598,11 +618,11 @@ int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
       }
 
       const bool is_best0 =
-          best_cluster[0] == anchor.cluster_index;
+          recovered[0] && best_cluster[0] == anchor.cluster_index;
       const bool is_best1 =
-          best_cluster[1] == anchor.cluster_index;
-      const bool found0 = best_cluster[0] != invalid_index;
-      const bool found1 = best_cluster[1] != invalid_index;
+          recovered[1] && best_cluster[1] == anchor.cluster_index;
+      const bool found0 = recovered[0];
+      const bool found1 = recovered[1];
 
       if (is_best0 && is_best1)
       {
@@ -720,6 +740,8 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("topology_definition", &topology_definition_);
   metadata_tree_->Branch("topology_priority", &topology_priority_);
   metadata_tree_->Branch("response_policy", &response_policy_);
+  metadata_tree_->Branch(
+      "photon_recovery_policy", &photon_recovery_policy_);
   metadata_tree_->Branch("signal_embedding_id", &signal_embedding_id_);
   metadata_tree_->Branch("n_bins", &n_bins_);
   metadata_tree_->Branch("et_max", &et_max_);
@@ -736,6 +758,9 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch(
       "min_energy_contribution_fraction",
       &min_energy_contribution_fraction_);
+  metadata_tree_->Branch(
+      "min_photon_energy_recovery",
+      &min_photon_energy_recovery_);
   metadata_tree_->Branch(
       "pi0_truth_matching_algorithm_version",
       &pi0_truth_matching_algorithm_version_);

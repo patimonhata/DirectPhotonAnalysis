@@ -97,6 +97,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   double dominant_fraction_min = 0.0;
   double anchor_pi0_fraction_min = 0.0;
   double min_energy_contribution_fraction = 0.0;
+  double min_photon_energy_recovery = 0.0;
   unsigned char bin_width_normalized = 1U;
   std::string* manifest_path = nullptr;
   std::string* first_suffix = nullptr;
@@ -108,6 +109,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   std::string* topology_definition = nullptr;
   std::string* topology_priority = nullptr;
   std::string* response_policy = nullptr;
+  std::string* photon_recovery_policy = nullptr;
   unsigned long long events_processed = 0;
   unsigned long long events_written = 0;
   unsigned long long events_invalid = 0;
@@ -141,6 +143,8 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   ok &= bind(metadata, "topology_definition", &topology_definition);
   ok &= bind(metadata, "topology_priority", &topology_priority);
   ok &= bind(metadata, "response_policy", &response_policy);
+  ok &= bind(metadata, "photon_recovery_policy",
+             &photon_recovery_policy);
   ok &= bind(metadata, "signal_embedding_id", &signal_embedding_id);
   ok &= bind(metadata, "n_bins", &n_bins);
   ok &= bind(metadata, "et_max", &et_max);
@@ -153,6 +157,8 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
              &anchor_pi0_fraction_min);
   ok &= bind(metadata, "min_energy_contribution_fraction",
              &min_energy_contribution_fraction);
+  ok &= bind(metadata, "min_photon_energy_recovery",
+             &min_photon_energy_recovery);
   ok &= bind(metadata, "pi0_truth_matching_algorithm_version",
              &matcher_version);
   ok &= bind(metadata, "bin_width_normalized", &bin_width_normalized);
@@ -183,7 +189,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   }
 
   const bool valid_metadata =
-      schema_version == 1 && manifest_path && !manifest_path->empty() &&
+      schema_version == 3 && manifest_path && !manifest_path->empty() &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() &&
       last_suffix && !last_suffix->empty() &&
@@ -199,12 +205,15 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
           "same_energy_cut_as_anchor_partner_eta_cut_configurable" &&
       topology_definition &&
       *topology_definition ==
-          "anchor_membership_in_direct_daughter_maximum_deposit_clusters" &&
+          "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters" &&
       topology_priority &&
       *topology_priority ==
           "ambiguous_main_to_other_then_merged_then_separated_then_missing_then_other" &&
       response_policy &&
       *response_policy == "not_used_for_classification" &&
+      photon_recovery_policy &&
+      *photon_recovery_policy ==
+          "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
       signal_embedding_id > 0 && n_bins > 0 &&
       std::isfinite(et_max) && et_max > 0.0 &&
       std::isfinite(truth_eta_max) && truth_eta_max > 0.0 &&
@@ -217,6 +226,9 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       anchor_pi0_fraction_min <= 1.0 &&
       min_energy_contribution_fraction >= 0.0 &&
       min_energy_contribution_fraction < 1.0 &&
+      std::isfinite(min_photon_energy_recovery) &&
+      min_photon_energy_recovery >= 0.0 &&
+      min_photon_energy_recovery <= 1.0 &&
       matcher_version > 0 && bin_width_normalized == 0U &&
       events_processed > 0 &&
       events_written + events_invalid == events_processed &&

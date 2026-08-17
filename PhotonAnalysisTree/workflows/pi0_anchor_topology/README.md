@@ -31,19 +31,29 @@ E_cluster >= 0.2 GeV.
 ## Energy-deposit topology
 
 For each direct pi0 daughter photon, the matcher finds the cluster with maximum
-absolute daughter energy deposit among clusters satisfying
+absolute daughter energy deposit among clusters passing the shared cluster
+selection. A daughter photon is considered recovered only when its
+maximum-deposit cluster satisfies the calibrated-energy estimate
+
+    Erec_gamma = Ecluster * (Edep_gamma / Edep_total)
+
+    Erec_gamma / Etruth_gamma >= min_photon_energy_recovery
+
+with default threshold 0.5. The optional cluster-composition requirement
 
     Edep_gamma / Edep_cluster > min_energy_contribution_fraction
 
-with default threshold 0.3. There is no cluster/pi0 response cut.
+is applied while selecting the maximum-deposit cluster; its default is 0.0, so
+any positive daughter deposit is accepted. There is no cluster/pi0 response
+cut.
 
 For one anchor cluster:
 
-- merged: it is the maximum-deposit cluster of both daughter photons;
-- separated: it is the maximum-deposit cluster of one daughter and the other
-  daughter has a distinct valid maximum-deposit partner cluster;
-- missing: it is the maximum-deposit cluster of one daughter and the other
-  daughter has no valid cluster;
+- merged: it is the recovered maximum-deposit cluster of both daughter photons;
+- separated: it is the recovered maximum-deposit cluster of one daughter and
+  the other daughter has a distinct recovered maximum-deposit partner cluster;
+- missing: it is the recovered maximum-deposit cluster of one daughter and the
+  other daughter has no cluster passing the photon-energy recovery cut;
 - other: the anchor is the maximum-deposit cluster of neither daughter, its
   main-contributor assignment is tied, or no preceding definition applies.
 
@@ -52,24 +62,24 @@ maximum-deposit clusters can be merged, separated, or missing; the extra
 anchors are intentionally other. This preserves the exact cluster-level
 partition without duplicate fills.
 
-## Build and pilot
+## Build and production
 
 Build and install only after jobs using the current installed library have
 finished:
 
     PhotonAnalysisTree/src/build.sh
 
-submit.job defaults to a 100-file minimum-bias pilot in ten jobs. Review paths
-and parameters, then submit manually:
+submit.job is configured for the minimum-bias production. Review paths,
+file/job counts, and parameters before submitting manually:
 
-    condor_submit -maxjobs 10 workflows/pi0_anchor_topology/submit.job
+    condor_submit workflows/pi0_anchor_topology/submit.job
 
 No repository script submits jobs automatically. Each job writes
 transactionally and validates its partial before publication.
 
-Finalize a complete pilot with:
+Finalize a complete production with:
 
-    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/pilot_eta07_full_partner_fgamma0p3/partial_*.root","output/plots/pi0_anchor_topology_eta07_full_partner_fgamma0p3",0,100)'
+    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000)'
 
 The finalizer writes the combined raw and bin-width-normalized spectra, category
 fractions relative to the anchor spectrum, output_base.pdf, and

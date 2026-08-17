@@ -43,7 +43,8 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
     const double min_cluster_energy = 0.2,
     const double dominant_fraction_min = 0.5,
     const double anchor_pi0_fraction_min = 0.5,
-    const double min_energy_contribution_fraction = 0.3)
+    const double min_energy_contribution_fraction = 0.0,
+    const double min_photon_energy_recovery = 0.5)
 {
   if (manifest_path.empty() || output_file.empty() || manifest_begin < 0 ||
       manifest_end <= manifest_begin)
@@ -157,6 +158,8 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
   accumulator->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);
   accumulator->set_min_energy_contribution_fraction(
       min_energy_contribution_fraction);
+  accumulator->set_min_photon_energy_recovery(
+      min_photon_energy_recovery);
   accumulator->set_verbosity(1);
   server->registerSubsystem(accumulator);
 

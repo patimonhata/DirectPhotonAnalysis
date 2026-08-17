@@ -87,10 +87,14 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   {
     min_energy_contribution_fraction_ = value;
   }
+  void set_min_photon_energy_recovery(double value)
+  {
+    min_photon_energy_recovery_ = value;
+  }
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 1;
+  static constexpr int schema_version_ = 3;
 
   void create_output_directory() const;
   void create_output();
@@ -115,10 +119,12 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   std::string partner_selection_ =
       "same_energy_cut_as_anchor_partner_eta_cut_configurable";
   std::string topology_definition_ =
-      "anchor_membership_in_direct_daughter_maximum_deposit_clusters";
+      "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters";
   std::string topology_priority_ =
       "ambiguous_main_to_other_then_merged_then_separated_then_missing_then_other";
   std::string response_policy_ = "not_used_for_classification";
+  std::string photon_recovery_policy_ =
+      "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold";
   long long manifest_begin_ = -1;
   long long manifest_end_ = -1;
   int signal_embedding_id_ = 1;
@@ -130,7 +136,8 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   double min_cluster_energy_ = 0.2;
   double dominant_fraction_min_ = 0.5;
   double anchor_pi0_fraction_min_ = 0.5;
-  double min_energy_contribution_fraction_ = 0.3;
+  double min_energy_contribution_fraction_ = 0.0;
+  double min_photon_energy_recovery_ = 0.5;
   int verbosity_ = 0;
 
   int pi0_truth_matching_algorithm_version_ =

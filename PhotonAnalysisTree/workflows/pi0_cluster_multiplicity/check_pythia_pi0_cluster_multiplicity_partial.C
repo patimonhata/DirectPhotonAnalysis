@@ -123,7 +123,6 @@ int check_pythia_pi0_cluster_multiplicity_partial(
   double pt_max = 0.0;
   double cluster_energy_max = 0.0;
   double truth_eta_max = 0.0;
-  double cluster_eta_max = 0.0;
   unsigned char cluster_energy_cut_applied = 1U;
   std::array<double, 4> thresholds{};
   long long manifest_begin = -1;
@@ -169,7 +168,6 @@ int check_pythia_pi0_cluster_multiplicity_partial(
   ok &= bind(metadata, "cluster_energy_bins", &cluster_energy_bins);
   ok &= bind(metadata, "cluster_energy_max", &cluster_energy_max);
   ok &= bind(metadata, "truth_eta_max", &truth_eta_max);
-  ok &= bind(metadata, "cluster_eta_max", &cluster_eta_max);
   ok &= bind(metadata, "cluster_energy_cut_applied",
              &cluster_energy_cut_applied);
   ok &= bind(metadata, "fraction_thresholds", thresholds.data());
@@ -192,19 +190,21 @@ int check_pythia_pi0_cluster_multiplicity_partial(
 
   const std::array<double, 4> expected_thresholds = {0.0, 0.1, 0.3, 0.5};
   const bool valid_metadata =
-      schema_version == 2 && manifest_path && !manifest_path->empty() &&
+      schema_version == 3 && manifest_path && !manifest_path->empty() &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() && last_suffix &&
       !last_suffix->empty() && cluster_collection &&
       *cluster_collection == "split" && pi0_selection &&
       !pi0_selection->empty() && cluster_selection &&
-      !cluster_selection->empty() && fraction_definition &&
+      *cluster_selection ==
+          "finite_cluster_kinematics_without_eta_or_energy_threshold" &&
+      fraction_definition &&
       !fraction_definition->empty() && zero_threshold_definition &&
       *zero_threshold_definition == "strictly_positive_fraction" &&
       signal_embedding_id > 0 && truth_matcher_algorithm_version > 0 &&
       pt_bins > 0 && pt_max > 0.0 && multiplicity_max > 0 &&
       cluster_energy_bins > 0 && cluster_energy_max > 0.0 &&
-      truth_eta_max > 0.0 && cluster_eta_max > 0.0 &&
+      truth_eta_max > 0.0 &&
       cluster_energy_cut_applied == 0U && thresholds == expected_thresholds &&
       events_written + events_invalid == events_processed &&
       cluster_invalid_truth <= cluster_considered &&

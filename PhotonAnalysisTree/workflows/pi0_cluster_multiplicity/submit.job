@@ -10,12 +10,12 @@ Priority           = 20
 job_lease_duration = 86400
 
 # Defaults are a small 100-file pilot. Increase only after validating the pilot.
-total_files        = 100
+total_files        = 10000
 files_per_job      = 10
-n_chunks           = 10
+n_chunks           = 1000
 chunk_offset       = 0
-input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/minimum_bias/segments.list
-partial_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/pi0_cluster_multiplicity_partial/pilot_primary_generator_eta07_no_cluster_energy_cut
+input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/jet5/segments.list
+partial_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/pi0_cluster_multiplicity_partial/jet5/primary_generator_truth_eta07
 log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
 pt_bins            = 100
 pt_max             = 20.0
@@ -23,12 +23,11 @@ multiplicity_max   = 20
 cluster_energy_bins = 100
 cluster_energy_max = 20.0
 truth_eta_max      = 0.7
-cluster_eta_max    = 0.7
 
 Output             = $(log_directory)/pythia_pi0_cluster_multiplicity_$(ProcId).out
 Error              = $(log_directory)/pythia_pi0_cluster_multiplicity_$(ProcId).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-pi0-cluster-multiplicity_$(ProcId).log
-Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(partial_output_directory) $(pt_bins) $(pt_max) $(multiplicity_max) $(cluster_energy_bins) $(cluster_energy_max) $(truth_eta_max) $(cluster_eta_max)"
+Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(partial_output_directory) $(pt_bins) $(pt_max) $(multiplicity_max) $(cluster_energy_bins) $(cluster_energy_max) $(truth_eta_max)"
 
 # Require n_chunks = ceil(total_files / files_per_job) - chunk_offset.
 Queue $(n_chunks)

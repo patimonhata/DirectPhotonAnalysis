@@ -36,8 +36,7 @@ int Fun4All_PythiaPi0ClusterMultiplicity(
     const int multiplicity_max = 20,
     const int cluster_energy_bins = 100,
     const double cluster_energy_max = 20.0,
-    const double truth_eta_max = 0.7,
-    const double cluster_eta_max = 0.7)
+    const double truth_eta_max = 0.7)
 {
   if (manifest_path.empty() || output_file.empty() || manifest_begin < 0 ||
       manifest_end <= manifest_begin)
@@ -118,7 +117,6 @@ int Fun4All_PythiaPi0ClusterMultiplicity(
   accumulator->set_cluster_energy_binning(
       cluster_energy_bins, cluster_energy_max);
   accumulator->set_truth_eta_max(truth_eta_max);
-  accumulator->set_cluster_eta_max(cluster_eta_max);
   accumulator->set_verbosity(1);
   server->registerSubsystem(accumulator);
 

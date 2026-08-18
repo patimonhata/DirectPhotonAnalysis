@@ -17,11 +17,11 @@ The selected truth pi0 population contains only transported G4-primary pi0
 decays and generator-level pi0 decays represented by their two G4-primary
 photons. Pi0s created as G4 secondaries during detector transport are excluded.
 
-The defaults require `|eta_truth_pi0| < 0.7` and
-`|eta_cluster| < 0.7`. Clusters must have finite energy and position and valid
-truth provenance. There is deliberately no analysis-level cluster-energy
-threshold. The RawCluster reconstruction may still have its own intrinsic
-thresholds.
+The defaults require `|eta_truth_pi0| < 0.7`. No cluster-eta acceptance cut is
+applied: every cluster in the SPLIT CEMC container can be considered. Clusters
+must have finite energy and position and valid truth provenance. There is
+deliberately no analysis-level cluster-energy threshold. The RawCluster
+reconstruction may still have its own intrinsic thresholds.
 
 `PythiaClusterTruthMatcher` supplies primary-shower energy fractions from the
 TowerInfo shower provenance. This workflow does not use the direct-daughter
@@ -71,7 +71,7 @@ Reduce the complete pilot range with:
 
 ```bash
 root -l -b -q \
-  'workflows/pi0_cluster_multiplicity/FinalizePythiaPi0ClusterMultiplicity.C("output/pi0_cluster_multiplicity_partial/pilot_primary_generator_eta07_no_cluster_energy_cut/partial_*.root","output/plots/pi0_cluster_multiplicity_primary_generator_eta07_no_cluster_energy_cut",0,100)'
+  'workflows/pi0_cluster_multiplicity/FinalizePythiaPi0ClusterMultiplicity.C("output/pi0_cluster_multiplicity_partial/pilot_primary_generator_truth_eta07_no_cluster_eta_or_energy_cut/partial_*.root","output/plots/pi0_cluster_multiplicity_primary_generator_truth_eta07_no_cluster_eta_or_energy_cut",0,100)'
 ```
 
 For full production, change `total_files`, `files_per_job`, `n_chunks`, and the

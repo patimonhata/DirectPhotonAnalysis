@@ -47,7 +47,6 @@ struct PartialMetadata
   double pt_max = 0.0;
   double cluster_energy_max = 0.0;
   double truth_eta_max = 0.0;
-  double cluster_eta_max = 0.0;
   unsigned char cluster_energy_cut_applied = 1U;
   std::array<double, 4> thresholds{};
   unsigned long long events_processed = 0;
@@ -109,7 +108,6 @@ bool read_metadata(const std::string& path, PartialMetadata& value)
   ok &= bind(tree, "cluster_energy_bins", &value.cluster_energy_bins);
   ok &= bind(tree, "cluster_energy_max", &value.cluster_energy_max);
   ok &= bind(tree, "truth_eta_max", &value.truth_eta_max);
-  ok &= bind(tree, "cluster_eta_max", &value.cluster_eta_max);
   ok &= bind(tree, "cluster_energy_cut_applied",
              &value.cluster_energy_cut_applied);
   ok &= bind(tree, "fraction_thresholds", value.thresholds.data());
@@ -130,7 +128,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value)
              &value.pair_evaluated);
   ok &= bind(tree, "pi0_cluster_pair_positive_count",
              &value.pair_positive);
-  if (!ok || tree->GetEntry(0) <= 0 || value.schema_version != 2 ||
+  if (!ok || tree->GetEntry(0) <= 0 || value.schema_version != 3 ||
       !manifest_path || !first_suffix ||
       !last_suffix || !cluster_collection || !pi0_selection ||
       !cluster_selection || !fraction_definition || !zero_threshold_definition)
@@ -146,7 +144,8 @@ bool read_metadata(const std::string& path, PartialMetadata& value)
   value.cluster_selection = *cluster_selection;
   value.fraction_definition = *fraction_definition;
   value.zero_threshold_definition = *zero_threshold_definition;
-  return true;
+  return value.cluster_selection ==
+      "finite_cluster_kinematics_without_eta_or_energy_threshold";
 }
 
 bool same_double(double left, double right)
@@ -174,8 +173,7 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
           reference.cluster_energy_cut_applied ||
       !same_double(value.pt_max, reference.pt_max) ||
       !same_double(value.cluster_energy_max, reference.cluster_energy_max) ||
-      !same_double(value.truth_eta_max, reference.truth_eta_max) ||
-      !same_double(value.cluster_eta_max, reference.cluster_eta_max))
+      !same_double(value.truth_eta_max, reference.truth_eta_max))
   {
     return false;
   }
@@ -247,9 +245,9 @@ bool make_output_directory(const std::string& output_base)
 
 int FinalizePythiaPi0ClusterMultiplicity(
     const std::string partial_pattern =
-        "output/pi0_cluster_multiplicity_partial/pilot_primary_generator_eta07_no_cluster_energy_cut/partial_*.root",
+        "output/pi0_cluster_multiplicity_partial/jet5/primary_generator_truth_eta07/partial_*.root",
     const std::string output_base =
-        "output/plots/pi0_cluster_multiplicity_primary_generator_eta07_no_cluster_energy_cut_primary_0p3",
+        "output/plots/pi0_cluster_multiplicity/jet5/primary_generator_truth_eta07",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {
@@ -425,7 +423,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
   label.DrawLatex(0.18, 0.84, "Pythia8 p+p minimum bias");
   std::ostringstream selection;
   selection << "|#eta_{#pi^{0}}^{truth}| < " << reference.truth_eta_max
-            << ", |#eta_{cluster}| < " << reference.cluster_eta_max;
+            << ", no cluster #eta cut";
   label.DrawLatex(0.18, 0.76, selection.str().c_str());
   label.DrawLatex(0.18, 0.68, "No cluster-energy threshold");
   multiplicity_canvas.RedrawAxis();
@@ -508,7 +506,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
   }
   summary.Write();
 
-  int output_schema_version = 2;
+  int output_schema_version = 3;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -535,7 +533,6 @@ int FinalizePythiaPi0ClusterMultiplicity(
   metadata.Branch("cluster_energy_bins", &total.cluster_energy_bins);
   metadata.Branch("cluster_energy_max", &total.cluster_energy_max);
   metadata.Branch("truth_eta_max", &total.truth_eta_max);
-  metadata.Branch("cluster_eta_max", &total.cluster_eta_max);
   metadata.Branch("cluster_energy_cut_applied",
                   &total.cluster_energy_cut_applied);
   metadata.Branch("fraction_thresholds", total.thresholds.data(),

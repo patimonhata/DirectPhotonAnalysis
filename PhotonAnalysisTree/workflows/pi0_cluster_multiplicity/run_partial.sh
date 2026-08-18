@@ -3,7 +3,7 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../.." && pwd)
-usage="usage: workflows/pi0_cluster_multiplicity/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [PT_BINS] [PT_MAX] [MULTIPLICITY_MAX] [CLUSTER_ENERGY_BINS] [CLUSTER_ENERGY_MAX] [TRUTH_ETA_MAX] [CLUSTER_ETA_MAX]"
+usage="usage: workflows/pi0_cluster_multiplicity/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [PT_BINS] [PT_MAX] [MULTIPLICITY_MAX] [CLUSTER_ENERGY_BINS] [CLUSTER_ENERGY_MAX] [TRUTH_ETA_MAX]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
 total_files=${3:?$usage}
@@ -16,7 +16,6 @@ multiplicity_max=${9:-20}
 cluster_energy_bins=${10:-100}
 cluster_energy_max=${11:-20.0}
 truth_eta_max=${12:-0.7}
-cluster_eta_max=${13:-0.7}
 
 for value in "$job_index" "$chunk_offset" "$total_files" "$files_per_job" "$pt_bins" "$multiplicity_max" "$cluster_energy_bins"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
@@ -63,7 +62,7 @@ trap cleanup EXIT
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 root -l -b -q \
-  "$workflow_dir/Fun4All_PythiaPi0ClusterMultiplicity.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${pt_bins},${pt_max},${multiplicity_max},${cluster_energy_bins},${cluster_energy_max},${truth_eta_max},${cluster_eta_max})"
+  "$workflow_dir/Fun4All_PythiaPi0ClusterMultiplicity.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${pt_bins},${pt_max},${multiplicity_max},${cluster_energy_bins},${cluster_energy_max},${truth_eta_max})"
 root -l -b -q \
   "$workflow_dir/check_pythia_pi0_cluster_multiplicity_partial.C(\"${temporary_output}\")"
 

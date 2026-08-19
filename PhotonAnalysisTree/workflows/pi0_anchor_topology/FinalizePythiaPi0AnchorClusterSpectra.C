@@ -4,6 +4,7 @@
 #include <TChain.h>
 #include <TFile.h>
 #include <TH1D.h>
+#include <THStack.h>
 #include <TLatex.h>
 #include <TLegend.h>
 #include <TObjArray.h>
@@ -276,9 +277,10 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     const std::string output_base =
         "output/plots/pi0_anchor_topology/TEMP_jet5",
     const long long expected_manifest_begin = 0,
-    const long long expected_manifest_end = -1)
+    const long long expected_manifest_end = -1,
+    const std::string sample_label = "Pythia8 p+p Jet 5")
 {
-  if (partial_pattern.empty() || output_base.empty() ||
+  if (partial_pattern.empty() || output_base.empty() || sample_label.empty() ||
       expected_manifest_begin < 0 || expected_manifest_end < -1 ||
       (expected_manifest_end >= 0 &&
        expected_manifest_end <= expected_manifest_begin))
@@ -453,12 +455,32 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     fractions[index]->GetYaxis()->SetTitle("Category / all anchors");
   }
 
+  std::array<std::unique_ptr<TH1D>, kCategoryCount> stacked_fractions;
+  for (std::size_t index = 0; index < stacked_fractions.size(); ++index) {
+    stacked_fractions[index].reset(static_cast<TH1D*>(fractions[index]->Clone(
+        (fraction_names[index] + "_stack_component").c_str())));
+    stacked_fractions[index]->SetDirectory(nullptr);
+    stacked_fractions[index]->SetFillColor(colors[index + 2]);
+    stacked_fractions[index]->SetLineColor(kBlack);
+    stacked_fractions[index]->SetLineWidth(1);
+    stacked_fractions[index]->SetMarkerStyle(0);
+  }
+
   if (!make_output_directory(output_base)) {
     return 6;
   }
   SetsPhenixStyle();
 
-  TCanvas spectrum_canvas("c_pythia_pi0_anchor_cluster_et", "Pythia pi0 anchor cluster spectra", 1000, 800);
+  constexpr int canvas_width = 1100;
+  constexpr int canvas_height = 800;
+  constexpr double annotation_x = 0.66;
+
+  TCanvas spectrum_canvas("c_pythia_pi0_anchor_cluster_et", "Pythia pi0 anchor cluster spectra", canvas_width, canvas_height);
+  spectrum_canvas.SetCanvasSize(canvas_width, canvas_height);
+  spectrum_canvas.SetLeftMargin(0.16);
+  spectrum_canvas.SetRightMargin(0.37);
+  spectrum_canvas.SetBottomMargin(0.14);
+  spectrum_canvas.SetTopMargin(0.05);
   spectrum_canvas.SetLogy();
   double maximum = 0.0;
   for (const auto& histogram : raw) {
@@ -466,14 +488,15 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   }
   const double minimum = smallest_positive(raw);
   raw[0]->SetMinimum(minimum > 0.0 ? 0.5 * minimum : 0.5);
-//   raw[0]->SetMaximum(maximum > 0.0 ? 5.0 * maximum : 1.0);
-  raw[0]->SetMaximum(maximum > 0.0 ? 1e10 : 1.0);
+  raw[0]->SetMaximum(maximum > 0.0 ? 2.0 * maximum : 1.0);
   raw[0]->Draw("HIST");
   for (std::size_t index = 1; index < raw.size(); ++index) {
     raw[index]->Draw("HIST SAME");
   }
-  TLegend spectrum_legend(0.55, 0.25, 0.95, 0.57);
+  TLegend spectrum_legend(annotation_x, 0.20, 0.96, 0.51);
   spectrum_legend.SetBorderSize(0);
+  spectrum_legend.SetFillStyle(0);
+  spectrum_legend.SetTextSize(0.028);
   spectrum_legend.AddEntry(raw[0].get(), "Prompt-#gamma cluster", "l");
   spectrum_legend.AddEntry(raw[1].get(), "#pi^{0}-main anchor", "l");
   spectrum_legend.AddEntry(raw[2].get(), "Separated", "l");
@@ -485,32 +508,40 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   TLatex spectrum_label;
   spectrum_label.SetNDC();
   spectrum_label.SetTextAlign(13);
-  spectrum_label.DrawLatex(0.25, 0.92, "#it{#bf{sPHENIX}} Internal");
-  spectrum_label.DrawLatex(0.25, 0.86, "Pythia8 p+p MB");
+  spectrum_label.SetTextSize(0.028);
+  spectrum_label.DrawLatex(annotation_x, 0.92, "#it{#bf{sPHENIX}} Internal");
+  spectrum_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
   std::ostringstream anchor_label;
   anchor_label << "Anchor |#eta| < " << reference.anchor_cluster_eta_max;
-  spectrum_label.DrawLatex(0.25, 0.80, anchor_label.str().c_str());
+  spectrum_label.DrawLatex(annotation_x, 0.80, anchor_label.str().c_str());
   const std::string partner_label =
       reference.partner_cluster_eta_max <= 0.0
           ? "Partner: clusters above E_{min}"
           : "Partner: software #eta cut applied";
-  spectrum_label.DrawLatex(0.25, 0.74, partner_label.c_str());
-  spectrum_label.DrawLatex(0.25, 0.68, "Topology: energy deposit");
+  spectrum_label.DrawLatex(annotation_x, 0.74, partner_label.c_str());
+  spectrum_label.DrawLatex(annotation_x, 0.68, "Topology: energy deposit");
   std::ostringstream recovery_label;
   recovery_label << "E_{clus} f_{dep}^{#gamma}/E_{truth}^{#gamma} #geq " << reference.min_photon_energy_recovery;
-  spectrum_label.DrawLatex(0.25, 0.62, recovery_label.str().c_str());
+  spectrum_label.DrawLatex(annotation_x, 0.62, recovery_label.str().c_str());
   spectrum_canvas.RedrawAxis();
   spectrum_canvas.SaveAs((output_base + ".pdf").c_str());
 
-  TCanvas fraction_canvas("c_pythia_pi0_anchor_category_fractions", "Pythia pi0 anchor category fractions", 1000, 800);
+  TCanvas fraction_canvas("c_pythia_pi0_anchor_category_fractions", "Pythia pi0 anchor category fractions", canvas_width, canvas_height);
+  fraction_canvas.SetCanvasSize(canvas_width, canvas_height);
+  fraction_canvas.SetLeftMargin(0.16);
+  fraction_canvas.SetRightMargin(0.37);
+  fraction_canvas.SetBottomMargin(0.14);
+  fraction_canvas.SetTopMargin(0.05);
   fractions[0]->SetMinimum(0.0);
   fractions[0]->SetMaximum(1.05);
   fractions[0]->Draw("E1");
   for (std::size_t index = 1; index < fractions.size(); ++index)  {
     fractions[index]->Draw("E1 SAME");
   }
-  TLegend fraction_legend(0.58, 0.36, 0.89, 0.60);
+  TLegend fraction_legend(annotation_x, 0.39, 0.96, 0.61);
   fraction_legend.SetBorderSize(0);
+  fraction_legend.SetFillStyle(0);
+  fraction_legend.SetTextSize(0.028);
   fraction_legend.AddEntry(fractions[0].get(), "Separated", "lep");
   fraction_legend.AddEntry(fractions[1].get(), "Merged", "lep");
   fraction_legend.AddEntry(fractions[2].get(), "Missing partner", "lep");
@@ -519,12 +550,50 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   TLatex fraction_label;
   fraction_label.SetNDC();
   fraction_label.SetTextAlign(13);
-  fraction_label.DrawLatex(0.25, 0.92, "#it{#bf{sPHENIX}} Internal");
-  fraction_label.DrawLatex(0.25, 0.86, "Pythia8 p+p MB");
-  fraction_label.DrawLatex(0.25, 0.80, "Denominator: all #pi^{0}-main anchors");
-  fraction_label.DrawLatex(0.25, 0.74, recovery_label.str().c_str());
+  fraction_label.SetTextSize(0.028);
+  fraction_label.DrawLatex(annotation_x, 0.92, "#it{#bf{sPHENIX}} Internal");
+  fraction_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
+  fraction_label.DrawLatex(annotation_x, 0.80, "Denominator: all #pi^{0}-main anchors");
+  fraction_label.DrawLatex(annotation_x, 0.74, recovery_label.str().c_str());
   fraction_canvas.RedrawAxis();
   fraction_canvas.SaveAs((output_base + "_category_fractions.pdf").c_str());
+
+  TCanvas fraction_stack_canvas("c_pythia_pi0_anchor_category_fraction_stack", "Pythia pi0 anchor category fraction stack", canvas_width, canvas_height);
+  fraction_stack_canvas.SetCanvasSize(canvas_width, canvas_height);
+  fraction_stack_canvas.SetLeftMargin(0.16);
+  fraction_stack_canvas.SetRightMargin(0.37);
+  fraction_stack_canvas.SetBottomMargin(0.14);
+  fraction_stack_canvas.SetTopMargin(0.05);
+  THStack fraction_stack("stack_pythia_pi0_anchor_category_fractions", "");
+  for (auto& histogram : stacked_fractions) {
+    fraction_stack.Add(histogram.get());
+  }
+  fraction_stack.SetMinimum(0.0);
+  fraction_stack.SetMaximum(1.05);
+  fraction_stack.Draw("HIST");
+  fraction_stack.GetXaxis()->SetTitle("Anchor cluster E_{T} [GeV]");
+  fraction_stack.GetYaxis()->SetTitle("Category / all anchors");
+
+  TLegend fraction_stack_legend(annotation_x, 0.39, 0.96, 0.61);
+  fraction_stack_legend.SetBorderSize(0);
+  fraction_stack_legend.SetFillStyle(0);
+  fraction_stack_legend.SetTextSize(0.028);
+  fraction_stack_legend.AddEntry(stacked_fractions[0].get(), "Separated", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[1].get(), "Merged", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[2].get(), "Missing partner", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[3].get(), "Other", "f");
+  fraction_stack_legend.Draw();
+
+  TLatex fraction_stack_label;
+  fraction_stack_label.SetNDC();
+  fraction_stack_label.SetTextAlign(13);
+  fraction_stack_label.SetTextSize(0.028);
+  fraction_stack_label.DrawLatex(annotation_x, 0.92, "#it{#bf{sPHENIX}} Internal");
+  fraction_stack_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
+  fraction_stack_label.DrawLatex(annotation_x, 0.80, "Denominator: all #pi^{0}-main anchors");
+  fraction_stack_label.DrawLatex(annotation_x, 0.74, recovery_label.str().c_str());
+  fraction_stack_canvas.RedrawAxis();
+  fraction_stack_canvas.SaveAs((output_base + "_category_fraction_stack.pdf").c_str());
 
   TFile output((output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) {

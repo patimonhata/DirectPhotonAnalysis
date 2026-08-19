@@ -79,8 +79,10 @@ transactionally and validates its partial before publication.
 
 Finalize a complete production with:
 
-    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000)'
+    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000,"Pythia8 p+p MB")'
 
 The finalizer writes the combined raw and bin-width-normalized spectra, category
 fractions relative to the anchor spectrum, output_base.pdf, and
-output_base_category_fractions.pdf.
+output_base_category_fractions.pdf. It also writes the stacked category-fraction
+plot output_base_category_fraction_stack.pdf. Plot annotations and legends are
+placed outside the histogram frame.

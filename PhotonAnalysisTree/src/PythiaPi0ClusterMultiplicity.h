@@ -53,7 +53,6 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
     split_cluster_node_name_ = value;
   }
   void set_truth_eta_max(double value) { truth_eta_max_ = value; }
-  void set_cluster_eta_max(double value) { cluster_eta_max_ = value; }
   void set_pt_binning(int bins, double maximum)
   {
     pt_bins_ = bins;
@@ -68,7 +67,7 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 2;
+  static constexpr int schema_version_ = 3;
   static constexpr std::size_t threshold_count_ = 4U;
   static constexpr std::size_t pathway_count_ = 2U;
 
@@ -89,7 +88,7 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
   std::string pi0_selection_ =
       "g4_primary_pi0_decay_or_generator_photon_pair_with_hepmc_pi0_origin";
   std::string cluster_selection_ =
-      "finite_cluster_kinematics_and_eta_acceptance_without_energy_threshold";
+      "finite_cluster_kinematics_without_eta_or_energy_threshold";
   std::string fraction_definition_ =
       "sum_of_ancestry_compatible_primary_shower_edep_over_all_cluster_primary_shower_edep";
   std::string zero_threshold_definition_ = "strictly_positive_fraction";
@@ -102,7 +101,6 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
   double pt_max_ = 20.0;
   double cluster_energy_max_ = 20.0;
   double truth_eta_max_ = 0.7;
-  double cluster_eta_max_ = 0.7;
   int verbosity_ = 0;
   std::array<double, threshold_count_> thresholds_ = {0.0, 0.1, 0.3, 0.5};
 

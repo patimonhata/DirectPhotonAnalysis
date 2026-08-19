@@ -209,8 +209,8 @@ int PythiaPi0ClusterMultiplicity::Init(PHCompositeNode* /*topNode*/)
       !first_suffix_.empty() && !last_suffix_.empty() &&
       signal_embedding_id_ > 0 && pt_bins_ > 0 && pt_max_ > 0.0 &&
       multiplicity_max_ > 0 && cluster_energy_bins_ > 0 &&
-      cluster_energy_max_ > 0.0 && truth_eta_max_ > 0.0 &&
-      cluster_eta_max_ > 0.0;
+      cluster_energy_max_ > 0.0 && std::isfinite(truth_eta_max_) &&
+      truth_eta_max_ > 0.0;
   if (!valid)
   {
     std::cerr << "PythiaPi0ClusterMultiplicity::Init - invalid configuration"
@@ -280,7 +280,7 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
       continue;
     }
     const double eta = std::asinh(dz / transverse);
-    if (!std::isfinite(eta) || std::abs(eta) >= cluster_eta_max_)
+    if (!std::isfinite(eta))
     {
       continue;
     }
@@ -561,7 +561,6 @@ void PythiaPi0ClusterMultiplicity::create_output()
   metadata_tree_->Branch("cluster_energy_bins", &cluster_energy_bins_);
   metadata_tree_->Branch("cluster_energy_max", &cluster_energy_max_);
   metadata_tree_->Branch("truth_eta_max", &truth_eta_max_);
-  metadata_tree_->Branch("cluster_eta_max", &cluster_eta_max_);
   metadata_tree_->Branch("cluster_energy_cut_applied",
                          &cluster_energy_cut_applied);
   metadata_tree_->Branch("fraction_thresholds", thresholds_.data(),

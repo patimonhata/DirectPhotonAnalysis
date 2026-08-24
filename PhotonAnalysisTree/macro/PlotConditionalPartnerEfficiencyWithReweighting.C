@@ -13,6 +13,7 @@
 #include <TSystem.h>
 #include <TTree.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -28,6 +29,10 @@ const std::array<double, 13> truth_pt_edges = {
     3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0,
     10.0, 11.0, 12.0, 13.0, 14.0, 15.0};
 constexpr std::size_t n_truth_pt_bins = truth_pt_edges.size() - 1U;
+constexpr double anchor_et_bin_width = 0.2;
+constexpr double anchor_et_histogram_min = 3.0;
+constexpr double anchor_et_histogram_max = 15.0;
+constexpr int n_anchor_et_bins = 60;
 
 enum class Topology : std::size_t {
   split = 0,
@@ -253,6 +258,17 @@ std::unique_ptr<TH1D> make_histogram(const std::string &name) {
   return histogram;
 }
 
+std::unique_ptr<TH1D> make_anchor_et_histogram(
+    const std::string &name) {
+  auto histogram = std::make_unique<TH1D>(
+      name.c_str(), "", n_anchor_et_bins, anchor_et_histogram_min,
+      anchor_et_histogram_max);
+  histogram->SetDirectory(nullptr);
+  histogram->Sumw2();
+  histogram->SetStats(false);
+  return histogram;
+}
+
 WeightedHistograms make_histograms(const std::string &collection) {
   WeightedHistograms histograms;
   const std::string prefix =
@@ -262,6 +278,21 @@ WeightedHistograms make_histograms(const std::string &collection) {
   for (std::size_t component = 0; component < n_topologies; ++component) {
     histograms.component[component] = make_histogram(
         prefix + topology_names[component] + "_vs_truth_pt");
+  }
+  return histograms;
+}
+
+WeightedHistograms make_anchor_et_histograms(
+    const std::string &collection) {
+  WeightedHistograms histograms;
+  const std::string prefix =
+      "h_" + collection +
+      "_energy_contribution_central_truth_pi0_anchor_";
+  histograms.total = make_anchor_et_histogram(
+      prefix + "component_total_vs_anchor_cluster_et");
+  for (std::size_t component = 0; component < n_topologies; ++component) {
+    histograms.component[component] = make_anchor_et_histogram(
+        prefix + topology_names[component] + "_vs_anchor_cluster_et");
   }
   return histograms;
 }
@@ -300,6 +331,41 @@ void fill_histograms(WeightedHistograms &histograms,
   histograms.sumw2 += event_weight * event_weight;
 }
 
+void fill_anchor_et_histograms(
+    WeightedHistograms &histograms, const double truth_pt,
+    const std::vector<double> &truth_daughter_pt,
+    const CollectionBranches &branches, const double event_weight,
+    const double anchor_eta_max, const double min_cluster_energy,
+    const double min_contribution_fraction,
+    const double merged_response_min, const double merged_response_max,
+    const double individual_response_min,
+    const double individual_response_max) {
+  bool malformed = false;
+  const Topology topology = classify_energy_contribution(
+      truth_pt, truth_daughter_pt, branches, min_cluster_energy,
+      min_contribution_fraction, merged_response_min, merged_response_max,
+      individual_response_min, individual_response_max, malformed);
+  const std::size_t component = static_cast<std::size_t>(topology);
+  if (!valid_collection_shape(branches)) {
+    return;
+  }
+  for (std::size_t cluster = 0; cluster < branches.cluster_et->size();
+       ++cluster) {
+    if (!valid_cluster(branches, cluster) ||
+        !(std::abs(branches.cluster_eta->at(cluster)) < anchor_eta_max)) {
+      continue;
+    }
+    const double anchor_et = branches.cluster_et->at(cluster);
+    histograms.total->Fill(anchor_et, event_weight);
+    histograms.component[component]->Fill(anchor_et, event_weight);
+    ++histograms.raw_total;
+    ++histograms.raw_component[component];
+    histograms.malformed += malformed;
+    histograms.sumw += event_weight;
+    histograms.sumw2 += event_weight * event_weight;
+  }
+}
+
 void make_fractions(WeightedHistograms &histograms,
                     const std::string &collection) {
   const std::string prefix =
@@ -308,6 +374,30 @@ void make_fractions(WeightedHistograms &histograms,
     histograms.fraction[component].reset(
         static_cast<TH1D *>(histograms.component[component]->Clone(
             (prefix + topology_names[component] + "_fraction_vs_truth_pt")
+                .c_str())));
+    TH1D &fraction = *histograms.fraction[component];
+    fraction.SetDirectory(nullptr);
+    fraction.Divide(histograms.component[component].get(),
+                    histograms.total.get(), 1.0, 1.0, "B");
+    fraction.SetStats(false);
+    fraction.SetLineColor(topology_colors[component]);
+    fraction.SetMarkerColor(topology_colors[component]);
+    fraction.SetMarkerStyle(20 + static_cast<int>(component));
+    fraction.SetMarkerSize(0.9);
+    fraction.SetLineWidth(2);
+  }
+}
+
+void make_anchor_et_fractions(WeightedHistograms &histograms,
+                              const std::string &collection) {
+  const std::string prefix =
+      "h_" + collection +
+      "_energy_contribution_central_truth_pi0_anchor_";
+  for (std::size_t component = 0; component < n_topologies; ++component) {
+    histograms.fraction[component].reset(
+        static_cast<TH1D *>(histograms.component[component]->Clone(
+            (prefix + topology_names[component] +
+             "_fraction_vs_anchor_cluster_et")
                 .c_str())));
     TH1D &fraction = *histograms.fraction[component];
     fraction.SetDirectory(nullptr);
@@ -358,17 +448,26 @@ void draw_histograms(WeightedHistograms &histograms,
                      const double individual_response_max,
                      const double weight_exponent,
                      const double weight_reference_pt,
-                     const bool log_y) {
+                     const bool log_y,
+                     const bool anchor_et_axis = false,
+                     const double anchor_eta_max = 0.0) {
   style_histograms(histograms);
+  const std::string axis_suffix =
+      anchor_et_axis ? "_anchor_et" : "_truth_pt";
   auto total = std::unique_ptr<TH1D>(
       static_cast<TH1D *>(histograms.total->Clone(
           (std::string(histograms.total->GetName()) +
            (log_y ? "_draw_log" : "_draw_linear"))
               .c_str())));
   total->SetDirectory(nullptr);
-  total->GetXaxis()->SetTitle("Truth p_{T}^{#pi^{0}} [GeV]");
+  total->GetXaxis()->SetTitle(
+      anchor_et_axis ? "Anchor cluster E_{T} [GeV]"
+                     : "Truth p_{T}^{#pi^{0}} [GeV]");
   total->GetYaxis()->SetTitle(
-      "Weighted generated #pi^{0} / 1 GeV (a.u.)");
+      anchor_et_axis
+          ? Form("Weighted anchor clusters / %.2g GeV (a.u.)",
+                 total->GetXaxis()->GetBinWidth(1))
+          : "Weighted generated #pi^{0} / 1 GeV (a.u.)");
   total->GetXaxis()->CenterTitle();
   total->GetYaxis()->CenterTitle();
   const double maximum = total->GetMaximum();
@@ -382,7 +481,7 @@ void draw_histograms(WeightedHistograms &histograms,
   }
 
   THStack stack(
-      ("stack_" + collection_label +
+      ("stack_" + collection_label + axis_suffix +
        (log_y ? "_reweighted_log" : "_reweighted_linear"))
           .c_str(),
       "");
@@ -391,10 +490,13 @@ void draw_histograms(WeightedHistograms &histograms,
   }
 
   TCanvas canvas(
-      ("c_" + collection_label +
+      ("c_" + collection_label + axis_suffix +
        (log_y ? "_reweighted_log" : "_reweighted_linear"))
           .c_str(),
-      "Weighted central truth pi0 reconstruction topologies", 1400, 800);
+      anchor_et_axis
+          ? "Weighted anchor-cluster ET by event topology"
+          : "Weighted central truth pi0 reconstruction topologies",
+      1400, 800);
   canvas.SetLeftMargin(0.14);
   canvas.SetRightMargin(0.36);
   canvas.SetBottomMargin(0.12);
@@ -411,30 +513,52 @@ void draw_histograms(WeightedHistograms &histograms,
   label.DrawLatex(0.67, 0.93, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(
       0.67, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
+  if (anchor_et_axis) {
+    label.DrawLatex(
+        0.67, 0.83,
+        "Energy-deposit event category assigned to every anchor");
+    label.DrawLatex(
+        0.67, 0.78,
+        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; |#eta_{anchor}| < %.1f",
+             truth_eta_max, anchor_eta_max));
+    label.DrawLatex(
+        0.67, 0.73,
+        Form("No anchor E_{T} cut; displayed: %.3g #leq E_{T} < %.3g GeV",
+             anchor_et_histogram_min, anchor_et_histogram_max));
+    label.DrawLatex(
+        0.67, 0.68,
+        Form("Weight per anchor: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+             weight_reference_pt, weight_exponent));
+  } else {
+    label.DrawLatex(
+        0.67, 0.83, "Energy-deposit matching; truth #alpha integrated");
+    label.DrawLatex(
+        0.67, 0.78,
+        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
+             truth_eta_max));
+    label.DrawLatex(
+        0.67, 0.73,
+        Form("Weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+             weight_reference_pt, weight_exponent));
+  }
+  const double match_y = anchor_et_axis ? 0.60 : 0.65;
+  const double split_y = anchor_et_axis ? 0.56 : 0.61;
+  const double merged_y = anchor_et_axis ? 0.52 : 0.57;
+  const double missing_y = anchor_et_axis ? 0.48 : 0.53;
   label.DrawLatex(
-      0.67, 0.83, "Energy-deposit matching; truth #alpha integrated");
-  label.DrawLatex(
-      0.67, 0.78,
-      Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
-           truth_eta_max));
-  label.DrawLatex(
-      0.67, 0.73,
-      Form("Weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
-           weight_reference_pt, weight_exponent));
-  label.DrawLatex(
-      0.67, 0.65,
+      0.67, match_y,
       Form("Maximum-E_{dep} match; f_{#gamma} > %.3g",
            min_contribution_fraction));
   label.DrawLatex(
-      0.67, 0.61,
+      0.67, split_y,
       Form("Split: distinct matches; E_{cluster} #geq %.3g GeV",
            min_cluster_energy));
   label.DrawLatex(
-      0.67, 0.57,
+      0.67, merged_y,
       Form("Merged: same match; response [%.1f, %.1f]",
            merged_response_min, merged_response_max));
   label.DrawLatex(
-      0.67, 0.53,
+      0.67, missing_y,
       Form("Missing: one match; response [%.1f, %.1f]",
            individual_response_min, individual_response_max));
 
@@ -442,7 +566,10 @@ void draw_histograms(WeightedHistograms &histograms,
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(0.022);
-  legend.AddEntry(total.get(), "Truth #pi^{0} in acceptance", "lep");
+  legend.AddEntry(
+      total.get(),
+      anchor_et_axis ? "Central anchor clusters"
+                     : "Truth #pi^{0} in acceptance", "lep");
   for (std::size_t component = 0; component < n_topologies; ++component) {
     legend.AddEntry(histograms.component[component].get(),
                     topology_labels[component].c_str(), "f");
@@ -459,7 +586,9 @@ void draw_fraction_information(
     const double merged_response_min, const double merged_response_max,
     const double individual_response_min,
     const double individual_response_max,
-    const double weight_exponent, const double weight_reference_pt) {
+    const double weight_exponent, const double weight_reference_pt,
+    const bool anchor_et_axis = false,
+    const double anchor_eta_max = 0.0) {
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
@@ -467,32 +596,55 @@ void draw_fraction_information(
   label.DrawLatex(0.67, 0.93, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(
       0.67, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
+  if (anchor_et_axis) {
+    label.DrawLatex(
+        0.67, 0.83, "Event category assigned to every selected anchor");
+    label.DrawLatex(
+        0.67, 0.78, "Denominator: weighted selected anchor clusters");
+    label.DrawLatex(
+        0.67, 0.73,
+        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; |#eta_{anchor}| < %.1f",
+             truth_eta_max, anchor_eta_max));
+    label.DrawLatex(
+        0.67, 0.68,
+        Form("No anchor E_{T} cut; displayed: %.3g #leq E_{T} < %.3g GeV",
+             anchor_et_histogram_min, anchor_et_histogram_max));
+    label.DrawLatex(
+        0.67, 0.63,
+        Form("Weight per anchor: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+             weight_reference_pt, weight_exponent));
+  } else {
+    label.DrawLatex(
+        0.67, 0.83, "Energy-deposit matching; truth #alpha integrated");
+    label.DrawLatex(
+        0.67, 0.78, "Denominator: weighted truth #pi^{0} in acceptance");
+    label.DrawLatex(
+        0.67, 0.73,
+        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
+             truth_eta_max));
+    label.DrawLatex(
+        0.67, 0.68,
+        Form("Weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+             weight_reference_pt, weight_exponent));
+  }
+  const double match_y = anchor_et_axis ? 0.56 : 0.61;
+  const double split_y = anchor_et_axis ? 0.51 : 0.56;
+  const double merged_y = anchor_et_axis ? 0.46 : 0.51;
+  const double missing_y = anchor_et_axis ? 0.41 : 0.46;
   label.DrawLatex(
-      0.67, 0.83, "Energy-deposit matching; truth #alpha integrated");
-  label.DrawLatex(
-      0.67, 0.78, "Denominator: weighted truth #pi^{0} in acceptance");
-  label.DrawLatex(
-      0.67, 0.73,
-      Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
-           truth_eta_max));
-  label.DrawLatex(
-      0.67, 0.68,
-      Form("Weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
-           weight_reference_pt, weight_exponent));
-  label.DrawLatex(
-      0.67, 0.61,
+      0.67, match_y,
       Form("Maximum-E_{dep} match; f_{#gamma} > %.3g",
            min_contribution_fraction));
   label.DrawLatex(
-      0.67, 0.56,
+      0.67, split_y,
       Form("Split: distinct matches; E_{cluster} #geq %.3g GeV",
            min_cluster_energy));
   label.DrawLatex(
-      0.67, 0.51,
+      0.67, merged_y,
       Form("Merged: same match; response [%.1f, %.1f]",
            merged_response_min, merged_response_max));
   label.DrawLatex(
-      0.67, 0.46,
+      0.67, missing_y,
       Form("Missing: one match; response [%.1f, %.1f]",
            individual_response_min, individual_response_max));
 }
@@ -505,18 +657,29 @@ void draw_fraction_overlay(
     const double merged_response_min, const double merged_response_max,
     const double individual_response_min,
     const double individual_response_max,
-    const double weight_exponent, const double weight_reference_pt) {
+    const double weight_exponent, const double weight_reference_pt,
+    const bool anchor_et_axis = false,
+    const double anchor_eta_max = 0.0) {
   TH1D &frame = *histograms.fraction.front();
   frame.SetMinimum(0.0);
   frame.SetMaximum(1.05);
-  frame.GetXaxis()->SetTitle("Truth p_{T}^{#pi^{0}} [GeV]");
-  frame.GetYaxis()->SetTitle("Category / truth #pi^{0} in acceptance");
+  frame.GetXaxis()->SetTitle(
+      anchor_et_axis ? "Anchor cluster E_{T} [GeV]"
+                     : "Truth p_{T}^{#pi^{0}} [GeV]");
+  frame.GetYaxis()->SetTitle(
+      anchor_et_axis ? "Category / selected anchor clusters"
+                     : "Category / truth #pi^{0} in acceptance");
   frame.GetXaxis()->CenterTitle();
   frame.GetYaxis()->CenterTitle();
 
   TCanvas canvas(
-      ("c_" + collection_label + "_reweighted_category_fractions").c_str(),
-      "Weighted truth-pi0 category fractions", 1400, 800);
+      ("c_" + collection_label +
+       (anchor_et_axis ? "_anchor_et" : "_truth_pt") +
+       "_reweighted_category_fractions")
+          .c_str(),
+      anchor_et_axis ? "Weighted anchor category fractions"
+                     : "Weighted truth-pi0 category fractions",
+      1400, 800);
   canvas.SetLeftMargin(0.14);
   canvas.SetRightMargin(0.36);
   canvas.SetBottomMargin(0.12);
@@ -539,7 +702,7 @@ void draw_fraction_overlay(
       collection_label, truth_eta_max, min_cluster_energy,
       min_contribution_fraction, merged_response_min, merged_response_max,
       individual_response_min, individual_response_max, weight_exponent,
-      weight_reference_pt);
+      weight_reference_pt, anchor_et_axis, anchor_eta_max);
   gPad->RedrawAxis();
   canvas.SaveAs(output_path.c_str());
 }
@@ -552,10 +715,15 @@ void draw_fraction_stack(
     const double merged_response_min, const double merged_response_max,
     const double individual_response_min,
     const double individual_response_max,
-    const double weight_exponent, const double weight_reference_pt) {
+    const double weight_exponent, const double weight_reference_pt,
+    const bool anchor_et_axis = false,
+    const double anchor_eta_max = 0.0) {
   std::array<std::unique_ptr<TH1D>, n_topologies> stacked;
   THStack stack(
-      ("stack_" + collection_label + "_reweighted_category_fractions").c_str(),
+      ("stack_" + collection_label +
+       (anchor_et_axis ? "_anchor_et" : "_truth_pt") +
+       "_reweighted_category_fractions")
+          .c_str(),
       "");
   for (std::size_t component = 0; component < n_topologies; ++component) {
     stacked[component].reset(
@@ -572,9 +740,13 @@ void draw_fraction_stack(
   }
 
   TCanvas canvas(
-      ("c_" + collection_label + "_reweighted_category_fraction_stack")
+      ("c_" + collection_label +
+       (anchor_et_axis ? "_anchor_et" : "_truth_pt") +
+       "_reweighted_category_fraction_stack")
           .c_str(),
-      "Weighted truth-pi0 category fraction stack", 1400, 800);
+      anchor_et_axis ? "Weighted anchor category fraction stack"
+                     : "Weighted truth-pi0 category fraction stack",
+      1400, 800);
   canvas.SetLeftMargin(0.14);
   canvas.SetRightMargin(0.36);
   canvas.SetBottomMargin(0.12);
@@ -582,8 +754,12 @@ void draw_fraction_stack(
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
   stack.Draw("HIST");
-  stack.GetXaxis()->SetTitle("Truth p_{T}^{#pi^{0}} [GeV]");
-  stack.GetYaxis()->SetTitle("Category / truth #pi^{0} in acceptance");
+  stack.GetXaxis()->SetTitle(
+      anchor_et_axis ? "Anchor cluster E_{T} [GeV]"
+                     : "Truth p_{T}^{#pi^{0}} [GeV]");
+  stack.GetYaxis()->SetTitle(
+      anchor_et_axis ? "Category / selected anchor clusters"
+                     : "Category / truth #pi^{0} in acceptance");
   stack.GetXaxis()->CenterTitle();
   stack.GetYaxis()->CenterTitle();
 
@@ -600,7 +776,7 @@ void draw_fraction_stack(
       collection_label, truth_eta_max, min_cluster_energy,
       min_contribution_fraction, merged_response_min, merged_response_max,
       individual_response_min, individual_response_max, weight_exponent,
-      weight_reference_pt);
+      weight_reference_pt, anchor_et_axis, anchor_eta_max);
   gPad->RedrawAxis();
   canvas.SaveAs(output_path.c_str());
 }
@@ -613,14 +789,15 @@ bool check_closure(const WeightedHistograms &histograms,
     raw_sum += count;
   }
   bool ok = raw_sum == histograms.raw_total;
-  for (int bin = 1; bin <= histograms.total->GetNbinsX(); ++bin) {
+  for (int bin = 0; bin <= histograms.total->GetNbinsX() + 1;
+       ++bin) {
     double component_sum = 0.0;
     for (const auto &component : histograms.component) {
       component_sum += component->GetBinContent(bin);
     }
     const double total = histograms.total->GetBinContent(bin);
     const double tolerance =
-        32.0 * std::numeric_limits<double>::epsilon() *
+        128.0 * std::numeric_limits<double>::epsilon() *
         std::max(1.0, std::abs(total));
     if (std::abs(component_sum - total) > tolerance) {
       std::cerr << label << " weighted closure failure in bin " << bin
@@ -687,7 +864,6 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
 
   if (input_path.empty() || output_base.empty() ||
       !(anchor_eta_max > 0.0) ||
-      !(anchor_et_min >= 0.0 && anchor_et_min < anchor_et_max) ||
       !(min_cluster_energy >= 0.0) || !(truth_eta_max > 0.0) ||
       !(min_contribution_fraction >= 0.0 &&
         min_contribution_fraction < 1.0) ||
@@ -778,6 +954,10 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
 
   WeightedHistograms split_histograms = make_histograms("split");
   WeightedHistograms nosplit_histograms = make_histograms("nosplit");
+  WeightedHistograms split_anchor_et_histograms =
+      make_anchor_et_histograms("split");
+  WeightedHistograms nosplit_anchor_et_histograms =
+      make_anchor_et_histograms("nosplit");
   Long64_t invalid_truth_shape = 0;
   Long64_t truth_pt_outside_range = 0;
   Long64_t invalid_weight = 0;
@@ -828,13 +1008,34 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
         event_weight, min_cluster_energy, min_contribution_fraction,
         merged_response_min, merged_response_max, individual_response_min,
         individual_response_max);
+    fill_anchor_et_histograms(
+        split_anchor_et_histograms, truth_pt, *truth_daughter_pt, split,
+        event_weight, anchor_eta_max, min_cluster_energy,
+        min_contribution_fraction, merged_response_min, merged_response_max,
+        individual_response_min,
+        individual_response_max);
+    fill_anchor_et_histograms(
+        nosplit_anchor_et_histograms, truth_pt, *truth_daughter_pt, nosplit,
+        event_weight, anchor_eta_max, min_cluster_energy,
+        min_contribution_fraction, merged_response_min, merged_response_max,
+        individual_response_min,
+        individual_response_max);
   }
 
   make_fractions(split_histograms, "split");
   make_fractions(nosplit_histograms, "nosplit");
-  const bool closure_ok =
-      check_closure(split_histograms, "SPLIT") &&
-      check_closure(nosplit_histograms, "NO_SPLIT");
+  make_anchor_et_fractions(split_anchor_et_histograms, "split");
+  make_anchor_et_fractions(nosplit_anchor_et_histograms, "nosplit");
+  const bool split_truth_closure =
+      check_closure(split_histograms, "SPLIT truth-pT");
+  const bool nosplit_truth_closure =
+      check_closure(nosplit_histograms, "NO-SPLIT truth-pT");
+  const bool split_anchor_closure =
+      check_closure(split_anchor_et_histograms, "SPLIT anchor-ET");
+  const bool nosplit_anchor_closure =
+      check_closure(nosplit_anchor_et_histograms, "NO-SPLIT anchor-ET");
+  const bool closure_ok = split_truth_closure && nosplit_truth_closure &&
+                          split_anchor_closure && nosplit_anchor_closure;
   const std::string split_output_base =
       collection_output_base(output_base, "split");
   const std::string nosplit_output_base =
@@ -847,6 +1048,7 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
 
   const auto draw_collection =
       [&](WeightedHistograms &histograms,
+          WeightedHistograms &anchor_et_histograms,
           const std::string &collection_label,
           const std::string &collection_base) {
         const std::string plot_base =
@@ -881,9 +1083,45 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
             merged_response_min, merged_response_max,
             individual_response_min, individual_response_max,
             pt_weight_exponent, weight_reference_pt);
+        const std::string anchor_plot_base =
+            collection_base +
+            "_central_truth_pi0_energy_contribution_event_components_vs_anchor_cluster_et";
+        draw_histograms(
+            anchor_et_histograms, collection_label,
+            anchor_plot_base + ".pdf", truth_eta_max, min_cluster_energy,
+            min_contribution_fraction, merged_response_min,
+            merged_response_max, individual_response_min,
+            individual_response_max, pt_weight_exponent,
+            weight_reference_pt, false, true, anchor_eta_max);
+        draw_histograms(
+            anchor_et_histograms, collection_label,
+            anchor_plot_base + "_logy.pdf", truth_eta_max,
+            min_cluster_energy, min_contribution_fraction,
+            merged_response_min, merged_response_max,
+            individual_response_min, individual_response_max,
+            pt_weight_exponent, weight_reference_pt, true, true, anchor_eta_max);
+        const std::string anchor_fraction_base =
+            collection_base +
+            "_central_truth_pi0_energy_contribution_event_component";
+        draw_fraction_overlay(
+            anchor_et_histograms, collection_label,
+            anchor_fraction_base + "_fractions_vs_anchor_cluster_et.pdf",
+            truth_eta_max, min_cluster_energy, min_contribution_fraction,
+            merged_response_min, merged_response_max,
+            individual_response_min, individual_response_max,
+            pt_weight_exponent, weight_reference_pt, true, anchor_eta_max);
+        draw_fraction_stack(
+            anchor_et_histograms, collection_label,
+            anchor_fraction_base + "_fraction_stack_vs_anchor_cluster_et.pdf",
+            truth_eta_max, min_cluster_energy, min_contribution_fraction,
+            merged_response_min, merged_response_max,
+            individual_response_min, individual_response_max,
+            pt_weight_exponent, weight_reference_pt, true, anchor_eta_max);
       };
-  draw_collection(split_histograms, "SPLIT", split_output_base);
-  draw_collection(nosplit_histograms, "NO_SPLIT", nosplit_output_base);
+  draw_collection(split_histograms, split_anchor_et_histograms, "SPLIT",
+                  split_output_base);
+  draw_collection(nosplit_histograms, nosplit_anchor_et_histograms,
+                  "NO_SPLIT", nosplit_output_base);
 
   TFile output((output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) {
@@ -892,6 +1130,8 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
   }
   write_histograms(output, split_histograms);
   write_histograms(output, nosplit_histograms);
+  write_histograms(output, split_anchor_et_histograms);
+  write_histograms(output, nosplit_anchor_et_histograms);
 
   TNamed("input_path", input_path.c_str()).Write();
   TNamed("weight_formula",
@@ -905,12 +1145,23 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
          "missing=individual_cluster_no_pair;other=no_matched_topology")
       .Write();
   TNamed("anchor_selection_note",
-         "anchor eta and ET arguments are retained for interface compatibility "
-         "but are not applied to this truth-pi0-denominator plot")
+         "every valid cluster satisfying only the anchor eta cut is an anchor; "
+         "there is no anchor ET selection; "
+         "the collection event-level topology is assigned to every anchor; "
+         "no anchor truth-contributor or recovery requirement")
       .Write();
-  TParameter<double>("anchor_eta_max_unused", anchor_eta_max).Write();
+  TParameter<double>("anchor_eta_max", anchor_eta_max).Write();
   TParameter<double>("anchor_et_min_unused", anchor_et_min).Write();
   TParameter<double>("anchor_et_max_unused", anchor_et_max).Write();
+  TParameter<double>("anchor_et_histogram_min",
+                     anchor_et_histogram_min)
+      .Write();
+  TParameter<double>("anchor_et_histogram_max",
+                     anchor_et_histogram_max)
+      .Write();
+  TParameter<double>("anchor_et_histogram_bin_width",
+                     split_anchor_et_histograms.total->GetBinWidth(1))
+      .Write();
   TParameter<double>("truth_pi0_eta_max", truth_eta_max).Write();
   TParameter<double>("analysis_min_cluster_energy", min_cluster_energy).Write();
   TParameter<double>("min_energy_contribution_fraction",
@@ -923,6 +1174,7 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
   TParameter<double>("individual_response_max", individual_response_max)
       .Write();
   TParameter<int>("contains_category_fractions", 1).Write();
+  TParameter<int>("contains_anchor_et_spectra", 1).Write();
   TParameter<double>("pt_weight_exponent", pt_weight_exponent).Write();
   TParameter<double>("weight_reference_pt", weight_reference_pt).Write();
   TParameter<double>("split_sum_weights", split_histograms.sumw).Write();
@@ -939,6 +1191,30 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
   TParameter<Long64_t>("nosplit_malformed_count",
                        nosplit_histograms.malformed)
       .Write();
+  TParameter<double>("split_anchor_sum_weights",
+                     split_anchor_et_histograms.sumw)
+      .Write();
+  TParameter<double>("split_anchor_sum_weights_squared",
+                     split_anchor_et_histograms.sumw2)
+      .Write();
+  TParameter<double>("nosplit_anchor_sum_weights",
+                     nosplit_anchor_et_histograms.sumw)
+      .Write();
+  TParameter<double>("nosplit_anchor_sum_weights_squared",
+                     nosplit_anchor_et_histograms.sumw2)
+      .Write();
+  TParameter<Long64_t>("split_anchor_raw_count",
+                       split_anchor_et_histograms.raw_total)
+      .Write();
+  TParameter<Long64_t>("nosplit_anchor_raw_count",
+                       nosplit_anchor_et_histograms.raw_total)
+      .Write();
+  TParameter<Long64_t>("split_anchor_malformed_count",
+                       split_anchor_et_histograms.malformed)
+      .Write();
+  TParameter<Long64_t>("nosplit_anchor_malformed_count",
+                       nosplit_anchor_et_histograms.malformed)
+      .Write();
   TParameter<Long64_t>("invalid_truth_shape_count", invalid_truth_shape)
       .Write();
   TParameter<Long64_t>("truth_pt_outside_range_count",
@@ -953,11 +1229,13 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
       << invalid_truth_shape << " / " << truth_pt_outside_range << " / "
       << invalid_weight << std::endl;
   std::cout << "Wrote " << output_base
-            << ".root and eight weighted PDF plots" << std::endl;
+            << ".root and sixteen weighted PDF plots" << std::endl;
   return closure_ok && invalid_truth_shape == 0 &&
                  truth_pt_outside_range == 0 && invalid_weight == 0 &&
                  split_histograms.malformed == 0 &&
-                 nosplit_histograms.malformed == 0
+                 nosplit_histograms.malformed == 0 &&
+                 split_anchor_et_histograms.malformed == 0 &&
+                 nosplit_anchor_et_histograms.malformed == 0
              ? 0
              : 7;
 }

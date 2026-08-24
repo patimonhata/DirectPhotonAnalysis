@@ -90,10 +90,11 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   {
     min_photon_energy_recovery_ = value;
   }
+  void set_max_abs_vertex_z(double value) { max_abs_vertex_z_ = value; }
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 3;
+  static constexpr int schema_version_ = 4;
 
   void create_output_directory() const;
   void create_output();
@@ -124,6 +125,8 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   std::string response_policy_ = "not_used_for_classification";
   std::string photon_recovery_policy_ =
       "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold";
+  std::string vertex_selection_ =
+      "signal_hepmc_collision_vertex_abs_z_lt_max";
   long long manifest_begin_ = -1;
   long long manifest_end_ = -1;
   int signal_embedding_id_ = 1;
@@ -137,6 +140,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   double anchor_pi0_fraction_min_ = 0.5;
   double min_energy_contribution_fraction_ = 0.0;
   double min_photon_energy_recovery_ = 0.5;
+  double max_abs_vertex_z_ = 60.0;
   int verbosity_ = 0;
 
   int pi0_truth_matching_algorithm_version_ =
@@ -154,6 +158,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   unsigned long long n_events_processed_ = 0;
   unsigned long long n_events_written_ = 0;
   unsigned long long n_events_invalid_ = 0;
+  unsigned long long n_events_vertex_rejected_ = 0;
   unsigned long long n_cluster_considered_ = 0;
   unsigned long long n_cluster_invalid_truth_ = 0;
   unsigned long long n_prompt_cluster_ = 0;

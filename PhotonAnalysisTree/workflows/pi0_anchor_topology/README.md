@@ -9,6 +9,24 @@ filled exactly once into separated, merged, missing, or other, so that
 holds both globally and in every cluster-ET bin, including underflow and
 overflow.
 
+## Event selection
+
+Pythia events use the truth collision vertex from the signal embedding
+(`PHHepMCGenEvent::get_collision_vertex()`, in cm). The anchor-spectrum
+workflow requires
+
+    std::abs(z_vertex) < max_abs_vertex_z
+
+with default `max_abs_vertex_z = 60.0` cm. Events at or beyond the boundary,
+including exactly +60 cm and -60 cm, are rejected before cluster truth matching.
+Rejected events fill no prompt, anchor, candidate, or topology histogram or
+counter and are recorded separately as `events_vertex_rejected`. Invalid input
+events remain recorded as `events_invalid`.
+
+The shared `Pi0AnchorTopologyEvaluator` keeps this cut disabled by default.
+The anchor-spectrum workflow enables it explicitly, so `TopologyEventDisplay`
+continues to evaluate all valid vertices.
+
 ## Anchor and pi0 definition
 
 For each cluster, contributor fractions compatible with the same selected pi0
@@ -79,7 +97,7 @@ transactionally and validates its partial before publication.
 
 Finalize a complete production with:
 
-    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000,"Pythia8 p+p MB")'
+    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000,"Pythia8 p+p MB")'
 
 The finalizer writes the combined raw and bin-width-normalized spectra, category
 fractions relative to the anchor spectrum, output_base.pdf, and

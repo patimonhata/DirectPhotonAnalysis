@@ -42,7 +42,8 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
       min_energy_contribution_fraction_ < 1.0 &&
       std::isfinite(min_photon_energy_recovery_) &&
       min_photon_energy_recovery_ >= 0.0 &&
-      min_photon_energy_recovery_ <= 1.0;
+      min_photon_energy_recovery_ <= 1.0 &&
+      std::isfinite(max_abs_vertex_z_) && max_abs_vertex_z_ > 0.0;
   if (!valid)
   {
     std::cerr << "PythiaPi0AnchorClusterSpectrum::Init - invalid configuration"
@@ -67,6 +68,7 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
   topology_config.anchor_pi0_fraction_min = anchor_pi0_fraction_min_;
   topology_config.min_energy_contribution_fraction = min_energy_contribution_fraction_;
   topology_config.min_photon_energy_recovery = min_photon_energy_recovery_;
+  topology_config.max_abs_vertex_z = max_abs_vertex_z_;
   topology_config.verbosity = verbosity_;
   topology_evaluator_.configure(topology_config);
   create_output_directory();
@@ -85,7 +87,12 @@ int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
   ++n_events_processed_;
   const photon_tree::Pi0AnchorTopologyEventResult result =
       topology_evaluator_.evaluate(topNode);
-  if (!result.valid)
+  if (result.status == photon_tree::Pi0TopologyEventStatus::vertex_rejected)
+  {
+    ++n_events_vertex_rejected_;
+    return Fun4AllReturnCodes::ABORTEVENT;
+  }
+  if (result.status != photon_tree::Pi0TopologyEventStatus::accepted)
   {
     ++n_events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;
@@ -173,8 +180,9 @@ int PythiaPi0AnchorClusterSpectrum::End(PHCompositeNode* /*topNode*/)
   const bool write_error = output_file_->TestBit(TFile::kWriteError);
   close_output();
   std::cout
-      << "PythiaPi0AnchorClusterSpectrum - events/anchors/separated/merged/missing/other = "
-      << n_events_written_ << "/" << n_anchor_cluster_ << "/"
+      << "PythiaPi0AnchorClusterSpectrum - processed/written/vertex-rejected/invalid/anchors/separated/merged/missing/other = "
+      << n_events_processed_ << "/" << n_events_written_ << "/"
+      << n_events_vertex_rejected_ << "/" << n_events_invalid_ << "/" << n_anchor_cluster_ << "/"
       << n_separated_ << "/" << n_merged_ << "/" << n_missing_ << "/"
       << n_other_ << std::endl;
   return write_error ? Fun4AllReturnCodes::ABORTRUN
@@ -244,6 +252,7 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("response_policy", &response_policy_);
   metadata_tree_->Branch(
       "photon_recovery_policy", &photon_recovery_policy_);
+  metadata_tree_->Branch("vertex_selection", &vertex_selection_);
   metadata_tree_->Branch("signal_embedding_id", &signal_embedding_id_);
   metadata_tree_->Branch("n_bins", &n_bins_);
   metadata_tree_->Branch("et_max", &et_max_);
@@ -263,6 +272,7 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch(
       "min_photon_energy_recovery",
       &min_photon_energy_recovery_);
+  metadata_tree_->Branch("max_abs_vertex_z", &max_abs_vertex_z_);
   metadata_tree_->Branch(
       "pi0_truth_matching_algorithm_version",
       &pi0_truth_matching_algorithm_version_);
@@ -271,6 +281,8 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("events_processed", &n_events_processed_);
   metadata_tree_->Branch("events_written", &n_events_written_);
   metadata_tree_->Branch("events_invalid", &n_events_invalid_);
+  metadata_tree_->Branch(
+      "events_vertex_rejected", &n_events_vertex_rejected_);
   metadata_tree_->Branch(
       "cluster_considered_count", &n_cluster_considered_);
   metadata_tree_->Branch(

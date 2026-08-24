@@ -39,6 +39,7 @@ struct PartialMetadata {
   std::string topology_priority;
   std::string response_policy;
   std::string photon_recovery_policy;
+  std::string vertex_selection;
   long long manifest_begin = -1;
   long long manifest_end = -1;
   int signal_embedding_id = 0;
@@ -53,10 +54,12 @@ struct PartialMetadata {
   double anchor_pi0_fraction_min = 0.0;
   double min_energy_contribution_fraction = 0.0;
   double min_photon_energy_recovery = 0.0;
+  double max_abs_vertex_z = 0.0;
   unsigned char bin_width_normalized = 1U;
   unsigned long long events_processed = 0;
   unsigned long long events_written = 0;
   unsigned long long events_invalid = 0;
+  unsigned long long events_vertex_rejected = 0;
   unsigned long long cluster_considered = 0;
   unsigned long long cluster_invalid_truth = 0;
   unsigned long long prompt_count = 0;
@@ -100,6 +103,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   std::string* topology_priority = nullptr;
   std::string* response_policy = nullptr;
   std::string* photon_recovery_policy = nullptr;
+  std::string* vertex_selection = nullptr;
   bool ok = true;
   ok &= bind(tree, "schema_version", &value.schema_version);
   ok &= bind(tree, "manifest_path", &manifest_path);
@@ -113,6 +117,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "topology_priority", &topology_priority);
   ok &= bind(tree, "response_policy", &response_policy);
   ok &= bind(tree, "photon_recovery_policy", &photon_recovery_policy);
+  ok &= bind(tree, "vertex_selection", &vertex_selection);
   ok &= bind(tree, "signal_embedding_id", &value.signal_embedding_id);
   ok &= bind(tree, "n_bins", &value.n_bins);
   ok &= bind(tree, "et_max", &value.et_max);
@@ -124,11 +129,13 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "anchor_pi0_fraction_min", &value.anchor_pi0_fraction_min);
   ok &= bind(tree, "min_energy_contribution_fraction", &value.min_energy_contribution_fraction);
   ok &= bind(tree, "min_photon_energy_recovery", &value.min_photon_energy_recovery);
+  ok &= bind(tree, "max_abs_vertex_z", &value.max_abs_vertex_z);
   ok &= bind(tree, "pi0_truth_matching_algorithm_version", &value.matcher_version);
   ok &= bind(tree, "bin_width_normalized", &value.bin_width_normalized);
   ok &= bind(tree, "events_processed", &value.events_processed);
   ok &= bind(tree, "events_written", &value.events_written);
   ok &= bind(tree, "events_invalid", &value.events_invalid);
+  ok &= bind(tree, "events_vertex_rejected", &value.events_vertex_rejected);
   ok &= bind(tree, "cluster_considered_count", &value.cluster_considered);
   ok &= bind(tree, "cluster_invalid_truth_count", &value.cluster_invalid_truth);
   ok &= bind(tree, "prompt_cluster_count", &value.prompt_count);
@@ -147,7 +154,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   if (!ok || tree->GetEntry(0) <= 0 || !manifest_path ||
       !cluster_collection || !classification_unit || !pi0_selection ||
       !partner_selection || !topology_definition || !topology_priority ||
-      !response_policy || !photon_recovery_policy)
+      !response_policy || !photon_recovery_policy || !vertex_selection)
   {
     return false;
   }
@@ -162,11 +169,12 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   value.topology_priority = *topology_priority;
   value.response_policy = *response_policy;
   value.photon_recovery_policy = *photon_recovery_policy;
+  value.vertex_selection = *vertex_selection;
   return true;
 }
 
 bool valid_metadata(const PartialMetadata& value) {
-  return value.schema_version == 3 &&
+  return value.schema_version == 4 &&
       !value.manifest_path.empty() &&
       value.manifest_begin >= 0 &&
       value.manifest_end > value.manifest_begin &&
@@ -178,6 +186,7 @@ bool valid_metadata(const PartialMetadata& value) {
       value.topology_priority == "ambiguous_main_to_other_then_merged_then_separated_then_missing_then_other" &&
       value.response_policy == "not_used_for_classification" &&
       value.photon_recovery_policy == "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
+      value.vertex_selection == "signal_hepmc_collision_vertex_abs_z_lt_max" &&
       value.signal_embedding_id > 0 && value.n_bins > 0 &&
       value.et_max > 0.0 && value.truth_eta_max > 0.0 &&
       value.anchor_cluster_eta_max > 0.0 &&
@@ -192,10 +201,12 @@ bool valid_metadata(const PartialMetadata& value) {
       std::isfinite(value.min_photon_energy_recovery) &&
       value.min_photon_energy_recovery >= 0.0 &&
       value.min_photon_energy_recovery <= 1.0 &&
+      std::isfinite(value.max_abs_vertex_z) && value.max_abs_vertex_z > 0.0 &&
       value.matcher_version > 0 &&
       value.bin_width_normalized == 0U &&
       value.events_processed > 0 &&
-      value.events_written + value.events_invalid == value.events_processed &&
+      value.events_written + value.events_invalid +
+          value.events_vertex_rejected == value.events_processed &&
       value.cluster_invalid_truth <= value.cluster_considered &&
       value.anchor_count == value.anchor_g4 + value.anchor_generator &&
       value.anchor_count == value.separated_count + value.merged_count + value.missing_count + value.other_count &&
@@ -214,6 +225,7 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference) 
       value.topology_priority == reference.topology_priority &&
       value.response_policy == reference.response_policy &&
       value.photon_recovery_policy == reference.photon_recovery_policy &&
+      value.vertex_selection == reference.vertex_selection &&
       value.signal_embedding_id == reference.signal_embedding_id &&
       value.n_bins == reference.n_bins &&
       value.matcher_version == reference.matcher_version &&
@@ -225,7 +237,8 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference) 
       same_double(value.dominant_fraction_min, reference.dominant_fraction_min) &&
       same_double(value.anchor_pi0_fraction_min, reference.anchor_pi0_fraction_min) &&
       same_double(value.min_energy_contribution_fraction, reference.min_energy_contribution_fraction) &&
-      same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery);
+      same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) &&
+      same_double(value.max_abs_vertex_z, reference.max_abs_vertex_z);
 }
 
 bool valid_histogram(const TH1D* histogram, const PartialMetadata& metadata, unsigned long long expected_entries) {
@@ -273,9 +286,9 @@ double smallest_positive(const std::array<std::unique_ptr<TH1D>, kHistogramCount
 
 int FinalizePythiaPi0AnchorClusterSpectra(
     const std::string partial_pattern =
-        "output/pi0_anchor_topology_partial/eta07_full_partner_fgamma0p0_recovery0p5_clusterenergy_jet5/partial_*.root",
+        "output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p2_clusterenergy/partial_*.root",
     const std::string output_base =
-        "output/plots/pi0_anchor_topology/TEMP_jet5",
+        "output/plots/pi0_anchor_topology/minimum_bias/with_vertex_cut",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1,
     const std::string sample_label = "Pythia8 p+p Jet 5")
@@ -348,6 +361,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
 
   PartialMetadata total = reference;
   total.events_processed = total.events_written = total.events_invalid = 0;
+  total.events_vertex_rejected = 0;
   total.cluster_considered = total.cluster_invalid_truth = 0;
   total.prompt_count = total.candidate_g4 = total.candidate_generator = 0;
   total.malformed_daughters = total.anchor_count = 0;
@@ -389,6 +403,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     total.events_processed += partial.events_processed;
     total.events_written += partial.events_written;
     total.events_invalid += partial.events_invalid;
+    total.events_vertex_rejected += partial.events_vertex_rejected;
     total.cluster_considered += partial.cluster_considered;
     total.cluster_invalid_truth += partial.cluster_invalid_truth;
     total.prompt_count += partial.prompt_count;
@@ -522,7 +537,10 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   spectrum_label.DrawLatex(annotation_x, 0.68, "Topology: energy deposit");
   std::ostringstream recovery_label;
   recovery_label << "E_{clus} f_{dep}^{#gamma}/E_{truth}^{#gamma} #geq " << reference.min_photon_energy_recovery;
+  std::ostringstream vertex_label;
+  vertex_label << "|z_{vtx}^{truth}| < " << reference.max_abs_vertex_z << " cm";
   spectrum_label.DrawLatex(annotation_x, 0.62, recovery_label.str().c_str());
+  spectrum_label.DrawLatex(annotation_x, 0.56, vertex_label.str().c_str());
   spectrum_canvas.RedrawAxis();
   spectrum_canvas.SaveAs((output_base + ".pdf").c_str());
 
@@ -555,6 +573,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
   fraction_label.DrawLatex(annotation_x, 0.80, "Denominator: all #pi^{0}-main anchors");
   fraction_label.DrawLatex(annotation_x, 0.74, recovery_label.str().c_str());
+  fraction_label.DrawLatex(annotation_x, 0.68, vertex_label.str().c_str());
   fraction_canvas.RedrawAxis();
   fraction_canvas.SaveAs((output_base + "_category_fractions.pdf").c_str());
 
@@ -592,6 +611,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_stack_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
   fraction_stack_label.DrawLatex(annotation_x, 0.80, "Denominator: all #pi^{0}-main anchors");
   fraction_stack_label.DrawLatex(annotation_x, 0.74, recovery_label.str().c_str());
+  fraction_stack_label.DrawLatex(annotation_x, 0.68, vertex_label.str().c_str());
   fraction_stack_canvas.RedrawAxis();
   fraction_stack_canvas.SaveAs((output_base + "_category_fraction_stack.pdf").c_str());
 
@@ -607,7 +627,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     histogram->Write();
   }
 
-  int output_schema_version = 3;
+  int output_schema_version = 4;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -630,6 +650,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("topology_priority", &total.topology_priority);
   metadata.Branch("response_policy", &total.response_policy);
   metadata.Branch("photon_recovery_policy", &total.photon_recovery_policy);
+  metadata.Branch("vertex_selection", &total.vertex_selection);
   metadata.Branch("signal_embedding_id", &total.signal_embedding_id);
   metadata.Branch("n_bins", &total.n_bins);
   metadata.Branch("et_max", &total.et_max);
@@ -641,6 +662,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("anchor_pi0_fraction_min", &total.anchor_pi0_fraction_min);
   metadata.Branch("min_energy_contribution_fraction", &total.min_energy_contribution_fraction);
   metadata.Branch("min_photon_energy_recovery", &total.min_photon_energy_recovery);
+  metadata.Branch("max_abs_vertex_z", &total.max_abs_vertex_z);
   metadata.Branch("pi0_truth_matching_algorithm_version", &total.matcher_version);
   metadata.Branch("contains_raw_histograms", &contains_raw_histograms);
   metadata.Branch("contains_bin_width_normalized_histograms", &contains_bin_width_normalized_histograms);
@@ -648,6 +670,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("events_processed", &total.events_processed);
   metadata.Branch("events_written", &total.events_written);
   metadata.Branch("events_invalid", &total.events_invalid);
+  metadata.Branch("events_vertex_rejected", &total.events_vertex_rejected);
   metadata.Branch("cluster_considered_count", &total.cluster_considered);
   metadata.Branch("cluster_invalid_truth_count", &total.cluster_invalid_truth);
   metadata.Branch("prompt_cluster_count", &total.prompt_count);
@@ -673,9 +696,10 @@ int FinalizePythiaPi0AnchorClusterSpectra(
 
   std::cout
       << "FinalizePythiaPi0AnchorClusterSpectra - partials/files/events"
-      << "/anchor/separated/merged/missing/other = "
+      << "/vertex-rejected/anchor/separated/merged/missing/other = "
       << partial_file_count << "/" << input_file_count << "/"
-      << total.events_processed << "/" << total.anchor_count << "/"
+      << total.events_processed << "/" << total.events_vertex_rejected << "/"
+      << total.anchor_count << "/"
       << total.separated_count << "/" << total.merged_count << "/"
       << total.missing_count << "/" << total.other_count << std::endl;
   return 0;

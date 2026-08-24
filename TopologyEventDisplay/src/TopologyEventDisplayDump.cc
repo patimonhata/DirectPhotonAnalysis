@@ -91,7 +91,7 @@ int TopologyEventDisplayDump::process_event(PHCompositeNode* topNode)
   b_event_ = static_cast<int>(events_processed_);
   ++events_processed_;
   const auto result = evaluator_.evaluate(topNode);
-  if (!result.valid)
+  if (result.status != photon_tree::Pi0TopologyEventStatus::accepted)
   {
     ++events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;

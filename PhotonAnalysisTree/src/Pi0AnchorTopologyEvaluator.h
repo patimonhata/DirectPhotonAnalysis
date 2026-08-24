@@ -45,6 +45,13 @@ enum class Pi0AnchorReason : int
   other_best_cluster_below_recovery = 5
 };
 
+enum class Pi0TopologyEventStatus : int
+{
+  invalid = 0,
+  vertex_rejected = 1,
+  accepted = 2
+};
+
 struct Pi0AnchorTopologyConfig
 {
   Pi0SampleMode sample_mode = Pi0SampleMode::pythia;
@@ -64,6 +71,8 @@ struct Pi0AnchorTopologyConfig
   double anchor_pi0_fraction_min = 0.5;
   double min_energy_contribution_fraction = 0.0;
   double min_photon_energy_recovery = 0.5;
+  // A non-positive value disables the event-level collision-z cut.
+  double max_abs_vertex_z = -1.0;
   bool evaluate_all_candidates = false;
   int verbosity = 0;
 };
@@ -114,7 +123,7 @@ struct Pi0TopologyAnchorRecord
 
 struct Pi0AnchorTopologyEventResult
 {
-  bool valid = false;
+  Pi0TopologyEventStatus status = Pi0TopologyEventStatus::invalid;
   std::array<double, 3> collision_vertex = {0.0, 0.0, 0.0};
   std::vector<Pi0TopologyClusterRecord> clusters;
   std::vector<unsigned char> prompt_cluster;
@@ -134,7 +143,7 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 1;
+  static constexpr int kAlgorithmVersion = 2;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

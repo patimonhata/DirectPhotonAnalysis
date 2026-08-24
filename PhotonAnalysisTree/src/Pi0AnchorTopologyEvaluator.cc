@@ -275,8 +275,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
   const HepMC::GenEvent* event = signal_event ? signal_event->getEvent() : nullptr;
   if (!truth || !towers || !raw_truth_towers || !truth_cells || !truth_hits ||
       !clusters || (pythia && (!event_map || !signal_event ||
-       !signal_event->is_simulated() || !event)) ||
-      !truth_matcher_.begin_event(topNode))
+       !signal_event->is_simulated() || !event)))
   {
     return result;
   }
@@ -310,6 +309,16 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
   if (!std::isfinite(result.collision_vertex[0]) ||
       !std::isfinite(result.collision_vertex[1]) ||
       !std::isfinite(result.collision_vertex[2]))
+  {
+    return result;
+  }
+  if (config_.max_abs_vertex_z > 0.0 &&
+      std::abs(result.collision_vertex[2]) >= config_.max_abs_vertex_z)
+  {
+    result.status = Pi0TopologyEventStatus::vertex_rejected;
+    return result;
+  }
+  if (!truth_matcher_.begin_event(topNode))
   {
     return result;
   }
@@ -723,7 +732,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
     }
   }
 
-  result.valid = true;
+  result.status = Pi0TopologyEventStatus::accepted;
   return result;
 }
 }

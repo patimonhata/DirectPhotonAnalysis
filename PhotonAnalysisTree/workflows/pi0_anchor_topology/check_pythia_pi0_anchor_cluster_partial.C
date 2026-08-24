@@ -98,6 +98,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   double anchor_pi0_fraction_min = 0.0;
   double min_energy_contribution_fraction = 0.0;
   double min_photon_energy_recovery = 0.0;
+  double max_abs_vertex_z = 0.0;
   unsigned char bin_width_normalized = 1U;
   std::string* manifest_path = nullptr;
   std::string* first_suffix = nullptr;
@@ -110,9 +111,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   std::string* topology_priority = nullptr;
   std::string* response_policy = nullptr;
   std::string* photon_recovery_policy = nullptr;
+  std::string* vertex_selection = nullptr;
   unsigned long long events_processed = 0;
   unsigned long long events_written = 0;
   unsigned long long events_invalid = 0;
+  unsigned long long events_vertex_rejected = 0;
   unsigned long long cluster_considered = 0;
   unsigned long long cluster_invalid_truth = 0;
   unsigned long long prompt_count = 0;
@@ -145,6 +148,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   ok &= bind(metadata, "response_policy", &response_policy);
   ok &= bind(metadata, "photon_recovery_policy",
              &photon_recovery_policy);
+  ok &= bind(metadata, "vertex_selection", &vertex_selection);
   ok &= bind(metadata, "signal_embedding_id", &signal_embedding_id);
   ok &= bind(metadata, "n_bins", &n_bins);
   ok &= bind(metadata, "et_max", &et_max);
@@ -159,12 +163,15 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
              &min_energy_contribution_fraction);
   ok &= bind(metadata, "min_photon_energy_recovery",
              &min_photon_energy_recovery);
+  ok &= bind(metadata, "max_abs_vertex_z", &max_abs_vertex_z);
   ok &= bind(metadata, "pi0_truth_matching_algorithm_version",
              &matcher_version);
   ok &= bind(metadata, "bin_width_normalized", &bin_width_normalized);
   ok &= bind(metadata, "events_processed", &events_processed);
   ok &= bind(metadata, "events_written", &events_written);
   ok &= bind(metadata, "events_invalid", &events_invalid);
+  ok &= bind(metadata, "events_vertex_rejected",
+             &events_vertex_rejected);
   ok &= bind(metadata, "cluster_considered_count", &cluster_considered);
   ok &= bind(metadata, "cluster_invalid_truth_count",
              &cluster_invalid_truth);
@@ -189,7 +196,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   }
 
   const bool valid_metadata =
-      schema_version == 3 && manifest_path && !manifest_path->empty() &&
+      schema_version == 4 && manifest_path && !manifest_path->empty() &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() &&
       last_suffix && !last_suffix->empty() &&
@@ -214,6 +221,8 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       photon_recovery_policy &&
       *photon_recovery_policy ==
           "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
+      vertex_selection &&
+      *vertex_selection == "signal_hepmc_collision_vertex_abs_z_lt_max" &&
       signal_embedding_id > 0 && n_bins > 0 &&
       std::isfinite(et_max) && et_max > 0.0 &&
       std::isfinite(truth_eta_max) && truth_eta_max > 0.0 &&
@@ -229,9 +238,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       std::isfinite(min_photon_energy_recovery) &&
       min_photon_energy_recovery >= 0.0 &&
       min_photon_energy_recovery <= 1.0 &&
+      std::isfinite(max_abs_vertex_z) && max_abs_vertex_z > 0.0 &&
       matcher_version > 0 && bin_width_normalized == 0U &&
       events_processed > 0 &&
-      events_written + events_invalid == events_processed &&
+      events_written + events_invalid + events_vertex_rejected ==
+          events_processed &&
       cluster_invalid_truth <= cluster_considered &&
       anchor_count == anchor_g4 + anchor_generator &&
       anchor_count ==
@@ -285,10 +296,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   }
 
   std::cout
-      << "check_pythia_pi0_anchor_cluster_partial - range/events/anchor"
+      << "check_pythia_pi0_anchor_cluster_partial - range/events/vertex-rejected/anchor"
       << "/separated/merged/missing/other = ["
       << manifest_begin << ":" << manifest_end << "]/"
-      << events_processed << "/" << anchor_count << "/"
+      << events_processed << "/" << events_vertex_rejected << "/"
+      << anchor_count << "/"
       << separated_count << "/" << merged_count << "/"
       << missing_count << "/" << other_count << std::endl;
   return 0;

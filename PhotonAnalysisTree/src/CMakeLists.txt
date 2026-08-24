@@ -42,6 +42,7 @@ endforeach()
 add_library(
   PhotonAnalysisTree SHARED
   HepMCPhotonClassifier.cc
+  Pi0AnchorTopologyEvaluator.cc
   Pi0ClusterTruthMatcher.cc
   PhotonAnalysisTree.cc
   PythiaClusterEtSpectrum.cc
@@ -102,6 +103,7 @@ install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
 install(
   FILES
     HepMCPhotonClassifier.h
+    Pi0AnchorTopologyEvaluator.h
     Pi0ClusterTruthMatcher.h
     PhotonAnalysisTree.h
     PhotonTreeCommon.h

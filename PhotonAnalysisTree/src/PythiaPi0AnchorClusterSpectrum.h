@@ -1,8 +1,7 @@
 #ifndef RYOTARO_PYTHIAPI0ANCHORCLUSTERSPECTRUM_H_20260814
 #define RYOTARO_PYTHIAPI0ANCHORCLUSTERSPECTRUM_H_20260814
 
-#include "Pi0ClusterTruthMatcher.h"
-#include "PythiaClusterTruthMatcher.h"
+#include "Pi0AnchorTopologyEvaluator.h"
 
 #include <fun4all/SubsysReco.h>
 
@@ -142,8 +141,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
 
   int pi0_truth_matching_algorithm_version_ =
       photon_tree::Pi0ClusterTruthMatcher::kAlgorithmVersion;
-  photon_tree::PythiaClusterTruthMatcher truth_matcher_;
-  photon_tree::Pi0ClusterTruthMatcher pi0_truth_matcher_;
+  photon_tree::Pi0AnchorTopologyEvaluator topology_evaluator_;
   TFile* output_file_ = nullptr;
   TH1D* h_prompt_ = nullptr;
   TH1D* h_anchor_ = nullptr;

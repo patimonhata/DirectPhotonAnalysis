@@ -1,208 +1,16 @@
 #include "PythiaPi0AnchorClusterSpectrum.h"
 
-#include <calobase/RawCluster.h>
-#include <calobase/RawClusterContainer.h>
-#include <calobase/RawTowerContainer.h>
-#include <calobase/TowerInfoContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
-#include <g4detectors/PHG4CellContainer.h>
-#include <g4main/PHG4HitContainer.h>
-#include <g4main/PHG4Particle.h>
-#include <g4main/PHG4TruthInfoContainer.h>
-#include <phhepmc/PHHepMCGenEvent.h>
-#include <phhepmc/PHHepMCGenEventMap.h>
-#include <phool/PHCompositeNode.h>
-#include <phool/getClass.h>
-
-#include <HepMC/GenEvent.h>
-#include <HepMC/GenParticle.h>
-#include <HepMC/GenVertex.h>
-#include <HepMC/SimpleVector.h>
 
 #include <TFile.h>
 #include <TH1D.h>
 #include <TSystem.h>
 #include <TTree.h>
 
-#include <algorithm>
-#include <array>
 #include <cmath>
+#include <cstddef>
 #include <iostream>
-#include <limits>
-#include <map>
-#include <set>
 #include <string>
-#include <utility>
-#include <vector>
-
-namespace
-{
-constexpr std::size_t invalid_index = std::numeric_limits<std::size_t>::max();
-
-enum class Pi0Pathway : int
-{
-  g4_primary_decay = 1,
-  generator_decay = 2
-};
-
-struct Pi0Origin
-{
-  bool valid = false;
-  const HepMC::GenParticle* parent = nullptr;
-};
-
-struct Pi0Candidate
-{
-  Pi0Pathway pathway = Pi0Pathway::g4_primary_decay;
-  int parent_barcode = 0;
-  const HepMC::GenParticle* parent = nullptr;
-  const PHG4Particle* g4_parent = nullptr;
-  std::array<const PHG4Particle*, 2> photons = {nullptr, nullptr};
-};
-
-struct PendingGeneratorCandidate
-{
-  const HepMC::GenParticle* parent = nullptr;
-  std::vector<const PHG4Particle*> photons;
-};
-
-struct ClusterRecord
-{
-  const RawCluster* cluster = nullptr;
-  double et = 0.0;
-  double eta = 0.0;
-  bool anchor_acceptance = false;
-  photon_tree::ClusterTruthMatch truth;
-};
-
-struct AnchorRecord
-{
-  std::size_t cluster_index = invalid_index;
-  std::size_t candidate_index = invalid_index;
-  bool ambiguous_main = false;
-};
-
-std::vector<const HepMC::GenParticle*> incoming(const HepMC::GenVertex* vertex)
-{
-  std::vector<const HepMC::GenParticle*> result;
-  if (!vertex)
-  {
-    return result;
-  }
-  for (auto iterator = vertex->particles_in_const_begin();
-       iterator != vertex->particles_in_const_end(); ++iterator)
-  {
-    if (*iterator)
-    {
-      result.push_back(*iterator);
-    }
-  }
-  return result;
-}
-
-Pi0Origin trace_pi0_origin(const HepMC::GenParticle* photon)
-{
-  Pi0Origin result;
-  if (!photon || photon->pdg_id() != 22)
-  {
-    return result;
-  }
-  const HepMC::GenParticle* current = photon;
-  std::set<int> visited;
-  if (current->barcode() != 0)
-  {
-    visited.insert(current->barcode());
-  }
-  while (current)
-  {
-    const auto parents = incoming(current->production_vertex());
-    if (parents.size() == 1U && parents.front()->pdg_id() == 22)
-    {
-      current = parents.front();
-      if (current->barcode() != 0 &&
-          !visited.insert(current->barcode()).second)
-      {
-        return result;
-      }
-      continue;
-    }
-    if (parents.size() == 1U && parents.front()->pdg_id() == 111)
-    {
-      result.valid = true;
-      result.parent = parents.front();
-    }
-    return result;
-  }
-  return result;
-}
-
-bool finite_eta(const HepMC::GenParticle* particle, double& eta)
-{
-  if (!particle)
-  {
-    return false;
-  }
-  const auto& momentum = particle->momentum();
-  const double pt = std::hypot(momentum.px(), momentum.py());
-  if (!(pt > 0.0) || !std::isfinite(momentum.pz()))
-  {
-    return false;
-  }
-  eta = std::asinh(momentum.pz() / pt);
-  return std::isfinite(eta);
-}
-
-double particle_pt(const PHG4Particle* particle)
-{
-  return particle ? std::hypot(particle->get_px(), particle->get_py()) : 0.0;
-}
-
-const HepMC::GenParticle* contributor_hepmc_particle(
-    const photon_tree::TruthContributor& contributor,
-    const PHHepMCGenEventMap* event_map)
-{
-  const PHHepMCGenEvent* subevent = event_map
-      ? event_map->get(contributor.embedding_id) : nullptr;
-  const HepMC::GenEvent* event = subevent ? subevent->getEvent() : nullptr;
-  return event ? event->barcode_to_particle(contributor.hepmc_barcode) : nullptr;
-}
-
-std::size_t contributor_candidate_index(
-    const photon_tree::TruthContributor& contributor,
-    const PHHepMCGenEventMap* event_map,
-    int signal_embedding_id,
-    const std::map<int, std::size_t>& g4_candidate_by_barcode,
-    const std::map<int, std::size_t>& generator_candidate_by_barcode)
-{
-  if (contributor.embedding_id != signal_embedding_id ||
-      !contributor.hepmc_valid)
-  {
-    return invalid_index;
-  }
-  const HepMC::GenParticle* particle =
-      contributor_hepmc_particle(contributor, event_map);
-  if (contributor.g4_pdg_id == 111 && particle &&
-      particle->pdg_id() == 111)
-  {
-    const auto found = g4_candidate_by_barcode.find(particle->barcode());
-    return found == g4_candidate_by_barcode.end()
-        ? invalid_index : found->second;
-  }
-  if (contributor.g4_pdg_id != 22)
-  {
-    return invalid_index;
-  }
-  const Pi0Origin origin = trace_pi0_origin(particle);
-  if (!origin.valid || !origin.parent)
-  {
-    return invalid_index;
-  }
-  const auto found =
-      generator_candidate_by_barcode.find(origin.parent->barcode());
-  return found == generator_candidate_by_barcode.end()
-      ? invalid_index : found->second;
-}
-}
 
 PythiaPi0AnchorClusterSpectrum::PythiaPi0AnchorClusterSpectrum(
     const std::string& name)
@@ -241,7 +49,26 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
               << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
   }
-  truth_matcher_.set_verbosity(verbosity_);
+  photon_tree::Pi0AnchorTopologyConfig topology_config;
+  topology_config.sample_mode = photon_tree::Pi0SampleMode::pythia;
+  topology_config.truth_node_name = truth_node_name_;
+  topology_config.hepmc_event_map_node_name = hepmc_event_map_node_name_;
+  topology_config.tower_node_name = tower_node_name_;
+  topology_config.raw_truth_tower_node_name = raw_truth_tower_node_name_;
+  topology_config.truth_cell_node_name = truth_cell_node_name_;
+  topology_config.truth_hit_node_name = truth_hit_node_name_;
+  topology_config.cluster_node_name = split_cluster_node_name_;
+  topology_config.signal_embedding_id = signal_embedding_id_;
+  topology_config.truth_eta_max = truth_eta_max_;
+  topology_config.anchor_cluster_eta_max = anchor_cluster_eta_max_;
+  topology_config.partner_cluster_eta_max = partner_cluster_eta_max_;
+  topology_config.min_cluster_energy = min_cluster_energy_;
+  topology_config.dominant_fraction_min = dominant_fraction_min_;
+  topology_config.anchor_pi0_fraction_min = anchor_pi0_fraction_min_;
+  topology_config.min_energy_contribution_fraction = min_energy_contribution_fraction_;
+  topology_config.min_photon_energy_recovery = min_photon_energy_recovery_;
+  topology_config.verbosity = verbosity_;
+  topology_evaluator_.configure(topology_config);
   create_output_directory();
   create_output();
   if (!output_file_ || output_file_->IsZombie())
@@ -256,281 +83,43 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
 int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
 {
   ++n_events_processed_;
-  auto* truth =
-      findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
-  auto* event_map = findNode::getClass<PHHepMCGenEventMap>(
-      topNode, hepmc_event_map_node_name_);
-  auto* towers =
-      findNode::getClass<TowerInfoContainer>(topNode, tower_node_name_);
-  auto* raw_truth_towers = findNode::getClass<RawTowerContainer>(
-      topNode, raw_truth_tower_node_name_);
-  auto* truth_cells = findNode::getClass<PHG4CellContainer>(
-      topNode, truth_cell_node_name_);
-  auto* truth_hits = findNode::getClass<PHG4HitContainer>(
-      topNode, truth_hit_node_name_);
-  auto* clusters = findNode::getClass<RawClusterContainer>(
-      topNode, split_cluster_node_name_);
-  const PHHepMCGenEvent* signal_event = event_map
-      ? event_map->get(signal_embedding_id_) : nullptr;
-  const HepMC::GenEvent* event =
-      signal_event ? signal_event->getEvent() : nullptr;
-  if (!truth || !event_map || !towers || !raw_truth_towers || !truth_cells ||
-      !truth_hits || !clusters || !signal_event ||
-      !signal_event->is_simulated() || !event ||
-      !truth_matcher_.begin_event(topNode))
+  const photon_tree::Pi0AnchorTopologyEventResult result =
+      topology_evaluator_.evaluate(topNode);
+  if (!result.valid)
   {
     ++n_events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
-  const HepMC::FourVector& collision = signal_event->get_collision_vertex();
-  if (!std::isfinite(collision.x()) || !std::isfinite(collision.y()) ||
-      !std::isfinite(collision.z()))
-  {
-    ++n_events_invalid_;
-    return Fun4AllReturnCodes::ABORTEVENT;
-  }
+  n_cluster_considered_ += result.clusters.size();
+  n_cluster_invalid_truth_ += result.cluster_invalid_truth_count;
+  n_pi0_candidate_g4_decay_ += result.g4_candidate_count;
+  n_pi0_candidate_generator_decay_ += result.generator_candidate_count;
+  n_pi0_malformed_daughters_ += result.malformed_candidate_count;
+  n_energy_match_invalid_ += result.energy_match_invalid_count;
 
-  std::vector<ClusterRecord> cluster_records;
-  const auto cluster_range = clusters->getClusters();
-  for (auto iterator = cluster_range.first; iterator != cluster_range.second;
-       ++iterator)
+  for (std::size_t index = 0; index < result.clusters.size(); ++index)
   {
-    const RawCluster* cluster = iterator->second;
-    if (!cluster || !std::isfinite(cluster->get_energy()) ||
-        !std::isfinite(cluster->get_x()) || !std::isfinite(cluster->get_y()) ||
-        !std::isfinite(cluster->get_z()) ||
-        cluster->get_energy() < min_cluster_energy_)
+    if (index < result.prompt_cluster.size() && result.prompt_cluster[index])
     {
-      continue;
-    }
-    const double dx = cluster->get_x() - collision.x();
-    const double dy = cluster->get_y() - collision.y();
-    const double dz = cluster->get_z() - collision.z();
-    const double distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-    const double transverse = std::hypot(dx, dy);
-    if (!(distance > 0.0) || !(transverse > 0.0))
-    {
-      continue;
-    }
-    ClusterRecord record;
-    record.cluster = cluster;
-    record.et = cluster->get_energy() * transverse / distance;
-    record.eta = std::asinh(dz / transverse);
-    if (!std::isfinite(record.et) || !(record.et > 0.0) ||
-        !std::isfinite(record.eta))
-    {
-      continue;
-    }
-    if (partner_cluster_eta_max_ > 0.0 &&
-        std::abs(record.eta) >= partner_cluster_eta_max_)
-    {
-      continue;
-    }
-    record.anchor_acceptance =
-        std::abs(record.eta) < anchor_cluster_eta_max_;
-    record.truth = truth_matcher_.match(
-        cluster, towers, raw_truth_towers, truth, event_map, true);
-    ++n_cluster_considered_;
-    if (!record.truth.valid)
-    {
-      ++n_cluster_invalid_truth_;
-    }
-    cluster_records.push_back(std::move(record));
-  }
-
-  // Prompt is retained only as an external spectrum reference. It is not part
-  // of the pi0-anchor partition.
-  for (const ClusterRecord& cluster : cluster_records)
-  {
-    if (!cluster.anchor_acceptance || !cluster.truth.valid ||
-        cluster.truth.contributors.empty())
-    {
-      continue;
-    }
-    const auto& dominant = cluster.truth.contributors.front();
-    if (dominant.embedding_id != signal_embedding_id_ ||
-        !dominant.hepmc_valid ||
-        dominant.fraction < dominant_fraction_min_ ||
-        dominant.g4_pdg_id != 22 ||
-        (dominant.photon_category != 1 && dominant.photon_category != 2))
-    {
-      continue;
-    }
-    double truth_eta = 0.0;
-    const HepMC::GenParticle* particle =
-        contributor_hepmc_particle(dominant, event_map);
-    if (finite_eta(particle, truth_eta) &&
-        std::abs(truth_eta) < truth_eta_max_)
-    {
-      h_prompt_->Fill(cluster.et);
+      h_prompt_->Fill(result.clusters[index].et);
       ++n_prompt_cluster_;
     }
   }
 
-  std::map<int, std::vector<const PHG4Particle*>> children_by_parent;
-  const auto secondary_range = truth->GetSecondaryParticleRange();
-  for (auto iterator = secondary_range.first;
-       iterator != secondary_range.second; ++iterator)
+  for (const photon_tree::Pi0TopologyAnchorRecord& anchor : result.anchors)
   {
-    const PHG4Particle* particle = iterator->second;
-    if (particle)
+    if (anchor.cluster_index >= result.clusters.size() ||
+        anchor.candidate_index >= result.candidates.size())
     {
-      children_by_parent[particle->get_parent_id()].push_back(particle);
+      ++n_events_invalid_;
+      return Fun4AllReturnCodes::ABORTEVENT;
     }
-  }
-
-  std::vector<Pi0Candidate> candidates;
-  std::map<int, PendingGeneratorCandidate> pending_generator;
-  const auto primary_range = truth->GetPrimaryParticleRange();
-  for (auto iterator = primary_range.first; iterator != primary_range.second;
-       ++iterator)
-  {
-    const PHG4Particle* primary = iterator->second;
-    if (!primary ||
-        truth->isEmbeded(primary->get_track_id()) != signal_embedding_id_)
-    {
-      continue;
-    }
-    const HepMC::GenParticle* hepmc_particle =
-        event->barcode_to_particle(primary->get_barcode());
-    if (primary->get_pid() == 111 && hepmc_particle &&
-        hepmc_particle->pdg_id() == 111)
-    {
-      double eta = 0.0;
-      const auto found = children_by_parent.find(primary->get_track_id());
-      if (found == children_by_parent.end() || found->second.size() != 2U ||
-          found->second[0]->get_pid() != 22 ||
-          found->second[1]->get_pid() != 22)
-      {
-        ++n_pi0_malformed_daughters_;
-        continue;
-      }
-      const double pt = particle_pt(primary);
-      eta = pt > 0.0 ? std::asinh(primary->get_pz() / pt) : 0.0;
-      if (!(pt > 0.0) || !std::isfinite(eta) ||
-          std::abs(eta) >= truth_eta_max_)
-      {
-        continue;
-      }
-      candidates.push_back({Pi0Pathway::g4_primary_decay,
-          hepmc_particle->barcode(), hepmc_particle, primary,
-          {found->second[0], found->second[1]}});
-      ++n_pi0_candidate_g4_decay_;
-      continue;
-    }
-    if (primary->get_pid() != 22 || !hepmc_particle ||
-        hepmc_particle->pdg_id() != 22)
-    {
-      continue;
-    }
-    const Pi0Origin origin = trace_pi0_origin(hepmc_particle);
-    if (!origin.valid || !origin.parent)
-    {
-      continue;
-    }
-    auto& pending = pending_generator[origin.parent->barcode()];
-    pending.parent = origin.parent;
-    pending.photons.push_back(primary);
-  }
-
-  for (const auto& [barcode, pending] : pending_generator)
-  {
-    double eta = 0.0;
-    if (!pending.parent || pending.photons.size() != 2U)
-    {
-      ++n_pi0_malformed_daughters_;
-      continue;
-    }
-    if (!finite_eta(pending.parent, eta) || std::abs(eta) >= truth_eta_max_)
-    {
-      continue;
-    }
-    candidates.push_back({Pi0Pathway::generator_decay, barcode,
-        pending.parent, nullptr,
-        {pending.photons[0], pending.photons[1]}});
-    ++n_pi0_candidate_generator_decay_;
-  }
-
-  std::map<int, std::size_t> g4_candidate_by_barcode;
-  std::map<int, std::size_t> generator_candidate_by_barcode;
-  for (std::size_t index = 0; index < candidates.size(); ++index)
-  {
-    const Pi0Candidate& candidate = candidates[index];
-    if (candidate.pathway == Pi0Pathway::g4_primary_decay)
-    {
-      g4_candidate_by_barcode[candidate.parent_barcode] = index;
-    }
-    else
-    {
-      generator_candidate_by_barcode[candidate.parent_barcode] = index;
-    }
-  }
-
-  std::vector<AnchorRecord> anchors;
-  std::vector<std::vector<std::size_t>> anchors_by_candidate(
-      candidates.size());
-  constexpr double tie_tolerance = 1e-6;
-  for (std::size_t cluster_index = 0;
-       cluster_index < cluster_records.size(); ++cluster_index)
-  {
-    const ClusterRecord& cluster = cluster_records[cluster_index];
-    if (!cluster.anchor_acceptance || !cluster.truth.valid ||
-        cluster.truth.contributors.empty())
-    {
-      continue;
-    }
-    std::map<std::size_t, double> fraction_by_candidate;
-    double unmatched_max_fraction = 0.0;
-    for (const auto& contributor : cluster.truth.contributors)
-    {
-      const std::size_t candidate_index = contributor_candidate_index(
-          contributor, event_map, signal_embedding_id_,
-          g4_candidate_by_barcode, generator_candidate_by_barcode);
-      if (candidate_index == invalid_index)
-      {
-        unmatched_max_fraction =
-            std::max(unmatched_max_fraction,
-                     static_cast<double>(contributor.fraction));
-      }
-      else
-      {
-        fraction_by_candidate[candidate_index] += contributor.fraction;
-      }
-    }
-
-    std::size_t best_candidate = invalid_index;
-    double best_fraction = -1.0;
-    double second_fraction = -1.0;
-    for (const auto& [candidate_index, fraction] : fraction_by_candidate)
-    {
-      if (fraction > best_fraction)
-      {
-        second_fraction = best_fraction;
-        best_fraction = fraction;
-        best_candidate = candidate_index;
-      }
-      else
-      {
-        second_fraction = std::max(second_fraction, fraction);
-      }
-    }
-    if (best_candidate == invalid_index ||
-        best_fraction < anchor_pi0_fraction_min_)
-    {
-      continue;
-    }
-
-    const bool ambiguous_main =
-        second_fraction >= best_fraction - tie_tolerance ||
-        unmatched_max_fraction >= best_fraction - tie_tolerance;
-    anchors.push_back(
-        {cluster_index, best_candidate, ambiguous_main});
-    anchors_by_candidate[best_candidate].push_back(anchors.size() - 1U);
-    h_anchor_->Fill(cluster.et);
+    const double et = result.clusters[anchor.cluster_index].et;
+    h_anchor_->Fill(et);
     ++n_anchor_cluster_;
-    if (candidates[best_candidate].pathway ==
-        Pi0Pathway::g4_primary_decay)
+    if (result.candidates[anchor.candidate_index].pathway ==
+        photon_tree::Pi0Pathway::g4_primary_decay)
     {
       ++n_anchor_g4_decay_;
     }
@@ -538,115 +127,28 @@ int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
     {
       ++n_anchor_generator_decay_;
     }
-    if (ambiguous_main)
+    if (anchor.ambiguous_main)
     {
       ++n_anchor_ambiguous_main_;
     }
-  }
-
-  for (std::size_t candidate_index = 0;
-       candidate_index < candidates.size(); ++candidate_index)
-  {
-    if (anchors_by_candidate[candidate_index].empty())
+    switch (anchor.topology)
     {
-      continue;
-    }
-    const Pi0Candidate& candidate = candidates[candidate_index];
-    const std::array<int, 2> direct_gamma_track_ids = {
-        candidate.photons[0]->get_track_id(),
-        candidate.photons[1]->get_track_id()};
-    const std::array<double, 2> truth_gamma_energy = {
-        candidate.photons[0]->get_e(),
-        candidate.photons[1]->get_e()};
-    std::array<std::size_t, 2> best_cluster = {
-        invalid_index, invalid_index};
-    std::array<double, 2> maximum_edep = {-1.0, -1.0};
-    std::array<double, 2> reconstructed_photon_energy = {0.0, 0.0};
-
-    for (std::size_t cluster_index = 0;
-         cluster_index < cluster_records.size(); ++cluster_index)
-    {
-      const ClusterRecord& cluster = cluster_records[cluster_index];
-      const photon_tree::Pi0ClusterTruthMatch match =
-          pi0_truth_matcher_.match(
-              cluster.cluster, towers, raw_truth_towers, truth_cells,
-              truth_hits, truth, direct_gamma_track_ids, true);
-      if (!match.valid)
-      {
-        ++n_energy_match_invalid_;
-        continue;
-      }
-      for (std::size_t photon = 0; photon < 2U; ++photon)
-      {
-        const double deposit = match.gamma_edep[photon];
-        const double fraction = match.total_edep > 0.0F
-            ? deposit / match.total_edep : 0.0;
-        if (deposit > 0.0 &&
-            fraction > min_energy_contribution_fraction_ &&
-            deposit > maximum_edep[photon])
-        {
-          best_cluster[photon] = cluster_index;
-          maximum_edep[photon] = deposit;
-          reconstructed_photon_energy[photon] =
-              cluster.cluster->get_energy() * fraction;
-        }
-      }
-    }
-    std::array<bool, 2> recovered = {false, false};
-    for (std::size_t photon = 0; photon < 2U; ++photon)
-    {
-      recovered[photon] =
-          best_cluster[photon] != invalid_index &&
-          std::isfinite(truth_gamma_energy[photon]) &&
-          std::isfinite(reconstructed_photon_energy[photon]) &&
-          truth_gamma_energy[photon] > 0.0 &&
-          reconstructed_photon_energy[photon] / truth_gamma_energy[photon] >=
-              min_photon_energy_recovery_;
-    }
-
-    for (const std::size_t anchor_position :
-         anchors_by_candidate[candidate_index])
-    {
-      const AnchorRecord& anchor = anchors[anchor_position];
-      const ClusterRecord& cluster =
-          cluster_records[anchor.cluster_index];
-      if (anchor.ambiguous_main)
-      {
-        h_other_->Fill(cluster.et);
-        ++n_other_;
-        continue;
-      }
-
-      const bool is_best0 =
-          recovered[0] && best_cluster[0] == anchor.cluster_index;
-      const bool is_best1 =
-          recovered[1] && best_cluster[1] == anchor.cluster_index;
-      const bool found0 = recovered[0];
-      const bool found1 = recovered[1];
-
-      if (is_best0 && is_best1)
-      {
-        h_merged_->Fill(cluster.et);
-        ++n_merged_;
-      }
-      else if ((is_best0 && found1 &&
-                best_cluster[1] != anchor.cluster_index) ||
-               (is_best1 && found0 &&
-                best_cluster[0] != anchor.cluster_index))
-      {
-        h_separated_->Fill(cluster.et);
-        ++n_separated_;
-      }
-      else if ((is_best0 && !found1) || (is_best1 && !found0))
-      {
-        h_missing_->Fill(cluster.et);
-        ++n_missing_;
-      }
-      else
-      {
-        h_other_->Fill(cluster.et);
-        ++n_other_;
-      }
+    case photon_tree::Pi0AnchorTopology::separated:
+      h_separated_->Fill(et);
+      ++n_separated_;
+      break;
+    case photon_tree::Pi0AnchorTopology::merged:
+      h_merged_->Fill(et);
+      ++n_merged_;
+      break;
+    case photon_tree::Pi0AnchorTopology::missing:
+      h_missing_->Fill(et);
+      ++n_missing_;
+      break;
+    case photon_tree::Pi0AnchorTopology::other:
+      h_other_->Fill(et);
+      ++n_other_;
+      break;
     }
   }
 

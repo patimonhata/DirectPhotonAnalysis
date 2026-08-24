@@ -30,9 +30,9 @@ const std::array<double, 13> truth_pt_edges = {
     10.0, 11.0, 12.0, 13.0, 14.0, 15.0};
 constexpr std::size_t n_truth_pt_bins = truth_pt_edges.size() - 1U;
 constexpr double anchor_et_bin_width = 0.2;
-constexpr double anchor_et_histogram_min = 3.0;
-constexpr double anchor_et_histogram_max = 15.0;
-constexpr int n_anchor_et_bins = 60;
+constexpr double anchor_et_histogram_min = 0.0;
+constexpr double anchor_et_histogram_max = 40.0;
+constexpr int n_anchor_et_bins = 200;
 
 enum class Topology : std::size_t {
   split = 0,

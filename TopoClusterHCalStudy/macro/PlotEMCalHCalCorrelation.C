@@ -61,11 +61,7 @@ bool fill_histograms(TTree &tree, TH2D &correlation_histogram, TH1D &ratio_histo
   return true;
 }
 
-void draw_correlation_panel(
-    TH2D &histogram,
-    const char *sample_label,
-    const Long64_t n_events,
-    const double common_maximum)
+void draw_correlation_panel(TH2D &histogram, const char *sample_label, const Long64_t n_events, const double common_maximum)
 {
   gPad->SetLeftMargin(0.12);
   gPad->SetRightMargin(0.16);
@@ -119,14 +115,8 @@ void draw_ratio_comparison(TH1D &gamma_histogram, TH1D &pi0_histogram) {
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(0.035);
-  legend.AddEntry(
-      &gamma_histogram,
-      Form("Single #gamma (%.0f clusters)", gamma_histogram.GetEntries()),
-      "l");
-  legend.AddEntry(
-      &pi0_histogram,
-      Form("Single #pi^{0} (%.0f clusters)", pi0_histogram.GetEntries()),
-      "l");
+  legend.AddEntry(&gamma_histogram, Form("Single #gamma (%.0f clusters)", gamma_histogram.GetEntries()), "l");
+  legend.AddEntry(&pi0_histogram, Form("Single #pi^{0} (%.0f clusters)", pi0_histogram.GetEntries()), "l");
   legend.DrawClone();
 
   TLatex label;

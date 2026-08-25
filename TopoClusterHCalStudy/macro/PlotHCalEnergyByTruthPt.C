@@ -27,10 +27,7 @@ constexpr double hcal_energy_max = 3.0;
 
 using HistogramArray = std::array<std::unique_ptr<TH1D>, n_truth_pt_bins>;
 
-bool load_hcal_energy_tree(
-    TFile &file,
-    TTree *&tree,
-    const std::string &input_file)
+bool load_hcal_energy_tree(TFile &file, TTree *&tree, const std::string &input_file)
 {
   if (file.IsZombie())
   {
@@ -168,7 +165,8 @@ void draw_panel(
   gPad->SetBottomMargin(0.14);
   gPad->SetTopMargin(0.10);
 
-  gamma_histogram.SetTitle(Form("%d #leq p_{T}^{truth} < %d GeV;E_{HCalIn}^{cluster} + E_{HCalOut}^{cluster} [GeV];Normalized TopoClusters", pt_low, pt_low + 1));
+  gamma_histogram.SetTitle(Form(
+      "%d #leq p_{T}^{truth} < %d GeV;E_{HCalIn}^{cluster} + E_{HCalOut}^{cluster} [GeV];Normalized TopoClusters", pt_low, pt_low + 1));
   gamma_histogram.SetLineColor(kAzure + 2);
   gamma_histogram.SetLineWidth(3);
   pi0_histogram.SetLineColor(kOrange + 7);
@@ -296,7 +294,9 @@ int PlotHCalEnergyByTruthPt(
   std::replace(eta_tag.begin(), eta_tag.end(), '.', 'p');
   std::string asymmetry_tag = Form("%.3gto%.3g", truth_energy_asymmetry_minimum, truth_energy_asymmetry_maximum);
   std::replace(asymmetry_tag.begin(), asymmetry_tag.end(), '.', 'p');
-  const std::string output_file = (output_path / ("hcal_total_energy_truth_pt_" + std::to_string(truth_pt_minimum) + "to" + std::to_string(truth_pt_maximum) + "_abseta_" + eta_tag + "_pi0ae_" + asymmetry_tag + ".pdf")).string();
+  const std::string output_name = "hcal_total_energy_truth_pt_" + std::to_string(truth_pt_minimum) + "to" + std::to_string(truth_pt_maximum) +
+                                  "_abseta_" + eta_tag + "_pi0ae_" + asymmetry_tag + ".pdf";
+  const std::string output_file = (output_path / output_name).string();
   canvas.SaveAs(output_file.c_str());
 
   for (int bin = 0; bin < n_truth_pt_bins; ++bin) {

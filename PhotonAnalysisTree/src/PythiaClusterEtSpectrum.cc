@@ -366,7 +366,8 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
   for (auto iterator = cluster_range.first; iterator != cluster_range.second; ++iterator) {
     const RawCluster* cluster = iterator->second;
     if (!cluster || !std::isfinite(cluster->get_energy()) ||
-        !std::isfinite(cluster->get_x()) || !std::isfinite(cluster->get_y()) || !std::isfinite(cluster->get_z()) || cluster->get_energy() < min_cluster_energy_) {
+        !std::isfinite(cluster->get_x()) || !std::isfinite(cluster->get_y()) ||
+        !std::isfinite(cluster->get_z()) || cluster->get_energy() < min_cluster_energy_) {
       continue;
     }
     const double dx = cluster->get_x() - collision.x();

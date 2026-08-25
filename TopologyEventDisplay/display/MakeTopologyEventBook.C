@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <string>
 
 void MakeTopologyEventBook(
@@ -11,7 +12,11 @@ void MakeTopologyEventBook(
     const char* output_pdf = "topology_event_book.pdf",
     int topology_filter = -1,
     int pathway_filter = -1,
-    int max_events = -1)
+    int max_events = -1,
+    double vertex_z_min = -std::numeric_limits<double>::infinity(),
+    double vertex_z_max = std::numeric_limits<double>::infinity(),
+    double truth_pi0_pt_min = -std::numeric_limits<double>::infinity(),
+    double truth_pi0_pt_max = std::numeric_limits<double>::infinity())
 {
   TFile* file = TFile::Open(input_file, "READ");
   if (!file || file->IsZombie())
@@ -19,7 +24,8 @@ void MakeTopologyEventBook(
     std::cerr << "MakeTopologyEventBook - cannot open " << input_file << std::endl;
     return;
   }
-  auto events = topology_display::event_ids(file, topology_filter, pathway_filter);
+  auto events = topology_display::event_ids(
+      file, topology_filter, pathway_filter, vertex_z_min, vertex_z_max, truth_pi0_pt_min, truth_pi0_pt_max);
   if (max_events >= 0 && static_cast<int>(events.size()) > max_events)
     events.resize(static_cast<std::size_t>(max_events));
   if (events.empty())

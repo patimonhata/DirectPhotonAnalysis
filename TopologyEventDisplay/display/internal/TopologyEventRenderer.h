@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
@@ -375,29 +376,44 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   return true;
 }
 
-inline std::vector<int> event_ids(TFile* file, int topology_filter = -1,
-                                  int pathway_filter = -1)
+inline std::vector<int> event_ids(
+    TFile* file, int topology_filter = -1, int pathway_filter = -1,
+    double vertex_z_min = -std::numeric_limits<double>::infinity(),
+    double vertex_z_max = std::numeric_limits<double>::infinity(),
+    double truth_pi0_pt_min = -std::numeric_limits<double>::infinity(),
+    double truth_pi0_pt_max = std::numeric_limits<double>::infinity())
 {
   std::vector<int> result;
-  if (!file || file->IsZombie()) return result;
+  if (!file || file->IsZombie() || vertex_z_min > vertex_z_max || truth_pi0_pt_min > truth_pi0_pt_max) return result;
   TTree* events = static_cast<TTree*>(file->Get("events"));
   TTree* anchors = static_cast<TTree*>(file->Get("anchor_decisions"));
   TTree* candidates = static_cast<TTree*>(file->Get("pi0_candidates"));
   if (!events || !anchors || !candidates) return result;
-  std::map<std::pair<int, int>, int> pathway;
+  struct CandidateFilterValues
+  {
+    int pathway = -1;
+    double pt = -1.0;
+  };
+  std::map<std::pair<int, int>, CandidateFilterValues> candidate_values;
+  std::set<int> candidate_accepted;
   int event = -1;
   int candidate = -1;
   int path = -1;
+  double pt = -1.0;
   candidates->SetBranchAddress("event", &event);
   candidates->SetBranchAddress("candidate_id", &candidate);
   candidates->SetBranchAddress("pathway", &path);
+  candidates->SetBranchAddress("pt", &pt);
   for (Long64_t entry = 0; entry < candidates->GetEntries(); ++entry)
   {
     candidates->GetEntry(entry);
-    pathway[{event, candidate}] = path;
+    candidate_values[{event, candidate}] = {path, pt};
+    const bool pathway_ok = pathway_filter < 0 || path == pathway_filter;
+    const bool pt_ok = pt >= truth_pi0_pt_min && pt <= truth_pi0_pt_max;
+    if (pathway_ok && pt_ok) candidate_accepted.insert(event);
   }
   candidates->ResetBranchAddresses();
-  std::set<int> accepted;
+  std::set<int> topology_accepted;
   int topology = -1;
   anchors->SetBranchAddress("event", &event);
   anchors->SetBranchAddress("candidate_id", &candidate);
@@ -406,18 +422,28 @@ inline std::vector<int> event_ids(TFile* file, int topology_filter = -1,
   {
     anchors->GetEntry(entry);
     const bool topology_ok = topology_filter < 0 || topology == topology_filter;
-    const auto found = pathway.find({event, candidate});
+    const auto found = candidate_values.find({event, candidate});
     const bool pathway_ok = pathway_filter < 0 ||
-        (found != pathway.end() && found->second == pathway_filter);
-    if (topology_ok && pathway_ok) accepted.insert(event);
+        (found != candidate_values.end() && found->second.pathway == pathway_filter);
+    const bool pt_ok = found != candidate_values.end() &&
+        found->second.pt >= truth_pi0_pt_min && found->second.pt <= truth_pi0_pt_max;
+    if (topology_ok && pathway_ok && pt_ok) topology_accepted.insert(event);
   }
   anchors->ResetBranchAddresses();
+  double collision_z = 0.0;
   events->SetBranchAddress("event", &event);
+  events->SetBranchAddress("collision_z", &collision_z);
+  const bool candidate_filter_enabled = pathway_filter >= 0 ||
+      truth_pi0_pt_min != -std::numeric_limits<double>::infinity() ||
+      truth_pi0_pt_max != std::numeric_limits<double>::infinity();
   for (Long64_t entry = 0; entry < events->GetEntries(); ++entry)
   {
     events->GetEntry(entry);
-    if ((topology_filter < 0 && pathway_filter < 0) || accepted.count(event))
-      result.push_back(event);
+    const bool vertex_ok = collision_z >= vertex_z_min && collision_z <= vertex_z_max;
+    const bool candidate_topology_ok = topology_filter >= 0
+        ? topology_accepted.count(event) != 0U
+        : (!candidate_filter_enabled || candidate_accepted.count(event) != 0U);
+    if (vertex_ok && candidate_topology_ok) result.push_back(event);
   }
   events->ResetBranchAddresses();
   return result;

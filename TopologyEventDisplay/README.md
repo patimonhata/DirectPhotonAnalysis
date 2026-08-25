@@ -76,17 +76,30 @@ Create one multipage PDF, optionally filtering on topology and pathway:
 root -l -b -q 'TopologyEventDisplay/display/MakeTopologyEventBook.C("output/topology_pythia.root","output/topology_book.pdf",-1,-1,-1)'
 ```
 
-The last three arguments are `topology_filter`, `pathway_filter`, and
+The next three arguments are `topology_filter`, `pathway_filter`, and
 `max_events`.  Use `-1` for no filter.  Topology codes are 0 other,
 1 separated, 2 merged, and 3 missing.  Pathway codes are 1 G4-primary pi0
 decay, 2 generator-level pi0 decay, and 3 single-particle G4 decay.
+
+Four optional range arguments follow: `vertex_z_min`, `vertex_z_max`,
+`truth_pi0_pt_min`, and `truth_pi0_pt_max`.  Bounds are inclusive.  For
+example, this selects up to 20 events with collision vertex z in [-10, 10] cm
+and at least one selected truth pi0 candidate with pT in [5, 15] GeV/c:
+
+```sh
+root -l -b -q 'TopologyEventDisplay/display/MakeTopologyEventBook.C("output/topology_pythia.root","output/selected.pdf",-1,-1,20,-10,10,5,15)'
+```
+
+Topology, pathway and truth-pT filters apply to the same pi0 candidate.  Omit
+the range arguments to leave these filters disabled.
 
 For sequential inspection in an interactive ROOT session:
 
 ```cpp
 .L TopologyEventDisplay/display/BrowseTopologyEvents.C
 BrowseTopologyEvents("output/topology_pythia.root",
-                     "output/current_event.pdf", -1, -1, -1);
+                     "output/current_event.pdf", -1, -1, -1,
+                     -10.0, 10.0, 5.0, 15.0);
 ```
 
 Every event starts with an overview page containing x-y, z-r and eta-phi

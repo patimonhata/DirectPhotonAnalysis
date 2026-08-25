@@ -4,6 +4,7 @@
 #include <TSystem.h>
 
 #include <iostream>
+#include <limits>
 #include <string>
 
 void BrowseTopologyEvents(
@@ -11,7 +12,11 @@ void BrowseTopologyEvents(
     const char* current_event_pdf = "current_event.pdf",
     int topology_filter = -1,
     int pathway_filter = -1,
-    int first_event = -1)
+    int first_event = -1,
+    double vertex_z_min = -std::numeric_limits<double>::infinity(),
+    double vertex_z_max = std::numeric_limits<double>::infinity(),
+    double truth_pi0_pt_min = -std::numeric_limits<double>::infinity(),
+    double truth_pi0_pt_max = std::numeric_limits<double>::infinity())
 {
   TFile* file = TFile::Open(input_file, "READ");
   if (!file || file->IsZombie())
@@ -19,7 +24,8 @@ void BrowseTopologyEvents(
     std::cerr << "BrowseTopologyEvents - cannot open " << input_file << std::endl;
     return;
   }
-  const auto events = topology_display::event_ids(file, topology_filter, pathway_filter);
+  const auto events = topology_display::event_ids(
+      file, topology_filter, pathway_filter, vertex_z_min, vertex_z_max, truth_pi0_pt_min, truth_pi0_pt_max);
   if (events.empty())
   {
     std::cerr << "BrowseTopologyEvents - no events match the filters" << std::endl;

@@ -84,10 +84,7 @@ namespace TruthPi0Hist
   }
 }
 
-int MakeTruthPi0HistogramsFromEventDisplayTree(
-    const int processID=0,
-    const double acceptance_eta_max = 1.1,
-    const Long64_t progress_interval = 100000)
+int MakeTruthPi0HistogramsFromEventDisplayTree(const int processID=0, const double acceptance_eta_max = 1.1, const Long64_t progress_interval = 100000)
 {
   std::ostringstream prid;
   prid << std::setw(6) << std::setfill('0') << processID;
@@ -279,12 +276,24 @@ int MakeTruthPi0HistogramsFromEventDisplayTree(
   }
 
   TH1D* h_truth_decay_ngamma = new TH1D("h_truth_decay_ngamma", "Direct truth #gamma daughters per primary #pi^{0};N_{#gamma};Primary #pi^{0}", 10, -0.5, 9.5);
-  TH1D* h_truth_gamma_e = new TH1D("h_truth_gamma_e", "Truth #gamma energy from primary #pi^{0} #rightarrow 2#gamma;E_{#gamma}^{truth} [GeV];Photons", 200, 0.0, 20.0);
-  TH1D* h_truth_m_gg = new TH1D("h_truth_m_gg", "Truth #gamma#gamma invariant mass from primary #pi^{0} #rightarrow 2#gamma;M_{#gamma#gamma}^{truth} [GeV];Pairs", 100, 0.0, 1.0);
-  TH1D* h_truth_pair_e_asym = new TH1D("h_truth_pair_e_asym", "Truth #gamma#gamma energy asymmetry from primary #pi^{0} #rightarrow 2#gamma;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
-  TH1D* h_truth_gamma_e_in_acceptance = new TH1D("h_truth_gamma_e_in_acceptance", "Truth #gamma energy, both #gamma in CEMC acceptance;E_{#gamma}^{truth} [GeV];Photons", 200, 0.0, 20.0);
-  TH1D* h_truth_m_gg_in_acceptance = new TH1D("h_truth_m_gg_in_acceptance", "Truth #gamma#gamma invariant mass, both #gamma in CEMC acceptance;M_{#gamma#gamma}^{truth} [GeV];Pairs", 100, 0.0, 1.0);
-  TH1D* h_truth_pair_e_asym_in_acceptance = new TH1D("h_truth_pair_e_asym_in_acceptance", "Truth #gamma#gamma energy asymmetry, both #gamma in CEMC acceptance;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
+  TH1D* h_truth_gamma_e = new TH1D(
+      "h_truth_gamma_e",
+      "Truth #gamma energy from primary #pi^{0} #rightarrow 2#gamma;E_{#gamma}^{truth} [GeV];Photons", 200, 0.0, 20.0);
+  TH1D* h_truth_m_gg = new TH1D(
+      "h_truth_m_gg",
+      "Truth #gamma#gamma invariant mass from primary #pi^{0} #rightarrow 2#gamma;M_{#gamma#gamma}^{truth} [GeV];Pairs", 100, 0.0, 1.0);
+  TH1D* h_truth_pair_e_asym = new TH1D(
+      "h_truth_pair_e_asym",
+      "Truth #gamma#gamma energy asymmetry from primary #pi^{0} #rightarrow 2#gamma;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
+  TH1D* h_truth_gamma_e_in_acceptance = new TH1D(
+      "h_truth_gamma_e_in_acceptance",
+      "Truth #gamma energy, both #gamma in CEMC acceptance;E_{#gamma}^{truth} [GeV];Photons", 200, 0.0, 20.0);
+  TH1D* h_truth_m_gg_in_acceptance = new TH1D(
+      "h_truth_m_gg_in_acceptance",
+      "Truth #gamma#gamma invariant mass, both #gamma in CEMC acceptance;M_{#gamma#gamma}^{truth} [GeV];Pairs", 100, 0.0, 1.0);
+  TH1D* h_truth_pair_e_asym_in_acceptance = new TH1D(
+      "h_truth_pair_e_asym_in_acceptance",
+      "Truth #gamma#gamma energy asymmetry, both #gamma in CEMC acceptance;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
   TH1D* h_truth_summary_counts = new TH1D("h_truth_summary_counts", "Truth primary #pi^{0} summary;Category;Count", 7, 0.5, 7.5);
   TH1D* h_truth_summary_fractions = new TH1D("h_truth_summary_fractions", "Truth primary #pi^{0} fractions;Category;Fraction", 4, 0.5, 4.5);
 
@@ -467,10 +476,18 @@ int MakeTruthPi0HistogramsFromEventDisplayTree(
     truth_pi0_tree->Fill();
   }
 
-  const double frac_pi0_to_2gamma = n_primary_pi0 > 0 ? static_cast<double>(n_pi0_to_2gamma) / static_cast<double>(n_primary_pi0) : 0.0;
-  const double frac_both_gamma_in_acceptance = n_pi0_to_2gamma > 0 ? static_cast<double>(n_both_gamma_in_acceptance) / static_cast<double>(n_pi0_to_2gamma) : 0.0;
-  const double frac_at_least_one_gamma_out_acceptance = n_pi0_to_2gamma > 0 ? static_cast<double>(n_at_least_one_gamma_out_acceptance) / static_cast<double>(n_pi0_to_2gamma) : 0.0;
-  const double frac_missing_gamma_projection = n_pi0_to_2gamma > 0 ? static_cast<double>(n_missing_gamma_projection) / static_cast<double>(n_pi0_to_2gamma) : 0.0;
+  const double frac_pi0_to_2gamma = n_primary_pi0 > 0
+      ? static_cast<double>(n_pi0_to_2gamma) / static_cast<double>(n_primary_pi0)
+      : 0.0;
+  const double frac_both_gamma_in_acceptance = n_pi0_to_2gamma > 0
+      ? static_cast<double>(n_both_gamma_in_acceptance) / static_cast<double>(n_pi0_to_2gamma)
+      : 0.0;
+  const double frac_at_least_one_gamma_out_acceptance = n_pi0_to_2gamma > 0
+      ? static_cast<double>(n_at_least_one_gamma_out_acceptance) / static_cast<double>(n_pi0_to_2gamma)
+      : 0.0;
+  const double frac_missing_gamma_projection = n_pi0_to_2gamma > 0
+      ? static_cast<double>(n_missing_gamma_projection) / static_cast<double>(n_pi0_to_2gamma)
+      : 0.0;
 
   h_truth_summary_counts->SetBinContent(1, n_primary_pi0);
   h_truth_summary_counts->SetBinContent(2, n_pi0_to_2gamma);
@@ -515,7 +532,9 @@ int MakeTruthPi0HistogramsFromEventDisplayTree(
   std::cout << "  n_primary_pi0 = " << n_primary_pi0 << std::endl;
   std::cout << "  n_pi0_to_2gamma = " << n_pi0_to_2gamma << " (" << frac_pi0_to_2gamma << ")" << std::endl;
   std::cout << "  n_both_gamma_in_acceptance = " << n_both_gamma_in_acceptance << " (" << frac_both_gamma_in_acceptance << " of pi0_to_2gamma)" << std::endl;
-  std::cout << "  n_at_least_one_gamma_out_acceptance = " << n_at_least_one_gamma_out_acceptance << " (" << frac_at_least_one_gamma_out_acceptance << " of pi0_to_2gamma)" << std::endl;
+  std::cout << "  n_at_least_one_gamma_out_acceptance = " << n_at_least_one_gamma_out_acceptance
+            << " (" << frac_at_least_one_gamma_out_acceptance << " of pi0_to_2gamma)"
+            << std::endl;
 
   return 0;
 }

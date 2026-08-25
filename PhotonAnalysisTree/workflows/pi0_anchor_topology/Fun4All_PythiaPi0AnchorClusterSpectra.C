@@ -136,8 +136,7 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
   truth_towers->Verbosity(0);
   server->registerSubsystem(truth_towers);
 
-  auto* accumulator = new PythiaPi0AnchorClusterSpectrum(
-      "PythiaPi0AnchorClusterSpectrum");
+  auto* accumulator = new PythiaPi0AnchorClusterSpectrum("PythiaPi0AnchorClusterSpectrum");
   accumulator->set_output_file_name(output_file);
   accumulator->set_manifest_path(manifest_path);
   accumulator->set_manifest_range(manifest_begin, manifest_end);
@@ -157,10 +156,8 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
   accumulator->set_min_cluster_energy(min_cluster_energy);
   accumulator->set_dominant_fraction_min(dominant_fraction_min);
   accumulator->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);
-  accumulator->set_min_energy_contribution_fraction(
-      min_energy_contribution_fraction);
-  accumulator->set_min_photon_energy_recovery(
-      min_photon_energy_recovery);
+  accumulator->set_min_energy_contribution_fraction(min_energy_contribution_fraction);
+  accumulator->set_min_photon_energy_recovery(min_photon_energy_recovery);
   accumulator->set_max_abs_vertex_z(max_abs_vertex_z);
   accumulator->set_verbosity(1);
   server->registerSubsystem(accumulator);

@@ -243,7 +243,9 @@ int PythiaTruthSpectrumTree::process_event(PHCompositeNode* topNode) {
   if (!fill_truth(event_map, truth)) {
     ++n_events_invalid_truth_;
     if (verbosity_ > 0) {
-      std::cerr << "PythiaTruthSpectrumTree::process_event - missing/invalid signal HepMC event " << signal_embedding_id_ << " in event " << b_event_in_file_ << std::endl;
+      std::cerr << "PythiaTruthSpectrumTree::process_event - missing/invalid signal HepMC event "
+                << signal_embedding_id_ << " in event " << b_event_in_file_
+                << std::endl;
     }
     return Fun4AllReturnCodes::ABORTEVENT;
   }
@@ -285,9 +287,7 @@ bool PythiaTruthSpectrumTree::fill_truth(const PHHepMCGenEventMap* event_map, co
 
   b_hepmc_event_number_ = event->event_number();
   b_event_weights_ = event->weights().weights();
-  const bool finite_weights = std::all_of(
-      b_event_weights_.begin(), b_event_weights_.end(),
-      [](const double weight) { return std::isfinite(weight); });
+  const bool finite_weights = std::all_of(b_event_weights_.begin(), b_event_weights_.end(), [](const double weight) { return std::isfinite(weight); });
   b_event_weight_valid_ = finite_weights ? 1U : 0U;
   b_event_weight_ = (!b_event_weights_.empty() && std::isfinite(b_event_weights_.front()))
       ? b_event_weights_.front() : 1.0;

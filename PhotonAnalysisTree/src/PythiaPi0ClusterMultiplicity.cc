@@ -144,9 +144,7 @@ double hepmc_pt(const HepMC::GenParticle* particle)
       : 0.0;
 }
 
-const HepMC::GenParticle* contributor_hepmc_particle(
-    const photon_tree::TruthContributor& contributor,
-    const PHHepMCGenEventMap* event_map)
+const HepMC::GenParticle* contributor_hepmc_particle(const photon_tree::TruthContributor& contributor, const PHHepMCGenEventMap* event_map)
 {
   const PHHepMCGenEvent* subevent = event_map
       ? event_map->get(contributor.embedding_id) : nullptr;
@@ -164,8 +162,7 @@ bool contributor_matches_pi0(const photon_tree::TruthContributor& contributor,
   {
     return false;
   }
-  const HepMC::GenParticle* particle =
-      contributor_hepmc_particle(contributor, event_map);
+  const HepMC::GenParticle* particle = contributor_hepmc_particle(contributor, event_map);
   if (candidate.pathway == Pi0Pathway::g4_primary_decay)
   {
     return contributor.g4_pdg_id == 111 && particle &&
@@ -191,8 +188,7 @@ const char* pathway_tag(std::size_t index)
 }
 }
 
-PythiaPi0ClusterMultiplicity::PythiaPi0ClusterMultiplicity(
-    const std::string& name)
+PythiaPi0ClusterMultiplicity::PythiaPi0ClusterMultiplicity(const std::string& name)
   : SubsysReco(name)
 {
 }
@@ -233,13 +229,10 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
 {
   ++n_events_processed_;
   auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
-  auto* event_map = findNode::getClass<PHHepMCGenEventMap>(
-      topNode, hepmc_event_map_node_name_);
+  auto* event_map = findNode::getClass<PHHepMCGenEventMap>(topNode, hepmc_event_map_node_name_);
   auto* towers = findNode::getClass<TowerInfoContainer>(topNode, tower_node_name_);
-  auto* raw_truth_towers = findNode::getClass<RawTowerContainer>(
-      topNode, raw_truth_tower_node_name_);
-  auto* clusters = findNode::getClass<RawClusterContainer>(
-      topNode, split_cluster_node_name_);
+  auto* raw_truth_towers = findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
+  auto* clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   const PHHepMCGenEvent* signal_event = event_map
       ? event_map->get(signal_embedding_id_) : nullptr;
   const HepMC::GenEvent* event = signal_event ? signal_event->getEvent() : nullptr;
@@ -322,8 +315,7 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
     {
       continue;
     }
-    const HepMC::GenParticle* hepmc_particle =
-        event->barcode_to_particle(primary->get_barcode());
+    const HepMC::GenParticle* hepmc_particle = event->barcode_to_particle(primary->get_barcode());
     if (primary->get_pid() == 111 && hepmc_particle &&
         hepmc_particle->pdg_id() == 111)
     {
@@ -350,8 +342,7 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
       continue;
     }
     const int barcode = origin.parent->barcode();
-    const auto insertion = generator_candidate_by_barcode.emplace(
-        barcode, candidates.size());
+    const auto insertion = generator_candidate_by_barcode.emplace(barcode, candidates.size());
     if (insertion.second)
     {
       candidates.push_back({Pi0Pathway::generator_decay, barcode,
@@ -444,10 +435,8 @@ int PythiaPi0ClusterMultiplicity::process_event(PHCompositeNode* topNode)
     for (std::size_t threshold = 0; threshold < threshold_count_; ++threshold)
     {
       h_multiplicity_[threshold]->Fill(multiplicity[threshold]);
-      h_multiplicity_vs_pt_[threshold]->Fill(
-          parent_pt, multiplicity[threshold]);
-      h_pathway_multiplicity_[pathway][threshold]->Fill(
-          multiplicity[threshold]);
+      h_multiplicity_vs_pt_[threshold]->Fill(parent_pt, multiplicity[threshold]);
+      h_pathway_multiplicity_[pathway][threshold]->Fill(multiplicity[threshold]);
     }
   }
 
@@ -535,12 +524,10 @@ void PythiaPi0ClusterMultiplicity::create_output()
   h_second_fraction_->Sumw2();
   h_fraction_vs_cluster_energy_->Sumw2();
 
-  metadata_tree_ = new TTree(
-      "metadata", "Pythia pi0 cluster multiplicity partial metadata");
+  metadata_tree_ = new TTree("metadata", "Pythia pi0 cluster multiplicity partial metadata");
   static int schema_version = schema_version_;
   static unsigned char cluster_energy_cut_applied = 0U;
-  static int truth_matcher_algorithm_version =
-      photon_tree::PythiaClusterTruthMatcher::kAlgorithmVersion;
+  static int truth_matcher_algorithm_version = photon_tree::PythiaClusterTruthMatcher::kAlgorithmVersion;
   metadata_tree_->Branch("schema_version", &schema_version);
   metadata_tree_->Branch("manifest_path", &manifest_path_);
   metadata_tree_->Branch("manifest_begin", &manifest_begin_);

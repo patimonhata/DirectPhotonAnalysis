@@ -39,10 +39,7 @@ class Pi0ClusterTruthMatcher
       bool allocate_split_tower_energy) const;
 
  private:
-  static int direct_gamma_index(
-      int track_id,
-      PHG4TruthInfoContainer* truth,
-      const std::array<int, 2>& direct_gamma_track_ids);
+  static int direct_gamma_index(int track_id, PHG4TruthInfoContainer* truth, const std::array<int, 2>& direct_gamma_track_ids);
 };
 
 struct Pi0ClusterTruthCollection

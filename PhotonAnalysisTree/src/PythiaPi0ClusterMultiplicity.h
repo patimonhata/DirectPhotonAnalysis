@@ -17,8 +17,7 @@ class TTree;
 class PythiaPi0ClusterMultiplicity : public SubsysReco
 {
  public:
-  explicit PythiaPi0ClusterMultiplicity(
-      const std::string& name = "PythiaPi0ClusterMultiplicity");
+  explicit PythiaPi0ClusterMultiplicity(const std::string& name = "PythiaPi0ClusterMultiplicity");
   ~PythiaPi0ClusterMultiplicity() override;
 
   int Init(PHCompositeNode* topNode) override;
@@ -85,12 +84,9 @@ class PythiaPi0ClusterMultiplicity : public SubsysReco
   std::string raw_truth_tower_node_name_ = "TOWER_CALIB_CEMC";
   std::string split_cluster_node_name_ = "CLUSTERINFO_CEMC";
   std::string cluster_collection_ = "split";
-  std::string pi0_selection_ =
-      "g4_primary_pi0_decay_or_generator_photon_pair_with_hepmc_pi0_origin";
-  std::string cluster_selection_ =
-      "finite_cluster_kinematics_without_eta_or_energy_threshold";
-  std::string fraction_definition_ =
-      "sum_of_ancestry_compatible_primary_shower_edep_over_all_cluster_primary_shower_edep";
+  std::string pi0_selection_ = "g4_primary_pi0_decay_or_generator_photon_pair_with_hepmc_pi0_origin";
+  std::string cluster_selection_ = "finite_cluster_kinematics_without_eta_or_energy_threshold";
+  std::string fraction_definition_ = "sum_of_ancestry_compatible_primary_shower_edep_over_all_cluster_primary_shower_edep";
   std::string zero_threshold_definition_ = "strictly_positive_fraction";
   long long manifest_begin_ = -1;
   long long manifest_end_ = -1;

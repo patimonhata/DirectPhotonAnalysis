@@ -100,8 +100,7 @@ int Fun4All_PythiaPi0ClusterMultiplicity(
   server->registerInputManager(truth_jet_input);
   server->registerInputManager(g4hits_input);
 
-  auto* accumulator =
-      new PythiaPi0ClusterMultiplicity("PythiaPi0ClusterMultiplicity");
+  auto* accumulator = new PythiaPi0ClusterMultiplicity("PythiaPi0ClusterMultiplicity");
   accumulator->set_output_file_name(output_file);
   accumulator->set_manifest_path(manifest_path);
   accumulator->set_manifest_range(manifest_begin, manifest_end);
@@ -114,8 +113,7 @@ int Fun4All_PythiaPi0ClusterMultiplicity(
   accumulator->set_split_cluster_node_name("CLUSTERINFO_CEMC");
   accumulator->set_pt_binning(pt_bins, pt_max);
   accumulator->set_multiplicity_max(multiplicity_max);
-  accumulator->set_cluster_energy_binning(
-      cluster_energy_bins, cluster_energy_max);
+  accumulator->set_cluster_energy_binning(cluster_energy_bins, cluster_energy_max);
   accumulator->set_truth_eta_max(truth_eta_max);
   accumulator->set_verbosity(1);
   server->registerSubsystem(accumulator);

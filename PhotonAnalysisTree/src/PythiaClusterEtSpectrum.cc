@@ -111,8 +111,7 @@ Pi0Origin trace_pi0_origin(const HepMC::GenParticle* photon)
   }
   while (current)
   {
-    const std::vector<const HepMC::GenParticle*> parents =
-        incoming(current->production_vertex());
+    const std::vector<const HepMC::GenParticle*> parents = incoming(current->production_vertex());
     if (parents.size() == 1U && parents.front()->pdg_id() == 22)
     {
       current = parents.front();
@@ -188,9 +187,7 @@ double cemc_radius(RawTowerGeomContainer* geometry)
   {
     for (int iphi = 0; iphi < 256; ++iphi)
     {
-      const unsigned int key = RawTowerDefs::encode_towerid(
-          RawTowerDefs::CEMC, static_cast<unsigned int>(ieta),
-          static_cast<unsigned int>(iphi));
+      const unsigned int key = RawTowerDefs::encode_towerid(RawTowerDefs::CEMC, static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
       const RawTowerGeom* tower = geometry->get_tower_geometry(key);
       if (tower)
       {
@@ -267,9 +264,7 @@ Projection project_photon(const PHG4Particle* photon,
   return result;
 }
 
-const HepMC::GenParticle* contributor_hepmc_particle(
-    const photon_tree::TruthContributor& contributor,
-    const PHHepMCGenEventMap* event_map)
+const HepMC::GenParticle* contributor_hepmc_particle(const photon_tree::TruthContributor& contributor, const PHHepMCGenEventMap* event_map)
 {
   const PHHepMCGenEvent* subevent = event_map
       ? event_map->get(contributor.embedding_id) : nullptr;
@@ -287,8 +282,7 @@ bool contributor_matches_pi0(const photon_tree::TruthContributor& contributor,
   {
     return false;
   }
-  const HepMC::GenParticle* particle =
-      contributor_hepmc_particle(contributor, event_map);
+  const HepMC::GenParticle* particle = contributor_hepmc_particle(contributor, event_map);
   if (pathway == Pi0Pathway::g4_primary_decay)
   {
     return contributor.g4_pdg_id == 111 && particle &&
@@ -354,7 +348,9 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
   auto* clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   const PHHepMCGenEvent* signal_event = event_map ? event_map->get(signal_embedding_id_) : nullptr;
   const HepMC::GenEvent* event = signal_event ? signal_event->getEvent() : nullptr;
-  if (!truth || !event_map || !towers || !raw_truth_towers || !truth_cells || !truth_hits || !geometry || !clusters || !signal_event || !signal_event->is_simulated() || !event || !truth_matcher_.begin_event(topNode)) {
+  if (!truth || !event_map || !towers || !raw_truth_towers ||
+      !truth_cells || !truth_hits || !geometry || !clusters ||
+      !signal_event || !signal_event->is_simulated() || !event || !truth_matcher_.begin_event(topNode)) {
     ++n_events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
@@ -369,8 +365,8 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
   const auto cluster_range = clusters->getClusters();
   for (auto iterator = cluster_range.first; iterator != cluster_range.second; ++iterator) {
     const RawCluster* cluster = iterator->second;
-    if (!cluster || !std::isfinite(cluster->get_energy()) || !std::isfinite(cluster->get_x()) || !std::isfinite(cluster->get_y()) || !std::isfinite(cluster->get_z()) ||
-        cluster->get_energy() < min_cluster_energy_) {
+    if (!cluster || !std::isfinite(cluster->get_energy()) ||
+        !std::isfinite(cluster->get_x()) || !std::isfinite(cluster->get_y()) || !std::isfinite(cluster->get_z()) || cluster->get_energy() < min_cluster_energy_) {
       continue;
     }
     const double dx = cluster->get_x() - collision.x();

@@ -22,10 +22,7 @@
 
 namespace photon_tree
 {
-int Pi0ClusterTruthMatcher::direct_gamma_index(
-    int track_id,
-    PHG4TruthInfoContainer* truth,
-    const std::array<int, 2>& direct_gamma_track_ids)
+int Pi0ClusterTruthMatcher::direct_gamma_index(int track_id, PHG4TruthInfoContainer* truth, const std::array<int, 2>& direct_gamma_track_ids)
 {
   std::set<int> visited;
   while (track_id != 0 && visited.insert(track_id).second)
@@ -69,8 +66,7 @@ Pi0ClusterTruthMatch Pi0ClusterTruthMatcher::match(
     const unsigned int raw_key = tower_iter->first;
     const int ieta = static_cast<int>(RawTowerDefs::decode_index1(raw_key));
     const int iphi = static_cast<int>(RawTowerDefs::decode_index2(raw_key));
-    const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(
-        static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
+    const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
     TowerInfo* tower = towers->get_tower_at_key(static_cast<int>(tower_info_key));
     if (!tower)
     {
@@ -114,8 +110,7 @@ Pi0ClusterTruthMatch Pi0ClusterTruthMatcher::match(
           return Pi0ClusterTruthMatch{};
         }
         const float allocated_edep = allocation * hit_edep;
-        const int gamma = direct_gamma_index(
-            hit->get_trkid(), truth, direct_gamma_track_ids);
+        const int gamma = direct_gamma_index(hit->get_trkid(), truth, direct_gamma_track_ids);
         if (gamma >= 0)
         {
           result.gamma_edep[static_cast<std::size_t>(gamma)] += allocated_edep;

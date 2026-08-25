@@ -41,9 +41,7 @@ double delta_phi(double lhs, double rhs)
 
 }
 
-int add_split_gamma_onnx(
-    const char* input_path,
-    const char* model_path = nullptr)
+int add_split_gamma_onnx(const char* input_path, const char* model_path = nullptr)
 {
   constexpr const char* tree_name = "event_tree";
   constexpr const char* score_branch = "split_cluster_p_gamma";

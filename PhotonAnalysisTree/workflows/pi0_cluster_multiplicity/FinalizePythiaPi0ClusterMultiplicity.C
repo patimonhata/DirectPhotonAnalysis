@@ -144,8 +144,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value)
   value.cluster_selection = *cluster_selection;
   value.fraction_definition = *fraction_definition;
   value.zero_threshold_definition = *zero_threshold_definition;
-  return value.cluster_selection ==
-      "finite_cluster_kinematics_without_eta_or_energy_threshold";
+  return value.cluster_selection == "finite_cluster_kinematics_without_eta_or_energy_threshold";
 }
 
 bool same_double(double left, double right)
@@ -244,10 +243,8 @@ bool make_output_directory(const std::string& output_base)
 }
 
 int FinalizePythiaPi0ClusterMultiplicity(
-    const std::string partial_pattern =
-        "output/pi0_cluster_multiplicity_partial/jet12_10k/primary_generator_truth_eta07/partial_*.root",
-    const std::string output_base =
-        "output/plots/pi0_cluster_multiplicity/jet12_10k/primary_generator_truth_eta07",
+    const std::string partial_pattern = "output/pi0_cluster_multiplicity_partial/jet12_10k/primary_generator_truth_eta07/partial_*.root",
+    const std::string output_base = "output/plots/pi0_cluster_multiplicity/jet12_10k/primary_generator_truth_eta07",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {
@@ -313,8 +310,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
   PartialMetadata total = reference;
   total.events_processed = total.events_written = total.events_invalid = 0;
   total.cluster_considered = total.cluster_invalid_truth = 0;
-  total.candidate_count = total.candidate_g4_primary =
-      total.candidate_generator = 0;
+  total.candidate_count = total.candidate_g4_primary = total.candidate_generator = 0;
   total.malformed_daughters = total.pair_evaluated = total.pair_positive = 0;
 
   for (const PartialMetadata& partial : partials)
@@ -339,8 +335,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
       auto found = histograms.find(name);
       if (found == histograms.end())
       {
-        std::unique_ptr<TH1> clone(
-            static_cast<TH1*>(source->Clone(name.c_str())));
+        std::unique_ptr<TH1> clone(static_cast<TH1*>(source->Clone(name.c_str())));
         clone->SetDirectory(nullptr);
         histograms.emplace(name, std::move(clone));
       }
@@ -390,16 +385,13 @@ int FinalizePythiaPi0ClusterMultiplicity(
     probability[index]->SetLineColor(colors[index]);
     probability[index]->SetMarkerColor(colors[index]);
     probability[index]->SetLineWidth(2);
-    probability[index]->GetXaxis()->SetTitle(
-        "N_{cluster} compatible with selected #pi^{0}");
+    probability[index]->GetXaxis()->SetTitle("N_{cluster} compatible with selected #pi^{0}");
     probability[index]->GetYaxis()->SetTitle("Probability");
-    maximum_probability =
-        std::max(maximum_probability, probability[index]->GetMaximum());
+    maximum_probability = std::max(maximum_probability, probability[index]->GetMaximum());
   }
 
   gStyle->SetOptStat(0);
-  TCanvas multiplicity_canvas(
-      "c_pi0_cluster_multiplicity", "Pi0 cluster multiplicity", 1000, 800);
+  TCanvas multiplicity_canvas("c_pi0_cluster_multiplicity", "Pi0 cluster multiplicity", 1000, 800);
   multiplicity_canvas.SetLogy();
   probability[0]->SetMinimum(1e-7);
   probability[0]->SetMaximum(
@@ -429,9 +421,7 @@ int FinalizePythiaPi0ClusterMultiplicity(
   multiplicity_canvas.RedrawAxis();
   multiplicity_canvas.SaveAs((output_base + ".pdf").c_str());
 
-  TCanvas pt_canvas(
-      "c_pi0_cluster_multiplicity_vs_pt", "Multiplicity versus pi0 pT",
-      1200, 1000);
+  TCanvas pt_canvas("c_pi0_cluster_multiplicity_vs_pt", "Multiplicity versus pi0 pT", 1200, 1000);
   pt_canvas.Divide(2, 2);
   for (std::size_t index = 0; index < tags.size(); ++index)
   {
@@ -449,12 +439,9 @@ int FinalizePythiaPi0ClusterMultiplicity(
   }
   pt_canvas.SaveAs((output_base + "_vs_truth_pt.pdf").c_str());
 
-  TCanvas fraction_canvas(
-      "c_pi0_fraction_vs_cluster_energy", "Fraction versus cluster energy",
-      1000, 800);
+  TCanvas fraction_canvas("c_pi0_fraction_vs_cluster_energy", "Fraction versus cluster energy", 1000, 800);
   fraction_canvas.SetLogz();
-  TH2D* fraction_vs_energy = dynamic_cast<TH2D*>(
-      histograms.at("h_pi0_compatible_fraction_vs_cluster_energy_raw").get());
+  TH2D* fraction_vs_energy = dynamic_cast<TH2D*>(histograms.at("h_pi0_compatible_fraction_vs_cluster_energy_raw").get());
   fraction_vs_energy->GetXaxis()->SetTitle("Cluster energy [GeV]");
   fraction_vs_energy->GetYaxis()->SetTitle("f_{#pi^{0}}^{cluster}");
   fraction_vs_energy->Draw("COLZ");

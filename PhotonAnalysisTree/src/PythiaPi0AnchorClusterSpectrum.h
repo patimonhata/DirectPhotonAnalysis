@@ -15,8 +15,7 @@ class TTree;
 class PythiaPi0AnchorClusterSpectrum : public SubsysReco
 {
  public:
-  explicit PythiaPi0AnchorClusterSpectrum(
-      const std::string& name = "PythiaPi0AnchorClusterSpectrum");
+  explicit PythiaPi0AnchorClusterSpectrum(const std::string& name = "PythiaPi0AnchorClusterSpectrum");
   ~PythiaPi0AnchorClusterSpectrum() override;
 
   int Init(PHCompositeNode* topNode) override;
@@ -112,21 +111,14 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   std::string truth_hit_node_name_ = "G4HIT_CEMC";
   std::string split_cluster_node_name_ = "CLUSTERINFO_CEMC";
   std::string cluster_collection_ = "split";
-  std::string classification_unit_ =
-      "every_cluster_with_selected_pi0_as_grouped_main_contributor";
-  std::string pi0_selection_ =
-      "signal_g4_primary_pi0_or_generator_pi0_with_exactly_two_g4_photons";
-  std::string partner_selection_ =
-      "same_energy_cut_as_anchor_partner_eta_cut_configurable";
-  std::string topology_definition_ =
-      "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters";
-  std::string topology_priority_ =
-      "ambiguous_main_to_other_then_merged_then_separated_then_missing_then_other";
+  std::string classification_unit_ = "every_cluster_with_selected_pi0_as_grouped_main_contributor";
+  std::string pi0_selection_ = "signal_g4_primary_pi0_or_generator_pi0_with_exactly_two_g4_photons";
+  std::string partner_selection_ = "same_energy_cut_as_anchor_partner_eta_cut_configurable";
+  std::string topology_definition_ = "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters";
+  std::string topology_priority_ = "ambiguous_main_to_other_then_merged_then_separated_then_missing_then_other";
   std::string response_policy_ = "not_used_for_classification";
-  std::string photon_recovery_policy_ =
-      "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold";
-  std::string vertex_selection_ =
-      "signal_hepmc_collision_vertex_abs_z_lt_max";
+  std::string photon_recovery_policy_ = "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold";
+  std::string vertex_selection_ = "signal_hepmc_collision_vertex_abs_z_lt_max";
   long long manifest_begin_ = -1;
   long long manifest_end_ = -1;
   int signal_embedding_id_ = 1;
@@ -143,8 +135,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   double max_abs_vertex_z_ = 60.0;
   int verbosity_ = 0;
 
-  int pi0_truth_matching_algorithm_version_ =
-      photon_tree::Pi0ClusterTruthMatcher::kAlgorithmVersion;
+  int pi0_truth_matching_algorithm_version_ = photon_tree::Pi0ClusterTruthMatcher::kAlgorithmVersion;
   photon_tree::Pi0AnchorTopologyEvaluator topology_evaluator_;
   TFile* output_file_ = nullptr;
   TH1D* h_prompt_ = nullptr;

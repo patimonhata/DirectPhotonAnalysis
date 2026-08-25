@@ -145,8 +145,7 @@ bool PhotonTreeCommon::fill_collection(RawClusterContainer* clusters,
       }
       const int ieta = static_cast<int>(RawTowerDefs::decode_index1(raw_key));
       const int iphi = static_cast<int>(RawTowerDefs::decode_index2(raw_key));
-      const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(
-          static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
+      const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
       TowerInfo* tower = towers->get_tower_at_key(static_cast<int>(tower_info_key));
       RawTowerGeom* tower_geometry = geometry->get_tower_geometry(raw_key);
       if (!tower || !tower_geometry || !std::isfinite(tower->get_energy()))

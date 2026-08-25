@@ -174,8 +174,7 @@ int check_scored_tree(const char* input_path)
   }
 
   std::cout << "check_scored_tree - events/valid_split_bdt/"
-               "valid_split_bdt_ppg15v1/valid_nosplit_bdt/"
-               "valid_split_gamma/valid_nosplit_gamma/malformed = "
+               "valid_split_bdt_ppg15v1/valid_nosplit_bdt/valid_split_gamma/valid_nosplit_gamma/malformed = "
             << tree->GetEntries() << "/" << valid_split_bdt << "/"
             << valid_split_bdt_ppg15v1 << "/" << valid_nosplit_bdt << "/"
             << valid_split_gamma << "/" << valid_nosplit_gamma << "/"

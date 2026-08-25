@@ -123,8 +123,7 @@ CollectionHistograms make_histograms(const std::string &prefix,
 
   histograms.truth = make_asymmetry_histogram("truth");
   histograms.matched = make_asymmetry_histogram("matched");
-  histograms.matched_mass_window =
-      make_asymmetry_histogram("matched_mass_window");
+  histograms.matched_mass_window = make_asymmetry_histogram("matched_mass_window");
 
   histograms.delta_r_each = std::make_unique<TH1D>(
       ("h_" + prefix + "_delta_r_each").c_str(), "", 200, 0.0, 1.0);
@@ -161,8 +160,7 @@ std::size_t find_truth_pt_bin(const double truth_pt) {
   if (truth_pt == truth_pt_edges.back()) {
     return truth_pt_labels.size() - 1U;
   }
-  const auto upper =
-      std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), truth_pt);
+  const auto upper = std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), truth_pt);
   return static_cast<std::size_t>(std::distance(truth_pt_edges.begin(), upper) -
                                   1);
 }
@@ -278,8 +276,7 @@ void style_count_histograms(CollectionHistograms &histograms) {
                           histograms.matched_mass_window.get()}) {
     histogram->SetLineWidth(2);
     histogram->SetMarkerSize(0.8);
-    histogram->GetXaxis()->SetTitle(
-        "Truth energy asymmetry |E_{1}-E_{2}|/(E_{1}+E_{2})");
+    histogram->GetXaxis()->SetTitle("Truth energy asymmetry |E_{1}-E_{2}|/(E_{1}+E_{2})");
     histogram->GetYaxis()->SetTitle("Events (truth pairs)");
   }
 }
@@ -351,8 +348,7 @@ void draw_efficiency_plot(CollectionHistograms &histograms,
   for (TH1D *histogram : {matched, mass_window}) {
     histogram->SetLineWidth(2);
     histogram->SetMarkerSize(0.8);
-    histogram->GetXaxis()->SetTitle(
-        "Truth energy asymmetry |E_{1}-E_{2}|/(E_{1}+E_{2})");
+    histogram->GetXaxis()->SetTitle("Truth energy asymmetry |E_{1}-E_{2}|/(E_{1}+E_{2})");
     histogram->GetYaxis()->SetTitle("Fraction of accepted truth pairs");
     histogram->SetMinimum(0.0);
     histogram->SetMaximum(1.05);
@@ -388,8 +384,7 @@ void draw_delta_r_plot(CollectionHistograms &histograms,
   maximum->GetYaxis()->SetTitle("Entries / 0.005");
   maximum->GetXaxis()->SetRangeUser(0.0, 0.20);
   maximum->SetMinimum(0.5);
-  const double plot_maximum =
-      std::max(each->GetMaximum(), maximum->GetMaximum());
+  const double plot_maximum = std::max(each->GetMaximum(), maximum->GetMaximum());
   maximum->SetMaximum(plot_maximum > 0.0 ? 3.0 * plot_maximum : 1.0);
 
   TCanvas canvas(("c_" + collection_label + "_delta_r").c_str(),
@@ -533,8 +528,7 @@ void draw_truth_pt_efficiencies(std::vector<CollectionHistograms> &histograms,
     for (TH1D *histogram : {matched, mass_window}) {
       histogram->SetLineWidth(2);
       histogram->SetMarkerSize(0.7);
-      histogram->GetXaxis()->SetTitle(
-          "Truth energy asymmetry |E_{1}-E_{2}|/(E_{1}+E_{2})");
+      histogram->GetXaxis()->SetTitle("Truth energy asymmetry |E_{1}-E_{2}|/(E_{1}+E_{2})");
       histogram->GetYaxis()->SetTitle("Fraction of accepted truth pairs");
       histogram->SetMinimum(0.0);
       histogram->SetMaximum(1.05);
@@ -584,8 +578,7 @@ void draw_truth_pt_delta_r(std::vector<CollectionHistograms> &histograms,
     maximum->GetYaxis()->SetTitle("Entries / 0.005");
     maximum->GetXaxis()->SetRangeUser(0.0, 0.20);
     maximum->SetMinimum(0.5);
-    const double plot_maximum =
-        std::max(each->GetMaximum(), maximum->GetMaximum());
+    const double plot_maximum = std::max(each->GetMaximum(), maximum->GetMaximum());
     maximum->SetMaximum(plot_maximum > 0.0 ? 3.0 * plot_maximum : 1.0);
     maximum->Draw("HIST");
     each->Draw("HIST SAME");
@@ -648,8 +641,7 @@ void print_summary(const std::string &collection,
 int PlotTruthPairMatching(
     const std::string input_path = "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
     const std::string output_base =
-        "PhotonAnalysisTree/output/plots/pair_matching_efficiency/"
-        "truth_pair_matching",
+        "PhotonAnalysisTree/output/plots/pair_matching_efficiency/truth_pair_matching",
     const double delta_r_cut = 0.03, const double mass_window_min = 0.10,
     const double mass_window_max = 0.18, const double min_cluster_energy = 0.1,
     const int asymmetry_nbins = 20) {
@@ -723,22 +715,17 @@ int PlotTruthPairMatching(
     return 4;
   }
 
-  CollectionHistograms split_histograms =
-      make_histograms("split", asymmetry_nbins);
-  CollectionHistograms nosplit_histograms =
-      make_histograms("nosplit", asymmetry_nbins);
-  std::vector<CollectionHistograms> split_truth_pt_histograms =
-      make_truth_pt_histograms("split", asymmetry_nbins);
-  std::vector<CollectionHistograms> nosplit_truth_pt_histograms =
-      make_truth_pt_histograms("nosplit", asymmetry_nbins);
+  CollectionHistograms split_histograms = make_histograms("split", asymmetry_nbins);
+  CollectionHistograms nosplit_histograms = make_histograms("nosplit", asymmetry_nbins);
+  std::vector<CollectionHistograms> split_truth_pt_histograms = make_truth_pt_histograms("split", asymmetry_nbins);
+  std::vector<CollectionHistograms> nosplit_truth_pt_histograms = make_truth_pt_histograms("nosplit", asymmetry_nbins);
 
   const auto process_collection = [&](const CollectionBranches &branches,
                                       CollectionHistograms &histograms) {
     ++histograms.truth_events;
     histograms.truth->Fill(truth_pair_e_asym);
 
-    const MatchResult match = match_truth_to_clusters(
-        *truth_eta, *truth_phi, branches, min_cluster_energy);
+    const MatchResult match = match_truth_to_clusters(*truth_eta, *truth_phi, branches, min_cluster_energy);
     if (!match.valid) {
       const bool branch_shapes_valid =
           branches.cluster_e && branches.cluster_eta && branches.cluster_phi &&
@@ -820,10 +807,8 @@ int PlotTruthPairMatching(
                       "nosplit_truth_pt_" + std::to_string(bin));
   }
 
-  const std::string split_output_base =
-      collection_output_base(output_base, "split");
-  const std::string nosplit_output_base =
-      collection_output_base(output_base, "nosplit");
+  const std::string split_output_base = collection_output_base(output_base, "split");
+  const std::string nosplit_output_base = collection_output_base(output_base, "nosplit");
   if (!make_output_directory(output_base) ||
       !make_output_directory(split_output_base) ||
       !make_output_directory(nosplit_output_base)) {

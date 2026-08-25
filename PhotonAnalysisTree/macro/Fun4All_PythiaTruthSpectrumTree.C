@@ -22,7 +22,10 @@ int Fun4All_PythiaTruthSpectrumTree(
   constexpr const char* root_extension = ".root";
   const std::string extension(root_extension);
   /* safe guard for input variables */
-  if (input_suffix.empty() || input_suffix.find('/') != std::string::npos || input_suffix.size() <= extension.size() || input_suffix.compare(input_suffix.size() - extension.size(), extension.size(), extension) != 0 || n_events < 0 || output_file.empty()) {
+  if (input_suffix.empty() ||
+      input_suffix.find('/') != std::string::npos ||
+      input_suffix.size() <= extension.size() ||
+      input_suffix.compare(input_suffix.size() - extension.size(), extension.size(), extension) != 0 || n_events < 0 || output_file.empty()) {
     std::cerr << "Fun4All_PythiaTruthSpectrumTree - invalid argument" << std::endl;
     return EXIT_FAILURE;
   }

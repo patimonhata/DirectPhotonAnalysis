@@ -147,10 +147,7 @@ bool compatible_histogram(const TH1D* histogram, const PartialMetadata& metadata
   return true;
 }
 
-bool histogram_sum_matches(
-    const TH1D* total,
-    const TH1D* hepmc,
-    const TH1D* g4)
+bool histogram_sum_matches(const TH1D* total, const TH1D* hepmc, const TH1D* g4)
 {
   if (!total || !hepmc || !g4 ||
       std::abs(total->GetEntries() - hepmc->GetEntries() - g4->GetEntries()) > 0.5)
@@ -212,7 +209,9 @@ int FinalizePythiaTruthPtSpectra(
     const Long64_t expected_manifest_begin = 0,
     const Long64_t expected_manifest_end = -1)
 {
-  if (partial_pattern.empty() || output_base.empty() || expected_manifest_begin < 0 || expected_manifest_end < -1 || (expected_manifest_end >= 0 && expected_manifest_end <= expected_manifest_begin)) {
+  if (partial_pattern.empty() || output_base.empty() ||
+      expected_manifest_begin < 0 || expected_manifest_end < -1 ||
+      (expected_manifest_end >= 0 && expected_manifest_end <= expected_manifest_begin)) {
     std::cerr << "FinalizePythiaTruthPtSpectra - invalid argument" << std::endl;
     return 1;
   }

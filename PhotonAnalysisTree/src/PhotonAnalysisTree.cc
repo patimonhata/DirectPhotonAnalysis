@@ -90,12 +90,9 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
 
   auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
   auto* towers = findNode::getClass<TowerInfoContainer>(topNode, tower_node_name_);
-  auto* raw_truth_towers =
-      findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
-  auto* truth_cells =
-      findNode::getClass<PHG4CellContainer>(topNode, truth_cell_node_name_);
-  auto* truth_hits =
-      findNode::getClass<PHG4HitContainer>(topNode, truth_hit_node_name_);
+  auto* raw_truth_towers = findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
+  auto* truth_cells = findNode::getClass<PHG4CellContainer>(topNode, truth_cell_node_name_);
+  auto* truth_hits = findNode::getClass<PHG4HitContainer>(topNode, truth_hit_node_name_);
   auto* geometry = findNode::getClass<RawTowerGeomContainer>(topNode, tower_geom_node_name_);
   auto* split_clusters = findNode::getClass<RawClusterContainer>(topNode, split_cluster_node_name_);
   auto* nosplit_clusters = findNode::getClass<RawClusterContainer>(topNode, nosplit_cluster_node_name_);
@@ -126,8 +123,7 @@ int PhotonAnalysisTree::process_event(PHCompositeNode* topNode)
   event_vertex.y = b_vertex_y_;
   event_vertex.z = b_vertex_z_;
   event_vertex.source = b_truth_valid_ ? 1 : 0;
-  const bool split_valid =
-      common_.fill_collection(split_clusters, towers, geometry, event_vertex, true, false, common_.split());
+  const bool split_valid = common_.fill_collection(split_clusters, towers, geometry, event_vertex, true, false, common_.split());
   const bool nosplit_valid =
       !nosplit_clusters ||
       common_.fill_collection(nosplit_clusters, towers, geometry, event_vertex, true, true, common_.nosplit());
@@ -581,8 +577,7 @@ double PhotonAnalysisTree::cemc_radius(RawTowerGeomContainer* geometry) const
   {
     for (int iphi = 0; iphi < 256; ++iphi)
     {
-      const unsigned int key = RawTowerDefs::encode_towerid(
-          RawTowerDefs::CEMC, static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
+      const unsigned int key = RawTowerDefs::encode_towerid(RawTowerDefs::CEMC, static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
       RawTowerGeom* tower = geometry->get_tower_geometry(key);
       if (tower)
       {

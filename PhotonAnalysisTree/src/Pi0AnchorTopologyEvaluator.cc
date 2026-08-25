@@ -130,9 +130,7 @@ bool finite_g4_kinematics(const PHG4Particle* particle,
       std::isfinite(eta) && std::isfinite(phi);
 }
 
-const HepMC::GenParticle* contributor_hepmc_particle(
-    const photon_tree::TruthContributor& contributor,
-    const PHHepMCGenEventMap* event_map)
+const HepMC::GenParticle* contributor_hepmc_particle(const photon_tree::TruthContributor& contributor, const PHHepMCGenEventMap* event_map)
 {
   const PHHepMCGenEvent* subevent = event_map
       ? event_map->get(contributor.embedding_id) : nullptr;
@@ -159,8 +157,7 @@ std::size_t contributor_candidate_index(
   {
     return invalid_index;
   }
-  const HepMC::GenParticle* particle =
-      contributor_hepmc_particle(contributor, event_map);
+  const HepMC::GenParticle* particle = contributor_hepmc_particle(contributor, event_map);
   if (contributor.g4_pdg_id == 111 && particle && particle->pdg_id() == 111)
   {
     const auto found = g4_candidate_by_barcode.find(particle->barcode());
@@ -176,8 +173,7 @@ std::size_t contributor_candidate_index(
   {
     return invalid_index;
   }
-  const auto found =
-      generator_candidate_by_barcode.find(origin.parent->barcode());
+  const auto found = generator_candidate_by_barcode.find(origin.parent->barcode());
   return found == generator_candidate_by_barcode.end()
       ? invalid_index : found->second;
 }
@@ -243,31 +239,22 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value)
   return "unknown";
 }
 
-void Pi0AnchorTopologyEvaluator::configure(
-    const Pi0AnchorTopologyConfig& config)
+void Pi0AnchorTopologyEvaluator::configure(const Pi0AnchorTopologyConfig& config)
 {
   config_ = config;
   truth_matcher_.set_verbosity(config_.verbosity);
 }
 
-Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
-    PHCompositeNode* topNode)
+Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNode* topNode)
 {
   Pi0AnchorTopologyEventResult result;
-  auto* truth = findNode::getClass<PHG4TruthInfoContainer>(
-      topNode, config_.truth_node_name);
-  auto* event_map = findNode::getClass<PHHepMCGenEventMap>(
-      topNode, config_.hepmc_event_map_node_name);
-  auto* towers = findNode::getClass<TowerInfoContainer>(
-      topNode, config_.tower_node_name);
-  auto* raw_truth_towers = findNode::getClass<RawTowerContainer>(
-      topNode, config_.raw_truth_tower_node_name);
-  auto* truth_cells = findNode::getClass<PHG4CellContainer>(
-      topNode, config_.truth_cell_node_name);
-  auto* truth_hits = findNode::getClass<PHG4HitContainer>(
-      topNode, config_.truth_hit_node_name);
-  auto* clusters = findNode::getClass<RawClusterContainer>(
-      topNode, config_.cluster_node_name);
+  auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, config_.truth_node_name);
+  auto* event_map = findNode::getClass<PHHepMCGenEventMap>(topNode, config_.hepmc_event_map_node_name);
+  auto* towers = findNode::getClass<TowerInfoContainer>(topNode, config_.tower_node_name);
+  auto* raw_truth_towers = findNode::getClass<RawTowerContainer>(topNode, config_.raw_truth_tower_node_name);
+  auto* truth_cells = findNode::getClass<PHG4CellContainer>(topNode, config_.truth_cell_node_name);
+  auto* truth_hits = findNode::getClass<PHG4HitContainer>(topNode, config_.truth_hit_node_name);
+  auto* clusters = findNode::getClass<RawClusterContainer>(topNode, config_.cluster_node_name);
 
   const bool pythia = config_.sample_mode == Pi0SampleMode::pythia;
   const PHHepMCGenEvent* signal_event = pythia && event_map
@@ -354,8 +341,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
       {
         continue;
       }
-      const HepMC::GenParticle* hepmc_particle =
-          event->barcode_to_particle(primary->get_barcode());
+      const HepMC::GenParticle* hepmc_particle = event->barcode_to_particle(primary->get_barcode());
       if (primary->get_pid() == 111 && hepmc_particle &&
           hepmc_particle->pdg_id() == 111)
       {
@@ -495,8 +481,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
     {
       continue;
     }
-    record.anchor_acceptance =
-        std::abs(record.eta) < config_.anchor_cluster_eta_max;
+    record.anchor_acceptance = std::abs(record.eta) < config_.anchor_cluster_eta_max;
     record.truth = truth_matcher_.match(
         cluster, towers, raw_truth_towers, truth, event_map, true);
     if (!record.truth.valid)
@@ -586,8 +571,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
           generator_candidate_by_barcode, single_candidate_by_track);
       if (candidate_index == invalid_index)
       {
-        unmatched_max_fraction = std::max(
-            unmatched_max_fraction, static_cast<double>(contributor.fraction));
+        unmatched_max_fraction = std::max(unmatched_max_fraction, static_cast<double>(contributor.fraction));
       }
       else
       {
@@ -642,8 +626,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
     }
     auto& candidate = result.candidates[candidate_index];
     candidate.topology_evaluated = true;
-    candidate.cluster_matches.assign(
-        result.clusters.size(), Pi0ClusterTruthMatch{});
+    candidate.cluster_matches.assign(result.clusters.size(), Pi0ClusterTruthMatch{});
     for (std::size_t cluster_index = 0;
          cluster_index < result.clusters.size(); ++cluster_index)
     {
@@ -667,8 +650,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
         {
           candidate.best_cluster[photon] = cluster_index;
           candidate.maximum_edep[photon] = deposit;
-          candidate.reconstructed_photon_energy[photon] =
-              result.clusters[cluster_index].energy * fraction;
+          candidate.reconstructed_photon_energy[photon] = result.clusters[cluster_index].energy * fraction;
         }
       }
     }
@@ -680,8 +662,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(
           std::isfinite(candidate.reconstructed_photon_energy[photon]) &&
           candidate.photon_energy[photon] > 0.0 &&
           candidate.reconstructed_photon_energy[photon] /
-              candidate.photon_energy[photon] >=
-                  config_.min_photon_energy_recovery;
+              candidate.photon_energy[photon] >= config_.min_photon_energy_recovery;
     }
 
     for (const std::size_t anchor_position :

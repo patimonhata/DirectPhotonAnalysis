@@ -75,8 +75,7 @@ void configure_axes(HistogramPair& histograms)
   frame->GetXaxis()->SetRangeUser(score_min, score_max);
   frame->SetMinimum(0.0);
 
-  const double maximum =
-      std::max(histograms.bdt->GetMaximum(), histograms.mlp->GetMaximum());
+  const double maximum = std::max(histograms.bdt->GetMaximum(), histograms.mlp->GetMaximum());
   frame->SetMaximum(maximum > 0.0 ? 1.25 * maximum : 1.0);
 }
 
@@ -370,13 +369,9 @@ int plot_collection(TTree* tree,
     gPad->RedrawAxis();
   }
   truth_pt_canvas.cd(7);
-  draw_information_panel(
-      truth_pt_histograms.front(), collection_label,
-      "Binned in truth #pi^{0} p_{T}", true);
+  draw_information_panel(truth_pt_histograms.front(), collection_label, "Binned in truth #pi^{0} p_{T}", true);
   truth_pt_canvas.cd(8);
-  draw_information_panel(
-      truth_pt_histograms.front(), collection_label,
-      "Binned in truth #pi^{0} p_{T}", false);
+  draw_information_panel(truth_pt_histograms.front(), collection_label, "Binned in truth #pi^{0} p_{T}", false);
   truth_pt_canvas.SaveAs((output_base + "_truth_pt.pdf").c_str());
 
   TCanvas cluster_et_canvas(
@@ -394,13 +389,9 @@ int plot_collection(TTree* tree,
   cluster_et_canvas.cd(7);
   const std::string cluster_binning_text =
       "Binned in " + collection_label + " cluster E_{T}";
-  draw_information_panel(
-      cluster_et_histograms.front(), collection_label,
-      cluster_binning_text.c_str(), true);
+  draw_information_panel(cluster_et_histograms.front(), collection_label, cluster_binning_text.c_str(), true);
   cluster_et_canvas.cd(8);
-  draw_information_panel(
-      cluster_et_histograms.front(), collection_label,
-      cluster_binning_text.c_str(), false);
+  draw_information_panel(cluster_et_histograms.front(), collection_label, cluster_binning_text.c_str(), false);
   cluster_et_canvas.SaveAs((output_base + "_cluster_et.pdf").c_str());
 
   std::cout << "PlotScoreComparison (" << collection_label

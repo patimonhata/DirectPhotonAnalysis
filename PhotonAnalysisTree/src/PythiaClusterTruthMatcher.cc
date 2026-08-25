@@ -94,8 +94,7 @@ ClusterTruthMatch PythiaClusterTruthMatcher::match(
     const unsigned int raw_key = tower_iter->first;
     const int ieta = static_cast<int>(RawTowerDefs::decode_index1(raw_key));
     const int iphi = static_cast<int>(RawTowerDefs::decode_index2(raw_key));
-    const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(
-        static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
+    const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
     TowerInfo* tower = towers->get_tower_at_key(static_cast<int>(tower_info_key));
     if (!tower)
     {

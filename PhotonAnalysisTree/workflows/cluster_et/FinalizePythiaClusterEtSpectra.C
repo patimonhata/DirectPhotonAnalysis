@@ -318,9 +318,7 @@ bool make_output_directory(const std::string& output_base)
       gSystem->mkdir(directory.c_str(), true) == 0;
 }
 
-double smallest_positive(
-    const std::array<std::unique_ptr<TH1D>, kHistogramCount>& histograms,
-    const std::array<std::size_t, kPlotHistogramCount>& indices)
+double smallest_positive(const std::array<std::unique_ptr<TH1D>, kHistogramCount>& histograms, const std::array<std::size_t, kPlotHistogramCount>& indices)
 {
   double result = std::numeric_limits<double>::infinity();
   for (const std::size_t index : indices)
@@ -340,10 +338,8 @@ double smallest_positive(
 }
 
 int FinalizePythiaClusterEtSpectra(
-    const std::string partial_pattern =
-        "output/cluster_et_partial_jet3/prompt_primary_generator_pi0_eta07_energy_contribution_anchor_0p3/partial_*.root",
-    const std::string output_base =
-        "output/plots/cluster_et_prompt_primary_generator_pi0_eta07_anchor_0p3",
+    const std::string partial_pattern = "output/cluster_et_partial_jet3/prompt_primary_generator_pi0_eta07_energy_contribution_anchor_0p3/partial_*.root",
+    const std::string output_base = "output/plots/cluster_et_prompt_primary_generator_pi0_eta07_anchor_0p3",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {
@@ -436,24 +432,17 @@ int FinalizePythiaClusterEtSpectra(
   PartialMetadata total = reference;
   total.events_processed = total.events_written = total.events_invalid = 0;
   total.prompt_cluster_count = total.pi0_cluster_count = 0;
-  total.pi0_cluster_g4_decay_count =
-      total.pi0_cluster_generator_decay_count = 0;
-  total.pi0_candidate_g4_decay_count =
-      total.pi0_candidate_generator_decay_count = 0;
-  total.pi0_malformed_daughters_count =
-      total.pi0_projection_failure_count = 0;
-  total.pi0_separated_count = total.pi0_merged_count =
-      total.pi0_missing_count = 0;
+  total.pi0_cluster_g4_decay_count = total.pi0_cluster_generator_decay_count = 0;
+  total.pi0_candidate_g4_decay_count = total.pi0_candidate_generator_decay_count = 0;
+  total.pi0_malformed_daughters_count = total.pi0_projection_failure_count = 0;
+  total.pi0_separated_count = total.pi0_merged_count = total.pi0_missing_count = 0;
   total.pi0_none_count = total.pi0_ambiguous_count = 0;
   total.pi0_separated_cluster_fill_count =
-      total.pi0_merged_cluster_fill_count =
-      total.pi0_missing_cluster_fill_count = 0;
-  total.pi0_energy_separated_count = total.pi0_energy_merged_count =
-      total.pi0_energy_missing_count = total.pi0_energy_none_count = 0;
+      total.pi0_merged_cluster_fill_count = total.pi0_missing_cluster_fill_count = 0;
+  total.pi0_energy_separated_count = total.pi0_energy_merged_count = total.pi0_energy_missing_count = total.pi0_energy_none_count = 0;
   total.pi0_energy_match_invalid_count = 0;
   total.pi0_energy_separated_cluster_fill_count =
-      total.pi0_energy_merged_cluster_fill_count =
-      total.pi0_energy_missing_cluster_fill_count = 0;
+      total.pi0_energy_merged_cluster_fill_count = total.pi0_energy_missing_cluster_fill_count = 0;
 
   for (const PartialMetadata& partial : partials)
   {
@@ -486,42 +475,28 @@ int FinalizePythiaClusterEtSpectra(
     total.events_invalid += partial.events_invalid;
     total.prompt_cluster_count += partial.prompt_cluster_count;
     total.pi0_cluster_count += partial.pi0_cluster_count;
-    total.pi0_cluster_g4_decay_count +=
-        partial.pi0_cluster_g4_decay_count;
-    total.pi0_cluster_generator_decay_count +=
-        partial.pi0_cluster_generator_decay_count;
-    total.pi0_candidate_g4_decay_count +=
-        partial.pi0_candidate_g4_decay_count;
-    total.pi0_candidate_generator_decay_count +=
-        partial.pi0_candidate_generator_decay_count;
-    total.pi0_malformed_daughters_count +=
-        partial.pi0_malformed_daughters_count;
-    total.pi0_projection_failure_count +=
-        partial.pi0_projection_failure_count;
+    total.pi0_cluster_g4_decay_count += partial.pi0_cluster_g4_decay_count;
+    total.pi0_cluster_generator_decay_count += partial.pi0_cluster_generator_decay_count;
+    total.pi0_candidate_g4_decay_count += partial.pi0_candidate_g4_decay_count;
+    total.pi0_candidate_generator_decay_count += partial.pi0_candidate_generator_decay_count;
+    total.pi0_malformed_daughters_count += partial.pi0_malformed_daughters_count;
+    total.pi0_projection_failure_count += partial.pi0_projection_failure_count;
     total.pi0_separated_count += partial.pi0_separated_count;
     total.pi0_merged_count += partial.pi0_merged_count;
     total.pi0_missing_count += partial.pi0_missing_count;
     total.pi0_none_count += partial.pi0_none_count;
     total.pi0_ambiguous_count += partial.pi0_ambiguous_count;
-    total.pi0_separated_cluster_fill_count +=
-        partial.pi0_separated_cluster_fill_count;
-    total.pi0_merged_cluster_fill_count +=
-        partial.pi0_merged_cluster_fill_count;
-    total.pi0_missing_cluster_fill_count +=
-        partial.pi0_missing_cluster_fill_count;
-    total.pi0_energy_separated_count +=
-        partial.pi0_energy_separated_count;
+    total.pi0_separated_cluster_fill_count += partial.pi0_separated_cluster_fill_count;
+    total.pi0_merged_cluster_fill_count += partial.pi0_merged_cluster_fill_count;
+    total.pi0_missing_cluster_fill_count += partial.pi0_missing_cluster_fill_count;
+    total.pi0_energy_separated_count += partial.pi0_energy_separated_count;
     total.pi0_energy_merged_count += partial.pi0_energy_merged_count;
     total.pi0_energy_missing_count += partial.pi0_energy_missing_count;
     total.pi0_energy_none_count += partial.pi0_energy_none_count;
-    total.pi0_energy_match_invalid_count +=
-        partial.pi0_energy_match_invalid_count;
-    total.pi0_energy_separated_cluster_fill_count +=
-        partial.pi0_energy_separated_cluster_fill_count;
-    total.pi0_energy_merged_cluster_fill_count +=
-        partial.pi0_energy_merged_cluster_fill_count;
-    total.pi0_energy_missing_cluster_fill_count +=
-        partial.pi0_energy_missing_cluster_fill_count;
+    total.pi0_energy_match_invalid_count += partial.pi0_energy_match_invalid_count;
+    total.pi0_energy_separated_cluster_fill_count += partial.pi0_energy_separated_cluster_fill_count;
+    total.pi0_energy_merged_cluster_fill_count += partial.pi0_energy_merged_cluster_fill_count;
+    total.pi0_energy_missing_cluster_fill_count += partial.pi0_energy_missing_cluster_fill_count;
   }
 
   std::array<std::unique_ptr<TH1D>, kHistogramCount> density;
@@ -530,8 +505,7 @@ int FinalizePythiaClusterEtSpectra(
       kAzure + 7, kMagenta + 1, kGreen + 2};
   for (std::size_t index = 0; index < raw.size(); ++index)
   {
-    density[index].reset(static_cast<TH1D*>(
-        raw[index]->Clone(density_names[index].c_str())));
+    density[index].reset(static_cast<TH1D*>(raw[index]->Clone(density_names[index].c_str())));
     density[index]->Scale(1.0, "width");
     density[index]->SetStats(false);
     density[index]->SetFillStyle(0);
@@ -629,8 +603,7 @@ int FinalizePythiaClusterEtSpectra(
   int output_schema_version = 3;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
-  long long partial_file_count =
-      static_cast<long long>(partials.size());
+  long long partial_file_count = static_cast<long long>(partials.size());
   long long input_file_count = manifest_end - manifest_begin;
   unsigned char contains_raw_histograms = 1U;
   unsigned char contains_bin_width_normalized_histograms = 1U;

@@ -285,10 +285,8 @@ double smallest_positive(const std::array<std::unique_ptr<TH1D>, kHistogramCount
 }
 
 int FinalizePythiaPi0AnchorClusterSpectra(
-    const std::string partial_pattern =
-        "output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p2_clusterenergy/partial_*.root",
-    const std::string output_base =
-        "output/plots/pi0_anchor_topology/minimum_bias/with_vertex_cut",
+    const std::string partial_pattern = "output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p2_clusterenergy/partial_*.root",
+    const std::string output_base = "output/plots/pi0_anchor_topology/minimum_bias/with_vertex_cut",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1,
     const std::string sample_label = "Pythia8 p+p Jet 5")
@@ -330,7 +328,9 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   long long next_begin = expected_manifest_begin;
   for (const PartialMetadata& partial : partials) {
     if (!compatible(partial, reference) || partial.manifest_begin != next_begin) {
-      std::cerr << "FinalizePythiaPi0AnchorClusterSpectra - incompatible or noncontiguous partial: " << partial.path << ", expected begin " << next_begin << std::endl;
+      std::cerr << "FinalizePythiaPi0AnchorClusterSpectra - incompatible or noncontiguous partial: "
+                << partial.path << ", expected begin " << next_begin
+                << std::endl;
       return 4;
     }
     next_begin = partial.manifest_end;

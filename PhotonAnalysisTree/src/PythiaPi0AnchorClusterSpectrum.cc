@@ -12,8 +12,7 @@
 #include <iostream>
 #include <string>
 
-PythiaPi0AnchorClusterSpectrum::PythiaPi0AnchorClusterSpectrum(
-    const std::string& name)
+PythiaPi0AnchorClusterSpectrum::PythiaPi0AnchorClusterSpectrum(const std::string& name)
   : SubsysReco(name)
 {
 }
@@ -85,8 +84,7 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
 int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
 {
   ++n_events_processed_;
-  const photon_tree::Pi0AnchorTopologyEventResult result =
-      topology_evaluator_.evaluate(topNode);
+  const photon_tree::Pi0AnchorTopologyEventResult result = topology_evaluator_.evaluate(topNode);
   if (result.status == photon_tree::Pi0TopologyEventStatus::vertex_rejected)
   {
     ++n_events_vertex_rejected_;
@@ -233,8 +231,7 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
     histogram->Sumw2();
   }
 
-  metadata_tree_ = new TTree(
-      "metadata", "Pythia pi0 anchor-cluster partial metadata");
+  metadata_tree_ = new TTree("metadata", "Pythia pi0 anchor-cluster partial metadata");
   static int schema_version = schema_version_;
   static unsigned char bin_width_normalized = 0U;
   metadata_tree_->Branch("schema_version", &schema_version);
@@ -250,62 +247,37 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("topology_definition", &topology_definition_);
   metadata_tree_->Branch("topology_priority", &topology_priority_);
   metadata_tree_->Branch("response_policy", &response_policy_);
-  metadata_tree_->Branch(
-      "photon_recovery_policy", &photon_recovery_policy_);
+  metadata_tree_->Branch("photon_recovery_policy", &photon_recovery_policy_);
   metadata_tree_->Branch("vertex_selection", &vertex_selection_);
   metadata_tree_->Branch("signal_embedding_id", &signal_embedding_id_);
   metadata_tree_->Branch("n_bins", &n_bins_);
   metadata_tree_->Branch("et_max", &et_max_);
   metadata_tree_->Branch("truth_eta_max", &truth_eta_max_);
-  metadata_tree_->Branch(
-      "anchor_cluster_eta_max", &anchor_cluster_eta_max_);
-  metadata_tree_->Branch(
-      "partner_cluster_eta_max", &partner_cluster_eta_max_);
+  metadata_tree_->Branch("anchor_cluster_eta_max", &anchor_cluster_eta_max_);
+  metadata_tree_->Branch("partner_cluster_eta_max", &partner_cluster_eta_max_);
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);
-  metadata_tree_->Branch(
-      "dominant_fraction_min", &dominant_fraction_min_);
-  metadata_tree_->Branch(
-      "anchor_pi0_fraction_min", &anchor_pi0_fraction_min_);
-  metadata_tree_->Branch(
-      "min_energy_contribution_fraction",
-      &min_energy_contribution_fraction_);
-  metadata_tree_->Branch(
-      "min_photon_energy_recovery",
-      &min_photon_energy_recovery_);
+  metadata_tree_->Branch("dominant_fraction_min", &dominant_fraction_min_);
+  metadata_tree_->Branch("anchor_pi0_fraction_min", &anchor_pi0_fraction_min_);
+  metadata_tree_->Branch("min_energy_contribution_fraction", &min_energy_contribution_fraction_);
+  metadata_tree_->Branch("min_photon_energy_recovery", &min_photon_energy_recovery_);
   metadata_tree_->Branch("max_abs_vertex_z", &max_abs_vertex_z_);
-  metadata_tree_->Branch(
-      "pi0_truth_matching_algorithm_version",
-      &pi0_truth_matching_algorithm_version_);
-  metadata_tree_->Branch(
-      "bin_width_normalized", &bin_width_normalized);
+  metadata_tree_->Branch("pi0_truth_matching_algorithm_version", &pi0_truth_matching_algorithm_version_);
+  metadata_tree_->Branch("bin_width_normalized", &bin_width_normalized);
   metadata_tree_->Branch("events_processed", &n_events_processed_);
   metadata_tree_->Branch("events_written", &n_events_written_);
   metadata_tree_->Branch("events_invalid", &n_events_invalid_);
-  metadata_tree_->Branch(
-      "events_vertex_rejected", &n_events_vertex_rejected_);
-  metadata_tree_->Branch(
-      "cluster_considered_count", &n_cluster_considered_);
-  metadata_tree_->Branch(
-      "cluster_invalid_truth_count", &n_cluster_invalid_truth_);
-  metadata_tree_->Branch(
-      "prompt_cluster_count", &n_prompt_cluster_);
-  metadata_tree_->Branch(
-      "pi0_candidate_g4_decay_count", &n_pi0_candidate_g4_decay_);
-  metadata_tree_->Branch(
-      "pi0_candidate_generator_decay_count",
-      &n_pi0_candidate_generator_decay_);
-  metadata_tree_->Branch(
-      "pi0_malformed_daughters_count", &n_pi0_malformed_daughters_);
-  metadata_tree_->Branch(
-      "anchor_cluster_count", &n_anchor_cluster_);
-  metadata_tree_->Branch(
-      "anchor_g4_decay_count", &n_anchor_g4_decay_);
-  metadata_tree_->Branch(
-      "anchor_generator_decay_count", &n_anchor_generator_decay_);
-  metadata_tree_->Branch(
-      "anchor_ambiguous_main_count", &n_anchor_ambiguous_main_);
-  metadata_tree_->Branch(
-      "energy_match_invalid_count", &n_energy_match_invalid_);
+  metadata_tree_->Branch("events_vertex_rejected", &n_events_vertex_rejected_);
+  metadata_tree_->Branch("cluster_considered_count", &n_cluster_considered_);
+  metadata_tree_->Branch("cluster_invalid_truth_count", &n_cluster_invalid_truth_);
+  metadata_tree_->Branch("prompt_cluster_count", &n_prompt_cluster_);
+  metadata_tree_->Branch("pi0_candidate_g4_decay_count", &n_pi0_candidate_g4_decay_);
+  metadata_tree_->Branch("pi0_candidate_generator_decay_count", &n_pi0_candidate_generator_decay_);
+  metadata_tree_->Branch("pi0_malformed_daughters_count", &n_pi0_malformed_daughters_);
+  metadata_tree_->Branch("anchor_cluster_count", &n_anchor_cluster_);
+  metadata_tree_->Branch("anchor_g4_decay_count", &n_anchor_g4_decay_);
+  metadata_tree_->Branch("anchor_generator_decay_count", &n_anchor_generator_decay_);
+  metadata_tree_->Branch("anchor_ambiguous_main_count", &n_anchor_ambiguous_main_);
+  metadata_tree_->Branch("energy_match_invalid_count", &n_energy_match_invalid_);
   metadata_tree_->Branch("separated_count", &n_separated_);
   metadata_tree_->Branch("merged_count", &n_merged_);
   metadata_tree_->Branch("missing_count", &n_missing_);

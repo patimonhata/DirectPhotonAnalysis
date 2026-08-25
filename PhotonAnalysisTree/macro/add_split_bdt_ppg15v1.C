@@ -30,8 +30,7 @@ bool bind(TTree* tree, const char* name, T* address)
 int add_split_bdt_ppg15v1(
     const char* input_path,
     const char* model_path =
-        "/sphenix/user/jaein213/photon/BDT/PPG15PhotonAN/bdt_training/outputs/"
-        "nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_xgb/"
+        "/sphenix/user/jaein213/photon/BDT/PPG15PhotonAN/bdt_training/outputs/nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_xgb/"
         "model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root")
 {
   constexpr const char* tree_name = "event_tree";

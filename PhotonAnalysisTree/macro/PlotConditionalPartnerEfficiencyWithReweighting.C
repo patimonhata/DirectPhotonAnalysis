@@ -42,8 +42,7 @@ enum class Topology : std::size_t {
   count = 4
 };
 
-constexpr std::size_t n_topologies =
-    static_cast<std::size_t>(Topology::count);
+constexpr std::size_t n_topologies = static_cast<std::size_t>(Topology::count);
 const std::array<std::string, n_topologies> topology_names = {
     "separated_pair_candidate", "merged_candidate",
     "individual_cluster_no_pair", "no_matched_topology"};
@@ -197,8 +196,7 @@ Topology classify_energy_contribution(
     }
   }
 
-  constexpr std::size_t invalid_cluster =
-      std::numeric_limits<std::size_t>::max();
+  constexpr std::size_t invalid_cluster = std::numeric_limits<std::size_t>::max();
   std::array<std::size_t, 2> maximum_deposit_cluster = {
       invalid_cluster, invalid_cluster};
   std::array<float, 2> maximum_deposit = {-1.0F, -1.0F};
@@ -246,8 +244,7 @@ Topology classify_energy_contribution(
     if (cluster == invalid_cluster) {
       continue;
     }
-    const double response =
-        branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
+    const double response = branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
     if (response >= individual_response_min &&
         response <= individual_response_max) {
       return Topology::missing;
@@ -257,9 +254,7 @@ Topology classify_energy_contribution(
 }
 
 std::unique_ptr<TH1D> make_histogram(const std::string &name) {
-  auto histogram = std::make_unique<TH1D>(
-      name.c_str(), "", static_cast<int>(n_truth_pt_bins),
-      truth_pt_edges.data());
+  auto histogram = std::make_unique<TH1D>(name.c_str(), "", static_cast<int>(n_truth_pt_bins), truth_pt_edges.data());
   histogram->SetDirectory(nullptr);
   histogram->Sumw2();
   histogram->SetStats(false);
@@ -523,9 +518,7 @@ void draw_histograms(WeightedHistograms &histograms,
   label.DrawLatex(
       plot_annotation_x, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
   if (anchor_et_axis) {
-    label.DrawLatex(
-        plot_annotation_x, 0.83,
-        "Event category per selected anchor");
+    label.DrawLatex(plot_annotation_x, 0.83, "Event category per selected anchor");
     label.DrawLatex(
         plot_annotation_x, 0.78,
         Form("Truth/anchor |#eta| < %.1f / %.1f",
@@ -539,12 +532,8 @@ void draw_histograms(WeightedHistograms &histograms,
         Form("Anchor weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   } else {
-    label.DrawLatex(
-        plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
-    label.DrawLatex(
-        plot_annotation_x, 0.78,
-        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts",
-             truth_eta_max));
+    label.DrawLatex(plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
+    label.DrawLatex(plot_annotation_x, 0.78, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts", truth_eta_max));
     label.DrawLatex(
         plot_annotation_x, 0.73,
         Form("w = (p_{T}^{truth}/%.3g GeV)^{%.3f}",
@@ -554,14 +543,8 @@ void draw_histograms(WeightedHistograms &histograms,
   const double split_y = anchor_et_axis ? 0.56 : 0.61;
   const double merged_y = anchor_et_axis ? 0.52 : 0.57;
   const double missing_y = anchor_et_axis ? 0.48 : 0.53;
-  label.DrawLatex(
-      plot_annotation_x, match_y,
-      Form("Max-E_{dep} match; f_{#gamma} > %.3g",
-           min_contribution_fraction));
-  label.DrawLatex(
-      plot_annotation_x, split_y,
-      Form("Separated: two clusters; E_{clus} #geq %.3g GeV",
-           min_cluster_energy));
+  label.DrawLatex(plot_annotation_x, match_y, Form("Max-E_{dep} match; f_{#gamma} > %.3g", min_contribution_fraction));
+  label.DrawLatex(plot_annotation_x, split_y, Form("Separated: two clusters; E_{clus} #geq %.3g GeV", min_cluster_energy));
   label.DrawLatex(
       plot_annotation_x, merged_y,
       Form("Merged: same match; R_{#pi^{0}} [%.1f, %.1f]",
@@ -606,10 +589,8 @@ void draw_fraction_information(
   label.DrawLatex(
       plot_annotation_x, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
   if (anchor_et_axis) {
-    label.DrawLatex(
-        plot_annotation_x, 0.83, "Event category per selected anchor");
-    label.DrawLatex(
-        plot_annotation_x, 0.78, "Denominator: weighted selected anchors");
+    label.DrawLatex(plot_annotation_x, 0.83, "Event category per selected anchor");
+    label.DrawLatex(plot_annotation_x, 0.78, "Denominator: weighted selected anchors");
     label.DrawLatex(
         plot_annotation_x, 0.73,
         Form("Truth/anchor |#eta| < %.1f / %.1f",
@@ -623,14 +604,9 @@ void draw_fraction_information(
         Form("Anchor weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   } else {
-    label.DrawLatex(
-        plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
-    label.DrawLatex(
-        plot_annotation_x, 0.78, "Denominator: weighted accepted truth #pi^{0}");
-    label.DrawLatex(
-        plot_annotation_x, 0.73,
-        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts",
-             truth_eta_max));
+    label.DrawLatex(plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
+    label.DrawLatex(plot_annotation_x, 0.78, "Denominator: weighted accepted truth #pi^{0}");
+    label.DrawLatex(plot_annotation_x, 0.73, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts", truth_eta_max));
     label.DrawLatex(
         plot_annotation_x, 0.68,
         Form("w = (p_{T}^{truth}/%.3g GeV)^{%.3f}",
@@ -640,14 +616,8 @@ void draw_fraction_information(
   const double split_y = anchor_et_axis ? 0.51 : 0.56;
   const double merged_y = anchor_et_axis ? 0.46 : 0.51;
   const double missing_y = anchor_et_axis ? 0.41 : 0.46;
-  label.DrawLatex(
-      plot_annotation_x, match_y,
-      Form("Max-E_{dep} match; f_{#gamma} > %.3g",
-           min_contribution_fraction));
-  label.DrawLatex(
-      plot_annotation_x, split_y,
-      Form("Separated: two clusters; E_{clus} #geq %.3g GeV",
-           min_cluster_energy));
+  label.DrawLatex(plot_annotation_x, match_y, Form("Max-E_{dep} match; f_{#gamma} > %.3g", min_contribution_fraction));
+  label.DrawLatex(plot_annotation_x, split_y, Form("Separated: two clusters; E_{clus} #geq %.3g GeV", min_cluster_energy));
   label.DrawLatex(
       plot_annotation_x, merged_y,
       Form("Merged: same match; R_{#pi^{0}} [%.1f, %.1f]",
@@ -855,11 +825,9 @@ void write_histograms(TFile &output,
 
 int PlotConditionalPartnerEfficiencyWithReweighting(
     const std::string input_path =
-        "PhotonAnalysisTree/output/merged/"
-        "newscheme_100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
+        "PhotonAnalysisTree/output/merged/newscheme_100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
     const std::string output_base =
-        "PhotonAnalysisTree/output/plots/conditional_efficiency_reweighted/"
-        "ET3to5GeV_threshold100MeV/conditional_partner_et3to5_reweighted",
+        "PhotonAnalysisTree/output/plots/conditional_efficiency_reweighted/ET3to5GeV_threshold100MeV/conditional_partner_et3to5_reweighted",
     const double anchor_eta_max = 0.7, const double anchor_et_min = 3.0,
     const double anchor_et_max = 5.0,
     const double min_cluster_energy = 0.1,
@@ -965,10 +933,8 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
 
   WeightedHistograms split_histograms = make_histograms("split");
   WeightedHistograms nosplit_histograms = make_histograms("nosplit");
-  WeightedHistograms split_anchor_et_histograms =
-      make_anchor_et_histograms("split");
-  WeightedHistograms nosplit_anchor_et_histograms =
-      make_anchor_et_histograms("nosplit");
+  WeightedHistograms split_anchor_et_histograms = make_anchor_et_histograms("split");
+  WeightedHistograms nosplit_anchor_et_histograms = make_anchor_et_histograms("nosplit");
   Long64_t invalid_truth_shape = 0;
   Long64_t truth_pt_outside_range = 0;
   Long64_t invalid_weight = 0;
@@ -1004,8 +970,7 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
       continue;
     }
 
-    const double event_weight =
-        std::pow(truth_pt / weight_reference_pt, pt_weight_exponent);
+    const double event_weight = std::pow(truth_pt / weight_reference_pt, pt_weight_exponent);
     if (!std::isfinite(event_weight) || !(event_weight > 0.0)) {
       ++invalid_weight;
       continue;
@@ -1037,20 +1002,14 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
   make_fractions(nosplit_histograms, "nosplit");
   make_anchor_et_fractions(split_anchor_et_histograms, "split");
   make_anchor_et_fractions(nosplit_anchor_et_histograms, "nosplit");
-  const bool split_truth_closure =
-      check_closure(split_histograms, "SPLIT truth-pT");
-  const bool nosplit_truth_closure =
-      check_closure(nosplit_histograms, "NO-SPLIT truth-pT");
-  const bool split_anchor_closure =
-      check_closure(split_anchor_et_histograms, "SPLIT anchor-ET");
-  const bool nosplit_anchor_closure =
-      check_closure(nosplit_anchor_et_histograms, "NO-SPLIT anchor-ET");
+  const bool split_truth_closure = check_closure(split_histograms, "SPLIT truth-pT");
+  const bool nosplit_truth_closure = check_closure(nosplit_histograms, "NO-SPLIT truth-pT");
+  const bool split_anchor_closure = check_closure(split_anchor_et_histograms, "SPLIT anchor-ET");
+  const bool nosplit_anchor_closure = check_closure(nosplit_anchor_et_histograms, "NO-SPLIT anchor-ET");
   const bool closure_ok = split_truth_closure && nosplit_truth_closure &&
                           split_anchor_closure && nosplit_anchor_closure;
-  const std::string split_output_base =
-      collection_output_base(output_base, "split");
-  const std::string nosplit_output_base =
-      collection_output_base(output_base, "nosplit");
+  const std::string split_output_base = collection_output_base(output_base, "split");
+  const std::string nosplit_output_base = collection_output_base(output_base, "nosplit");
   if (!make_output_directory(output_base) ||
       !make_output_directory(split_output_base) ||
       !make_output_directory(nosplit_output_base)) {

@@ -85,8 +85,7 @@ std::set<std::string> expected_keys()
 }
 }
 
-int check_pythia_pi0_cluster_multiplicity_partial(
-    const std::string input_file)
+int check_pythia_pi0_cluster_multiplicity_partial(const std::string input_file)
 {
   TFile input(input_file.c_str(), "READ");
   if (input.IsZombie())
@@ -264,8 +263,7 @@ int check_pythia_pi0_cluster_multiplicity_partial(
   TH2D* fraction_vs_energy = nullptr;
   input.GetObject("h_pi0_maximum_compatible_fraction_raw", maximum);
   input.GetObject("h_pi0_second_compatible_fraction_raw", second);
-  input.GetObject(
-      "h_pi0_compatible_fraction_vs_cluster_energy_raw", fraction_vs_energy);
+  input.GetObject("h_pi0_compatible_fraction_vs_cluster_energy_raw", fraction_vs_energy);
   if (!finite_histogram(maximum) || !finite_histogram(second) ||
       !finite_histogram(fraction_vs_energy) ||
       !entries_equal(maximum, candidate_count) ||

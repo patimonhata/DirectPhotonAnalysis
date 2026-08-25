@@ -160,9 +160,7 @@ int PythiaPhotonAnalysisTree::End(PHCompositeNode* /*topNode*/)
   return Fun4AllReturnCodes::EVENT_OK;
 }
 
-bool PythiaPhotonAnalysisTree::fill_hepmc_event_info(
-    const PHHepMCGenEventMap* event_map,
-    photon_tree::EventVertex& event_vertex)
+bool PythiaPhotonAnalysisTree::fill_hepmc_event_info(const PHHepMCGenEventMap* event_map, photon_tree::EventVertex& event_vertex)
 {
   if (!event_map)
   {

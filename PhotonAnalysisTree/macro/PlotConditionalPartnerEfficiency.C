@@ -109,8 +109,7 @@ enum class EventComponent : std::size_t {
   count = 4
 };
 
-constexpr std::size_t n_event_components =
-    static_cast<std::size_t>(EventComponent::count);
+constexpr std::size_t n_event_components = static_cast<std::size_t>(EventComponent::count);
 const std::array<std::string, n_event_components> event_component_names = {
     "correct_pair", "merged_candidate", "individual_anchor_no_partner",
     "other_anchor"};
@@ -174,8 +173,7 @@ enum class ClusterSelection : std::size_t {
   count = 4
 };
 
-constexpr std::size_t n_cluster_selections =
-    static_cast<std::size_t>(ClusterSelection::count);
+constexpr std::size_t n_cluster_selections = static_cast<std::size_t>(ClusterSelection::count);
 constexpr std::size_t n_cluster_retentions = n_cluster_selections - 1U;
 const std::array<std::string, n_cluster_selections> cluster_selection_names = {
     "all", "min_energy", "eta", "min_energy_eta"};
@@ -202,8 +200,7 @@ enum class CoreCondition : std::size_t {
   count = 4
 };
 
-constexpr std::size_t n_core_conditions =
-    static_cast<std::size_t>(CoreCondition::count);
+constexpr std::size_t n_core_conditions = static_cast<std::size_t>(CoreCondition::count);
 constexpr std::size_t condition_index(const CoreCondition condition) {
   return static_cast<std::size_t>(condition);
 }
@@ -250,15 +247,13 @@ void divide_panel_canvas(TCanvas &canvas) {
   const double header_bottom =
       1.0 - 1.0 / static_cast<double>(canvas_rows);
   const double column_width = 1.0 / static_cast<double>(canvas_columns);
-  const double plot_row_height =
-      header_bottom / static_cast<double>(plot_rows);
+  const double plot_row_height = header_bottom / static_cast<double>(plot_rows);
 
   const auto add_pad = [&](const int number, const std::string &suffix,
                            const double x_low, const double y_low,
                            const double x_high, const double y_high) {
     const std::string name = std::string(canvas.GetName()) + "_" + suffix;
-    auto *pad =
-        new TPad(name.c_str(), "", x_low, y_low, x_high, y_high);
+    auto *pad = new TPad(name.c_str(), "", x_low, y_low, x_high, y_high);
     pad->SetNumber(number);
     pad->Draw();
   };
@@ -328,8 +323,7 @@ std::size_t find_truth_pt_bin(const double truth_pt) {
   if (truth_pt == truth_pt_edges.back()) {
     return truth_pt_labels.size() - 1U;
   }
-  const auto upper =
-      std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), truth_pt);
+  const auto upper = std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), truth_pt);
   return static_cast<std::size_t>(std::distance(truth_pt_edges.begin(), upper) -
                                   1);
 }
@@ -342,8 +336,7 @@ std::size_t find_reco_et_bin(const double cluster_et) {
   if (cluster_et == truth_pt_edges.back()) {
     return reco_et_labels.size() - 1U;
   }
-  const auto upper =
-      std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), cluster_et);
+  const auto upper = std::upper_bound(truth_pt_edges.begin(), truth_pt_edges.end(), cluster_et);
   return static_cast<std::size_t>(
       std::distance(truth_pt_edges.begin(), upper) - 1);
 }
@@ -553,8 +546,7 @@ make_truth_pi0_component_histograms(const std::string &prefix,
   histograms.reference = make("reference");
   histograms.in_truth_eta = make("in_truth_eta");
   for (std::size_t component = 0; component < n_event_components; ++component) {
-    histograms.component[component] =
-        make(truth_pi0_component_names[component]);
+    histograms.component[component] = make(truth_pi0_component_names[component]);
   }
   return histograms;
 }
@@ -725,16 +717,13 @@ bool fill_reco_et_histograms(std::vector<RecoEtHistograms> &histograms,
     if (!valid_cluster(branches, cluster)) {
       continue;
     }
-    const std::size_t reco_bin =
-        find_reco_et_bin(branches.cluster_et->at(cluster));
+    const std::size_t reco_bin = find_reco_et_bin(branches.cluster_et->at(cluster));
     if (reco_bin >= histograms.size()) {
       continue;
     }
     RecoEtHistograms &current = histograms[reco_bin];
-    const bool passes_energy =
-        branches.cluster_e->at(cluster) >= min_cluster_energy;
-    const bool passes_eta =
-        std::abs(branches.cluster_eta->at(cluster)) < eta_max;
+    const bool passes_energy = branches.cluster_e->at(cluster) >= min_cluster_energy;
+    const bool passes_eta = std::abs(branches.cluster_eta->at(cluster)) < eta_max;
     const std::array<bool, n_cluster_selections> passed = {
         true, passes_energy, passes_eta, passes_energy && passes_eta};
     for (std::size_t selection = 0; selection < n_cluster_selections;
@@ -817,8 +806,7 @@ void fill_pair_selection_stages(
     return;
   }
 
-  const MatchResult match =
-      match_event(truth_eta, truth_phi, branches, min_cluster_energy);
+  const MatchResult match = match_event(truth_eta, truth_phi, branches, min_cluster_energy);
   if (!match.valid ||
       !(std::max(match.delta_r0, match.delta_r1) < delta_r_cut)) {
     return;
@@ -886,8 +874,7 @@ void fill_event_components(
   histograms.selected->Fill(truth_alpha);
 
   EventComponent classification = EventComponent::other_anchor;
-  const MatchResult pair_match =
-      match_event(truth_eta, truth_phi, branches, min_cluster_energy);
+  const MatchResult pair_match = match_event(truth_eta, truth_phi, branches, min_cluster_energy);
   const bool correct_pair =
       pair_match.valid &&
       std::max(pair_match.delta_r0, pair_match.delta_r1) < delta_r_cut &&
@@ -923,8 +910,7 @@ void fill_event_components(
               delta_r(truth_eta[gamma], truth_phi[gamma],
                       branches.cluster_eta->at(anchor),
                       branches.cluster_phi->at(anchor));
-          const double response =
-              branches.cluster_et->at(anchor) / truth_daughter_pt[gamma];
+          const double response = branches.cluster_et->at(anchor) / truth_daughter_pt[gamma];
           has_individual_anchor |= anchor_delta_r < delta_r_cut &&
                                    response >= individual_response_min &&
                                    response <= individual_response_max;
@@ -957,8 +943,7 @@ EventComponent classify_truth_pi0_delta_r(
     return EventComponent::other_anchor;
   }
 
-  const MatchResult pair_match =
-      match_event(truth_eta, truth_phi, branches, min_cluster_energy);
+  const MatchResult pair_match = match_event(truth_eta, truth_phi, branches, min_cluster_energy);
   if (pair_match.valid &&
       std::max(pair_match.delta_r0, pair_match.delta_r1) < delta_r_cut) {
     return EventComponent::correct_pair;
@@ -988,8 +973,7 @@ EventComponent classify_truth_pi0_delta_r(
           delta_r(truth_eta[gamma], truth_phi[gamma],
                   branches.cluster_eta->at(cluster),
                   branches.cluster_phi->at(cluster));
-      const double response =
-          branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
+      const double response = branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
       if (cluster_delta_r < delta_r_cut &&
           response >= individual_response_min &&
           response <= individual_response_max) {
@@ -1032,8 +1016,7 @@ EventComponent classify_truth_pi0_energy_contribution(
 
   // Match each daughter independently before applying topology-specific cuts.
   // This prevents a secondary split-off cluster from creating an arbitrary pair.
-  constexpr std::size_t invalid_cluster =
-      std::numeric_limits<std::size_t>::max();
+  constexpr std::size_t invalid_cluster = std::numeric_limits<std::size_t>::max();
   std::array<std::size_t, 2> maximum_deposit_cluster = {
       invalid_cluster, invalid_cluster};
   std::array<float, 2> maximum_deposit = {-1.0F, -1.0F};
@@ -1079,8 +1062,7 @@ EventComponent classify_truth_pi0_energy_contribution(
     if (cluster == invalid_cluster) {
       continue;
     }
-    const double response =
-        branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
+    const double response = branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
     if (response >= individual_response_min &&
         response <= individual_response_max) {
       return EventComponent::individual_anchor;
@@ -1144,8 +1126,7 @@ void fill_truth_pi0_components(
       !(truth_daughter_pt[0] > 0.0) || !(truth_daughter_pt[1] > 0.0)) {
     ++histograms.n_malformed;
   } else {
-    const MatchResult pair_match =
-        match_event(truth_eta, truth_phi, branches, min_cluster_energy);
+    const MatchResult pair_match = match_event(truth_eta, truth_phi, branches, min_cluster_energy);
     const bool separated_pair =
         pair_match.valid &&
         std::max(pair_match.delta_r0, pair_match.delta_r1) < delta_r_cut;
@@ -1185,8 +1166,7 @@ void fill_truth_pi0_components(
                 delta_r(truth_eta[gamma], truth_phi[gamma],
                         branches.cluster_eta->at(cluster),
                         branches.cluster_phi->at(cluster));
-            const double response =
-                branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
+            const double response = branches.cluster_et->at(cluster) / truth_daughter_pt[gamma];
             has_individual_cluster |= cluster_delta_r < delta_r_cut &&
                                       response >= individual_response_min &&
                                       response <= individual_response_max;
@@ -1257,8 +1237,7 @@ void fill_event_histograms(
   ++histograms.n_denominator;
   histograms.denominator->Fill(truth_alpha);
 
-  const MatchResult match =
-      match_event(truth_eta, truth_phi, branches, min_cluster_energy);
+  const MatchResult match = match_event(truth_eta, truth_phi, branches, min_cluster_energy);
   if (!match.valid ||
       !(std::max(match.delta_r0, match.delta_r1) < delta_r_cut) ||
       (!selected_anchor(branches, match.cluster0, anchor_eta_max, anchor_et_min,
@@ -1552,9 +1531,7 @@ void draw_component_information(
         0.10, 0.59,
         Form("Individual: %.1f < E_{T}^{anchor}/p_{T}^{#gamma} < %.1f",
              individual_response_min, individual_response_max));
-    label.DrawLatex(
-        0.10, 0.52,
-        "Exclusive priority: correct > merged > individual > other");
+    label.DrawLatex(0.10, 0.52, "Exclusive priority: correct > merged > individual > other");
 
     return;
   }
@@ -1720,10 +1697,7 @@ void draw_truth_pi0_component_information(
                      (fractions ? ", truth-denominator fractions"
                                 : ", truth-denominator components"))
                         .c_str());
-    label.DrawLatex(
-        0.08, 0.83,
-        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
-             truth_eta_max));
+    label.DrawLatex(0.08, 0.83, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut", truth_eta_max));
     if (use_energy_contribution) {
       label.DrawLatex(
           0.08, 0.77,
@@ -1901,15 +1875,12 @@ void draw_truth_pi0_component_counts_vs_truth_pt(
 
   for (std::size_t bin = 0; bin < n_truth_pt_bins; ++bin) {
     const int root_bin = static_cast<int>(bin + 1U);
-    const double total_count =
-        static_cast<double>(histograms[bin].n_in_truth_eta);
+    const double total_count = static_cast<double>(histograms[bin].n_in_truth_eta);
     total.SetBinContent(root_bin, total_count);
     total.SetBinError(root_bin, std::sqrt(total_count));
     for (std::size_t component = 0; component < n_event_components;
          ++component) {
-      components[component]->SetBinContent(
-          root_bin,
-          static_cast<double>(histograms[bin].n_component[component]));
+      components[component]->SetBinContent(root_bin, static_cast<double>(histograms[bin].n_component[component]));
     }
   }
 
@@ -1957,10 +1928,7 @@ void draw_truth_pi0_component_counts_vs_truth_pt(
       (std::string(use_energy_contribution ? "Energy-deposit matching"
                                            : "Geometrical matching") +
        "; truth #alpha integrated").c_str());
-  label.DrawLatex(
-      0.15, 0.78,
-      Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
-           truth_eta_max));
+  label.DrawLatex(0.15, 0.78, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut", truth_eta_max));
   if (use_energy_contribution) {
     label.DrawLatex(
         0.15, 0.65,
@@ -2328,9 +2296,7 @@ bool print_cut_stage_summary(
   return nesting_ok;
 }
 
-void write_component_histograms(
-    TFile &output, std::vector<EventComponentHistograms> &histograms) {
-  output.cd();
+void write_component_histograms(TFile &output, std::vector<EventComponentHistograms> &histograms) { output.cd();
   for (EventComponentHistograms &current : histograms) {
     current.reference->Write();
     current.in_acceptance->Write();
@@ -2343,9 +2309,7 @@ void write_component_histograms(
   }
 }
 
-void write_truth_pi0_component_histograms(
-    TFile &output, std::vector<TruthPi0ComponentHistograms> &histograms) {
-  output.cd();
+void write_truth_pi0_component_histograms(TFile &output, std::vector<TruthPi0ComponentHistograms> &histograms) { output.cd();
   for (TruthPi0ComponentHistograms &current : histograms) {
     current.reference->Write();
     current.in_truth_eta->Write();
@@ -2356,9 +2320,7 @@ void write_truth_pi0_component_histograms(
     }
   }
 }
-void write_topology_comparison_histograms(
-    TFile &output, std::vector<TopologyComparisonHistograms> &histograms) {
-  output.cd();
+void write_topology_comparison_histograms(TFile &output, std::vector<TopologyComparisonHistograms> &histograms) { output.cd();
   for (TopologyComparisonHistograms &current : histograms) {
     current.confusion->Write();
     for (auto &difference : current.fraction_difference) {
@@ -2451,8 +2413,7 @@ bool print_topology_comparison_summary(
   bool closure_ok = true;
   for (std::size_t bin = 0; bin < histograms.size(); ++bin) {
     const TopologyComparisonHistograms &current = histograms[bin];
-    const Long64_t matrix_total =
-        static_cast<Long64_t>(std::llround(current.confusion->Integral()));
+    const Long64_t matrix_total = static_cast<Long64_t>(std::llround(current.confusion->Integral()));
     const bool bin_ok = matrix_total == current.n_total &&
                         current.n_agree <= current.n_total;
     closure_ok &= bin_ok;
@@ -2510,10 +2471,7 @@ void draw_reco_et_information(RecoEtHistograms &histograms,
     legend.AddEntry(histograms.truth_pt_contribution[truth_bin].get(),
                     truth_pt_labels[truth_bin].c_str(), "f");
   }
-  legend.AddEntry(
-      histograms.selection[selection_index(ClusterSelection::min_energy_eta)]
-          .get(),
-      "Total after both cuts", "lep");
+  legend.AddEntry(histograms.selection[selection_index(ClusterSelection::min_energy_eta)].get(), "Total after both cuts", "lep");
   legend.DrawClone();
 }
 
@@ -2540,8 +2498,7 @@ void draw_reco_et_truth_pt_stack(std::vector<RecoEtHistograms> &histograms,
   for (std::size_t reco_bin = 0; reco_bin < histograms.size(); ++reco_bin) {
     canvas.cd(first_plot_pad + static_cast<int>(reco_bin));
     RecoEtHistograms &current = histograms[reco_bin];
-    TH1D &total =
-        *current.selection[selection_index(ClusterSelection::min_energy_eta)];
+    TH1D &total = *current.selection[selection_index(ClusterSelection::min_energy_eta)];
     set_point_style(total, kBlack, kFullDiamond);
     total.GetXaxis()->SetTitle("Truth #alpha");
     total.GetYaxis()->SetTitle("Clusters");
@@ -2648,12 +2605,9 @@ bool print_reco_et_summary(const std::string &label,
     for (const Long64_t count : current.n_truth_pt_contribution) {
       contribution_sum += count;
     }
-    const Long64_t all =
-        current.n_selection[selection_index(ClusterSelection::all)];
-    const Long64_t energy =
-        current.n_selection[selection_index(ClusterSelection::min_energy)];
-    const Long64_t eta =
-        current.n_selection[selection_index(ClusterSelection::eta)];
+    const Long64_t all = current.n_selection[selection_index(ClusterSelection::all)];
+    const Long64_t energy = current.n_selection[selection_index(ClusterSelection::min_energy)];
+    const Long64_t eta = current.n_selection[selection_index(ClusterSelection::eta)];
     const Long64_t both = current.n_selection[
         selection_index(ClusterSelection::min_energy_eta)];
     const bool bin_ok = contribution_sum == both && energy <= all && eta <= all &&
@@ -2672,11 +2626,9 @@ bool print_reco_et_summary(const std::string &label,
 
 int PlotConditionalPartnerEfficiency(
     const std::string input_path =
-        "PhotonAnalysisTree/output/merged/"
-        "100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
+        "PhotonAnalysisTree/output/merged/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
     const std::string output_base =
-        "PhotonAnalysisTree/output/plots/conditional_efficiency/"
-        "conditional_partner_et5to7",
+        "PhotonAnalysisTree/output/plots/conditional_efficiency/conditional_partner_et5to7",
     const double anchor_eta_max = 0.7, const double anchor_et_min = 5.0,
     const double anchor_et_max = 7.0, const double delta_r_cut = 0.03,
     const double mass_window_min = 0.10, const double mass_window_max = 0.18,
@@ -2801,14 +2753,10 @@ int PlotConditionalPartnerEfficiency(
               << std::endl;
   }
 
-  std::vector<StageHistograms> split_event =
-      make_truth_pt_histograms("split_event", asymmetry_nbins);
-  std::vector<StageHistograms> split_cluster =
-      make_truth_pt_histograms("split_cluster", asymmetry_nbins);
-  std::vector<StageHistograms> nosplit_event =
-      make_truth_pt_histograms("nosplit_event", asymmetry_nbins);
-  std::vector<StageHistograms> nosplit_cluster =
-      make_truth_pt_histograms("nosplit_cluster", asymmetry_nbins);
+  std::vector<StageHistograms> split_event = make_truth_pt_histograms("split_event", asymmetry_nbins);
+  std::vector<StageHistograms> split_cluster = make_truth_pt_histograms("split_cluster", asymmetry_nbins);
+  std::vector<StageHistograms> nosplit_event = make_truth_pt_histograms("nosplit_event", asymmetry_nbins);
+  std::vector<StageHistograms> nosplit_cluster = make_truth_pt_histograms("nosplit_cluster", asymmetry_nbins);
   std::vector<EventComponentHistograms> split_components =
       make_truth_pt_component_histograms("split_event_component",
                                          asymmetry_nbins);
@@ -2816,26 +2764,18 @@ int PlotConditionalPartnerEfficiency(
       make_truth_pt_component_histograms("nosplit_event_component",
                                          asymmetry_nbins);
   std::vector<TruthPi0ComponentHistograms> split_truth_pi0_components =
-      make_truth_pt_truth_pi0_component_histograms(
-          "split_central_truth_pi0_component", asymmetry_nbins);
+      make_truth_pt_truth_pi0_component_histograms("split_central_truth_pi0_component", asymmetry_nbins);
   std::vector<TruthPi0ComponentHistograms> nosplit_truth_pi0_components =
-      make_truth_pt_truth_pi0_component_histograms(
-          "nosplit_central_truth_pi0_component", asymmetry_nbins);
+      make_truth_pt_truth_pi0_component_histograms("nosplit_central_truth_pi0_component", asymmetry_nbins);
   std::vector<TruthPi0ComponentHistograms> split_contribution_components;
   std::vector<TruthPi0ComponentHistograms> nosplit_contribution_components;
   std::vector<TopologyComparisonHistograms> split_topology_comparison;
   std::vector<TopologyComparisonHistograms> nosplit_topology_comparison;
   if (has_energy_contribution_branches) {
-    split_contribution_components = make_truth_pt_truth_pi0_component_histograms(
-        "split_central_truth_pi0_energy_contribution_component",
-        asymmetry_nbins);
-    nosplit_contribution_components = make_truth_pt_truth_pi0_component_histograms(
-        "nosplit_central_truth_pi0_energy_contribution_component",
-        asymmetry_nbins);
-    split_topology_comparison =
-        make_topology_comparison_histograms("split_central_truth_pi0_topology");
-    nosplit_topology_comparison =
-        make_topology_comparison_histograms("nosplit_central_truth_pi0_topology");
+    split_contribution_components = make_truth_pt_truth_pi0_component_histograms("split_central_truth_pi0_energy_contribution_component", asymmetry_nbins);
+    nosplit_contribution_components = make_truth_pt_truth_pi0_component_histograms("nosplit_central_truth_pi0_energy_contribution_component", asymmetry_nbins);
+    split_topology_comparison = make_topology_comparison_histograms("split_central_truth_pi0_topology");
+    nosplit_topology_comparison = make_topology_comparison_histograms("nosplit_central_truth_pi0_topology");
   }
   const std::array<std::string, n_cut_stages> event_stage_suffixes = {
       "truth", "cluster_energy", "central_cluster", "selected_cluster"};
@@ -2853,10 +2793,8 @@ int PlotConditionalPartnerEfficiency(
   std::vector<CutStageHistograms> nosplit_pair_stages =
       make_truth_pt_cut_stage_histograms("nosplit_pair_stage",
                                          pair_stage_suffixes, asymmetry_nbins);
-  std::vector<RecoEtHistograms> split_reco_et =
-      make_reco_et_histogram_set("split_cluster", asymmetry_nbins);
-  std::vector<RecoEtHistograms> nosplit_reco_et =
-      make_reco_et_histogram_set("nosplit_cluster", asymmetry_nbins);
+  std::vector<RecoEtHistograms> split_reco_et = make_reco_et_histogram_set("split_cluster", asymmetry_nbins);
+  std::vector<RecoEtHistograms> nosplit_reco_et = make_reco_et_histogram_set("nosplit_cluster", asymmetry_nbins);
 
   Long64_t invalid_truth_shape = 0;
   Long64_t split_reco_et_malformed = 0;
@@ -2903,10 +2841,8 @@ int PlotConditionalPartnerEfficiency(
         merged_response_min, merged_response_max, individual_response_min,
         individual_response_max);
     if (has_energy_contribution_branches) {
-      EventComponent split_contribution_classification =
-          EventComponent::other_anchor;
-      EventComponent nosplit_contribution_classification =
-          EventComponent::other_anchor;
+      EventComponent split_contribution_classification = EventComponent::other_anchor;
+      EventComponent nosplit_contribution_classification = EventComponent::other_anchor;
       fill_truth_pi0_contribution_components(
           split_contribution_components[bin], truth_alpha, passes_truth_eta,
           truth_pt, *truth_daughter_pt, split, min_cluster_energy,
@@ -2936,22 +2872,14 @@ int PlotConditionalPartnerEfficiency(
                 merged_response_min, merged_response_max,
                 individual_response_min, individual_response_max,
                 nosplit_delta_malformed);
-        TopologyComparisonHistograms &split_comparison =
-            split_topology_comparison[bin];
-        TopologyComparisonHistograms &nosplit_comparison =
-            nosplit_topology_comparison[bin];
-        split_comparison.confusion->Fill(
-            static_cast<double>(split_delta_classification),
-            static_cast<double>(split_contribution_classification));
-        nosplit_comparison.confusion->Fill(
-            static_cast<double>(nosplit_delta_classification),
-            static_cast<double>(nosplit_contribution_classification));
+        TopologyComparisonHistograms &split_comparison = split_topology_comparison[bin];
+        TopologyComparisonHistograms &nosplit_comparison = nosplit_topology_comparison[bin];
+        split_comparison.confusion->Fill(static_cast<double>(split_delta_classification), static_cast<double>(split_contribution_classification));
+        nosplit_comparison.confusion->Fill(static_cast<double>(nosplit_delta_classification), static_cast<double>(nosplit_contribution_classification));
         ++split_comparison.n_total;
         ++nosplit_comparison.n_total;
-        split_comparison.n_agree +=
-            split_delta_classification == split_contribution_classification;
-        nosplit_comparison.n_agree +=
-            nosplit_delta_classification == nosplit_contribution_classification;
+        split_comparison.n_agree += split_delta_classification == split_contribution_classification;
+        nosplit_comparison.n_agree += nosplit_delta_classification == nosplit_contribution_classification;
       }
     }
 
@@ -3059,22 +2987,18 @@ int PlotConditionalPartnerEfficiency(
                                     .fraction[component]
                                     ->Clone(split_difference_name.c_str())));
         split_topology_comparison[bin].fraction_difference[component]->SetDirectory(nullptr);
-        split_topology_comparison[bin].fraction_difference[component]->Add(
-            split_truth_pi0_components[bin].fraction[component].get(), -1.0);
+        split_topology_comparison[bin].fraction_difference[component]->Add(split_truth_pi0_components[bin].fraction[component].get(), -1.0);
         nosplit_topology_comparison[bin].fraction_difference[component].reset(
             static_cast<TH1D *>(nosplit_contribution_components[bin]
                                     .fraction[component]
                                     ->Clone(nosplit_difference_name.c_str())));
         nosplit_topology_comparison[bin].fraction_difference[component]->SetDirectory(nullptr);
-        nosplit_topology_comparison[bin].fraction_difference[component]->Add(
-            nosplit_truth_pi0_components[bin].fraction[component].get(), -1.0);
+        nosplit_topology_comparison[bin].fraction_difference[component]->Add(nosplit_truth_pi0_components[bin].fraction[component].get(), -1.0);
       }
     }
   }
-  const std::string split_output_base =
-      collection_output_base(output_base, "split");
-  const std::string nosplit_output_base =
-      collection_output_base(output_base, "nosplit");
+  const std::string split_output_base = collection_output_base(output_base, "split");
+  const std::string nosplit_output_base = collection_output_base(output_base, "nosplit");
   if (!make_output_directory(output_base) ||
       !make_output_directory(split_output_base) ||
       !make_output_directory(nosplit_output_base)) {
@@ -3289,8 +3213,7 @@ int PlotConditionalPartnerEfficiency(
                                                     individual_response_min);
   TParameter<double> stored_individual_response_max("individual_response_max",
                                                     individual_response_max);
-  TParameter<double> stored_min_contribution_fraction(
-      "min_energy_contribution_fraction", min_contribution_fraction);
+  TParameter<double> stored_min_contribution_fraction("min_energy_contribution_fraction", min_contribution_fraction);
   stored_eta_max.Write();
   stored_truth_eta_max.Write();
   TParameter<double> stored_min_cluster_energy("analysis_min_cluster_energy",
@@ -3328,28 +3251,20 @@ int PlotConditionalPartnerEfficiency(
         print_truth_pi0_component_summary(
             "SPLIT energy-contribution truth pi0 component",
             split_contribution_components) &&
-        print_truth_pi0_component_summary(
-            "NO_SPLIT energy-contribution truth pi0 component",
-            nosplit_contribution_components);
+        print_truth_pi0_component_summary("NO_SPLIT energy-contribution truth pi0 component", nosplit_contribution_components);
     topology_comparison_closure_ok =
         print_topology_comparison_summary(
             "SPLIT DeltaR vs energy contribution", split_topology_comparison) &&
-        print_topology_comparison_summary(
-            "NO_SPLIT DeltaR vs energy contribution",
-            nosplit_topology_comparison);
+        print_topology_comparison_summary("NO_SPLIT DeltaR vs energy contribution", nosplit_topology_comparison);
   }
   const bool reco_et_selection_ok =
       print_reco_et_summary("SPLIT reco-ET", split_reco_et) &&
       print_reco_et_summary("NO_SPLIT reco-ET", nosplit_reco_et);
   bool cut_stage_nesting_ok = true;
-  cut_stage_nesting_ok &=
-      print_cut_stage_summary("SPLIT event stages", split_event_stages);
-  cut_stage_nesting_ok &=
-      print_cut_stage_summary("SPLIT pair stages", split_pair_stages);
-  cut_stage_nesting_ok &=
-      print_cut_stage_summary("NO_SPLIT event stages", nosplit_event_stages);
-  cut_stage_nesting_ok &=
-      print_cut_stage_summary("NO_SPLIT pair stages", nosplit_pair_stages);
+  cut_stage_nesting_ok &= print_cut_stage_summary("SPLIT event stages", split_event_stages);
+  cut_stage_nesting_ok &= print_cut_stage_summary("SPLIT pair stages", split_pair_stages);
+  cut_stage_nesting_ok &= print_cut_stage_summary("NO_SPLIT event stages", nosplit_event_stages);
+  cut_stage_nesting_ok &= print_cut_stage_summary("NO_SPLIT pair stages", nosplit_pair_stages);
   std::cout << "PlotConditionalPartnerEfficiency - invalid truth shape / truth "
                "pT outside bins = "
             << invalid_truth_shape << " / " << truth_pt_outside_bins

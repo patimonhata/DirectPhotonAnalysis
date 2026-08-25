@@ -23,11 +23,7 @@ bool bind_branch(TTree* tree, const char* name, T* address)
   return tree->SetBranchAddress(name, address) >= 0;
 }
 
-bool valid_histogram(
-    const TH1D* histogram,
-    const int n_bins,
-    const double pt_max,
-    const ULong64_t expected_entries)
+bool valid_histogram(const TH1D* histogram, const int n_bins, const double pt_max, const ULong64_t expected_entries)
 {
   if (!histogram || histogram->GetNbinsX() != n_bins ||
       std::abs(histogram->GetXaxis()->GetXmin()) > 1e-12 ||
@@ -48,10 +44,7 @@ bool valid_histogram(
   return true;
 }
 
-bool histogram_sum_matches(
-    const TH1D* total,
-    const TH1D* hepmc,
-    const TH1D* g4)
+bool histogram_sum_matches(const TH1D* total, const TH1D* hepmc, const TH1D* g4)
 {
   if (!total || !hepmc || !g4 ||
       std::abs(total->GetEntries() - hepmc->GetEntries() - g4->GetEntries()) > 0.5)

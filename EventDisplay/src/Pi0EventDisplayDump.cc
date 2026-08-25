@@ -289,7 +289,9 @@ void Pi0EventDisplayDump::fill_truth_segment(PHG4TruthInfoContainer* truth, PHG4
   }
 }
 
-void Pi0EventDisplayDump::fill_clusters(PHCompositeNode* topNode, const std::vector<TruthProjection>& gamma_projections, const std::map<unsigned int, TowerLookup>& tower_lookup)
+void Pi0EventDisplayDump::fill_clusters(
+    PHCompositeNode* topNode, const std::vector<TruthProjection>& gamma_projections,
+    const std::map<unsigned int, TowerLookup>& tower_lookup)
 {
   RawClusterContainer* clusters = findNode::getClass<RawClusterContainer>(topNode, m_clusterNode);
   if (!clusters)
@@ -591,7 +593,9 @@ bool Pi0EventDisplayDump::get_vertex(PHG4TruthInfoContainer* truth, int vtx_id, 
   return std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
 }
 
-bool Pi0EventDisplayDump::project_to_radius(double x0, double y0, double z0, double px, double py, double pz, double radius_target, double& x1, double& y1, double& z1) const
+bool Pi0EventDisplayDump::project_to_radius(
+    double x0, double y0, double z0, double px, double py, double pz,
+    double radius_target, double& x1, double& y1, double& z1) const
 {
   const double p = std::sqrt(px * px + py * py + pz * pz);
   if (!std::isfinite(p) || p <= 0.0 || radius_target <= 0.0)

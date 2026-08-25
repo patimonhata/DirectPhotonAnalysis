@@ -19,8 +19,7 @@ void BrowseTopologyEvents(
     std::cerr << "BrowseTopologyEvents - cannot open " << input_file << std::endl;
     return;
   }
-  const auto events = topology_display::event_ids(
-      file, topology_filter, pathway_filter);
+  const auto events = topology_display::event_ids(file, topology_filter, pathway_filter);
   if (events.empty())
   {
     std::cerr << "BrowseTopologyEvents - no events match the filters" << std::endl;

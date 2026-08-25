@@ -29,9 +29,7 @@ namespace
 {
 constexpr std::size_t invalid_index = std::numeric_limits<std::size_t>::max();
 
-int cluster_id_from_index(
-    const photon_tree::Pi0AnchorTopologyEventResult& result,
-    std::size_t index)
+int cluster_id_from_index(const photon_tree::Pi0AnchorTopologyEventResult& result, std::size_t index)
 {
   return index < result.clusters.size()
       ? static_cast<int>(result.clusters[index].cluster_id) : -999;
@@ -109,8 +107,7 @@ int TopologyEventDisplayDump::process_event(PHCompositeNode* topNode)
   }
   else
   {
-    auto* truth = findNode::getClass<PHG4TruthInfoContainer>(
-        topNode, config_.truth_node_name);
+    auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, config_.truth_node_name);
     if (truth)
     {
       const auto range = truth->GetParticleRange();
@@ -132,8 +129,7 @@ int TopologyEventDisplayDump::process_event(PHCompositeNode* topNode)
         }
       }
     }
-    auto* clusters = findNode::getClass<RawClusterContainer>(
-        topNode, config_.cluster_node_name);
+    auto* clusters = findNode::getClass<RawClusterContainer>(topNode, config_.cluster_node_name);
     b_n_clusters_ = clusters ? static_cast<int>(clusters->size()) : 0;
   }
   fill_candidates(result);
@@ -167,8 +163,7 @@ int TopologyEventDisplayDump::End(PHCompositeNode*)
                      : Fun4AllReturnCodes::EVENT_OK;
 }
 
-void TopologyEventDisplayDump::fill_event(
-    PHCompositeNode*, const photon_tree::Pi0AnchorTopologyEventResult& result)
+void TopologyEventDisplayDump::fill_event(PHCompositeNode*, const photon_tree::Pi0AnchorTopologyEventResult& result)
 {
   b_collision_x_ = result.collision_vertex[0];
   b_collision_y_ = result.collision_vertex[1];
@@ -206,8 +201,7 @@ void TopologyEventDisplayDump::fill_event(
   events_tree_->Fill();
 }
 
-void TopologyEventDisplayDump::fill_candidates(
-    const photon_tree::Pi0AnchorTopologyEventResult& result)
+void TopologyEventDisplayDump::fill_candidates(const photon_tree::Pi0AnchorTopologyEventResult& result)
 {
   for (std::size_t index = 0; index < result.candidates.size(); ++index)
   {
@@ -242,8 +236,7 @@ void TopologyEventDisplayDump::fill_candidates(
   }
 }
 
-void TopologyEventDisplayDump::fill_anchors(
-    const photon_tree::Pi0AnchorTopologyEventResult& result)
+void TopologyEventDisplayDump::fill_anchors(const photon_tree::Pi0AnchorTopologyEventResult& result)
 {
   for (std::size_t index = 0; index < result.anchors.size(); ++index)
   {
@@ -290,8 +283,7 @@ void TopologyEventDisplayDump::fill_anchors(
   }
 }
 
-void TopologyEventDisplayDump::fill_candidate_cluster_truth(
-    const photon_tree::Pi0AnchorTopologyEventResult& result)
+void TopologyEventDisplayDump::fill_candidate_cluster_truth(const photon_tree::Pi0AnchorTopologyEventResult& result)
 {
   for (std::size_t candidate_index = 0;
        candidate_index < result.candidates.size(); ++candidate_index)
@@ -329,14 +321,10 @@ void TopologyEventDisplayDump::fill_candidate_cluster_truth(
   }
 }
 
-void TopologyEventDisplayDump::fill_clusters(
-    PHCompositeNode* topNode,
-    const photon_tree::Pi0AnchorTopologyEventResult& result)
+void TopologyEventDisplayDump::fill_clusters(PHCompositeNode* topNode, const photon_tree::Pi0AnchorTopologyEventResult& result)
 {
-  auto* clusters = findNode::getClass<RawClusterContainer>(
-      topNode, config_.cluster_node_name);
-  auto* towers = findNode::getClass<TowerInfoContainer>(
-      topNode, config_.tower_node_name);
+  auto* clusters = findNode::getClass<RawClusterContainer>(topNode, config_.cluster_node_name);
+  auto* towers = findNode::getClass<TowerInfoContainer>(topNode, config_.tower_node_name);
   if (!clusters || !towers)
   {
     return;
@@ -386,8 +374,7 @@ void TopologyEventDisplayDump::fill_clusters(
 
     if (b_topology_considered_)
     {
-      const auto& contributors =
-          result.clusters[considered->second].truth.contributors;
+      const auto& contributors = result.clusters[considered->second].truth.contributors;
       for (std::size_t contribution = 0;
            contribution < contributors.size(); ++contribution)
       {
@@ -410,10 +397,8 @@ void TopologyEventDisplayDump::fill_clusters(
       b_ieta_ = static_cast<int>(RawTowerDefs::decode_index1(b_tower_key_));
       b_iphi_ = static_cast<int>(RawTowerDefs::decode_index2(b_tower_key_));
       b_cluster_tower_energy_ = tower->second;
-      const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(
-          static_cast<unsigned int>(b_ieta_), static_cast<unsigned int>(b_iphi_));
-      TowerInfo* tower_info = towers->get_tower_at_key(
-          static_cast<int>(tower_info_key));
+      const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(static_cast<unsigned int>(b_ieta_), static_cast<unsigned int>(b_iphi_));
+      TowerInfo* tower_info = towers->get_tower_at_key(static_cast<int>(tower_info_key));
       b_tower_energy_ = tower_info ? tower_info->get_energy() : invalid_double_;
       b_allocation_fraction_ = b_tower_energy_ > 0.0
           ? std::clamp(b_cluster_tower_energy_ / b_tower_energy_, 0.0, 1.0)
@@ -423,12 +408,9 @@ void TopologyEventDisplayDump::fill_clusters(
   }
 }
 
-void TopologyEventDisplayDump::fill_truth(
-    PHCompositeNode* topNode,
-    const photon_tree::Pi0AnchorTopologyEventResult& result)
+void TopologyEventDisplayDump::fill_truth(PHCompositeNode* topNode, const photon_tree::Pi0AnchorTopologyEventResult& result)
 {
-  auto* truth = findNode::getClass<PHG4TruthInfoContainer>(
-      topNode, config_.truth_node_name);
+  auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, config_.truth_node_name);
   if (!truth)
   {
     return;
@@ -604,10 +586,8 @@ void TopologyEventDisplayDump::create_output()
     return;
   }
   static int schema_version = schema_version_;
-  static int evaluator_algorithm_version =
-      photon_tree::Pi0AnchorTopologyEvaluator::kAlgorithmVersion;
-  static int energy_match_algorithm_version =
-      photon_tree::Pi0ClusterTruthMatcher::kAlgorithmVersion;
+  static int evaluator_algorithm_version = photon_tree::Pi0AnchorTopologyEvaluator::kAlgorithmVersion;
+  static int energy_match_algorithm_version = photon_tree::Pi0ClusterTruthMatcher::kAlgorithmVersion;
   metadata_tree_ = new TTree("metadata", "Topology event-display metadata");
   metadata_tree_->Branch("schema_version", &schema_version);
   metadata_tree_->Branch("evaluator_algorithm_version", &evaluator_algorithm_version);

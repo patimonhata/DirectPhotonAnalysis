@@ -17,8 +17,7 @@ class TTree;
 class TopologyEventDisplayDump : public SubsysReco
 {
  public:
-  explicit TopologyEventDisplayDump(
-      const std::string& name = "TopologyEventDisplayDump");
+  explicit TopologyEventDisplayDump(const std::string& name = "TopologyEventDisplayDump");
   ~TopologyEventDisplayDump() override;
 
   int Init(PHCompositeNode*) override;
@@ -72,9 +71,7 @@ class TopologyEventDisplayDump : public SubsysReco
                                 double px, double py, double pz,
                                 double radius, double& x1,
                                 double& y1, double& z1);
-  static std::array<int, 2> family_for_track(
-      int track_id, PHG4TruthInfoContainer*,
-      const photon_tree::Pi0AnchorTopologyEventResult&);
+  static std::array<int, 2> family_for_track(int track_id, PHG4TruthInfoContainer*, const photon_tree::Pi0AnchorTopologyEventResult&);
 
   std::string output_file_name_ = "topology_event_display.root";
   std::string source_label_;

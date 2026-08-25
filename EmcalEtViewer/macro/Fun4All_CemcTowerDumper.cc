@@ -28,7 +28,9 @@ void Fun4All_CemcTowerDumper(int process_id, int run, int n_events, bool save_tr
   pair<int, int> runseg = Fun4AllUtils::GetRunSegment(fileName);
   int runnumber = runseg.first;
   recoConsts *rc = recoConsts::instance();
-  rc->set_StringFlag("CDB_GLOBALTAG", "MDC2"); /* From wiki: The latest version/tags of the CDB that is being updated continuously are "ProdA_2024" (for 2024 data), "ProdA_2023" (for 2023 data), and "MDC2" (for MC). */
+  // From the wiki: continuously updated tags are "ProdA_2024" for 2024 data,
+  // "ProdA_2023" for 2023 data, and "MDC2" for MC.
+  rc->set_StringFlag("CDB_GLOBALTAG", "MDC2");
   rc->set_uint64Flag("TIMESTAMP", runnumber);
 
   Process_Calo_Calib(); /* From wiki: Note you want to put this after you declare the input managers but before your analysis module. */
@@ -38,7 +40,9 @@ void Fun4All_CemcTowerDumper(int process_id, int run, int n_events, bool save_tr
   // std::string output_directory = Form("output/%d", run);
   std::string output_directory = std::string("/sphenix/user/ryotaro/CemcTowerDumper/output/") + std::to_string(run);;
   std::string final_output_file_name = Form("%d-%s.root", run, job_index.c_str());
-  system(Form("if [ -f %s/completed/%s ]; then rm %s/completed/%s; fi;", output_directory.c_str(), final_output_file_name.c_str(), output_directory.c_str(), final_output_file_name.c_str()));  
+  system(Form(
+      "if [ -f %s/completed/%s ]; then rm %s/completed/%s; fi;",
+      output_directory.c_str(), final_output_file_name.c_str(), output_directory.c_str(), final_output_file_name.c_str()));
 
   fun4all_server->registerSubsystem(module_cemc_tower_dumper);
   fun4all_server->run(n_events);
@@ -48,7 +52,8 @@ void Fun4All_CemcTowerDumper(int process_id, int run, int n_events, bool save_tr
 
   // delete module_carryover_monitor;
   // for (int i=0; i<8; i++) {
-  //   delete input_managers[i]; /* This will cause segmentaion fault. Probably because input_managers will be deleted automatically when we delete fun4all_server.
+  //   This would cause a segmentation fault, probably because input_managers
+  //   are deleted automatically when we delete fun4all_server.
   // }
   delete fun4all_server;
 

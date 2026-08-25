@@ -32,7 +32,9 @@ void Fun4All_CemcClusterDumper(int process_id, int run, int n_events, bool save_
   std::string output_directory = std::string("/sphenix/user/ryotaro/CemcClusterDumper/output/") + std::to_string(run);
   std::string final_output_file_name = Form("%d-%s.root", run, job_index.c_str());
   system(Form("mkdir -p %s/completed", output_directory.c_str()));
-  system(Form("if [ -f %s/completed/%s ]; then rm %s/completed/%s; fi;", output_directory.c_str(), final_output_file_name.c_str(), output_directory.c_str(), final_output_file_name.c_str()));
+  system(Form(
+      "if [ -f %s/completed/%s ]; then rm %s/completed/%s; fi;",
+      output_directory.c_str(), final_output_file_name.c_str(), output_directory.c_str(), final_output_file_name.c_str()));
 
   fun4all_server->registerSubsystem(module_cemc_cluster_dumper);
   fun4all_server->run(n_events);

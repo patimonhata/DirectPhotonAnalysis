@@ -48,10 +48,18 @@ const std::array<std::string, n_topologies> topology_names = {
     "separated_pair_candidate", "merged_candidate",
     "individual_cluster_no_pair", "no_matched_topology"};
 const std::array<std::string, n_topologies> topology_labels = {
-    "Split (two separated clusters)", "Merged",
-    "Missing (individual cluster only)", "Other"};
+    "Separated", "Merged", "Missing partner", "Other"};
 const std::array<int, n_topologies> topology_colors = {
-    kBlue + 1, kMagenta - 3, kOrange + 7, kGray + 1};
+    kAzure + 7, kMagenta + 1, kGreen + 2, kGray + 2};
+
+constexpr int plot_canvas_width = 1100;
+constexpr int plot_canvas_height = 800;
+constexpr double plot_left_margin = 0.16;
+constexpr double plot_right_margin = 0.37;
+constexpr double plot_bottom_margin = 0.14;
+constexpr double plot_top_margin = 0.05;
+constexpr double plot_annotation_x = 0.66;
+constexpr double plot_text_size = 0.026;
 
 struct CollectionBranches {
   std::vector<double> *cluster_e = nullptr;
@@ -413,8 +421,8 @@ void make_anchor_et_fractions(WeightedHistograms &histograms,
 }
 
 void style_histograms(WeightedHistograms &histograms) {
-  histograms.total->SetLineColor(kGreen + 2);
-  histograms.total->SetMarkerColor(kGreen + 2);
+  histograms.total->SetLineColor(kBlue + 1);
+  histograms.total->SetMarkerColor(kBlue + 1);
   histograms.total->SetMarkerStyle(kFullSquare);
   histograms.total->SetMarkerSize(0.9);
   histograms.total->SetLineWidth(2);
@@ -496,11 +504,12 @@ void draw_histograms(WeightedHistograms &histograms,
       anchor_et_axis
           ? "Weighted anchor-cluster ET by event topology"
           : "Weighted central truth pi0 reconstruction topologies",
-      1400, 800);
-  canvas.SetLeftMargin(0.14);
-  canvas.SetRightMargin(0.36);
-  canvas.SetBottomMargin(0.12);
-  canvas.SetTopMargin(0.04);
+      plot_canvas_width, plot_canvas_height);
+  canvas.SetCanvasSize(plot_canvas_width, plot_canvas_height);
+  canvas.SetLeftMargin(plot_left_margin);
+  canvas.SetRightMargin(plot_right_margin);
+  canvas.SetBottomMargin(plot_bottom_margin);
+  canvas.SetTopMargin(plot_top_margin);
   canvas.SetLogy(log_y);
   total->Draw("E1");
   stack.Draw("HIST SAME");
@@ -509,36 +518,36 @@ void draw_histograms(WeightedHistograms &histograms,
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  label.SetTextSize(0.021);
-  label.DrawLatex(0.67, 0.93, "#it{#bf{sPHENIX}} Internal");
+  label.SetTextSize(plot_text_size);
+  label.DrawLatex(plot_annotation_x, 0.93, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(
-      0.67, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
+      plot_annotation_x, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
   if (anchor_et_axis) {
     label.DrawLatex(
-        0.67, 0.83,
-        "Energy-deposit event category assigned to every anchor");
+        plot_annotation_x, 0.83,
+        "Event category per selected anchor");
     label.DrawLatex(
-        0.67, 0.78,
-        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; |#eta_{anchor}| < %.1f",
+        plot_annotation_x, 0.78,
+        Form("Truth/anchor |#eta| < %.1f / %.1f",
              truth_eta_max, anchor_eta_max));
     label.DrawLatex(
-        0.67, 0.73,
-        Form("No anchor E_{T} cut; displayed: %.3g #leq E_{T} < %.3g GeV",
+        plot_annotation_x, 0.73,
+        Form("Displayed anchor E_{T}: [%.3g, %.3g) GeV",
              anchor_et_histogram_min, anchor_et_histogram_max));
     label.DrawLatex(
-        0.67, 0.68,
-        Form("Weight per anchor: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+        plot_annotation_x, 0.68,
+        Form("Anchor weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   } else {
     label.DrawLatex(
-        0.67, 0.83, "Energy-deposit matching; truth #alpha integrated");
+        plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
     label.DrawLatex(
-        0.67, 0.78,
-        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
+        plot_annotation_x, 0.78,
+        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts",
              truth_eta_max));
     label.DrawLatex(
-        0.67, 0.73,
-        Form("Weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+        plot_annotation_x, 0.73,
+        Form("w = (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   }
   const double match_y = anchor_et_axis ? 0.60 : 0.65;
@@ -546,26 +555,26 @@ void draw_histograms(WeightedHistograms &histograms,
   const double merged_y = anchor_et_axis ? 0.52 : 0.57;
   const double missing_y = anchor_et_axis ? 0.48 : 0.53;
   label.DrawLatex(
-      0.67, match_y,
-      Form("Maximum-E_{dep} match; f_{#gamma} > %.3g",
+      plot_annotation_x, match_y,
+      Form("Max-E_{dep} match; f_{#gamma} > %.3g",
            min_contribution_fraction));
   label.DrawLatex(
-      0.67, split_y,
-      Form("Split: distinct matches; E_{cluster} #geq %.3g GeV",
+      plot_annotation_x, split_y,
+      Form("Separated: two clusters; E_{clus} #geq %.3g GeV",
            min_cluster_energy));
   label.DrawLatex(
-      0.67, merged_y,
-      Form("Merged: same match; response [%.1f, %.1f]",
+      plot_annotation_x, merged_y,
+      Form("Merged: same match; R_{#pi^{0}} [%.1f, %.1f]",
            merged_response_min, merged_response_max));
   label.DrawLatex(
-      0.67, missing_y,
-      Form("Missing: one match; response [%.1f, %.1f]",
+      plot_annotation_x, missing_y,
+      Form("Missing: one match; R_{#gamma} [%.1f, %.1f]",
            individual_response_min, individual_response_max));
 
-  TLegend legend(0.67, 0.14, 0.98, 0.43);
+  TLegend legend(plot_annotation_x, 0.14, 0.96, 0.43);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(0.022);
+  legend.SetTextSize(plot_text_size);
   legend.AddEntry(
       total.get(),
       anchor_et_axis ? "Central anchor clusters"
@@ -592,39 +601,39 @@ void draw_fraction_information(
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  label.SetTextSize(0.021);
-  label.DrawLatex(0.67, 0.93, "#it{#bf{sPHENIX}} Internal");
+  label.SetTextSize(plot_text_size);
+  label.DrawLatex(plot_annotation_x, 0.93, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(
-      0.67, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
+      plot_annotation_x, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
   if (anchor_et_axis) {
     label.DrawLatex(
-        0.67, 0.83, "Event category assigned to every selected anchor");
+        plot_annotation_x, 0.83, "Event category per selected anchor");
     label.DrawLatex(
-        0.67, 0.78, "Denominator: weighted selected anchor clusters");
+        plot_annotation_x, 0.78, "Denominator: weighted selected anchors");
     label.DrawLatex(
-        0.67, 0.73,
-        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; |#eta_{anchor}| < %.1f",
+        plot_annotation_x, 0.73,
+        Form("Truth/anchor |#eta| < %.1f / %.1f",
              truth_eta_max, anchor_eta_max));
     label.DrawLatex(
-        0.67, 0.68,
-        Form("No anchor E_{T} cut; displayed: %.3g #leq E_{T} < %.3g GeV",
+        plot_annotation_x, 0.68,
+        Form("Displayed anchor E_{T}: [%.3g, %.3g) GeV",
              anchor_et_histogram_min, anchor_et_histogram_max));
     label.DrawLatex(
-        0.67, 0.63,
-        Form("Weight per anchor: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+        plot_annotation_x, 0.63,
+        Form("Anchor weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   } else {
     label.DrawLatex(
-        0.67, 0.83, "Energy-deposit matching; truth #alpha integrated");
+        plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
     label.DrawLatex(
-        0.67, 0.78, "Denominator: weighted truth #pi^{0} in acceptance");
+        plot_annotation_x, 0.78, "Denominator: weighted accepted truth #pi^{0}");
     label.DrawLatex(
-        0.67, 0.73,
-        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco #eta or E_{T} cut",
+        plot_annotation_x, 0.73,
+        Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts",
              truth_eta_max));
     label.DrawLatex(
-        0.67, 0.68,
-        Form("Weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
+        plot_annotation_x, 0.68,
+        Form("w = (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   }
   const double match_y = anchor_et_axis ? 0.56 : 0.61;
@@ -632,20 +641,20 @@ void draw_fraction_information(
   const double merged_y = anchor_et_axis ? 0.46 : 0.51;
   const double missing_y = anchor_et_axis ? 0.41 : 0.46;
   label.DrawLatex(
-      0.67, match_y,
-      Form("Maximum-E_{dep} match; f_{#gamma} > %.3g",
+      plot_annotation_x, match_y,
+      Form("Max-E_{dep} match; f_{#gamma} > %.3g",
            min_contribution_fraction));
   label.DrawLatex(
-      0.67, split_y,
-      Form("Split: distinct matches; E_{cluster} #geq %.3g GeV",
+      plot_annotation_x, split_y,
+      Form("Separated: two clusters; E_{clus} #geq %.3g GeV",
            min_cluster_energy));
   label.DrawLatex(
-      0.67, merged_y,
-      Form("Merged: same match; response [%.1f, %.1f]",
+      plot_annotation_x, merged_y,
+      Form("Merged: same match; R_{#pi^{0}} [%.1f, %.1f]",
            merged_response_min, merged_response_max));
   label.DrawLatex(
-      0.67, missing_y,
-      Form("Missing: one match; response [%.1f, %.1f]",
+      plot_annotation_x, missing_y,
+      Form("Missing: one match; R_{#gamma} [%.1f, %.1f]",
            individual_response_min, individual_response_max));
 }
 
@@ -679,20 +688,21 @@ void draw_fraction_overlay(
           .c_str(),
       anchor_et_axis ? "Weighted anchor category fractions"
                      : "Weighted truth-pi0 category fractions",
-      1400, 800);
-  canvas.SetLeftMargin(0.14);
-  canvas.SetRightMargin(0.36);
-  canvas.SetBottomMargin(0.12);
-  canvas.SetTopMargin(0.04);
+      plot_canvas_width, plot_canvas_height);
+  canvas.SetCanvasSize(plot_canvas_width, plot_canvas_height);
+  canvas.SetLeftMargin(plot_left_margin);
+  canvas.SetRightMargin(plot_right_margin);
+  canvas.SetBottomMargin(plot_bottom_margin);
+  canvas.SetTopMargin(plot_top_margin);
   frame.Draw("E1");
   for (std::size_t component = 1; component < n_topologies; ++component) {
     histograms.fraction[component]->Draw("E1 SAME");
   }
 
-  TLegend legend(0.67, 0.14, 0.98, 0.40);
+  TLegend legend(plot_annotation_x, 0.14, 0.96, 0.40);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(0.022);
+  legend.SetTextSize(plot_text_size);
   for (std::size_t component = 0; component < n_topologies; ++component) {
     legend.AddEntry(histograms.fraction[component].get(),
                     topology_labels[component].c_str(), "lep");
@@ -746,11 +756,12 @@ void draw_fraction_stack(
           .c_str(),
       anchor_et_axis ? "Weighted anchor category fraction stack"
                      : "Weighted truth-pi0 category fraction stack",
-      1400, 800);
-  canvas.SetLeftMargin(0.14);
-  canvas.SetRightMargin(0.36);
-  canvas.SetBottomMargin(0.12);
-  canvas.SetTopMargin(0.04);
+      plot_canvas_width, plot_canvas_height);
+  canvas.SetCanvasSize(plot_canvas_width, plot_canvas_height);
+  canvas.SetLeftMargin(plot_left_margin);
+  canvas.SetRightMargin(plot_right_margin);
+  canvas.SetBottomMargin(plot_bottom_margin);
+  canvas.SetTopMargin(plot_top_margin);
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
   stack.Draw("HIST");
@@ -763,10 +774,10 @@ void draw_fraction_stack(
   stack.GetXaxis()->CenterTitle();
   stack.GetYaxis()->CenterTitle();
 
-  TLegend legend(0.67, 0.14, 0.98, 0.40);
+  TLegend legend(plot_annotation_x, 0.14, 0.96, 0.40);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(0.022);
+  legend.SetTextSize(plot_text_size);
   for (std::size_t component = 0; component < n_topologies; ++component) {
     legend.AddEntry(stacked[component].get(),
                     topology_labels[component].c_str(), "f");

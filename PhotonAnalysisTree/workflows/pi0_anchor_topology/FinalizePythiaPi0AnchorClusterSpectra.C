@@ -443,12 +443,16 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     density[index]->SetLineWidth(index < 2 ? 3 : 2);
     density[index]->GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
     density[index]->GetYaxis()->SetTitle("Clusters / GeV");
+    density[index]->GetXaxis()->CenterTitle();
+    density[index]->GetYaxis()->CenterTitle();
 
     raw[index]->SetStats(false);
     raw[index]->SetLineColor(colors[index]);
     raw[index]->SetLineWidth(index < 2 ? 3 : 2);
     raw[index]->GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
     raw[index]->GetYaxis()->SetTitle("Counts / bin");
+    raw[index]->GetXaxis()->CenterTitle();
+    raw[index]->GetYaxis()->CenterTitle();
   }
 
   const std::array<std::string, kCategoryCount> fraction_names = {
@@ -465,9 +469,12 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     fractions[index]->SetLineColor(colors[index + 2]);
     fractions[index]->SetMarkerColor(colors[index + 2]);
     fractions[index]->SetMarkerStyle(20 + static_cast<int>(index));
+    fractions[index]->SetMarkerSize(0.9);
     fractions[index]->SetLineWidth(2);
     fractions[index]->GetXaxis()->SetTitle("Anchor cluster E_{T} [GeV]");
-    fractions[index]->GetYaxis()->SetTitle("Category / all anchors");
+    fractions[index]->GetYaxis()->SetTitle("Category / selected anchor clusters");
+    fractions[index]->GetXaxis()->CenterTitle();
+    fractions[index]->GetYaxis()->CenterTitle();
   }
 
   std::array<std::unique_ptr<TH1D>, kCategoryCount> stacked_fractions;
@@ -511,7 +518,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   TLegend spectrum_legend(annotation_x, 0.20, 0.96, 0.51);
   spectrum_legend.SetBorderSize(0);
   spectrum_legend.SetFillStyle(0);
-  spectrum_legend.SetTextSize(0.028);
+  spectrum_legend.SetTextSize(0.026);
   spectrum_legend.AddEntry(raw[0].get(), "Prompt-#gamma cluster", "l");
   spectrum_legend.AddEntry(raw[1].get(), "#pi^{0}-main anchor", "l");
   spectrum_legend.AddEntry(raw[2].get(), "Separated", "l");
@@ -523,7 +530,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   TLatex spectrum_label;
   spectrum_label.SetNDC();
   spectrum_label.SetTextAlign(13);
-  spectrum_label.SetTextSize(0.028);
+  spectrum_label.SetTextSize(0.026);
   spectrum_label.DrawLatex(annotation_x, 0.92, "#it{#bf{sPHENIX}} Internal");
   spectrum_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
   std::ostringstream anchor_label;
@@ -556,10 +563,10 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   for (std::size_t index = 1; index < fractions.size(); ++index)  {
     fractions[index]->Draw("E1 SAME");
   }
-  TLegend fraction_legend(annotation_x, 0.39, 0.96, 0.61);
+  TLegend fraction_legend(annotation_x, 0.14, 0.96, 0.40);
   fraction_legend.SetBorderSize(0);
   fraction_legend.SetFillStyle(0);
-  fraction_legend.SetTextSize(0.028);
+  fraction_legend.SetTextSize(0.026);
   fraction_legend.AddEntry(fractions[0].get(), "Separated", "lep");
   fraction_legend.AddEntry(fractions[1].get(), "Merged", "lep");
   fraction_legend.AddEntry(fractions[2].get(), "Missing partner", "lep");
@@ -568,7 +575,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   TLatex fraction_label;
   fraction_label.SetNDC();
   fraction_label.SetTextAlign(13);
-  fraction_label.SetTextSize(0.028);
+  fraction_label.SetTextSize(0.026);
   fraction_label.DrawLatex(annotation_x, 0.92, "#it{#bf{sPHENIX}} Internal");
   fraction_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
   fraction_label.DrawLatex(annotation_x, 0.80, "Denominator: all #pi^{0}-main anchors");
@@ -591,12 +598,14 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_stack.SetMaximum(1.05);
   fraction_stack.Draw("HIST");
   fraction_stack.GetXaxis()->SetTitle("Anchor cluster E_{T} [GeV]");
-  fraction_stack.GetYaxis()->SetTitle("Category / all anchors");
+  fraction_stack.GetYaxis()->SetTitle("Category / selected anchor clusters");
+  fraction_stack.GetXaxis()->CenterTitle();
+  fraction_stack.GetYaxis()->CenterTitle();
 
-  TLegend fraction_stack_legend(annotation_x, 0.39, 0.96, 0.61);
+  TLegend fraction_stack_legend(annotation_x, 0.14, 0.96, 0.40);
   fraction_stack_legend.SetBorderSize(0);
   fraction_stack_legend.SetFillStyle(0);
-  fraction_stack_legend.SetTextSize(0.028);
+  fraction_stack_legend.SetTextSize(0.026);
   fraction_stack_legend.AddEntry(stacked_fractions[0].get(), "Separated", "f");
   fraction_stack_legend.AddEntry(stacked_fractions[1].get(), "Merged", "f");
   fraction_stack_legend.AddEntry(stacked_fractions[2].get(), "Missing partner", "f");
@@ -606,7 +615,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   TLatex fraction_stack_label;
   fraction_stack_label.SetNDC();
   fraction_stack_label.SetTextAlign(13);
-  fraction_stack_label.SetTextSize(0.028);
+  fraction_stack_label.SetTextSize(0.026);
   fraction_stack_label.DrawLatex(annotation_x, 0.92, "#it{#bf{sPHENIX}} Internal");
   fraction_stack_label.DrawLatex(annotation_x, 0.86, sample_label.c_str());
   fraction_stack_label.DrawLatex(annotation_x, 0.80, "Denominator: all #pi^{0}-main anchors");

@@ -167,13 +167,27 @@ int CompareSplitClusterMass(
   }
 
   TH1D *h_m_no_split_n2 = new TH1D("h_m_no_split_n2", "NO_SPLIT, N_{cluster}=2;M_{#gamma#gamma} [GeV];Events", 120, 0.0, 0.30);
-  TH1D *h_m_split_n2_given_no_split_n2 = new TH1D("h_m_split_n2_given_no_split_n2", "SPLIT, N_{cluster}=2, same NO_SPLIT N_{cluster}=2 events;M_{#gamma#gamma} [GeV];Events", 120, 0.0, 0.30);
-  TH1D *h_delta_m_split_minus_no_split = new TH1D("h_delta_m_split_minus_no_split", "SPLIT - NO_SPLIT for events with both N_{cluster}=2;#Delta M_{#gamma#gamma} [GeV];Events", 120, -0.12, 0.12);
-  TH1D *h_ncluster_split_given_no_split_n2 = new TH1D("h_ncluster_split_given_no_split_n2", "SPLIT N_{cluster} for NO_SPLIT N_{cluster}=2 events;SPLIT N_{cluster};Events", 20, -0.5, 19.5);
-  TH1D *h_energy_sum_ratio = new TH1D("h_energy_sum_ratio", "E_{#gamma#gamma}^{SPLIT}/E_{#gamma#gamma}^{NO_SPLIT} for both N_{cluster}=2;Energy sum ratio;Events", 120, 0.5, 1.5);
-  TH1D *h_opening_angle_ratio = new TH1D("h_opening_angle_ratio", "#theta_{#gamma#gamma}^{SPLIT}/#theta_{#gamma#gamma}^{NO_SPLIT} for both N_{cluster}=2;Opening-angle ratio;Events", 120, 0.5, 1.5);
-  TH2D *h_m_split_vs_no_split = new TH2D("h_m_split_vs_no_split", "Both N_{cluster}=2;NO_SPLIT M_{#gamma#gamma} [GeV];SPLIT M_{#gamma#gamma} [GeV]", 120, 0.0, 0.30, 120, 0.0, 0.30);
-  TH2D *h_delta_m_vs_no_split_m = new TH2D("h_delta_m_vs_no_split_m", "Both N_{cluster}=2;NO_SPLIT M_{#gamma#gamma} [GeV];SPLIT - NO_SPLIT [GeV]", 120, 0.0, 0.30, 120, -0.12, 0.12);
+  TH1D *h_m_split_n2_given_no_split_n2 = new TH1D(
+      "h_m_split_n2_given_no_split_n2",
+      "SPLIT, N_{cluster}=2, same NO_SPLIT N_{cluster}=2 events;M_{#gamma#gamma} [GeV];Events", 120, 0.0, 0.30);
+  TH1D *h_delta_m_split_minus_no_split = new TH1D(
+      "h_delta_m_split_minus_no_split",
+      "SPLIT - NO_SPLIT for events with both N_{cluster}=2;#Delta M_{#gamma#gamma} [GeV];Events", 120, -0.12, 0.12);
+  TH1D *h_ncluster_split_given_no_split_n2 = new TH1D(
+      "h_ncluster_split_given_no_split_n2",
+      "SPLIT N_{cluster} for NO_SPLIT N_{cluster}=2 events;SPLIT N_{cluster};Events", 20, -0.5, 19.5);
+  TH1D *h_energy_sum_ratio = new TH1D(
+      "h_energy_sum_ratio",
+      "E_{#gamma#gamma}^{SPLIT}/E_{#gamma#gamma}^{NO_SPLIT} for both N_{cluster}=2;Energy sum ratio;Events", 120, 0.5, 1.5);
+  TH1D *h_opening_angle_ratio = new TH1D(
+      "h_opening_angle_ratio",
+      "#theta_{#gamma#gamma}^{SPLIT}/#theta_{#gamma#gamma}^{NO_SPLIT} for both N_{cluster}=2;Opening-angle ratio;Events", 120, 0.5, 1.5);
+  TH2D *h_m_split_vs_no_split = new TH2D(
+      "h_m_split_vs_no_split",
+      "Both N_{cluster}=2;NO_SPLIT M_{#gamma#gamma} [GeV];SPLIT M_{#gamma#gamma} [GeV]", 120, 0.0, 0.30, 120, 0.0, 0.30);
+  TH2D *h_delta_m_vs_no_split_m = new TH2D(
+      "h_delta_m_vs_no_split_m",
+      "Both N_{cluster}=2;NO_SPLIT M_{#gamma#gamma} [GeV];SPLIT - NO_SPLIT [GeV]", 120, 0.0, 0.30, 120, -0.12, 0.12);
 
   unsigned long long no_split_n2 = 0;
   unsigned long long matched_events = 0;
@@ -307,7 +321,9 @@ int CompareSplitClusterMass(
   summary << "split_ncluster_not_2_given_no_split_n2: " << split_not_n2_given_no_split_n2 << "\n";
   summary << "mean_no_split_mass_for_no_split_n2: " << (no_split_n2 > 0 ? sum_no_split_mass / no_split_n2 : 0.0) << "\n";
   summary << "mean_split_mass_for_both_n2: " << (split_n2_given_no_split_n2 > 0 ? sum_split_mass / split_n2_given_no_split_n2 : 0.0) << "\n";
-  summary << "mean_delta_mass_split_minus_no_split_for_both_n2: " << (split_n2_given_no_split_n2 > 0 ? sum_delta_mass / split_n2_given_no_split_n2 : 0.0) << "\n";
+  summary << "mean_delta_mass_split_minus_no_split_for_both_n2: "
+          << (split_n2_given_no_split_n2 > 0 ? sum_delta_mass / split_n2_given_no_split_n2 : 0.0)
+          << "\n";
   summary << "mean_energy_sum_ratio_for_both_n2: " << (split_n2_given_no_split_n2 > 0 ? sum_energy_ratio / split_n2_given_no_split_n2 : 0.0) << "\n";
   summary << "mean_opening_angle_ratio_for_both_n2: " << (split_n2_given_no_split_n2 > 0 ? sum_opening_ratio / split_n2_given_no_split_n2 : 0.0) << "\n";
 

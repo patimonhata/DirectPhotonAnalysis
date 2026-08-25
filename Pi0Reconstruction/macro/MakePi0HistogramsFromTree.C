@@ -66,7 +66,9 @@ int MakePi0HistogramsFromTree(
   TH1D *h_cluster_e = new TH1D("h_cluster_e", "CEMC cluster energy;E_{cluster} [GeV];Clusters", 200, 0.0, 20.0);
   TH1D *h_m_gg = new TH1D("h_m_gg", "CEMC cluster pair invariant mass;M_{#gamma#gamma} [GeV];Pairs", 100, 0.0, 1.0);
   TH1D *h_pair_e_asym = new TH1D("h_pair_e_asym", "CEMC cluster pair energy asymmetry after mass window;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 50, 0.0, 1.0);
-  TH1D *h_pair_e_asym_outside_mass_window = new TH1D("h_pair_e_asym_outside_mass_window", "CEMC cluster pair energy asymmetry outside mass window;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 50, 0.0, 1.0);
+  TH1D *h_pair_e_asym_outside_mass_window = new TH1D(
+      "h_pair_e_asym_outside_mass_window",
+      "CEMC cluster pair energy asymmetry outside mass window;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 50, 0.0, 1.0);
 
   const Long64_t entries = tree->GetEntries();
   for (Long64_t entry = 0; entry < entries; ++entry)

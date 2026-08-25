@@ -100,8 +100,7 @@ ShowerShapeCalculator::Result ShowerShapeCalculator::calculate(
     const int iphi = wrap_phi_index(RawTowerDefs::decode_index2(tower_key));
     if (ieta >= 0 && ieta < kCemcEtaBins)
     {
-      owned_tower_keys.insert(TowerInfoDefs::encode_emcal(
-          static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi)));
+      owned_tower_keys.insert(TowerInfoDefs::encode_emcal(static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi)));
     }
 
     if (!std::isfinite(tower_energy) || tower_energy <= config_.min_tower_energy)
@@ -142,8 +141,7 @@ ShowerShapeCalculator::Result ShowerShapeCalculator::calculate(
     {
       return 0.0F;
     }
-    const RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(
-        RawTowerDefs::CalorimeterId::CEMC, ieta, wrap_phi_index(iphi));
+    const RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::CEMC, ieta, wrap_phi_index(iphi));
     const auto iter = tower_map.find(key);
     if (iter == tower_map.end() || !std::isfinite(iter->second) || iter->second <= config_.min_tower_energy)
     {
@@ -184,8 +182,7 @@ ShowerShapeCalculator::Result ShowerShapeCalculator::calculate(
         continue;
       }
 
-      const unsigned int tower_key = TowerInfoDefs::encode_emcal(
-          static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
+      const unsigned int tower_key = TowerInfoDefs::encode_emcal(static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
       result.patch_owned[index] = owned_tower_keys.contains(tower_key) ? 1U : 0U;
 
       TowerInfo *tower = cemc_towers.get_tower_at_key(tower_key);

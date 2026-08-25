@@ -84,10 +84,7 @@ int PlotPairEnergyAsymmetry(
   for (const std::size_t i : legend_order)
   {
     const double efficiency_percent = histograms[i]->GetEntries() / 1000.0;
-    const TString legend_label = TString::Format(
-        "E_{cluster}>%d MeV, #varepsilon=%.1f%%",
-        energy_thresholds_mev[i],
-        efficiency_percent);
+    const TString legend_label = TString::Format("E_{cluster}>%d MeV, #varepsilon=%.1f%%", energy_thresholds_mev[i], efficiency_percent);
     legend.AddEntry(histograms[i].get(), legend_label.Data(), "l");
   }
   legend.AddEntry(&truth_line, "Expected truth distribution", "l");

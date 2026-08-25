@@ -127,7 +127,8 @@ int Pi0Reconstruction::Init(PHCompositeNode * /*topNode*/)
     return Fun4AllReturnCodes::ABORTRUN;
   }
 
-  h_m_gg_ = new TH1D("h_m_gg", "CEMC cluster pair invariant mass;M_{#gamma#gamma} [GeV];Pairs", mass_histogram_nbins_, mass_histogram_min_, mass_histogram_max_);
+  h_m_gg_ = new TH1D(
+      "h_m_gg", "CEMC cluster pair invariant mass;M_{#gamma#gamma} [GeV];Pairs", mass_histogram_nbins_, mass_histogram_min_, mass_histogram_max_);
   h_ncluster_ = new TH1D("h_ncluster", "CEMC clusters per event;N_{cluster};Events", 100, 0.0, 100.0);
   h_cluster_e_ = new TH1D("h_cluster_e", "CEMC cluster energy;E_{cluster} [GeV];Clusters", 200, 0.0, 20.0);
   h_pair_e_asym_ = new TH1D("h_pair_e_asym", "CEMC cluster pair energy asymmetry;(|E_{1}-E_{2}|)/(E_{1}+E_{2});Pairs", 100, -1.0, 1.0);
@@ -161,7 +162,8 @@ int Pi0Reconstruction::process_event(PHCompositeNode *topNode)
   reset_tree_variables();
   tree_process_id_ = process_id_;
   tree_event_ = event_number;
-  tree_event_uid_ = (static_cast<unsigned long long>(process_id_) << 32U) | static_cast<unsigned long long>(event_number); // Fills the upper 32 bits with process_id_ and the lower 32 bits with event_number 
+  // Fill the upper 32 bits with process_id_ and the lower 32 bits with event_number.
+  tree_event_uid_ = (static_cast<unsigned long long>(process_id_) << 32U) | static_cast<unsigned long long>(event_number);
   tree_min_cluster_energy_ = min_cluster_energy_;
   tree_shower_shape_min_tower_energy_ = shower_shape_min_tower_energy_;
   tree_shower_shape_algorithm_version_ = ShowerShapeCalculator::kAlgorithmVersion;
@@ -379,7 +381,9 @@ bool Pi0Reconstruction::get_event_vertex(PHCompositeNode *topNode, std::array<do
   return true;
 }
 
-bool Pi0Reconstruction::build_photon_candidate(double energy, double x, double y, double z, const std::array<double, 3> &vertex, PhotonCandidate &candidate) const
+bool Pi0Reconstruction::build_photon_candidate(
+    double energy, double x, double y, double z,
+    const std::array<double, 3> &vertex, PhotonCandidate &candidate) const
 {
   if (!std::isfinite(energy) || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
   {
@@ -429,12 +433,9 @@ void Pi0Reconstruction::append_shower_shape_result(const ShowerShapeCalculator::
 
   if (store_shower_shape_tower_patch_)
   {
-    tree_cluster_shower_patch_e_.insert(
-        tree_cluster_shower_patch_e_.end(), result.patch_energy.begin(), result.patch_energy.end());
-    tree_cluster_shower_patch_good_.insert(
-        tree_cluster_shower_patch_good_.end(), result.patch_good.begin(), result.patch_good.end());
-    tree_cluster_shower_patch_owned_.insert(
-        tree_cluster_shower_patch_owned_.end(), result.patch_owned.begin(), result.patch_owned.end());
+    tree_cluster_shower_patch_e_.insert(tree_cluster_shower_patch_e_.end(), result.patch_energy.begin(), result.patch_energy.end());
+    tree_cluster_shower_patch_good_.insert(tree_cluster_shower_patch_good_.end(), result.patch_good.begin(), result.patch_good.end());
+    tree_cluster_shower_patch_owned_.insert(tree_cluster_shower_patch_owned_.end(), result.patch_owned.begin(), result.patch_owned.end());
   }
 }
 

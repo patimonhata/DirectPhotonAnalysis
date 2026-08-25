@@ -40,10 +40,7 @@ bool SetBranches(TTree *tree, EventData &data, const std::string &label) {
   return true;
 }
 
-unsigned int CountClusters(
-    const std::vector<double> *cluster_energies,
-    bool use_energy_threshold,
-    double min_cluster_energy)
+unsigned int CountClusters(const std::vector<double> *cluster_energies, bool use_energy_threshold, double min_cluster_energy)
 {
   if (!cluster_energies) {
     return 0;
@@ -81,8 +78,7 @@ int CompareSplitClusterCounts(
         "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/100kevents_5GeV_pi0_eta0_towerinfo_NO_SPLIT_CLUSTERS_UID_tree.root",
     const std::string split_file =
         "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/100kevents_5GeV_pi0_eta0_towerinfo_SPLIT_CLUSTERS_UID_tree.root",
-    const std::string output_file =
-        "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/compare_split_cluster_counts_5GeV.root",
+    const std::string output_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/output/compare_split_cluster_counts_5GeV.root",
     const double min_cluster_energy = std::numeric_limits<double>::quiet_NaN())
 {
   const bool use_energy_threshold = !std::isnan(min_cluster_energy);

@@ -20,7 +20,8 @@ int Fun4All_PhotonAnalysisTree(
     const int process_id = 0,
     const int n_events = 0,
     const std::string input_directory =
-        "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_3to15GeV_etapm1_vertexpm60",
+        "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_2to40GeV_etapm0p7_vertexpm60",
+        // "/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/DST_pi0_3to15GeV_etapm1_vertexpm60",
         // "/sphenix/user/ryotaro/Pi0DirectGammaSeparation/SinglePi0GunSimulation/output/newDST_pi0_5to15GeV_etapm1/",
     const std::string output_directory =
         "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/root",

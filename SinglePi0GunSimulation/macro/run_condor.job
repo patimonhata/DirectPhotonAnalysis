@@ -8,15 +8,15 @@ Priority           = 20
 job_lease_duration = 86400
 
 runnumber          = 0
-nEvents            = 20
+nEvents            = 500
 save_tree          = true
-job_offset         = 500
+job_offset         = 0
 process_shift      = $(Process) + $(job_offset) 
 output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output/condor
 
 
 Output             = $(output_directory)/condor_$(runnumber)_$INT(process_shift).out
 Error              = $(output_directory)/condor_$(runnumber)_$INT(process_shift).err
-Log                = /tmp/ryotaro/SinglePi0GunSimulation/condor_$(runnumber)_$INT(process_shift).log
+Log                = /tmp/ryotaro_SinglePi0GunSimulation_condor_$(runnumber)_$INT(process_shift).log
 Arguments          = "$INT(process_shift) $(nEvents) $(save_tree)"
-Queue 4500
+Queue 1000

@@ -58,7 +58,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
 
   // std::string baseDir(cwd);
   std::string baseDir("/sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/output");
-  std::string outDir  = baseDir + "/DST_" + particle_name + "_25to35GeV_etapm1_vertexpm60";
+  std::string outDir  = baseDir + "/DST_" + particle_name + "_2to40GeV_etapm0p7_vertexpm60";
   ensure_dir(outDir);
   
   Fun4AllServer *fun4allServer = Fun4AllServer::instance();
@@ -82,10 +82,10 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
                                                                             PHG4SimpleEventGenerator::Uniform);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_mean(0., 0., 0.);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_vertex_distribution_width(0., 0., 60.);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(-1.0, 1.0);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_eta_range(-0.7, 0.7);
   // INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(0.0, 0.0);
   INPUTGENERATOR::SimpleEventGenerator[0]->set_phi_range(-M_PI, M_PI);
-  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(25., 35.);
+  INPUTGENERATOR::SimpleEventGenerator[0]->set_pt_range(2., 40.);
 
   // register all input generators with Fun4All
   InputRegister();
@@ -128,7 +128,7 @@ int Fun4All_SingleParticlePi0(int processID=0, int nEvents=5, bool save_tree=fal
   // Enable::HCALOUT_EVAL =  false;
   // Enable::HCALOUT_QA =  false;
 
-  Enable::TOPOCLUSTER = true;
+  Enable::TOPOCLUSTER = false;
   Enable::GLOBAL_RECO = true;
 
   Enable::CDB = true;

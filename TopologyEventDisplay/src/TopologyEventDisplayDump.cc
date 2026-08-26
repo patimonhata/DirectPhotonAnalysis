@@ -60,9 +60,14 @@ int TopologyEventDisplayDump::Init(PHCompositeNode*)
       config_.anchor_pi0_fraction_min >= 0.0 &&
       config_.anchor_pi0_fraction_min <= 1.0 &&
       config_.min_energy_contribution_fraction >= 0.0 &&
+      first_event_ >= 0 &&
       config_.min_energy_contribution_fraction < 1.0 &&
       config_.min_photon_energy_recovery >= 0.0 &&
-      config_.min_photon_energy_recovery <= 1.0;
+      config_.min_photon_energy_recovery <= 1.0 &&
+      config_.min_direct_match_cluster_energy_coverage >= 0.0 &&
+      config_.min_direct_match_cluster_energy_coverage <= 1.0 &&
+      std::isfinite(config_.missing_diagnostic_max_delta_r) &&
+      config_.missing_diagnostic_max_delta_r > 0.0;
   if (!valid)
   {
     std::cerr << "TopologyEventDisplayDump::Init - invalid configuration"
@@ -72,6 +77,7 @@ int TopologyEventDisplayDump::Init(PHCompositeNode*)
   metadata_sample_mode_ = static_cast<int>(config_.sample_mode);
   metadata_write_detail_ = write_detail_ ? 1 : 0;
   config_.evaluate_all_candidates = write_detail_;
+  config_.enable_missing_diagnostics = true;
   evaluator_.configure(config_);
   create_output_directory();
   create_output();
@@ -86,7 +92,9 @@ int TopologyEventDisplayDump::Init(PHCompositeNode*)
 
 int TopologyEventDisplayDump::process_event(PHCompositeNode* topNode)
 {
-  b_event_ = static_cast<int>(events_processed_);
+  const int source_event = static_cast<int>(source_events_seen_++);
+  if (source_event < first_event_) return Fun4AllReturnCodes::EVENT_OK;
+  b_event_ = source_event;
   ++events_processed_;
   const auto result = evaluator_.evaluate(topNode);
   if (result.status != photon_tree::Pi0TopologyEventStatus::accepted)
@@ -256,6 +264,9 @@ void TopologyEventDisplayDump::fill_anchors(const photon_tree::Pi0AnchorTopology
     b_topology_name_ = photon_tree::pi0_anchor_topology_name(anchor.topology);
     b_reason_ = static_cast<int>(anchor.reason);
     b_reason_name_ = photon_tree::pi0_anchor_reason_name(anchor.reason);
+    b_missing_detail_ = static_cast<int>(anchor.missing_detail);
+    b_missing_detail_name_ = photon_tree::pi0_missing_detail_name(anchor.missing_detail);
+    b_partner_photon_index_ = anchor.partner_photon_index;
     b_main_fraction_ = anchor.main_fraction;
     b_second_fraction_ = anchor.second_fraction;
     b_unmatched_max_fraction_ = anchor.unmatched_max_fraction;
@@ -269,15 +280,69 @@ void TopologyEventDisplayDump::fill_anchors(const photon_tree::Pi0AnchorTopology
     b_photon0_energy_ = candidate.photon_energy[0];
     b_photon1_energy_ = candidate.photon_energy[1];
     b_match_valid_ = 0;
+    b_match_usable_ = 0;
+    b_match_status_ = static_cast<int>(photon_tree::Pi0ClusterTruthMatchStatus::invalid);
+    b_match_status_name_ = "invalid";
+    b_match_failure_ = static_cast<int>(photon_tree::Pi0ClusterTruthMatchFailure::none);
+    b_match_failure_name_ = "none";
+    b_match_failure_ieta_ = b_match_failure_iphi_ = invalid_int_;
+    b_match_tower_count_ = b_match_matched_tower_count_ = 0;
+    b_match_cluster_member_energy_coverage_ = 0.0;
     b_total_edep_ = b_gamma0_edep_ = b_gamma1_edep_ = b_other_edep_ = 0.0;
     if (anchor.cluster_index < candidate.cluster_matches.size())
     {
       const auto& match = candidate.cluster_matches[anchor.cluster_index];
       b_match_valid_ = match.valid ? 1 : 0;
+      b_match_usable_ = match.usable ? 1 : 0;
+      b_match_status_ = static_cast<int>(match.status);
+      b_match_status_name_ = photon_tree::pi0_cluster_truth_match_status_name(match.status);
+      b_match_failure_ = static_cast<int>(match.failure);
+      b_match_failure_name_ = photon_tree::pi0_cluster_truth_match_failure_name(match.failure);
+      b_match_failure_ieta_ = match.failure_ieta;
+      b_match_failure_iphi_ = match.failure_iphi;
+      b_match_tower_count_ = match.tower_count;
+      b_match_matched_tower_count_ = match.matched_tower_count;
+      b_match_cluster_member_energy_coverage_ = match.cluster_member_energy_coverage;
       b_total_edep_ = match.total_edep;
       b_gamma0_edep_ = match.gamma_edep[0];
       b_gamma1_edep_ = match.gamma_edep[1];
       b_other_edep_ = match.other_edep;
+    }
+    b_partner_diagnostic_found_ = 0;
+    b_partner_diagnostic_below_energy_threshold_ = 0;
+    b_partner_diagnostic_has_direct_deposit_ = 0;
+    b_partner_diagnostic_cluster_id_ = invalid_int_;
+    b_partner_diagnostic_cluster_energy_ = b_partner_diagnostic_cluster_eta_ =
+        b_partner_diagnostic_cluster_phi_ = b_partner_diagnostic_delta_r_ = invalid_double_;
+    b_partner_diagnostic_reconstructed_energy_ = b_partner_diagnostic_recovery_ = 0.0;
+    b_partner_diagnostic_match_usable_ = 0;
+    b_partner_diagnostic_match_status_ = static_cast<int>(photon_tree::Pi0ClusterTruthMatchStatus::invalid);
+    b_partner_diagnostic_match_status_name_ = "invalid";
+    b_partner_diagnostic_match_failure_ = static_cast<int>(photon_tree::Pi0ClusterTruthMatchFailure::none);
+    b_partner_diagnostic_match_failure_name_ = "none";
+    b_partner_diagnostic_failure_ieta_ = b_partner_diagnostic_failure_iphi_ = invalid_int_;
+    b_partner_diagnostic_match_coverage_ = 0.0;
+    if (anchor.partner_photon_index >= 0 && anchor.partner_photon_index < 2)
+    {
+      const auto& diagnostic = candidate.partner_diagnostics[static_cast<std::size_t>(anchor.partner_photon_index)];
+      b_partner_diagnostic_found_ = diagnostic.found ? 1 : 0;
+      b_partner_diagnostic_below_energy_threshold_ = diagnostic.below_energy_threshold ? 1 : 0;
+      b_partner_diagnostic_has_direct_deposit_ = diagnostic.has_direct_deposit ? 1 : 0;
+      b_partner_diagnostic_cluster_id_ = diagnostic.found ? static_cast<int>(diagnostic.cluster_id) : invalid_int_;
+      b_partner_diagnostic_cluster_energy_ = diagnostic.found ? diagnostic.cluster_energy : invalid_double_;
+      b_partner_diagnostic_cluster_eta_ = diagnostic.found ? diagnostic.cluster_eta : invalid_double_;
+      b_partner_diagnostic_cluster_phi_ = diagnostic.found ? diagnostic.cluster_phi : invalid_double_;
+      b_partner_diagnostic_delta_r_ = diagnostic.found ? diagnostic.delta_r : invalid_double_;
+      b_partner_diagnostic_reconstructed_energy_ = diagnostic.reconstructed_photon_energy;
+      b_partner_diagnostic_recovery_ = diagnostic.recovery;
+      b_partner_diagnostic_match_usable_ = diagnostic.match.usable ? 1 : 0;
+      b_partner_diagnostic_match_status_ = static_cast<int>(diagnostic.match.status);
+      b_partner_diagnostic_match_status_name_ = photon_tree::pi0_cluster_truth_match_status_name(diagnostic.match.status);
+      b_partner_diagnostic_match_failure_ = static_cast<int>(diagnostic.match.failure);
+      b_partner_diagnostic_match_failure_name_ = photon_tree::pi0_cluster_truth_match_failure_name(diagnostic.match.failure);
+      b_partner_diagnostic_failure_ieta_ = diagnostic.match.failure_ieta;
+      b_partner_diagnostic_failure_iphi_ = diagnostic.match.failure_iphi;
+      b_partner_diagnostic_match_coverage_ = diagnostic.match.cluster_member_energy_coverage;
     }
     anchors_tree_->Fill();
   }
@@ -301,6 +366,16 @@ void TopologyEventDisplayDump::fill_candidate_cluster_truth(const photon_tree::P
       b_candidate_id_ = static_cast<int>(candidate_index);
       b_cluster_id_ = result.clusters[cluster_index].cluster_id;
       b_match_valid_ = match.valid ? 1 : 0;
+      b_match_usable_ = match.usable ? 1 : 0;
+      b_match_status_ = static_cast<int>(match.status);
+      b_match_status_name_ = photon_tree::pi0_cluster_truth_match_status_name(match.status);
+      b_match_failure_ = static_cast<int>(match.failure);
+      b_match_failure_name_ = photon_tree::pi0_cluster_truth_match_failure_name(match.failure);
+      b_match_failure_ieta_ = match.failure_ieta;
+      b_match_failure_iphi_ = match.failure_iphi;
+      b_match_tower_count_ = match.tower_count;
+      b_match_matched_tower_count_ = match.matched_tower_count;
+      b_match_cluster_member_energy_coverage_ = match.cluster_member_energy_coverage;
       b_total_edep_ = match.total_edep;
       b_gamma0_edep_ = match.gamma_edep[0];
       b_gamma1_edep_ = match.gamma_edep[1];
@@ -599,6 +674,7 @@ void TopologyEventDisplayDump::create_output()
   metadata_tree_->Branch("manifest_begin", &manifest_begin_);
   metadata_tree_->Branch("manifest_end", &manifest_end_);
   metadata_tree_->Branch("cluster_node", &config_.cluster_node_name);
+  metadata_tree_->Branch("first_event", &first_event_);
   metadata_tree_->Branch("truth_eta_max", &config_.truth_eta_max);
   metadata_tree_->Branch("anchor_cluster_eta_max", &config_.anchor_cluster_eta_max);
   metadata_tree_->Branch("partner_cluster_eta_max", &config_.partner_cluster_eta_max);
@@ -607,7 +683,10 @@ void TopologyEventDisplayDump::create_output()
   metadata_tree_->Branch("anchor_pi0_fraction_min", &config_.anchor_pi0_fraction_min);
   metadata_tree_->Branch("min_energy_contribution_fraction", &config_.min_energy_contribution_fraction);
   metadata_tree_->Branch("min_photon_energy_recovery", &config_.min_photon_energy_recovery);
+  metadata_tree_->Branch("min_direct_match_cluster_energy_coverage", &config_.min_direct_match_cluster_energy_coverage);
+  metadata_tree_->Branch("missing_diagnostic_max_delta_r", &config_.missing_diagnostic_max_delta_r);
   metadata_tree_->Branch("evaluate_all_candidates", &config_.evaluate_all_candidates);
+  metadata_tree_->Branch("enable_missing_diagnostics", &config_.enable_missing_diagnostics);
   metadata_tree_->Branch("events_processed", &events_processed_);
   metadata_tree_->Branch("events_written", &events_written_);
   metadata_tree_->Branch("events_invalid", &events_invalid_);
@@ -640,18 +719,39 @@ void TopologyEventDisplayDump::create_output()
 #define ANCHOR_BRANCH(name) anchors_tree_->Branch(#name, &b_##name##_)
   ANCHOR_BRANCH(event); ANCHOR_BRANCH(anchor_id); ANCHOR_BRANCH(candidate_id); ANCHOR_BRANCH(cluster_id);
   ANCHOR_BRANCH(energy); ANCHOR_BRANCH(et); ANCHOR_BRANCH(topology); ANCHOR_BRANCH(topology_name);
-  ANCHOR_BRANCH(reason); ANCHOR_BRANCH(reason_name); ANCHOR_BRANCH(main_fraction);
+  ANCHOR_BRANCH(reason); ANCHOR_BRANCH(reason_name); ANCHOR_BRANCH(missing_detail); ANCHOR_BRANCH(missing_detail_name);
+  ANCHOR_BRANCH(partner_photon_index); ANCHOR_BRANCH(main_fraction);
   ANCHOR_BRANCH(second_fraction); ANCHOR_BRANCH(unmatched_max_fraction); ANCHOR_BRANCH(ambiguous_main);
   ANCHOR_BRANCH(best_cluster0_id); ANCHOR_BRANCH(best_cluster1_id);
   ANCHOR_BRANCH(photon0_energy); ANCHOR_BRANCH(photon1_energy);
   ANCHOR_BRANCH(reconstructed_photon0_energy); ANCHOR_BRANCH(reconstructed_photon1_energy);
-  ANCHOR_BRANCH(recovered0); ANCHOR_BRANCH(recovered1); ANCHOR_BRANCH(match_valid);
+  ANCHOR_BRANCH(recovered0); ANCHOR_BRANCH(recovered1);
+  ANCHOR_BRANCH(match_valid); ANCHOR_BRANCH(match_usable); ANCHOR_BRANCH(match_status); ANCHOR_BRANCH(match_status_name);
+  ANCHOR_BRANCH(match_failure); ANCHOR_BRANCH(match_failure_name);
+  ANCHOR_BRANCH(match_failure_ieta); ANCHOR_BRANCH(match_failure_iphi);
+  ANCHOR_BRANCH(match_tower_count); ANCHOR_BRANCH(match_matched_tower_count);
+  ANCHOR_BRANCH(match_cluster_member_energy_coverage);
   ANCHOR_BRANCH(total_edep); ANCHOR_BRANCH(gamma0_edep); ANCHOR_BRANCH(gamma1_edep); ANCHOR_BRANCH(other_edep);
-#undef ANCHOR_BRANCH
+  ANCHOR_BRANCH(partner_diagnostic_found); ANCHOR_BRANCH(partner_diagnostic_below_energy_threshold);
+  ANCHOR_BRANCH(partner_diagnostic_has_direct_deposit); ANCHOR_BRANCH(partner_diagnostic_cluster_id);
+  ANCHOR_BRANCH(partner_diagnostic_cluster_energy); ANCHOR_BRANCH(partner_diagnostic_cluster_eta);
+  ANCHOR_BRANCH(partner_diagnostic_cluster_phi); ANCHOR_BRANCH(partner_diagnostic_delta_r);
+  ANCHOR_BRANCH(partner_diagnostic_reconstructed_energy); ANCHOR_BRANCH(partner_diagnostic_recovery);
+  ANCHOR_BRANCH(partner_diagnostic_match_usable); ANCHOR_BRANCH(partner_diagnostic_match_status);
+  ANCHOR_BRANCH(partner_diagnostic_match_status_name); ANCHOR_BRANCH(partner_diagnostic_match_failure);
+  ANCHOR_BRANCH(partner_diagnostic_match_failure_name);
+  ANCHOR_BRANCH(partner_diagnostic_failure_ieta); ANCHOR_BRANCH(partner_diagnostic_failure_iphi);
+  ANCHOR_BRANCH(partner_diagnostic_match_coverage);
 
+#undef ANCHOR_BRANCH
   candidate_cluster_truth_tree_ = new TTree("candidate_cluster_truth", "Per-candidate per-cluster direct daughter deposits");
 #define MATCH_BRANCH(name) candidate_cluster_truth_tree_->Branch(#name, &b_##name##_)
-  MATCH_BRANCH(event); MATCH_BRANCH(candidate_id); MATCH_BRANCH(cluster_id); MATCH_BRANCH(match_valid);
+  MATCH_BRANCH(event); MATCH_BRANCH(candidate_id); MATCH_BRANCH(cluster_id);
+  MATCH_BRANCH(match_valid); MATCH_BRANCH(match_usable); MATCH_BRANCH(match_status); MATCH_BRANCH(match_status_name);
+  MATCH_BRANCH(match_failure); MATCH_BRANCH(match_failure_name);
+  MATCH_BRANCH(match_failure_ieta); MATCH_BRANCH(match_failure_iphi);
+  MATCH_BRANCH(match_tower_count); MATCH_BRANCH(match_matched_tower_count);
+  MATCH_BRANCH(match_cluster_member_energy_coverage);
   MATCH_BRANCH(total_edep); MATCH_BRANCH(gamma0_edep); MATCH_BRANCH(gamma1_edep); MATCH_BRANCH(other_edep);
   MATCH_BRANCH(gamma0_fraction); MATCH_BRANCH(gamma1_fraction); MATCH_BRANCH(other_fraction);
   MATCH_BRANCH(gamma0_recovery_estimate); MATCH_BRANCH(gamma1_recovery_estimate);

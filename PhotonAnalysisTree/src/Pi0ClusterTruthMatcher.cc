@@ -22,6 +22,33 @@
 
 namespace photon_tree
 {
+const char* pi0_cluster_truth_match_status_name(Pi0ClusterTruthMatchStatus value)
+{
+  switch (value)
+  {
+  case Pi0ClusterTruthMatchStatus::invalid: return "invalid";
+  case Pi0ClusterTruthMatchStatus::partial: return "partial";
+  case Pi0ClusterTruthMatchStatus::complete: return "complete";
+  }
+  return "unknown";
+}
+
+const char* pi0_cluster_truth_match_failure_name(Pi0ClusterTruthMatchFailure value)
+{
+  switch (value)
+  {
+  case Pi0ClusterTruthMatchFailure::none: return "none";
+  case Pi0ClusterTruthMatchFailure::missing_input: return "missing_input";
+  case Pi0ClusterTruthMatchFailure::missing_tower_info: return "missing_tower_info";
+  case Pi0ClusterTruthMatchFailure::invalid_tower_energy: return "invalid_tower_energy";
+  case Pi0ClusterTruthMatchFailure::missing_truth_tower: return "missing_truth_tower";
+  case Pi0ClusterTruthMatchFailure::missing_g4_cell: return "missing_g4_cell";
+  case Pi0ClusterTruthMatchFailure::missing_g4_hit: return "missing_g4_hit";
+  case Pi0ClusterTruthMatchFailure::invalid_hit_edep: return "invalid_hit_edep";
+  }
+  return "unknown";
+}
+
 int Pi0ClusterTruthMatcher::direct_gamma_index(int track_id, PHG4TruthInfoContainer* truth, const std::array<int, 2>& direct_gamma_track_ids)
 {
   std::set<int> visited;
@@ -57,6 +84,7 @@ Pi0ClusterTruthMatch Pi0ClusterTruthMatcher::match(
   Pi0ClusterTruthMatch result;
   if (!cluster || !towers || !raw_truth_towers || !cells || !hits || !truth)
   {
+    result.failure = Pi0ClusterTruthMatchFailure::missing_input;
     return result;
   }
 
@@ -66,22 +94,40 @@ Pi0ClusterTruthMatch Pi0ClusterTruthMatcher::match(
     const unsigned int raw_key = tower_iter->first;
     const int ieta = static_cast<int>(RawTowerDefs::decode_index1(raw_key));
     const int iphi = static_cast<int>(RawTowerDefs::decode_index2(raw_key));
+    const float cluster_tower_energy = tower_iter->second;
+    ++result.tower_count;
+    if (std::isfinite(cluster_tower_energy) && cluster_tower_energy >= 0.0F)
+    {
+      result.cluster_member_energy += cluster_tower_energy;
+    }
+    const auto record_failure = [&](Pi0ClusterTruthMatchFailure failure, unsigned long long cell_id = 0, unsigned long long hit_id = 0) {
+      if (result.failure == Pi0ClusterTruthMatchFailure::none)
+      {
+        result.failure = failure;
+        result.failure_ieta = ieta;
+        result.failure_iphi = iphi;
+        result.failure_tower_key = raw_key;
+        result.failure_cell_id = cell_id;
+        result.failure_hit_id = hit_id;
+      }
+    };
     const unsigned int tower_info_key = TowerInfoDefs::encode_emcal(static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
     TowerInfo* tower = towers->get_tower_at_key(static_cast<int>(tower_info_key));
     if (!tower)
     {
-      return Pi0ClusterTruthMatch{};
+      record_failure(Pi0ClusterTruthMatchFailure::missing_tower_info);
+      continue;
     }
 
     float allocation = 1.0F;
     if (allocate_split_tower_energy)
     {
       const float tower_energy = tower->get_energy();
-      const float cluster_tower_energy = tower_iter->second;
       if (!(tower_energy > 0.0F) || !std::isfinite(tower_energy) ||
           !std::isfinite(cluster_tower_energy) || cluster_tower_energy < 0.0F)
       {
-        return Pi0ClusterTruthMatch{};
+        record_failure(Pi0ClusterTruthMatchFailure::invalid_tower_energy);
+        continue;
       }
       allocation = std::clamp(cluster_tower_energy / tower_energy, 0.0F, 1.0F);
     }
@@ -89,42 +135,82 @@ Pi0ClusterTruthMatch Pi0ClusterTruthMatcher::match(
     RawTower* raw_tower = raw_truth_towers->getTower(raw_key);
     if (!raw_tower)
     {
-      return Pi0ClusterTruthMatch{};
+      record_failure(Pi0ClusterTruthMatchFailure::missing_truth_tower);
+      continue;
     }
 
+    Pi0ClusterTruthMatch tower_result;
+    bool tower_valid = true;
     const auto cell_range = raw_tower->get_g4cells();
     for (auto cell_iter = cell_range.first; cell_iter != cell_range.second; ++cell_iter)
     {
       PHG4Cell* cell = cells->findCell(cell_iter->first);
       if (!cell)
       {
-        return Pi0ClusterTruthMatch{};
+        record_failure(Pi0ClusterTruthMatchFailure::missing_g4_cell, cell_iter->first);
+        tower_valid = false;
+        break;
       }
       const auto hit_range = cell->get_g4hits();
       for (auto hit_iter = hit_range.first; hit_iter != hit_range.second; ++hit_iter)
       {
         PHG4Hit* hit = hits->findHit(hit_iter->first);
         const float hit_edep = hit_iter->second;
-        if (!hit || !std::isfinite(hit_edep) || hit_edep < 0.0F)
+        if (!hit)
         {
-          return Pi0ClusterTruthMatch{};
+          record_failure(Pi0ClusterTruthMatchFailure::missing_g4_hit, cell_iter->first, hit_iter->first);
+          tower_valid = false;
+          break;
+        }
+        if (!std::isfinite(hit_edep) || hit_edep < 0.0F)
+        {
+          record_failure(Pi0ClusterTruthMatchFailure::invalid_hit_edep, cell_iter->first, hit_iter->first);
+          tower_valid = false;
+          break;
         }
         const float allocated_edep = allocation * hit_edep;
         const int gamma = direct_gamma_index(hit->get_trkid(), truth, direct_gamma_track_ids);
         if (gamma >= 0)
         {
-          result.gamma_edep[static_cast<std::size_t>(gamma)] += allocated_edep;
+          tower_result.gamma_edep[static_cast<std::size_t>(gamma)] += allocated_edep;
         }
         else
         {
-          result.other_edep += allocated_edep;
+          tower_result.other_edep += allocated_edep;
         }
-        result.total_edep += allocated_edep;
+        tower_result.total_edep += allocated_edep;
       }
+      if (!tower_valid) break;
     }
+    if (!tower_valid)
+    {
+      continue;
+    }
+    ++result.matched_tower_count;
+    if (std::isfinite(cluster_tower_energy) && cluster_tower_energy >= 0.0F)
+    {
+      result.matched_cluster_member_energy += cluster_tower_energy;
+    }
+    result.total_edep += tower_result.total_edep;
+    result.gamma_edep[0] += tower_result.gamma_edep[0];
+    result.gamma_edep[1] += tower_result.gamma_edep[1];
+    result.other_edep += tower_result.other_edep;
   }
 
-  result.valid = true;
+  result.cluster_member_energy_coverage = result.cluster_member_energy > 0.0F
+      ? result.matched_cluster_member_energy / result.cluster_member_energy
+      : (result.matched_tower_count == result.tower_count ? 1.0F : 0.0F);
+  if (result.matched_tower_count == result.tower_count)
+  {
+    result.status = Pi0ClusterTruthMatchStatus::complete;
+    result.failure = Pi0ClusterTruthMatchFailure::none;
+    result.valid = true;
+    result.usable = true;
+  }
+  else if (result.matched_tower_count > 0U)
+  {
+    result.status = Pi0ClusterTruthMatchStatus::partial;
+  }
   return result;
 }
 

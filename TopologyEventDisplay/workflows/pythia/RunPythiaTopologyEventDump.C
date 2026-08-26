@@ -46,10 +46,13 @@ int RunPythiaTopologyEventDump(
     const double min_cluster_energy = 0.2,
     const double anchor_pi0_fraction_min = 0.5,
     const double min_energy_contribution_fraction = 0.0,
-    const double min_photon_energy_recovery = 0.5)
+    const double min_photon_energy_recovery = 0.5,
+    const double min_direct_match_cluster_energy_coverage = 0.5,
+    const double missing_diagnostic_max_delta_r = 0.15,
+    const int first_event = 0)
 {
   if (manifest_path.empty() || output_file.empty() || manifest_begin < 0 ||
-      manifest_end <= manifest_begin || n_events < 0)
+      manifest_end <= manifest_begin || n_events < 0 || first_event < 0)
   {
     std::cerr << "RunPythiaTopologyEventDump - invalid arguments" << std::endl;
     return EXIT_FAILURE;
@@ -135,6 +138,7 @@ int RunPythiaTopologyEventDump(
   display->set_manifest_range(manifest_begin, manifest_end);
   display->set_sample_mode(photon_tree::Pi0SampleMode::pythia);
   display->set_signal_embedding_id(1);
+  display->set_first_event(first_event);
   display->set_truth_eta_max(truth_eta_max);
   display->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
   display->set_partner_cluster_eta_max(partner_cluster_eta_max);
@@ -142,6 +146,8 @@ int RunPythiaTopologyEventDump(
   display->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);
   display->set_min_energy_contribution_fraction(min_energy_contribution_fraction);
   display->set_min_photon_energy_recovery(min_photon_energy_recovery);
+  display->set_min_direct_match_cluster_energy_coverage(min_direct_match_cluster_energy_coverage);
+  display->set_missing_diagnostic_max_delta_r(missing_diagnostic_max_delta_r);
   display->set_write_detail(write_detail);
   display->set_verbosity(1);
   server->registerSubsystem(display);
@@ -149,7 +155,7 @@ int RunPythiaTopologyEventDump(
   std::cout << "RunPythiaTopologyEventDump - manifest range/output/detail = ["
             << manifest_begin << ":" << manifest_end << "]/" << output_file
             << "/" << write_detail << std::endl;
-  const int run_status = server->run(n_events);
+  const int run_status = server->run(n_events > 0 ? first_event + n_events : 0);
   const int end_status = server->End();
   delete server;
   const bool run_ok = run_status == Fun4AllReturnCodes::EVENT_OK ||

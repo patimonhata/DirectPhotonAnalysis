@@ -116,6 +116,38 @@ using the same line grammar.  Truth segments are straight display guides
 between G4 vertices or to the calorimeter radius; they are not
 magnetic-field-propagated charged tracks.
 
+## Anchor and direct-match diagnostics
+
+An anchor must pass the cluster energy and eta selections, and its main truth
+pi0 contribution must be at least `anchor_pi0_fraction_min` (0.5 by default).
+The fraction is the selected pi0 contribution divided by the cluster energy;
+being selected as an anchor does not by itself mean that both daughter photons
+were reconstructed.
+
+Direct daughter matching now distinguishes a strict complete match from a
+usable partial match. A complete match resolves every cluster member tower. A
+partial match is usable for topology decisions when the resolved member-energy
+coverage is at least `min_direct_match_cluster_energy_coverage` (0.5 by
+default). The first unresolved tower is recorded together with a failure name:
+`missing_tower_info`, `invalid_tower_energy`, `missing_truth_tower`,
+`missing_g4_cell`, `missing_g4_hit`, or `invalid_hit_edep`. `match_valid`
+continues to mean strict completeness; `match_usable` is the quantity used by
+the topology evaluator.
+
+The top-level topology remains `separated`, `merged`, `missing`, or `other`.
+For `missing`, `missing_detail_name` records one of:
+
+- `partner_best_below_recovery`
+- `partner_cluster_below_energy_threshold_recovered`
+- `partner_cluster_below_energy_threshold_below_recovery`
+- `partner_direct_match_incomplete`
+- `partner_no_direct_deposit`
+
+Below-threshold diagnostics search within
+`missing_diagnostic_max_delta_r` (0.15 by default) of the unrecovered photon
+projection. These diagnostics are recorded even with `write_detail=false`;
+that flag still controls the large geometry/truth tables.
+
 ## Intermediate ROOT schema
 
 - `metadata`: schema/algorithm versions, sample mode, source range,
@@ -124,9 +156,11 @@ magnetic-field-propagated charged tracks.
 - `pi0_candidates`: the two supported Pythia pathways (or gun pathway),
   daughter photons, best clusters and recovery decision.
 - `anchor_decisions`: one row per anchor, including topology, reason,
-  fractions and energy-deposit inputs.
+  detailed missing reason, strict/usable direct-match status, failure location,
+  coverage and any nearby below-threshold partner diagnostic.
 - `candidate_cluster_truth`: direct daughter-photon deposit and recovery
-  quantities for every evaluated candidate/cluster pair.
+  quantities plus strict/usable match status, failure and coverage for every
+  evaluated candidate/cluster pair.
 - `clusters`, `cluster_contributors`: reconstructed clusters and their
   truth contributors.
 - `cluster_towers`: member energy, calibrated tower energy and allocation

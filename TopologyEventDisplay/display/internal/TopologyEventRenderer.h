@@ -79,6 +79,9 @@ struct Anchor
   std::string topology_name;
   int reason = 0;
   std::string reason_name;
+  int missing_detail = 0;
+  std::string missing_detail_name;
+  int partner_photon = -1;
   double main_fraction = -1.0;
   double second_fraction = -1.0;
   double unmatched_fraction = 0.0;
@@ -88,9 +91,35 @@ struct Anchor
   double truth_energy[2] = {0.0, 0.0};
   double reconstructed[2] = {0.0, 0.0};
   int match_valid = 0;
+  int match_usable = 0;
+  int match_status = 0;
+  std::string match_status_name;
+  int match_failure = 0;
+  std::string match_failure_name;
+  int match_failure_ieta = -999;
+  int match_failure_iphi = -999;
+  unsigned int match_towers = 0;
+  unsigned int match_matched_towers = 0;
+  double match_coverage = 0.0;
   double total_edep = 0.0;
   double gamma_edep[2] = {0.0, 0.0};
   double other_edep = 0.0;
+  int diagnostic_found = 0;
+  int diagnostic_below_threshold = 0;
+  int diagnostic_has_direct = 0;
+  int diagnostic_cluster = -999;
+  double diagnostic_energy = -999.0;
+  double diagnostic_eta = -999.0;
+  double diagnostic_phi = -999.0;
+  double diagnostic_delta_r = -999.0;
+  double diagnostic_reconstructed = 0.0;
+  double diagnostic_recovery = 0.0;
+  int diagnostic_match_usable = 0;
+  std::string diagnostic_match_status_name;
+  std::string diagnostic_match_failure_name;
+  int diagnostic_failure_ieta = -999;
+  int diagnostic_failure_iphi = -999;
+  double diagnostic_match_coverage = 0.0;
 };
 
 struct Segment
@@ -261,8 +290,16 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   candidates->ResetBranchAddresses();
 
   Anchor anchor;
+  const auto bind_anchor = [&](const char* name, auto* address) {
+    if (anchors->GetBranch(name)) anchors->SetBranchAddress(name, address);
+  };
   std::string* topology_name = nullptr;
   std::string* reason_name = nullptr;
+  std::string* missing_detail_name = nullptr;
+  std::string* match_status_name = nullptr;
+  std::string* match_failure_name = nullptr;
+  std::string* diagnostic_match_status_name = nullptr;
+  std::string* diagnostic_match_failure_name = nullptr;
   anchors->SetBranchAddress("event", &event);
   anchors->SetBranchAddress("anchor_id", &anchor.id);
   anchors->SetBranchAddress("candidate_id", &anchor.candidate);
@@ -273,6 +310,9 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   anchors->SetBranchAddress("topology_name", &topology_name);
   anchors->SetBranchAddress("reason", &anchor.reason);
   anchors->SetBranchAddress("reason_name", &reason_name);
+  bind_anchor("missing_detail", &anchor.missing_detail);
+  bind_anchor("missing_detail_name", &missing_detail_name);
+  bind_anchor("partner_photon_index", &anchor.partner_photon);
   anchors->SetBranchAddress("main_fraction", &anchor.main_fraction);
   anchors->SetBranchAddress("second_fraction", &anchor.second_fraction);
   anchors->SetBranchAddress("unmatched_max_fraction", &anchor.unmatched_fraction);
@@ -286,10 +326,37 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   anchors->SetBranchAddress("reconstructed_photon0_energy", &anchor.reconstructed[0]);
   anchors->SetBranchAddress("reconstructed_photon1_energy", &anchor.reconstructed[1]);
   anchors->SetBranchAddress("match_valid", &anchor.match_valid);
+  bind_anchor("match_usable", &anchor.match_usable);
+  bind_anchor("match_status", &anchor.match_status);
+  bind_anchor("match_status_name", &match_status_name);
+  bind_anchor("match_failure", &anchor.match_failure);
+  bind_anchor("match_failure_name", &match_failure_name);
+  bind_anchor("match_failure_ieta", &anchor.match_failure_ieta);
+  bind_anchor("match_failure_iphi", &anchor.match_failure_iphi);
+  bind_anchor("match_tower_count", &anchor.match_towers);
+  bind_anchor("match_matched_tower_count", &anchor.match_matched_towers);
+  bind_anchor("match_cluster_member_energy_coverage", &anchor.match_coverage);
   anchors->SetBranchAddress("total_edep", &anchor.total_edep);
   anchors->SetBranchAddress("gamma0_edep", &anchor.gamma_edep[0]);
   anchors->SetBranchAddress("gamma1_edep", &anchor.gamma_edep[1]);
   anchors->SetBranchAddress("other_edep", &anchor.other_edep);
+  bind_anchor("partner_diagnostic_found", &anchor.diagnostic_found);
+  bind_anchor("partner_diagnostic_below_energy_threshold", &anchor.diagnostic_below_threshold);
+  bind_anchor("partner_diagnostic_has_direct_deposit", &anchor.diagnostic_has_direct);
+  bind_anchor("partner_diagnostic_cluster_id", &anchor.diagnostic_cluster);
+  bind_anchor("partner_diagnostic_cluster_energy", &anchor.diagnostic_energy);
+  bind_anchor("partner_diagnostic_cluster_eta", &anchor.diagnostic_eta);
+  bind_anchor("partner_diagnostic_cluster_phi", &anchor.diagnostic_phi);
+  bind_anchor("partner_diagnostic_delta_r", &anchor.diagnostic_delta_r);
+  bind_anchor("partner_diagnostic_reconstructed_energy", &anchor.diagnostic_reconstructed);
+  bind_anchor("partner_diagnostic_recovery", &anchor.diagnostic_recovery);
+  bind_anchor("partner_diagnostic_match_usable", &anchor.diagnostic_match_usable);
+  bind_anchor("partner_diagnostic_match_status_name", &diagnostic_match_status_name);
+  bind_anchor("partner_diagnostic_match_failure_name", &diagnostic_match_failure_name);
+  bind_anchor("partner_diagnostic_failure_ieta", &anchor.diagnostic_failure_ieta);
+  bind_anchor("partner_diagnostic_failure_iphi", &anchor.diagnostic_failure_iphi);
+  bind_anchor("partner_diagnostic_match_coverage", &anchor.diagnostic_match_coverage);
+  const bool has_match_usable = anchors->GetBranch("match_usable");
   for (Long64_t entry = 0; entry < anchors->GetEntries(); ++entry)
   {
     anchors->GetEntry(entry);
@@ -297,18 +364,26 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
     {
       anchor.topology_name = topology_name ? *topology_name : "unknown";
       anchor.reason_name = reason_name ? *reason_name : "unknown";
+      anchor.missing_detail_name = missing_detail_name ? *missing_detail_name : "not_recorded";
+      anchor.match_status_name = match_status_name ? *match_status_name : (anchor.match_valid ? "complete" : "invalid");
+      anchor.match_failure_name = match_failure_name ? *match_failure_name : "not_recorded";
+      anchor.diagnostic_match_status_name = diagnostic_match_status_name ? *diagnostic_match_status_name : "not_recorded";
+      anchor.diagnostic_match_failure_name = diagnostic_match_failure_name ? *diagnostic_match_failure_name : "not_recorded";
+      if (!has_match_usable) anchor.match_usable = anchor.match_valid;
       data.anchors.push_back(anchor);
     }
   }
   anchors->ResetBranchAddresses();
-
   if (matches)
   {
     CandidateClusterMatch match;
     matches->SetBranchAddress("event", &event);
     matches->SetBranchAddress("candidate_id", &match.candidate);
     matches->SetBranchAddress("cluster_id", &match.cluster);
-    matches->SetBranchAddress("match_valid", &match.valid);
+    if (matches->GetBranch("match_usable"))
+      matches->SetBranchAddress("match_usable", &match.valid);
+    else
+      matches->SetBranchAddress("match_valid", &match.valid);
     matches->SetBranchAddress("gamma0_fraction", &match.gamma_fraction[0]);
     matches->SetBranchAddress("gamma1_fraction", &match.gamma_fraction[1]);
     for (Long64_t entry = 0; entry < matches->GetEntries(); ++entry)
@@ -773,36 +848,57 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
 {
   gPad->Range(0.0, 0.0, 1.0, 1.0);
   const Candidate* candidate = find_candidate(data, anchor.candidate);
-  TLatex text; text.SetNDC(); text.SetTextSize(0.048);
-  double y = 0.94;
-  text.SetTextFont(62); text.DrawLatex(0.04, y, "Anchor classification"); text.SetTextFont(42); y -= 0.075;
+  TLatex text; text.SetNDC(); text.SetTextSize(0.040);
+  double y = 0.96;
+  text.SetTextFont(62); text.DrawLatex(0.04, y, "Anchor classification"); text.SetTextFont(42); y -= 0.055;
   text.SetTextColor(topology_color(anchor.topology));
   text.DrawLatex(0.04, y, Form("%s", anchor.topology_name.c_str()));
-  text.SetTextColor(kBlack); y -= 0.065;
-  text.SetTextSize(0.036); text.DrawLatex(0.04, y, Form("reason: %s", anchor.reason_name.c_str())); y -= 0.065;
-  text.SetTextSize(0.048);
-  text.DrawLatex(0.04, y, Form("E = %.3f GeV    E_{T} = %.3f GeV", anchor.energy, anchor.et)); y -= 0.07;
-  text.DrawLatex(0.04, y, Form("main / second f = %.4f / %.4f", anchor.main_fraction, anchor.second_fraction)); y -= 0.06;
-  text.DrawLatex(0.04, y, Form("unmatched f = %.4f", anchor.unmatched_fraction)); y -= 0.075;
+  text.SetTextColor(kBlack); y -= 0.050;
+  text.SetTextSize(0.030); text.DrawLatex(0.04, y, Form("reason: %s", anchor.reason_name.c_str())); y -= 0.045;
+  if (anchor.topology == 3)
+  {
+    text.DrawLatex(0.04, y, Form("missing: %s  (partner #gamma%d)", anchor.missing_detail_name.c_str(), anchor.partner_photon)); y -= 0.045;
+  }
+  text.SetTextSize(0.036);
+  text.DrawLatex(0.04, y, Form("E = %.3f GeV    E_{T} = %.3f GeV", anchor.energy, anchor.et)); y -= 0.048;
+  text.DrawLatex(0.04, y, Form("main/second/unmatched f = %.4f / %.4f / %.4f",
+      anchor.main_fraction, anchor.second_fraction, anchor.unmatched_fraction)); y -= 0.044;
   if (candidate)
   {
-    text.DrawLatex(0.04, y, Form("candidate P%d    p_{T} = %.3f GeV", candidate->id, candidate->pt)); y -= 0.06;
-    text.SetTextSize(0.037); text.DrawLatex(0.04, y, candidate->pathway_name.c_str()); y -= 0.07;
+    text.DrawLatex(0.04, y, Form("candidate P%d    p_{T} = %.3f GeV", candidate->id, candidate->pt)); y -= 0.044;
+    text.SetTextSize(0.030); text.DrawLatex(0.04, y, candidate->pathway_name.c_str()); y -= 0.050;
   }
-  text.SetTextSize(0.040);
+  text.SetTextSize(0.032);
   for (int photon = 0; photon < 2; ++photon)
   {
     const double recovery = anchor.truth_energy[photon] > 0.0 ? anchor.reconstructed[photon] / anchor.truth_energy[photon] : 0.0;
     const int style = photon == 0 ? photon0_line_style : photon1_line_style;
     auto* sample = new TLine(0.04, y + 0.008, 0.16, y + 0.008);
     sample->SetLineColor(family_color(anchor.candidate)); sample->SetLineStyle(style); sample->SetLineWidth(2); sample->Draw();
-    text.DrawLatex(0.19, y, Form("Cbest=%d  recovered=%s", anchor.best_cluster[photon], anchor.recovered[photon] ? "yes" : "no")); y -= 0.052;
+    text.DrawLatex(0.19, y, Form("#gamma%d Cbest=%d  recovered=%s", photon, anchor.best_cluster[photon],
+        anchor.recovered[photon] ? "yes" : "no")); y -= 0.038;
     text.DrawLatex(0.19, y, Form("Etruth=%.3f  Erec=%.3f  ratio=%.3f",
-        anchor.truth_energy[photon], anchor.reconstructed[photon], recovery)); y -= 0.065;
+        anchor.truth_energy[photon], anchor.reconstructed[photon], recovery)); y -= 0.043;
   }
-  text.DrawLatex(0.04, y, Form("anchor edep: total=%.4g  other=%.4g", anchor.total_edep, anchor.other_edep)); y -= 0.052;
-  text.DrawLatex(0.04, y, Form("fine/coarse photon edep = %.4g / %.4g   valid=%d",
-      anchor.gamma_edep[0], anchor.gamma_edep[1], anchor.match_valid));
+  text.DrawLatex(0.04, y, Form("anchor match: strict=%d usable=%d  %s  coverage=%.3f",
+      anchor.match_valid, anchor.match_usable, anchor.match_status_name.c_str(), anchor.match_coverage)); y -= 0.038;
+  text.DrawLatex(0.04, y, Form("towers=%d/%d  failure=%s at (%d,%d)",
+      anchor.match_matched_towers, anchor.match_towers, anchor.match_failure_name.c_str(),
+      anchor.match_failure_ieta, anchor.match_failure_iphi)); y -= 0.038;
+  text.DrawLatex(0.04, y, Form("anchor edep: total=%.4g  other=%.4g", anchor.total_edep, anchor.other_edep)); y -= 0.038;
+  text.DrawLatex(0.04, y, Form("fine/coarse photon edep = %.4g / %.4g", anchor.gamma_edep[0], anchor.gamma_edep[1])); y -= 0.038;
+  if (anchor.diagnostic_found)
+  {
+    text.DrawLatex(0.04, y, Form("partner diagnostic C%d: E=%.3f  #DeltaR=%.4f  below=%d direct=%d",
+        anchor.diagnostic_cluster, anchor.diagnostic_energy, anchor.diagnostic_delta_r,
+        anchor.diagnostic_below_threshold, anchor.diagnostic_has_direct)); y -= 0.038;
+    text.DrawLatex(0.04, y, Form("Erec=%.3f  recovery=%.3f  match=%s usable=%d coverage=%.3f",
+        anchor.diagnostic_reconstructed, anchor.diagnostic_recovery,
+        anchor.diagnostic_match_status_name.c_str(), anchor.diagnostic_match_usable,
+        anchor.diagnostic_match_coverage)); y -= 0.038;
+    text.DrawLatex(0.04, y, Form("diagnostic failure=%s at (%d,%d)",
+        anchor.diagnostic_match_failure_name.c_str(), anchor.diagnostic_failure_ieta, anchor.diagnostic_failure_iphi));
+  }
 }
 
 inline TPad* make_display_pad(TCanvas* canvas, const std::string& name,

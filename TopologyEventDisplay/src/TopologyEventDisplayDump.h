@@ -33,6 +33,7 @@ class TopologyEventDisplayDump : public SubsysReco
     manifest_end_ = end;
   }
   void set_sample_mode(photon_tree::Pi0SampleMode value) { config_.sample_mode = value; }
+  void set_first_event(int value) { first_event_ = value; }
   void set_signal_embedding_id(int value) { config_.signal_embedding_id = value; }
   void set_truth_node_name(const std::string& value) { config_.truth_node_name = value; }
   void set_hepmc_event_map_node_name(const std::string& value) { config_.hepmc_event_map_node_name = value; }
@@ -49,11 +50,13 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_anchor_pi0_fraction_min(double value) { config_.anchor_pi0_fraction_min = value; }
   void set_min_energy_contribution_fraction(double value) { config_.min_energy_contribution_fraction = value; }
   void set_min_photon_energy_recovery(double value) { config_.min_photon_energy_recovery = value; }
+  void set_min_direct_match_cluster_energy_coverage(double value) { config_.min_direct_match_cluster_energy_coverage = value; }
+  void set_missing_diagnostic_max_delta_r(double value) { config_.missing_diagnostic_max_delta_r = value; }
   void set_write_detail(bool value) { write_detail_ = value; }
   void set_verbosity(int value) { verbosity_ = value; config_.verbosity = value; }
 
  private:
-  static constexpr int schema_version_ = 1;
+  static constexpr int schema_version_ = 2;
   static constexpr int invalid_int_ = -999;
   static constexpr double invalid_double_ = -999.0;
 
@@ -80,6 +83,7 @@ class TopologyEventDisplayDump : public SubsysReco
   long long manifest_end_ = -1;
   bool write_detail_ = true;
   int verbosity_ = 0;
+  int first_event_ = 0;
   photon_tree::Pi0AnchorTopologyConfig config_;
   photon_tree::Pi0AnchorTopologyEvaluator evaluator_;
 
@@ -96,6 +100,7 @@ class TopologyEventDisplayDump : public SubsysReco
   TTree* truth_segments_tree_ = nullptr;
 
   unsigned long long events_processed_ = 0;
+  unsigned long long source_events_seen_ = 0;
   unsigned long long events_written_ = 0;
   unsigned long long events_invalid_ = 0;
 
@@ -140,6 +145,9 @@ class TopologyEventDisplayDump : public SubsysReco
   std::string b_topology_name_;
   int b_reason_ = 0;
   std::string b_reason_name_;
+  int b_missing_detail_ = 0;
+  std::string b_missing_detail_name_;
+  int b_partner_photon_index_ = invalid_int_;
   double b_main_fraction_ = invalid_double_;
   double b_second_fraction_ = invalid_double_;
   double b_unmatched_max_fraction_ = invalid_double_;
@@ -147,6 +155,16 @@ class TopologyEventDisplayDump : public SubsysReco
 
   int b_match_valid_ = 0;
   double b_total_edep_ = 0.0;
+  int b_match_usable_ = 0;
+  int b_match_status_ = 0;
+  std::string b_match_status_name_;
+  int b_match_failure_ = 0;
+  std::string b_match_failure_name_;
+  int b_match_failure_ieta_ = invalid_int_;
+  int b_match_failure_iphi_ = invalid_int_;
+  unsigned int b_match_tower_count_ = 0;
+  unsigned int b_match_matched_tower_count_ = 0;
+  double b_match_cluster_member_energy_coverage_ = 0.0;
   double b_gamma0_edep_ = 0.0;
   double b_gamma1_edep_ = 0.0;
   double b_other_edep_ = 0.0;
@@ -157,6 +175,24 @@ class TopologyEventDisplayDump : public SubsysReco
   double b_gamma1_recovery_estimate_ = 0.0;
 
   int b_topology_considered_ = 0;
+  int b_partner_diagnostic_found_ = 0;
+  int b_partner_diagnostic_below_energy_threshold_ = 0;
+  int b_partner_diagnostic_has_direct_deposit_ = 0;
+  int b_partner_diagnostic_cluster_id_ = invalid_int_;
+  double b_partner_diagnostic_cluster_energy_ = invalid_double_;
+  double b_partner_diagnostic_cluster_eta_ = invalid_double_;
+  double b_partner_diagnostic_cluster_phi_ = invalid_double_;
+  double b_partner_diagnostic_delta_r_ = invalid_double_;
+  double b_partner_diagnostic_reconstructed_energy_ = 0.0;
+  double b_partner_diagnostic_recovery_ = 0.0;
+  int b_partner_diagnostic_match_usable_ = 0;
+  int b_partner_diagnostic_match_status_ = 0;
+  std::string b_partner_diagnostic_match_status_name_;
+  int b_partner_diagnostic_match_failure_ = 0;
+  std::string b_partner_diagnostic_match_failure_name_;
+  int b_partner_diagnostic_failure_ieta_ = invalid_int_;
+  int b_partner_diagnostic_failure_iphi_ = invalid_int_;
+  double b_partner_diagnostic_match_coverage_ = 0.0;
   int b_topology_cluster_index_ = invalid_int_;
   int b_anchor_acceptance_ = 0;
   int b_ntowers_ = 0;

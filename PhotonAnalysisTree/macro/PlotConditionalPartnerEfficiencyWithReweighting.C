@@ -459,8 +459,8 @@ void style_histograms(WeightedHistograms &histograms) {
   histograms.total->SetLineWidth(2);
   for (std::size_t component = 0; component < n_topologies; ++component) {
     histograms.component[component]->SetLineColor(topology_colors[component]);
-    histograms.component[component]->SetFillColor(topology_colors[component]);
-    histograms.component[component]->SetLineWidth(1);
+    histograms.component[component]->SetFillStyle(0);
+    histograms.component[component]->SetLineWidth(2);
   }
 }
 
@@ -487,7 +487,6 @@ void draw_histograms(WeightedHistograms &histograms,
                      const double individual_response_max,
                      const double weight_exponent,
                      const double weight_reference_pt,
-                     const bool log_y,
                      const bool anchor_et_axis = false,
                      const double anchor_eta_max = 0.0) {
   style_histograms(histograms);
@@ -495,45 +494,32 @@ void draw_histograms(WeightedHistograms &histograms,
       anchor_et_axis ? "_anchor_et" : "_truth_pt";
   auto total = std::unique_ptr<TH1D>(
       static_cast<TH1D *>(histograms.total->Clone(
-          (std::string(histograms.total->GetName()) +
-           (log_y ? "_draw_log" : "_draw_linear"))
-              .c_str())));
+          (std::string(histograms.total->GetName()) + "_draw_log").c_str())));
   total->SetDirectory(nullptr);
   total->GetXaxis()->SetTitle(anchor_et_axis ? "Anchor Cluster E_{T} [GeV]" : "Truth #pi^{0} p_{T} [GeV]");
   total->GetYaxis()->SetTitle("Counts");
   style_plot_axes(total->GetXaxis(), total->GetYaxis());
   const double maximum = total->GetMaximum();
-  if (log_y) {
-    const double minimum = minimum_positive_bin(*total);
-    total->SetMinimum(std::isfinite(minimum) ? 0.5 * minimum : 1.0e-12);
-    total->SetMaximum(maximum > 0.0 ? 20.0 * maximum : 1.0);
-  } else {
-    total->SetMinimum(0.0);
-    total->SetMaximum(maximum > 0.0 ? 2.5 * maximum : 1.0);
+  double minimum = minimum_positive_bin(*total);
+  for (const auto &component : histograms.component) {
+    minimum = std::min(minimum, minimum_positive_bin(*component));
   }
-
-  THStack stack(
-      ("stack_" + collection_label + axis_suffix +
-       (log_y ? "_reweighted_log" : "_reweighted_linear"))
-          .c_str(),
-      "");
-  for (auto &component : histograms.component) {
-    stack.Add(component.get());
-  }
+  total->SetMinimum(std::isfinite(minimum) ? 0.5 * minimum : 1.0e-12);
+  total->SetMaximum(maximum > 0.0 ? 20.0 * maximum : 1.0);
 
   TCanvas canvas(
-      ("c_" + collection_label + axis_suffix +
-       (log_y ? "_reweighted_log" : "_reweighted_linear"))
-          .c_str(),
+      ("c_" + collection_label + axis_suffix + "_reweighted_log").c_str(),
       anchor_et_axis
           ? "Weighted anchor-cluster ET by event topology"
           : "Weighted central truth pi0 reconstruction topologies",
       plot_canvas_width, plot_canvas_height);
   canvas.SetCanvasSize(plot_canvas_width, plot_canvas_height);
-  auto plot_pad = make_plot_pad(std::string(canvas.GetName()) + "_plot", log_y);
-  total->Draw("E1");
-  stack.Draw("HIST SAME");
-  total->Draw("E1 SAME");
+  auto plot_pad = make_plot_pad(std::string(canvas.GetName()) + "_plot", true);
+  total->Draw("HIST");
+  for (const auto &component : histograms.component) {
+    component->Draw("HIST SAME");
+  }
+  total->Draw("HIST SAME");
 
   canvas.cd();
   TLatex label;
@@ -559,10 +545,10 @@ void draw_histograms(WeightedHistograms &histograms,
   legend.AddEntry(
       total.get(),
       anchor_et_axis ? "Central anchor clusters"
-                     : "Truth #pi^{0} in acceptance", "lep");
+                     : "Truth #pi^{0} in acceptance", "l");
   for (std::size_t component = 0; component < n_topologies; ++component) {
     legend.AddEntry(histograms.component[component].get(),
-                    topology_labels[component].c_str(), "f");
+                    topology_labels[component].c_str(), "l");
   }
   legend.DrawClone();
   plot_pad->cd();
@@ -990,13 +976,7 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
             min_cluster_energy, min_contribution_fraction,
             merged_response_min, merged_response_max,
             individual_response_min, individual_response_max,
-            pt_weight_exponent, weight_reference_pt, false);
-        draw_histograms(
-            histograms, collection_label, plot_base + "_logy.pdf",
-            truth_eta_max, min_cluster_energy, min_contribution_fraction,
-            merged_response_min, merged_response_max,
-            individual_response_min, individual_response_max,
-            pt_weight_exponent, weight_reference_pt, true);
+            pt_weight_exponent, weight_reference_pt);
         const std::string fraction_base =
             collection_base +
             "_central_truth_pi0_energy_contribution_event_component";
@@ -1023,14 +1003,7 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
             min_contribution_fraction, merged_response_min,
             merged_response_max, individual_response_min,
             individual_response_max, pt_weight_exponent,
-            weight_reference_pt, false, true, anchor_eta_max);
-        draw_histograms(
-            anchor_et_histograms, collection_label,
-            anchor_plot_base + "_logy.pdf", truth_eta_max,
-            min_cluster_energy, min_contribution_fraction,
-            merged_response_min, merged_response_max,
-            individual_response_min, individual_response_max,
-            pt_weight_exponent, weight_reference_pt, true, true, anchor_eta_max);
+            weight_reference_pt, true, anchor_eta_max);
         const std::string anchor_fraction_base =
             collection_base +
             "_central_truth_pi0_energy_contribution_event_component";
@@ -1160,7 +1133,7 @@ int PlotConditionalPartnerEfficiencyWithReweighting(
       << invalid_truth_shape << " / " << truth_pt_outside_range << " / "
       << invalid_weight << std::endl;
   std::cout << "Wrote " << output_base
-            << ".root and sixteen weighted PDF plots" << std::endl;
+            << ".root and twelve weighted PDF plots" << std::endl;
   return closure_ok && invalid_truth_shape == 0 &&
                  truth_pt_outside_range == 0 && invalid_weight == 0 &&
                  split_histograms.malformed == 0 &&

@@ -112,9 +112,11 @@ eta-phi, the classification inputs, a local tower energy map and a
 self-contained legend.  Detail pages are grouped by pi0
 candidate; the stored anchor IDs and intermediate trees are unchanged.  Nested
 tower outlines identify the anchor and the two best daughter-photon clusters
-using the same line grammar.  Truth segments are straight display guides
-between G4 vertices or to the calorimeter radius; they are not
-magnetic-field-propagated charged tracks.
+using the same line grammar.  Within a selected pi0 family, fallback projection
+to the calorimeter radius is reserved for the pi0 and its two direct photons;
+terminal shower descendants without a child vertex are omitted.  Truth segments
+are straight display guides between G4 vertices or to the calorimeter radius;
+they are not magnetic-field-propagated charged tracks.
 
 ## Anchor and direct-match diagnostics
 

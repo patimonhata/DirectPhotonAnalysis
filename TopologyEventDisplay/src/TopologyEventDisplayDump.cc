@@ -34,6 +34,20 @@ int cluster_id_from_index(const photon_tree::Pi0AnchorTopologyEventResult& resul
   return index < result.clusters.size()
       ? static_cast<int>(result.clusters[index].cluster_id) : -999;
 }
+
+bool is_selected_candidate_core_track(int track_id, const photon_tree::Pi0AnchorTopologyEventResult& result)
+{
+  for (const auto& candidate : result.candidates)
+  {
+    if (track_id == candidate.g4_parent_track_id ||
+        track_id == candidate.photon_track_ids[0] ||
+        track_id == candidate.photon_track_ids[1])
+    {
+      return true;
+    }
+  }
+  return false;
+}
 }
 
 TopologyEventDisplayDump::TopologyEventDisplayDump(const std::string& name)
@@ -558,8 +572,11 @@ void TopologyEventDisplayDump::fill_truth(PHCompositeNode* topNode, const photon
       b_z1_ = child->second->get_z();
       have_end = true;
     }
-    if (!have_end)
+    if (!have_end &&
+        (b_family_candidate_id_ < 0 || is_selected_candidate_core_track(b_track_id_, result)))
     {
+      // Terminal selected-family shower descendants have no stored end vertex.
+      // Projecting an inward descendant to r=100 cm would create a false detector-spanning chord.
       have_end = project_to_radius(
           b_x0_, b_y0_, b_z0_, b_px_, b_py_, b_pz_,
           100.0, b_x1_, b_y1_, b_z1_);

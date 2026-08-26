@@ -159,14 +159,22 @@ inline int topology_color(int topology)
   return kGray + 2;
 }
 
-inline int family_color(int family, int gamma = -1)
+constexpr int photon0_line_style = 11;
+constexpr int photon1_line_style = 12;
+
+inline int family_color(int family)
 {
   static const int colors[] = {kAzure + 1, kRed + 1, kViolet + 1,
                                kTeal + 2, kOrange + 1, kPink + 7};
   if (family < 0) return kGray + 1;
-  int color = colors[family % 6];
-  if (gamma == 1) color += 2;
-  return color;
+  return colors[family % 6];
+}
+
+inline int family_line_style(int gamma)
+{
+  if (gamma == 0) return photon0_line_style;
+  if (gamma == 1) return photon1_line_style;
+  return 1;
 }
 
 inline bool load_event(TFile* file, int event_id, DisplayData& data)
@@ -515,11 +523,11 @@ inline void draw_xy(const DisplayData& data, int selected_family = -1)
   inner->SetFillStyle(0); inner->SetLineColor(kGray + 2); inner->SetLineStyle(2); inner->Draw();
   for (const auto& segment : data.segments)
   {
-    if (selected_family >= 0 && segment.family >= 0 && segment.family != selected_family) continue;
+    if (selected_family >= 0 && segment.family != selected_family) continue;
     auto* line = new TLine(segment.x0, segment.y0, segment.x1, segment.y1);
-    line->SetLineColor(family_color(segment.family, segment.gamma));
+    line->SetLineColor(family_color(segment.family));
     line->SetLineWidth(segment.family >= 0 ? 2 : 1);
-    line->SetLineStyle(segment.family >= 0 ? 1 : 3);
+    line->SetLineStyle(segment.family >= 0 ? family_line_style(segment.gamma) : 3);
     line->Draw();
   }
   for (const auto& candidate : data.candidates)
@@ -529,7 +537,7 @@ inline void draw_xy(const DisplayData& data, int selected_family = -1)
         data.event.cx + 100.0 * std::cos(candidate.phi),
         data.event.cy + 100.0 * std::sin(candidate.phi));
     direction->SetLineColor(family_color(candidate.id));
-    direction->SetLineStyle(2); direction->SetLineWidth(2); direction->Draw();
+    direction->SetLineStyle(1); direction->SetLineWidth(2); direction->Draw();
   }
   for (const auto& cluster : data.clusters)
   {
@@ -544,21 +552,26 @@ inline void draw_zr(const DisplayData& data, int selected_family = -1)
   auto* frame = new TH2F(Form("zr_%d_%d", data.event.id, selected_family),
       ";z [cm];r [cm]", 120, -180.0, 180.0, 100, 0.0, 140.0);
   frame->SetDirectory(nullptr); frame->Draw();
+  for (const double radius : {93.0, 113.0})
+  {
+    auto* surface = new TLine(-180.0, radius, 180.0, radius);
+    surface->SetLineColor(kGray + 2); surface->SetLineStyle(2); surface->Draw();
+  }
   for (const auto& segment : data.segments)
   {
-    if (selected_family >= 0 && segment.family >= 0 && segment.family != selected_family) continue;
+    if (selected_family >= 0 && segment.family != selected_family) continue;
     auto* line = new TLine(segment.z0, std::hypot(segment.x0, segment.y0),
                            segment.z1, std::hypot(segment.x1, segment.y1));
-    line->SetLineColor(family_color(segment.family, segment.gamma));
+    line->SetLineColor(family_color(segment.family));
     line->SetLineWidth(segment.family >= 0 ? 2 : 1);
-    line->SetLineStyle(segment.family >= 0 ? 1 : 3); line->Draw();
+    line->SetLineStyle(segment.family >= 0 ? family_line_style(segment.gamma) : 3); line->Draw();
   }
   for (const auto& candidate : data.candidates)
   {
     if (selected_family >= 0 && candidate.id != selected_family) continue;
     auto* direction = new TLine(data.event.cz, std::hypot(data.event.cx, data.event.cy),
                                 data.event.cz + 100.0 * std::sinh(candidate.eta), 100.0);
-    direction->SetLineColor(family_color(candidate.id)); direction->SetLineStyle(2);
+    direction->SetLineColor(family_color(candidate.id)); direction->SetLineStyle(1);
     direction->SetLineWidth(2); direction->Draw();
   }
   for (const auto& cluster : data.clusters)
@@ -587,7 +600,7 @@ inline void draw_eta_phi(const DisplayData& data, int selected_family = -1)
     for (int gamma = 0; gamma < 2; ++gamma)
     {
       auto* marker = new TMarker(candidate.photon_eta[gamma], candidate.photon_phi[gamma], 29);
-      marker->SetMarkerColor(family_color(candidate.id, gamma));
+      marker->SetMarkerColor(family_color(candidate.id));
       marker->SetMarkerSize(1.6); marker->Draw();
     }
   }
@@ -636,111 +649,241 @@ inline void draw_anchor_towers(const DisplayData& data, const Anchor& anchor)
   for (const auto& [index, energy] : tower_energy)
     heat->Fill(index.first, index.second, energy);
   heat->Draw("colz");
-  for (const auto& tower : data.towers)
+
+  const auto draw_outline = [&](int cluster_id, double half_width, int color, int style, int width)
   {
-    if (!roles.count(tower.cluster)) continue;
-    const int phi = unwrap_iphi(tower.iphi, reference);
-    double half_width = 0.47;
-    if (tower.cluster != anchor.cluster &&
-        static_cast<int>(tower.cluster) == anchor.best_cluster[0])
-      half_width = 0.36;
-    else if (tower.cluster != anchor.cluster &&
-             static_cast<int>(tower.cluster) == anchor.best_cluster[1])
-      half_width = 0.25;
-    auto* box = new TBox(tower.ieta - half_width, phi - half_width,
-                         tower.ieta + half_width, phi + half_width);
-    box->SetFillStyle(0);
-    int color = kBlack;
-    if (tower.cluster == anchor.cluster) color = topology_color(anchor.topology);
-    else if (static_cast<int>(tower.cluster) == anchor.best_cluster[0]) color = kAzure + 1;
-    else if (static_cast<int>(tower.cluster) == anchor.best_cluster[1]) color = kRed + 1;
-    box->SetLineColor(color); box->SetLineWidth(2); box->Draw();
+    if (cluster_id < 0) return;
+    for (const auto& tower : data.towers)
+    {
+      if (static_cast<int>(tower.cluster) != cluster_id) continue;
+      const int phi = unwrap_iphi(tower.iphi, reference);
+      auto* box = new TBox(tower.ieta - half_width, phi - half_width,
+                           tower.ieta + half_width, phi + half_width);
+      box->SetFillStyle(0); box->SetLineColor(color); box->SetLineStyle(style); box->SetLineWidth(width); box->Draw();
+    }
+  };
+  draw_outline(static_cast<int>(anchor.cluster), 0.47, topology_color(anchor.topology), 1, 3);
+  draw_outline(anchor.best_cluster[0], 0.36, family_color(anchor.candidate), photon0_line_style, 2);
+  draw_outline(anchor.best_cluster[1], 0.25, family_color(anchor.candidate), photon1_line_style, 2);
+}
+
+inline int anchor_display_role(const DisplayData& data, const Anchor& anchor)
+{
+  const Candidate* candidate = find_candidate(data, anchor.candidate);
+  if (!candidate) return 2;
+  if (static_cast<int>(anchor.cluster) == candidate->best_cluster[0]) return 0;
+  if (static_cast<int>(anchor.cluster) == candidate->best_cluster[1]) return 1;
+  return 2;
+}
+
+inline std::vector<const Anchor*> ordered_anchors(const DisplayData& data)
+{
+  std::vector<const Anchor*> result;
+  result.reserve(data.anchors.size());
+  for (const auto& anchor : data.anchors) result.push_back(&anchor);
+  std::stable_sort(result.begin(), result.end(), [&](const Anchor* left, const Anchor* right)
+  {
+    return std::make_tuple(left->candidate, anchor_display_role(data, *left), left->id) <
+        std::make_tuple(right->candidate, anchor_display_role(data, *right), right->id);
+  });
+  return result;
+}
+
+inline void draw_legend_line(double y, int color, int style, int width, const char* label, double text_size)
+{
+  auto* line = new TLine(0.06, y, 0.25, y);
+  line->SetLineColor(color); line->SetLineStyle(style); line->SetLineWidth(width); line->Draw();
+  TLatex text; text.SetTextSize(text_size); text.SetTextAlign(12); text.DrawLatex(0.30, y, label);
+}
+
+inline void draw_display_legend(int family = -1, bool tower_detail = false,
+                                double start_y = 0.92, double step = 0.075,
+                                double text_size = 0.038)
+{
+  gPad->Range(0.0, 0.0, 1.0, 1.0);
+  const int color = family >= 0 ? family_color(family) : kAzure + 1;
+  TLatex title; title.SetTextSize(text_size + 0.012); title.SetTextFont(62); title.DrawLatex(0.05, start_y, "Legend");
+  double y = start_y - step;
+  draw_legend_line(y, color, 1, 3, "#pi^{0} direction / segment", text_size); y -= step;
+  draw_legend_line(y, color, photon0_line_style, 2, "photon: fine dash", text_size); y -= step;
+  draw_legend_line(y, color, photon1_line_style, 2, "partner photon: coarse dash", text_size); y -= step;
+  if (family < 0)
+  {
+    draw_legend_line(y, kGray + 1, 3, 1, "other G4 truth segment", text_size);
   }
+  else
+  {
+    TLatex note; note.SetTextSize(text_size); note.SetTextAlign(12); note.DrawLatex(0.06, y, "other G4 truth segments hidden");
+  }
+  y -= step;
+
+  auto* star = new TMarker(0.15, y, 29);
+  star->SetMarkerColor(color); star->SetMarkerSize(1.4); star->Draw();
+  TLatex text; text.SetTextSize(text_size); text.SetTextAlign(12); text.DrawLatex(0.30, y, "truth photon in #eta-#phi"); y -= step;
+
+  auto* cluster = new TMarker(0.15, y, 20);
+  cluster->SetMarkerColor(kGray + 2); cluster->SetMarkerSize(1.2); cluster->Draw();
+  auto* ring = new TMarker(0.15, y, 24);
+  ring->SetMarkerColor(color); ring->SetMarkerSize(1.55); ring->Draw();
+  text.DrawLatex(0.30, y, "cluster: fill=topology, ring=#pi^{0} family"); y -= step;
+
+  draw_legend_line(y, kGray + 2, 2, 1, "CEMC inner / outer surface", text_size); y -= step;
+  text.SetTextColor(kGreen + 2); text.DrawLatex(0.05, y, "S separated");
+  text.SetTextColor(kMagenta + 1); text.DrawLatex(0.34, y, "M merged");
+  text.SetTextColor(kOrange + 7); text.DrawLatex(0.58, y, "X missing");
+  text.SetTextColor(kGray + 2); text.DrawLatex(0.82, y, "O other");
+  text.SetTextColor(kBlack);
+
+  if (!tower_detail) return;
+  y -= step;
+  text.DrawLatex(0.05, y, "Tower map: heat = calibrated tower E"); y -= step;
+  draw_legend_line(y, topology_color(1), 1, 3, "anchor cluster outline", text_size); y -= step;
+  draw_legend_line(y, color, photon0_line_style, 2, "best-cluster outline: fine dash", text_size); y -= step;
+  draw_legend_line(y, color, photon1_line_style, 2, "best-cluster outline: coarse dash", text_size);
 }
 
 inline void draw_overview_text(const DisplayData& data)
 {
-  TLatex text; text.SetNDC(); text.SetTextSize(0.035);
-  double y = 0.94;
-  text.DrawLatex(0.04, y, Form("Event %d  vertex=(%.2f, %.2f, %.2f) cm",
-      data.event.id, data.event.cx, data.event.cy, data.event.cz)); y -= 0.07;
-  text.DrawLatex(0.04, y, Form("selected #pi^{0}: %d  G4-primary: %d  generator: %d",
-      data.event.candidates, data.event.g4_primary, data.event.generator)); y -= 0.06;
-  text.DrawLatex(0.04, y, Form("G4-secondary #pi^{0}: %d  selected-family particles: %d / %d",
-      data.event.secondary, data.event.family_particles, data.event.truth_particles)); y -= 0.06;
-  text.DrawLatex(0.04, y, Form("clusters: %d  anchors: %d  S/M/X/O=%d/%d/%d/%d",
+  gPad->Range(0.0, 0.0, 1.0, 1.0);
+  TLatex text; text.SetNDC(); text.SetTextSize(0.043);
+  double y = 0.95;
+  text.DrawLatex(0.04, y, Form("vertex = (%.2f, %.2f, %.2f) cm", data.event.cx, data.event.cy, data.event.cz)); y -= 0.07;
+  text.DrawLatex(0.04, y, Form("selected #pi^{0}: %d   G4-primary: %d   generator: %d",
+      data.event.candidates, data.event.g4_primary, data.event.generator)); y -= 0.065;
+  text.DrawLatex(0.04, y, Form("clusters: %d   anchors: %d   S/M/X/O = %d/%d/%d/%d",
       data.event.clusters, data.event.anchors, data.event.separated,
-      data.event.merged, data.event.missing, data.event.other)); y -= 0.08;
-  for (const auto& anchor : data.anchors)
+      data.event.merged, data.event.missing, data.event.other)); y -= 0.075;
+
+  const auto anchors = ordered_anchors(data);
+  text.SetTextSize(0.038);
+  std::size_t shown = 0;
+  for (const Anchor* anchor : anchors)
   {
-    text.SetTextColor(topology_color(anchor.topology));
-    text.DrawLatex(0.04, y, Form("A%d C%u P%d %-9s E_{T}=%.2f f=%.3f",
-        anchor.id, anchor.cluster, anchor.candidate,
-        anchor.topology_name.c_str(), anchor.et, anchor.main_fraction));
-    text.SetTextColor(kBlack); y -= 0.05;
-    if (y < 0.08) break;
+    if (y < 0.57) break;
+    text.SetTextColor(topology_color(anchor->topology));
+    text.DrawLatex(0.04, y, Form("P%d  A%d  C%u  %-9s  E_{T}=%.2f  f=%.3f",
+        anchor->candidate, anchor->id, anchor->cluster, anchor->topology_name.c_str(), anchor->et, anchor->main_fraction));
+    text.SetTextColor(kBlack); y -= 0.052; ++shown;
   }
-  text.SetTextSize(0.025);
-  text.DrawLatex(0.04, 0.055, "Cluster: open ring = selected #pi^{0} family (#geq 50% direct-daughter edep); fill = anchor topology.");
-  text.DrawLatex(0.04, 0.025, "Dashed directions are projections; charged-particle lines are not propagated trajectories.");
+  if (shown < anchors.size()) text.DrawLatex(0.04, y, Form("... %zu more anchors", anchors.size() - shown));
+  draw_display_legend(-1, false, 0.48, 0.052, 0.033);
 }
 
 inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
 {
+  gPad->Range(0.0, 0.0, 1.0, 1.0);
   const Candidate* candidate = find_candidate(data, anchor.candidate);
-  TLatex text; text.SetNDC(); text.SetTextSize(0.033);
+  TLatex text; text.SetNDC(); text.SetTextSize(0.048);
   double y = 0.94;
+  text.SetTextFont(62); text.DrawLatex(0.04, y, "Anchor classification"); text.SetTextFont(42); y -= 0.075;
   text.SetTextColor(topology_color(anchor.topology));
-  text.DrawLatex(0.04, y, Form("Anchor %d  cluster %u  %s",
-      anchor.id, anchor.cluster, anchor.topology_name.c_str()));
-  text.SetTextColor(kBlack); y -= 0.07;
-  text.DrawLatex(0.04, y, Form("reason: %s", anchor.reason_name.c_str())); y -= 0.06;
-  text.DrawLatex(0.04, y, Form("E=%.3f GeV  E_{T}=%.3f GeV", anchor.energy, anchor.et)); y -= 0.06;
-  text.DrawLatex(0.04, y, Form("main/second/unmatched f = %.4f / %.4f / %.4f",
-      anchor.main_fraction, anchor.second_fraction, anchor.unmatched_fraction)); y -= 0.07;
+  text.DrawLatex(0.04, y, Form("%s", anchor.topology_name.c_str()));
+  text.SetTextColor(kBlack); y -= 0.065;
+  text.SetTextSize(0.036); text.DrawLatex(0.04, y, Form("reason: %s", anchor.reason_name.c_str())); y -= 0.065;
+  text.SetTextSize(0.048);
+  text.DrawLatex(0.04, y, Form("E = %.3f GeV    E_{T} = %.3f GeV", anchor.energy, anchor.et)); y -= 0.07;
+  text.DrawLatex(0.04, y, Form("main / second f = %.4f / %.4f", anchor.main_fraction, anchor.second_fraction)); y -= 0.06;
+  text.DrawLatex(0.04, y, Form("unmatched f = %.4f", anchor.unmatched_fraction)); y -= 0.075;
   if (candidate)
   {
-    text.DrawLatex(0.04, y, Form("candidate %d  %s  p_{T}=%.3f GeV",
-        candidate->id, candidate->pathway_name.c_str(), candidate->pt)); y -= 0.06;
+    text.DrawLatex(0.04, y, Form("candidate P%d    p_{T} = %.3f GeV", candidate->id, candidate->pt)); y -= 0.06;
+    text.SetTextSize(0.037); text.DrawLatex(0.04, y, candidate->pathway_name.c_str()); y -= 0.07;
   }
-  for (int gamma = 0; gamma < 2; ++gamma)
+  text.SetTextSize(0.040);
+  for (int photon = 0; photon < 2; ++photon)
   {
-    const double recovery = anchor.truth_energy[gamma] > 0.0
-        ? anchor.reconstructed[gamma] / anchor.truth_energy[gamma] : 0.0;
-    text.DrawLatex(0.04, y, Form("#gamma%d: Cbest=%d recovered=%d Etruth=%.3f Erec=%.3f ratio=%.3f",
-        gamma, anchor.best_cluster[gamma], anchor.recovered[gamma],
-        anchor.truth_energy[gamma], anchor.reconstructed[gamma], recovery)); y -= 0.06;
+    const double recovery = anchor.truth_energy[photon] > 0.0 ? anchor.reconstructed[photon] / anchor.truth_energy[photon] : 0.0;
+    const int style = photon == 0 ? photon0_line_style : photon1_line_style;
+    auto* sample = new TLine(0.04, y + 0.008, 0.16, y + 0.008);
+    sample->SetLineColor(family_color(anchor.candidate)); sample->SetLineStyle(style); sample->SetLineWidth(2); sample->Draw();
+    text.DrawLatex(0.19, y, Form("Cbest=%d  recovered=%s", anchor.best_cluster[photon], anchor.recovered[photon] ? "yes" : "no")); y -= 0.052;
+    text.DrawLatex(0.19, y, Form("Etruth=%.3f  Erec=%.3f  ratio=%.3f",
+        anchor.truth_energy[photon], anchor.reconstructed[photon], recovery)); y -= 0.065;
   }
-  y -= 0.02;
-  text.DrawLatex(0.04, y, Form("anchor edep: total=%.4g #gamma0=%.4g #gamma1=%.4g other=%.4g valid=%d",
-      anchor.total_edep, anchor.gamma_edep[0], anchor.gamma_edep[1],
-      anchor.other_edep, anchor.match_valid));
+  text.DrawLatex(0.04, y, Form("anchor edep: total=%.4g  other=%.4g", anchor.total_edep, anchor.other_edep)); y -= 0.052;
+  text.DrawLatex(0.04, y, Form("fine/coarse photon edep = %.4g / %.4g   valid=%d",
+      anchor.gamma_edep[0], anchor.gamma_edep[1], anchor.match_valid));
 }
 
-inline std::vector<std::unique_ptr<TCanvas>> make_event_pages(
-    TFile* file, int event_id)
+inline TPad* make_display_pad(TCanvas* canvas, const std::string& name,
+                              double x0, double y0, double x1, double y1,
+                              int fill_color = kWhite)
+{
+  canvas->cd();
+  auto* pad = new TPad(name.c_str(), "", x0, y0, x1, y1);
+  pad->SetFillColor(fill_color); pad->SetBorderMode(0); pad->Draw();
+  return pad;
+}
+
+inline void draw_page_header(TCanvas* canvas, const DisplayData& data,
+                             const Anchor* anchor = nullptr,
+                             std::size_t anchor_position = 0,
+                             std::size_t anchor_count = 0)
+{
+  auto* header = make_display_pad(canvas, Form("header_%d_%d", data.event.id, anchor ? anchor->id : -1),
+      0.0, 0.93, 1.0, 1.0, anchor ? kOrange - 9 : kAzure - 9);
+  header->cd(); header->Range(0.0, 0.0, 1.0, 1.0);
+  TLatex text; text.SetTextAlign(12); text.SetTextFont(62); text.SetTextSize(anchor ? 0.30 : 0.34);
+  if (!anchor)
+  {
+    text.DrawLatex(0.02, 0.50, Form("EVENT OVERVIEW   |   Event %d", data.event.id));
+    return;
+  }
+  text.DrawLatex(0.02, 0.50, Form("ANCHOR DETAIL %zu/%zu   |   Event %d   |   P%d   A%d   C%u",
+      anchor_position, anchor_count, data.event.id, anchor->candidate, anchor->id, anchor->cluster));
+  auto* badge = new TBox(0.83, 0.13, 0.98, 0.87);
+  badge->SetFillColor(topology_color(anchor->topology)); badge->SetLineColor(topology_color(anchor->topology)); badge->Draw();
+  text.SetTextAlign(22); text.SetTextColor(kWhite); text.SetTextSize(0.25);
+  text.DrawLatex(0.905, 0.50, anchor->topology_name.c_str());
+}
+
+inline void configure_plot_pad(TPad* pad, bool color_bar = false)
+{
+  pad->SetLeftMargin(0.13); pad->SetBottomMargin(0.13); pad->SetTopMargin(0.08);
+  pad->SetRightMargin(color_bar ? 0.17 : 0.05);
+}
+
+inline std::vector<std::unique_ptr<TCanvas>> make_event_pages(TFile* file, int event_id)
 {
   DisplayData data;
   std::vector<std::unique_ptr<TCanvas>> pages;
   if (!load_event(file, event_id, data)) return pages;
   gStyle->SetOptStat(0);
-  auto overview = std::make_unique<TCanvas>(Form("overview_%d", event_id),
-      "topology event overview", 1600, 1000);
-  overview->Divide(2, 2);
-  overview->cd(1); draw_xy(data);
-  overview->cd(2); draw_zr(data);
-  overview->cd(3); draw_eta_phi(data);
-  overview->cd(4); draw_overview_text(data);
+  gStyle->SetLineStyleString(photon0_line_style, "4 4");
+  gStyle->SetLineStyleString(photon1_line_style, "16 8");
+
+  auto overview = std::make_unique<TCanvas>(Form("overview_%d", event_id), "topology event overview", 1800, 1100);
+  draw_page_header(overview.get(), data);
+  auto* overview_xy = make_display_pad(overview.get(), Form("overview_xy_%d", event_id), 0.00, 0.49, 0.50, 0.93);
+  auto* overview_zr = make_display_pad(overview.get(), Form("overview_zr_%d", event_id), 0.50, 0.49, 1.00, 0.93);
+  auto* overview_eta_phi = make_display_pad(overview.get(), Form("overview_eta_phi_%d", event_id), 0.00, 0.00, 0.50, 0.49);
+  auto* overview_text = make_display_pad(overview.get(), Form("overview_text_%d", event_id), 0.50, 0.00, 1.00, 0.49);
+  configure_plot_pad(overview_xy); configure_plot_pad(overview_zr); configure_plot_pad(overview_eta_phi);
+  overview_xy->cd(); draw_xy(data);
+  overview_zr->cd(); draw_zr(data);
+  overview_eta_phi->cd(); draw_eta_phi(data);
+  overview_text->cd(); draw_overview_text(data);
   pages.push_back(std::move(overview));
-  for (const auto& anchor : data.anchors)
+
+  const auto anchors = ordered_anchors(data);
+  for (std::size_t position = 0; position < anchors.size(); ++position)
   {
-    auto page = std::make_unique<TCanvas>(Form("anchor_%d_%d", event_id, anchor.id),
-        "topology anchor detail", 1600, 1000);
-    page->Divide(2, 2);
-    page->cd(1); draw_xy(data, anchor.candidate);
-    page->cd(2); draw_eta_phi(data, anchor.candidate);
-    page->cd(3); gPad->SetRightMargin(0.14); draw_anchor_towers(data, anchor);
-    page->cd(4); draw_anchor_text(data, anchor);
+    const Anchor& anchor = *anchors[position];
+    auto page = std::make_unique<TCanvas>(Form("anchor_%d_%d", event_id, anchor.id), "topology anchor detail", 1800, 1100);
+    draw_page_header(page.get(), data, &anchor, position + 1, anchors.size());
+    auto* xy = make_display_pad(page.get(), Form("anchor_xy_%d_%d", event_id, anchor.id), 0.00, 0.49, 0.333, 0.93);
+    auto* zr = make_display_pad(page.get(), Form("anchor_zr_%d_%d", event_id, anchor.id), 0.333, 0.49, 0.666, 0.93);
+    auto* eta_phi = make_display_pad(page.get(), Form("anchor_eta_phi_%d_%d", event_id, anchor.id), 0.666, 0.49, 1.00, 0.93);
+    auto* towers = make_display_pad(page.get(), Form("anchor_towers_%d_%d", event_id, anchor.id), 0.00, 0.00, 0.42, 0.49);
+    auto* info = make_display_pad(page.get(), Form("anchor_info_%d_%d", event_id, anchor.id), 0.42, 0.00, 0.72, 0.49);
+    auto* legend = make_display_pad(page.get(), Form("anchor_legend_%d_%d", event_id, anchor.id), 0.72, 0.00, 1.00, 0.49);
+    configure_plot_pad(xy); configure_plot_pad(zr); configure_plot_pad(eta_phi); configure_plot_pad(towers, true);
+    xy->cd(); draw_xy(data, anchor.candidate);
+    zr->cd(); draw_zr(data, anchor.candidate);
+    eta_phi->cd(); draw_eta_phi(data, anchor.candidate);
+    towers->cd(); draw_anchor_towers(data, anchor);
+    info->cd(); draw_anchor_text(data, anchor);
+    legend->cd(); draw_display_legend(anchor.candidate, true, 0.94, 0.068, 0.035);
     pages.push_back(std::move(page));
   }
   return pages;

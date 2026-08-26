@@ -103,12 +103,17 @@ BrowseTopologyEvents("output/topology_pythia.root",
 ```
 
 Every event starts with an overview page containing x-y, z-r and eta-phi
-views.  Selected pi0 families use distinct line/open-ring colors; the filled
-cluster marker encodes the anchor topology.  Each anchor then gets a detail
-page with the selected family, the classification inputs and a local tower
-energy map.  Nested colored outlines identify tower membership of the anchor
-and the two best daughter-photon clusters.  Truth segments are straight
-display guides between G4 vertices or to the calorimeter radius; they are not
+views.  One color consistently identifies one selected pi0 family: the pi0 is
+solid, while its two daughter-photon branches use fine and coarse dashes.  The
+open cluster ring uses the same family color, and the filled cluster marker
+encodes the anchor topology.  Each anchor then gets a clearly labeled detail
+page showing only that family's G4 truth segments in x-y and z-r, together with
+eta-phi, the classification inputs, a local tower energy map and a
+self-contained legend.  Detail pages are grouped by pi0
+candidate; the stored anchor IDs and intermediate trees are unchanged.  Nested
+tower outlines identify the anchor and the two best daughter-photon clusters
+using the same line grammar.  Truth segments are straight display guides
+between G4 vertices or to the calorimeter radius; they are not
 magnetic-field-propagated charged tracks.
 
 ## Intermediate ROOT schema

@@ -29,7 +29,7 @@ constexpr std::size_t kHistogramCount = 6;
 constexpr std::size_t kCategoryCount = 4;
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
-constexpr double kPlotAreaTop = 0.52;
+constexpr double kPlotAreaTop = 0.62;
 constexpr double kPlotLeftMargin = 0.13;
 constexpr double kPlotRightMargin = 0.04;
 constexpr double kPlotBottomMargin = 0.16;
@@ -37,6 +37,20 @@ constexpr double kPlotTopMargin = 0.04;
 constexpr double kAnnotationX = 0.06;
 constexpr double kLegendX = 0.55;
 constexpr double kTextSize = 0.026;
+constexpr double kAxisTextSize = 0.05;
+constexpr double kXTitleOffset = 1.4;
+constexpr double kYTitleOffset = 1.15;
+
+void style_plot_axes(TAxis* x_axis, TAxis* y_axis) {
+  x_axis->SetLabelSize(kAxisTextSize);
+  x_axis->SetTitleSize(kAxisTextSize);
+  x_axis->SetTitleOffset(kXTitleOffset);
+  x_axis->CenterTitle();
+  y_axis->SetLabelSize(kAxisTextSize);
+  y_axis->SetTitleSize(kAxisTextSize);
+  y_axis->SetTitleOffset(kYTitleOffset);
+  y_axis->CenterTitle();
+}
 
 std::unique_ptr<TPad> make_plot_pad(const std::string& name, bool log_y = false) {
   auto pad = std::make_unique<TPad>(name.c_str(), "", 0.0, 0.0, 1.0, kPlotAreaTop);
@@ -465,18 +479,16 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     density[index]->SetStats(false);
     density[index]->SetLineColor(colors[index]);
     density[index]->SetLineWidth(index < 2 ? 3 : 2);
-    density[index]->GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
+    density[index]->GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
     density[index]->GetYaxis()->SetTitle("Clusters / GeV");
-    density[index]->GetXaxis()->CenterTitle();
-    density[index]->GetYaxis()->CenterTitle();
+    style_plot_axes(density[index]->GetXaxis(), density[index]->GetYaxis());
 
     raw[index]->SetStats(false);
     raw[index]->SetLineColor(colors[index]);
     raw[index]->SetLineWidth(index < 2 ? 3 : 2);
-    raw[index]->GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
-    raw[index]->GetYaxis()->SetTitle("Counts / bin");
-    raw[index]->GetXaxis()->CenterTitle();
-    raw[index]->GetYaxis()->CenterTitle();
+    raw[index]->GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
+    raw[index]->GetYaxis()->SetTitle("Counts");
+    style_plot_axes(raw[index]->GetXaxis(), raw[index]->GetYaxis());
   }
 
   const std::array<std::string, kCategoryCount> fraction_names = {
@@ -495,10 +507,9 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     fractions[index]->SetMarkerStyle(20 + static_cast<int>(index));
     fractions[index]->SetMarkerSize(0.9);
     fractions[index]->SetLineWidth(2);
-    fractions[index]->GetXaxis()->SetTitle("Anchor cluster E_{T} [GeV]");
-    fractions[index]->GetYaxis()->SetTitle("Category / selected anchor clusters");
-    fractions[index]->GetXaxis()->CenterTitle();
-    fractions[index]->GetYaxis()->CenterTitle();
+    fractions[index]->GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
+    fractions[index]->GetYaxis()->SetTitle("Fraction");
+    style_plot_axes(fractions[index]->GetXaxis(), fractions[index]->GetYaxis());
   }
 
   std::array<std::unique_ptr<TH1D>, kCategoryCount> stacked_fractions;
@@ -548,23 +559,21 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   spectrum_label.SetNDC();
   spectrum_label.SetTextAlign(13);
   spectrum_label.SetTextSize(kTextSize);
-  spectrum_label.DrawLatex(kAnnotationX, 0.95, "#it{#bf{sPHENIX}} Internal");
-  spectrum_label.DrawLatex(kAnnotationX, 0.89, sample_label.c_str());
+  spectrum_label.DrawLatex(kAnnotationX, 0.96, "#it{#bf{sPHENIX}} Internal");
+  spectrum_label.DrawLatex(kAnnotationX, 0.91, sample_label.c_str());
+  spectrum_label.DrawLatex(kAnnotationX, 0.86, "Category unit: #pi^{0}-main anchor cluster");
   std::ostringstream anchor_label;
   anchor_label << "Anchor |#eta| < " << reference.anchor_cluster_eta_max;
-  spectrum_label.DrawLatex(kAnnotationX, 0.83, anchor_label.str().c_str());
-  const std::string partner_label =
-      reference.partner_cluster_eta_max <= 0.0
-          ? "Partner: clusters above E_{min}"
-          : "Partner: software #eta cut applied";
-  spectrum_label.DrawLatex(kAnnotationX, 0.77, partner_label.c_str());
-  spectrum_label.DrawLatex(kAnnotationX, 0.71, "Topology: energy deposit");
+  spectrum_label.DrawLatex(kAnnotationX, 0.81, anchor_label.str().c_str());
+  std::ostringstream min_cluster_energy_label;
+  min_cluster_energy_label << "E_{min}^{cluster} = " << reference.min_cluster_energy << " GeV";
+  spectrum_label.DrawLatex(kAnnotationX, 0.76, min_cluster_energy_label.str().c_str());
   std::ostringstream recovery_label;
   recovery_label << "E_{clus} f_{dep}^{#gamma}/E_{truth}^{#gamma} #geq " << reference.min_photon_energy_recovery;
+  spectrum_label.DrawLatex(kAnnotationX, 0.71, recovery_label.str().c_str());
   std::ostringstream vertex_label;
   vertex_label << "|z_{vtx}^{truth}| < " << reference.max_abs_vertex_z << " cm";
-  spectrum_label.DrawLatex(kAnnotationX, 0.65, recovery_label.str().c_str());
-  spectrum_label.DrawLatex(kAnnotationX, 0.59, vertex_label.str().c_str());
+  spectrum_label.DrawLatex(kAnnotationX, 0.66, vertex_label.str().c_str());
   spectrum_plot_pad->cd();
   spectrum_plot_pad->RedrawAxis();
   spectrum_canvas.cd();
@@ -593,11 +602,13 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_label.SetNDC();
   fraction_label.SetTextAlign(13);
   fraction_label.SetTextSize(kTextSize);
-  fraction_label.DrawLatex(kAnnotationX, 0.95, "#it{#bf{sPHENIX}} Internal");
-  fraction_label.DrawLatex(kAnnotationX, 0.89, sample_label.c_str());
-  fraction_label.DrawLatex(kAnnotationX, 0.83, "Denominator: all #pi^{0}-main anchors");
-  fraction_label.DrawLatex(kAnnotationX, 0.77, recovery_label.str().c_str());
-  fraction_label.DrawLatex(kAnnotationX, 0.71, vertex_label.str().c_str());
+  fraction_label.DrawLatex(kAnnotationX, 0.96, "#it{#bf{sPHENIX}} Internal");
+  fraction_label.DrawLatex(kAnnotationX, 0.91, sample_label.c_str());
+  fraction_label.DrawLatex(kAnnotationX, 0.86, "Denominator: all #pi^{0}-main anchors");
+  fraction_label.DrawLatex(kAnnotationX, 0.81, anchor_label.str().c_str());
+  fraction_label.DrawLatex(kAnnotationX, 0.76, min_cluster_energy_label.str().c_str());
+  fraction_label.DrawLatex(kAnnotationX, 0.71, recovery_label.str().c_str());
+  fraction_label.DrawLatex(kAnnotationX, 0.66, vertex_label.str().c_str());
   fraction_plot_pad->cd();
   fraction_plot_pad->RedrawAxis();
   fraction_canvas.cd();
@@ -613,10 +624,9 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_stack.SetMinimum(0.0);
   fraction_stack.SetMaximum(1.05);
   fraction_stack.Draw("HIST");
-  fraction_stack.GetXaxis()->SetTitle("Anchor cluster E_{T} [GeV]");
-  fraction_stack.GetYaxis()->SetTitle("Category / selected anchor clusters");
-  fraction_stack.GetXaxis()->CenterTitle();
-  fraction_stack.GetYaxis()->CenterTitle();
+  fraction_stack.GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
+  fraction_stack.GetYaxis()->SetTitle("Fraction");
+  style_plot_axes(fraction_stack.GetXaxis(), fraction_stack.GetYaxis());
 
   fraction_stack_canvas.cd();
   TLegend fraction_stack_legend(kLegendX, 0.72, 0.94, 0.95);
@@ -633,11 +643,13 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_stack_label.SetNDC();
   fraction_stack_label.SetTextAlign(13);
   fraction_stack_label.SetTextSize(kTextSize);
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.95, "#it{#bf{sPHENIX}} Internal");
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.89, sample_label.c_str());
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.83, "Denominator: all #pi^{0}-main anchors");
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.77, recovery_label.str().c_str());
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.71, vertex_label.str().c_str());
+  fraction_stack_label.DrawLatex(kAnnotationX, 0.96, "#it{#bf{sPHENIX}} Internal");
+  fraction_stack_label.DrawLatex(kAnnotationX, 0.91, sample_label.c_str());
+  fraction_stack_label.DrawLatex(kAnnotationX, 0.86, "Denominator: all #pi^{0}-main anchors");
+  fraction_stack_label.DrawLatex(kAnnotationX, 0.81, anchor_label.str().c_str());
+  fraction_stack_label.DrawLatex(kAnnotationX, 0.76, min_cluster_energy_label.str().c_str());
+  fraction_stack_label.DrawLatex(kAnnotationX, 0.71, recovery_label.str().c_str());
+  fraction_stack_label.DrawLatex(kAnnotationX, 0.66, vertex_label.str().c_str());
   fraction_stack_plot_pad->cd();
   fraction_stack_plot_pad->RedrawAxis();
   fraction_stack_canvas.cd();

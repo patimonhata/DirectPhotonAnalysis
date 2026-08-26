@@ -8,6 +8,7 @@
 #include <TLatex.h>
 #include <TLegend.h>
 #include <TNamed.h>
+#include <TPad.h>
 #include <TParameter.h>
 #include <TString.h>
 #include <TSystem.h>
@@ -25,9 +26,15 @@
 
 namespace conditional_partner_reweighting {
 
-const std::array<double, 13> truth_pt_edges = {
-    3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0,
-    10.0, 11.0, 12.0, 13.0, 14.0, 15.0};
+// const std::array<double, 13> truth_pt_edges = {
+//     3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0,
+//     10.0, 11.0, 12.0, 13.0, 14.0, 15.0};
+const std::array<double, 39> truth_pt_edges = {
+    2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+    11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0,
+    19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0,
+    27.0, 28.0, 29.0, 30.0, 31.0, 32.0, 33.0, 34.0,
+    35.0, 36.0, 37.0, 38.0, 39.0, 40.0};
 constexpr std::size_t n_truth_pt_bins = truth_pt_edges.size() - 1U;
 constexpr double anchor_et_bin_width = 0.2;
 constexpr double anchor_et_histogram_min = 0.0;
@@ -52,13 +59,28 @@ const std::array<int, n_topologies> topology_colors = {
     kAzure + 7, kMagenta + 1, kGreen + 2, kGray + 2};
 
 constexpr int plot_canvas_width = 1100;
-constexpr int plot_canvas_height = 800;
-constexpr double plot_left_margin = 0.16;
-constexpr double plot_right_margin = 0.37;
-constexpr double plot_bottom_margin = 0.14;
-constexpr double plot_top_margin = 0.05;
-constexpr double plot_annotation_x = 0.66;
+constexpr int plot_canvas_height = 900;
+constexpr double plot_area_top = 0.52;
+constexpr double plot_left_margin = 0.13;
+constexpr double plot_right_margin = 0.04;
+constexpr double plot_bottom_margin = 0.16;
+constexpr double plot_top_margin = 0.04;
+constexpr double plot_annotation_x = 0.06;
+constexpr double plot_legend_x = 0.55;
 constexpr double plot_text_size = 0.026;
+
+std::unique_ptr<TPad> make_plot_pad(const std::string &name, const bool log_y = false) {
+  auto pad = std::make_unique<TPad>(name.c_str(), "", 0.0, 0.0, 1.0, plot_area_top);
+  pad->SetLeftMargin(plot_left_margin);
+  pad->SetRightMargin(plot_right_margin);
+  pad->SetBottomMargin(plot_bottom_margin);
+  pad->SetTopMargin(plot_top_margin);
+  pad->SetTicks(1, 1);
+  pad->SetLogy(log_y);
+  pad->Draw();
+  pad->cd();
+  return pad;
+}
 
 struct CollectionBranches {
   std::vector<double> *cluster_e = nullptr;
@@ -501,48 +523,45 @@ void draw_histograms(WeightedHistograms &histograms,
           : "Weighted central truth pi0 reconstruction topologies",
       plot_canvas_width, plot_canvas_height);
   canvas.SetCanvasSize(plot_canvas_width, plot_canvas_height);
-  canvas.SetLeftMargin(plot_left_margin);
-  canvas.SetRightMargin(plot_right_margin);
-  canvas.SetBottomMargin(plot_bottom_margin);
-  canvas.SetTopMargin(plot_top_margin);
-  canvas.SetLogy(log_y);
+  auto plot_pad = make_plot_pad(std::string(canvas.GetName()) + "_plot", log_y);
   total->Draw("E1");
   stack.Draw("HIST SAME");
   total->Draw("E1 SAME");
 
+  canvas.cd();
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
   label.SetTextSize(plot_text_size);
-  label.DrawLatex(plot_annotation_x, 0.93, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(plot_annotation_x, 0.96, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(
-      plot_annotation_x, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
+      plot_annotation_x, 0.92, ("Single #pi^{0} gun, " + collection_label).c_str());
   if (anchor_et_axis) {
-    label.DrawLatex(plot_annotation_x, 0.83, "Event category per selected anchor");
+    label.DrawLatex(plot_annotation_x, 0.88, "Event category per selected anchor");
     label.DrawLatex(
-        plot_annotation_x, 0.78,
+        plot_annotation_x, 0.84,
         Form("Truth/anchor |#eta| < %.1f / %.1f",
              truth_eta_max, anchor_eta_max));
     label.DrawLatex(
-        plot_annotation_x, 0.73,
+        plot_annotation_x, 0.80,
         Form("Displayed anchor E_{T}: [%.3g, %.3g) GeV",
              anchor_et_histogram_min, anchor_et_histogram_max));
     label.DrawLatex(
-        plot_annotation_x, 0.68,
+        plot_annotation_x, 0.76,
         Form("Anchor weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   } else {
-    label.DrawLatex(plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
-    label.DrawLatex(plot_annotation_x, 0.78, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts", truth_eta_max));
+    label.DrawLatex(plot_annotation_x, 0.88, "Energy-deposit match; truth #alpha integrated");
+    label.DrawLatex(plot_annotation_x, 0.84, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts", truth_eta_max));
     label.DrawLatex(
-        plot_annotation_x, 0.73,
+        plot_annotation_x, 0.80,
         Form("w = (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   }
-  const double match_y = anchor_et_axis ? 0.60 : 0.65;
-  const double split_y = anchor_et_axis ? 0.56 : 0.61;
-  const double merged_y = anchor_et_axis ? 0.52 : 0.57;
-  const double missing_y = anchor_et_axis ? 0.48 : 0.53;
+  const double match_y = anchor_et_axis ? 0.72 : 0.76;
+  const double split_y = anchor_et_axis ? 0.68 : 0.72;
+  const double merged_y = anchor_et_axis ? 0.64 : 0.68;
+  const double missing_y = anchor_et_axis ? 0.60 : 0.64;
   label.DrawLatex(plot_annotation_x, match_y, Form("Max-E_{dep} match; f_{#gamma} > %.3g", min_contribution_fraction));
   label.DrawLatex(plot_annotation_x, split_y, Form("Separated: two clusters; E_{clus} #geq %.3g GeV", min_cluster_energy));
   label.DrawLatex(
@@ -554,7 +573,7 @@ void draw_histograms(WeightedHistograms &histograms,
       Form("Missing: one match; R_{#gamma} [%.1f, %.1f]",
            individual_response_min, individual_response_max));
 
-  TLegend legend(plot_annotation_x, 0.14, 0.96, 0.43);
+  TLegend legend(plot_legend_x, 0.67, 0.94, 0.95);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(plot_text_size);
@@ -567,7 +586,9 @@ void draw_histograms(WeightedHistograms &histograms,
                     topology_labels[component].c_str(), "f");
   }
   legend.DrawClone();
-  gPad->RedrawAxis();
+  plot_pad->cd();
+  plot_pad->RedrawAxis();
+  canvas.cd();
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -585,37 +606,37 @@ void draw_fraction_information(
   label.SetNDC();
   label.SetTextAlign(13);
   label.SetTextSize(plot_text_size);
-  label.DrawLatex(plot_annotation_x, 0.93, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(plot_annotation_x, 0.96, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(
-      plot_annotation_x, 0.88, ("Single #pi^{0} gun, " + collection_label).c_str());
+      plot_annotation_x, 0.92, ("Single #pi^{0} gun, " + collection_label).c_str());
   if (anchor_et_axis) {
-    label.DrawLatex(plot_annotation_x, 0.83, "Event category per selected anchor");
-    label.DrawLatex(plot_annotation_x, 0.78, "Denominator: weighted selected anchors");
+    label.DrawLatex(plot_annotation_x, 0.88, "Event category per selected anchor");
+    label.DrawLatex(plot_annotation_x, 0.84, "Denominator: weighted selected anchors");
     label.DrawLatex(
-        plot_annotation_x, 0.73,
+        plot_annotation_x, 0.80,
         Form("Truth/anchor |#eta| < %.1f / %.1f",
              truth_eta_max, anchor_eta_max));
     label.DrawLatex(
-        plot_annotation_x, 0.68,
+        plot_annotation_x, 0.76,
         Form("Displayed anchor E_{T}: [%.3g, %.3g) GeV",
              anchor_et_histogram_min, anchor_et_histogram_max));
     label.DrawLatex(
-        plot_annotation_x, 0.63,
+        plot_annotation_x, 0.72,
         Form("Anchor weight: (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   } else {
-    label.DrawLatex(plot_annotation_x, 0.83, "Energy-deposit match; truth #alpha integrated");
-    label.DrawLatex(plot_annotation_x, 0.78, "Denominator: weighted accepted truth #pi^{0}");
-    label.DrawLatex(plot_annotation_x, 0.73, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts", truth_eta_max));
+    label.DrawLatex(plot_annotation_x, 0.88, "Energy-deposit match; truth #alpha integrated");
+    label.DrawLatex(plot_annotation_x, 0.84, "Denominator: weighted accepted truth #pi^{0}");
+    label.DrawLatex(plot_annotation_x, 0.80, Form("|#eta_{truth}^{#pi^{0}}| < %.1f; no reco cuts", truth_eta_max));
     label.DrawLatex(
-        plot_annotation_x, 0.68,
+        plot_annotation_x, 0.76,
         Form("w = (p_{T}^{truth}/%.3g GeV)^{%.3f}",
              weight_reference_pt, weight_exponent));
   }
-  const double match_y = anchor_et_axis ? 0.56 : 0.61;
-  const double split_y = anchor_et_axis ? 0.51 : 0.56;
-  const double merged_y = anchor_et_axis ? 0.46 : 0.51;
-  const double missing_y = anchor_et_axis ? 0.41 : 0.46;
+  const double match_y = anchor_et_axis ? 0.68 : 0.72;
+  const double split_y = anchor_et_axis ? 0.64 : 0.68;
+  const double merged_y = anchor_et_axis ? 0.60 : 0.64;
+  const double missing_y = anchor_et_axis ? 0.56 : 0.60;
   label.DrawLatex(plot_annotation_x, match_y, Form("Max-E_{dep} match; f_{#gamma} > %.3g", min_contribution_fraction));
   label.DrawLatex(plot_annotation_x, split_y, Form("Separated: two clusters; E_{clus} #geq %.3g GeV", min_cluster_energy));
   label.DrawLatex(
@@ -660,16 +681,14 @@ void draw_fraction_overlay(
                      : "Weighted truth-pi0 category fractions",
       plot_canvas_width, plot_canvas_height);
   canvas.SetCanvasSize(plot_canvas_width, plot_canvas_height);
-  canvas.SetLeftMargin(plot_left_margin);
-  canvas.SetRightMargin(plot_right_margin);
-  canvas.SetBottomMargin(plot_bottom_margin);
-  canvas.SetTopMargin(plot_top_margin);
+  auto plot_pad = make_plot_pad(std::string(canvas.GetName()) + "_plot");
   frame.Draw("E1");
   for (std::size_t component = 1; component < n_topologies; ++component) {
     histograms.fraction[component]->Draw("E1 SAME");
   }
 
-  TLegend legend(plot_annotation_x, 0.14, 0.96, 0.40);
+  canvas.cd();
+  TLegend legend(plot_legend_x, 0.72, 0.94, 0.95);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(plot_text_size);
@@ -683,7 +702,9 @@ void draw_fraction_overlay(
       min_contribution_fraction, merged_response_min, merged_response_max,
       individual_response_min, individual_response_max, weight_exponent,
       weight_reference_pt, anchor_et_axis, anchor_eta_max);
-  gPad->RedrawAxis();
+  plot_pad->cd();
+  plot_pad->RedrawAxis();
+  canvas.cd();
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -728,10 +749,7 @@ void draw_fraction_stack(
                      : "Weighted truth-pi0 category fraction stack",
       plot_canvas_width, plot_canvas_height);
   canvas.SetCanvasSize(plot_canvas_width, plot_canvas_height);
-  canvas.SetLeftMargin(plot_left_margin);
-  canvas.SetRightMargin(plot_right_margin);
-  canvas.SetBottomMargin(plot_bottom_margin);
-  canvas.SetTopMargin(plot_top_margin);
+  auto plot_pad = make_plot_pad(std::string(canvas.GetName()) + "_plot");
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
   stack.Draw("HIST");
@@ -744,7 +762,8 @@ void draw_fraction_stack(
   stack.GetXaxis()->CenterTitle();
   stack.GetYaxis()->CenterTitle();
 
-  TLegend legend(plot_annotation_x, 0.14, 0.96, 0.40);
+  canvas.cd();
+  TLegend legend(plot_legend_x, 0.72, 0.94, 0.95);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(plot_text_size);
@@ -758,7 +777,9 @@ void draw_fraction_stack(
       min_contribution_fraction, merged_response_min, merged_response_max,
       individual_response_min, individual_response_max, weight_exponent,
       weight_reference_pt, anchor_et_axis, anchor_eta_max);
-  gPad->RedrawAxis();
+  plot_pad->cd();
+  plot_pad->RedrawAxis();
+  canvas.cd();
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -825,9 +846,10 @@ void write_histograms(TFile &output,
 
 int PlotConditionalPartnerEfficiencyWithReweighting(
     const std::string input_path =
-        "PhotonAnalysisTree/output/merged/newscheme_100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
+        // "PhotonAnalysisTree/output/merged/newscheme_100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
+        "PhotonAnalysisTree/output/merged/newscheme_496p5kevents_pi0_2to40GeV_etapm0p7_vertexpm60.root",
     const std::string output_base =
-        "PhotonAnalysisTree/output/plots/conditional_efficiency_reweighted/ET3to5GeV_threshold100MeV/conditional_partner_et3to5_reweighted",
+        "PhotonAnalysisTree/output/plots/conditional_efficiency_reweighted/ET3to5GeV_threshold100MeV_widepT/conditional_partner_et3to5_reweighted",
     const double anchor_eta_max = 0.7, const double anchor_et_min = 3.0,
     const double anchor_et_max = 5.0,
     const double min_cluster_energy = 0.1,

@@ -52,7 +52,17 @@ enum class Pi0MissingDetail : int
   partner_cluster_below_energy_threshold_recovered = 2,
   partner_cluster_below_energy_threshold_below_recovery = 3,
   partner_direct_match_incomplete = 4,
-  partner_no_direct_deposit = 5
+  partner_no_direct_deposit = 5,
+  partner_outside_cemc_acceptance = 6,
+  partner_projection_invalid = 7
+};
+
+enum class Pi0MissingCategory : int
+{
+  not_missing = 0,
+  energy_threshold = 1,
+  acceptance = 2,
+  other = 3
 };
 
 enum class Pi0TopologyEventStatus : int
@@ -72,9 +82,11 @@ struct Pi0AnchorTopologyConfig
   std::string truth_cell_node_name = "G4CELL_CEMC";
   std::string truth_hit_node_name = "G4HIT_CEMC";
   std::string cluster_node_name = "CLUSTERINFO_CEMC";
+  std::string tower_geom_node_name = "TOWERGEOM_CEMC";
   int signal_embedding_id = 1;
   double anchor_cluster_eta_max = 0.7;
   double partner_cluster_eta_max = -1.0;
+  double cemc_acceptance_eta_max = 1.1;
   double min_cluster_energy = 0.2;
   double dominant_fraction_min = 0.5;
   double anchor_pi0_fraction_min = 0.5;
@@ -129,6 +141,10 @@ struct Pi0TopologyCandidateRecord
   std::array<double, 2> photon_energy = {0.0, 0.0};
   std::array<double, 2> photon_eta = {0.0, 0.0};
   std::array<double, 2> photon_phi = {0.0, 0.0};
+  std::array<bool, 2> photon_projection_valid = {false, false};
+  std::array<double, 2> photon_projection_eta = {-999.0, -999.0};
+  std::array<double, 2> photon_projection_phi = {-999.0, -999.0};
+  std::array<bool, 2> photon_in_cemc_acceptance = {false, false};
   bool topology_evaluated = false;
   std::array<std::size_t, 2> best_cluster = {static_cast<std::size_t>(-1), static_cast<std::size_t>(-1)};
   std::array<double, 2> maximum_edep = {-1.0, -1.0};
@@ -148,6 +164,7 @@ struct Pi0TopologyAnchorRecord
   bool ambiguous_main = false;
   Pi0AnchorTopology topology = Pi0AnchorTopology::other;
   Pi0AnchorReason reason = Pi0AnchorReason::other_not_daughter_maximum;
+  Pi0MissingCategory missing_category = Pi0MissingCategory::not_missing;
   Pi0MissingDetail missing_detail = Pi0MissingDetail::not_missing;
   int partner_photon_index = -1;
 };
@@ -168,6 +185,7 @@ struct Pi0AnchorTopologyEventResult
 };
 
 const char* pi0_missing_detail_name(Pi0MissingDetail value);
+const char* pi0_missing_category_name(Pi0MissingCategory value);
 const char* pi0_pathway_name(Pi0Pathway value);
 const char* pi0_anchor_topology_name(Pi0AnchorTopology value);
 const char* pi0_anchor_reason_name(Pi0AnchorReason value);
@@ -175,7 +193,7 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 4;
+  static constexpr int kAlgorithmVersion = 5;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

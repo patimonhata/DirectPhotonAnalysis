@@ -1,8 +1,10 @@
 #include <TFile.h>
 #include <TTree.h>
 
+#include <array>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <set>
 #include <string>
 #include <tuple>
@@ -17,6 +19,14 @@ bool require_branch(TTree* tree, const char* name)
             << std::endl;
   return false;
 }
+
+struct CandidateProjection
+{
+  std::array<int, 2> valid = {0, 0};
+  std::array<double, 2> eta = {-999.0, -999.0};
+  std::array<double, 2> phi = {-999.0, -999.0};
+  std::array<int, 2> in_acceptance = {0, 0};
+};
 }
 
 int CheckTopologyEventDump(const char* input_file)
@@ -37,7 +47,8 @@ int CheckTopologyEventDump(const char* input_file)
   bool ok = metadata && events && candidates && anchors && clusters && matches;
   ok &= metadata && metadata->GetEntries() == 1;
   for (const char* branch : {
-           "schema_version", "sample_mode", "write_detail", "first_event", "min_direct_match_cluster_energy_coverage",
+           "schema_version", "sample_mode", "write_detail", "first_event", "tower_geom_node",
+           "cemc_acceptance_eta_max", "min_direct_match_cluster_energy_coverage",
            "missing_diagnostic_max_delta_r", "enable_missing_diagnostics",
            "events_processed", "events_written", "events_invalid"})
     ok &= require_branch(metadata, branch);
@@ -45,11 +56,15 @@ int CheckTopologyEventDump(const char* input_file)
                              "n_merged", "n_missing", "n_other"})
     ok &= require_branch(events, branch);
   for (const char* branch : {"event", "candidate_id", "pathway",
-                             "best_cluster0_id", "best_cluster1_id"})
+                             "best_cluster0_id", "best_cluster1_id",
+                             "photon0_projection_valid", "photon1_projection_valid",
+                             "photon0_projection_eta", "photon1_projection_eta",
+                             "photon0_projection_phi", "photon1_projection_phi",
+                             "photon0_in_cemc_acceptance", "photon1_in_cemc_acceptance"})
     ok &= require_branch(candidates, branch);
   for (const char* branch : {
            "event", "candidate_id", "cluster_id", "topology", "reason", "main_fraction",
-           "missing_detail", "partner_photon_index",
+           "missing_category", "missing_detail", "partner_photon_index",
            "match_valid", "match_usable", "match_status", "match_failure",
            "match_failure_ieta", "match_failure_iphi", "match_tower_count",
            "match_matched_tower_count", "match_cluster_member_energy_coverage",
@@ -71,17 +86,22 @@ int CheckTopologyEventDump(const char* input_file)
   {
     file->Close();
     return 2;
+  }
   int schema_version = 0;
+  double cemc_acceptance_eta_max = 0.0;
   metadata->SetBranchAddress("schema_version", &schema_version);
+  metadata->SetBranchAddress("cemc_acceptance_eta_max", &cemc_acceptance_eta_max);
   metadata->GetEntry(0);
   metadata->ResetBranchAddresses();
-  if (schema_version != 3)
+  if (schema_version != 4)
   {
-    std::cerr << "CheckTopologyEventDump - expected schema version 3, got "
-              << schema_version << std::endl;
+    std::cerr << "CheckTopologyEventDump - expected schema version 4, got " << schema_version << std::endl;
     ok = false;
   }
-
+  if (!std::isfinite(cemc_acceptance_eta_max) || !(cemc_acceptance_eta_max > 0.0))
+  {
+    std::cerr << "CheckTopologyEventDump - invalid CEMC acceptance eta max" << std::endl;
+    ok = false;
   }
 
   int event = -1;
@@ -105,13 +125,45 @@ int CheckTopologyEventDump(const char* input_file)
   events->ResetBranchAddresses();
 
   std::set<std::pair<int, int>> candidate_keys;
+  std::map<std::pair<int, int>, CandidateProjection> candidate_projection;
   int candidate_id = -1;
+  CandidateProjection projection;
   candidates->SetBranchAddress("event", &event);
   candidates->SetBranchAddress("candidate_id", &candidate_id);
+  candidates->SetBranchAddress("photon0_projection_valid", &projection.valid[0]);
+  candidates->SetBranchAddress("photon1_projection_valid", &projection.valid[1]);
+  candidates->SetBranchAddress("photon0_projection_eta", &projection.eta[0]);
+  candidates->SetBranchAddress("photon1_projection_eta", &projection.eta[1]);
+  candidates->SetBranchAddress("photon0_projection_phi", &projection.phi[0]);
+  candidates->SetBranchAddress("photon1_projection_phi", &projection.phi[1]);
+  candidates->SetBranchAddress("photon0_in_cemc_acceptance", &projection.in_acceptance[0]);
+  candidates->SetBranchAddress("photon1_in_cemc_acceptance", &projection.in_acceptance[1]);
   for (Long64_t entry = 0; entry < candidates->GetEntries(); ++entry)
   {
     candidates->GetEntry(entry);
-    if (!candidate_keys.insert({event, candidate_id}).second) ok = false;
+    const std::pair<int, int> key = {event, candidate_id};
+    bool invalid_projection = !candidate_keys.insert(key).second;
+    for (int photon = 0; photon < 2; ++photon)
+    {
+      invalid_projection |= (projection.valid[photon] != 0 && projection.valid[photon] != 1) ||
+          (projection.in_acceptance[photon] != 0 && projection.in_acceptance[photon] != 1);
+      if (projection.valid[photon])
+      {
+        const bool expected_in_acceptance = std::abs(projection.eta[photon]) < cemc_acceptance_eta_max;
+        invalid_projection |= !std::isfinite(projection.eta[photon]) || !std::isfinite(projection.phi[photon]) ||
+            projection.in_acceptance[photon] != static_cast<int>(expected_in_acceptance);
+      }
+      else
+      {
+        invalid_projection |= projection.in_acceptance[photon] != 0;
+      }
+    }
+    if (invalid_projection)
+    {
+      std::cerr << "CheckTopologyEventDump - invalid candidate projection at entry " << entry << std::endl;
+      ok = false;
+    }
+    candidate_projection[key] = projection;
   }
   candidates->ResetBranchAddresses();
 
@@ -126,7 +178,7 @@ int CheckTopologyEventDump(const char* input_file)
   }
   clusters->ResetBranchAddresses();
 
-  int topology = -1, missing_detail = 0, partner_photon = -1;
+  int topology = -1, missing_category = 0, missing_detail = 0, partner_photon = -1;
   int match_valid = 0, match_usable = 0, match_status = 0, match_failure = 0;
   int match_failure_ieta = -999, match_failure_iphi = -999;
   unsigned int match_towers = 0, match_matched_towers = 0;
@@ -138,6 +190,7 @@ int CheckTopologyEventDump(const char* input_file)
   anchors->SetBranchAddress("candidate_id", &candidate_id);
   anchors->SetBranchAddress("cluster_id", &cluster_id);
   anchors->SetBranchAddress("topology", &topology);
+  anchors->SetBranchAddress("missing_category", &missing_category);
   anchors->SetBranchAddress("missing_detail", &missing_detail);
   anchors->SetBranchAddress("partner_photon_index", &partner_photon);
   anchors->SetBranchAddress("match_valid", &match_valid);
@@ -161,9 +214,36 @@ int CheckTopologyEventDump(const char* input_file)
     const bool invalid_reference = !candidate_keys.count({event, candidate_id}) ||
         (!cluster_keys.empty() && !cluster_keys.count({event, cluster_id})) ||
         topology < 0 || topology > 3;
-    const bool invalid_missing_detail =
-        (topology == 3 && (missing_detail < 1 || missing_detail > 5 || partner_photon < 0 || partner_photon > 1)) ||
-        (topology != 3 && (missing_detail != 0 || partner_photon != -1));
+    bool invalid_missing_detail = false;
+    if (topology == 3)
+    {
+      invalid_missing_detail = missing_category < 1 || missing_category > 3 ||
+          missing_detail < 1 || missing_detail > 7 || partner_photon < 0 || partner_photon > 1;
+      const auto projection_it = candidate_projection.find({event, candidate_id});
+      invalid_missing_detail |= projection_it == candidate_projection.end();
+      if (!invalid_missing_detail)
+      {
+        const bool projection_valid = projection_it->second.valid[partner_photon];
+        const bool in_acceptance = projection_it->second.in_acceptance[partner_photon];
+        if (missing_category == 2)
+        {
+          invalid_missing_detail = missing_detail != 6 || !projection_valid || in_acceptance;
+        }
+        else if (missing_category == 1)
+        {
+          invalid_missing_detail = (missing_detail != 2 && missing_detail != 3) || (projection_valid && !in_acceptance);
+        }
+        else
+        {
+          invalid_missing_detail = (missing_detail != 1 && missing_detail != 4 && missing_detail != 5 && missing_detail != 7) ||
+              (missing_detail == 7 ? projection_valid : (!projection_valid || !in_acceptance));
+        }
+      }
+    }
+    else
+    {
+      invalid_missing_detail = missing_category != 0 || missing_detail != 0 || partner_photon != -1;
+    }
     const bool invalid_match = match_status < 0 || match_status > 2 ||
         match_failure < 0 || match_failure > 7 ||
         !std::isfinite(match_coverage) || match_coverage < 0.0 || match_coverage > 1.0 + 1e-6 ||

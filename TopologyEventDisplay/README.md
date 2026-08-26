@@ -141,13 +141,26 @@ continues to mean strict completeness; `match_usable` is the quantity used by
 the topology evaluator.
 
 The top-level topology remains `separated`, `merged`, `missing`, or `other`.
-For `missing`, `missing_detail_name` records one of:
+Only `missing` is subdivided by `missing_category_name`:
+
+- `acceptance`: the unrecovered partner photon has a valid projection to the
+  CEMC radius with `abs(eta_projection) >= cemc_acceptance_eta_max` (1.1 by
+  default).
+- `energy_threshold`: a nearby partner-derived cluster exists below
+  `min_cluster_energy`.
+- `other`: the remaining missing cases, including an invalid projection.
+
+The priority is acceptance, energy threshold, then other. A recovered partner
+therefore remains separated or merged even if its truth projection is outside
+the fiducial boundary. `missing_detail_name` retains the finer cause:
 
 - `partner_best_below_recovery`
 - `partner_cluster_below_energy_threshold_recovered`
 - `partner_cluster_below_energy_threshold_below_recovery`
 - `partner_direct_match_incomplete`
 - `partner_no_direct_deposit`
+- `partner_outside_cemc_acceptance`
+- `partner_projection_invalid`
 
 Below-threshold diagnostics search within
 `missing_diagnostic_max_delta_r` (0.15 by default) of the unrecovered photon
@@ -160,10 +173,11 @@ that flag still controls the large geometry/truth tables.
   thresholds, detail flag and processing counters.
 - `events`: pi0 population, truth/cluster population and topology counts.
 - `pi0_candidates`: the two supported Pythia pathways (or gun pathway),
-  daughter photons, best clusters and recovery decision.
+  daughter photons, CEMC projection validity/eta/phi/fiducial status, best
+  clusters and recovery decision.
 - `anchor_decisions`: one row per anchor, including topology, reason,
-  detailed missing reason, strict/usable direct-match status, failure location,
-  coverage and any nearby below-threshold partner diagnostic.
+  coarse and detailed missing reasons, strict/usable direct-match status, failure
+  location, coverage and any nearby below-threshold partner diagnostic.
 - `candidate_cluster_truth`: direct daughter-photon deposit and recovery
   quantities plus strict/usable match status, failure and coverage for every
   evaluated candidate/cluster pair.
@@ -186,4 +200,5 @@ root -l -b -q 'TopologyEventDisplay/validation/CheckTopologyEventDump.C("output/
 ```
 
 It checks required trees and branches, category closure, anchor references,
-key uniqueness and direct energy-deposit closure.
+projection/fiducial consistency, missing-category priority, key uniqueness and
+direct energy-deposit closure.

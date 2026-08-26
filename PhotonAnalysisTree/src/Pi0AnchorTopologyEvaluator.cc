@@ -3,6 +3,9 @@
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
 #include <calobase/RawTowerContainer.h>
+#include <calobase/RawTowerDefs.h>
+#include <calobase/RawTowerGeom.h>
+#include <calobase/RawTowerGeomContainer.h>
 #include <calobase/TowerInfoContainer.h>
 #include <g4detectors/PHG4CellContainer.h>
 #include <g4main/PHG4HitContainer.h>
@@ -41,6 +44,13 @@ struct CandidateWork
 {
   photon_tree::Pi0TopologyCandidateRecord record;
   const HepMC::GenParticle* hepmc_parent = nullptr;
+};
+
+struct Projection
+{
+  bool valid = false;
+  double eta = -999.0;
+  double phi = -999.0;
 };
 
 std::vector<const HepMC::GenParticle*> incoming(const HepMC::GenVertex* vertex)
@@ -178,18 +188,81 @@ std::size_t contributor_candidate_index(
       ? invalid_index : found->second;
 }
 
-void fill_photon_kinematics(photon_tree::Pi0TopologyCandidateRecord& record,
-                            std::size_t index,
-                            const PHG4Particle* photon)
+double cemc_radius(RawTowerGeomContainer* geometry)
+{
+  constexpr double fallback = 95.0;
+  if (!geometry) return fallback;
+  for (int ieta = 0; ieta < 96; ++ieta)
+  {
+    for (int iphi = 0; iphi < 256; ++iphi)
+    {
+      const unsigned int key = RawTowerDefs::encode_towerid(RawTowerDefs::CEMC, static_cast<unsigned int>(ieta), static_cast<unsigned int>(iphi));
+      const RawTowerGeom* tower = geometry->get_tower_geometry(key);
+      if (tower)
+      {
+        const double radius = std::hypot(tower->get_center_x(), tower->get_center_y());
+        return radius > 0.0 && std::isfinite(radius) ? radius : fallback;
+      }
+    }
+  }
+  return fallback;
+}
+
+Projection project_photon(const PHG4Particle* photon, PHG4TruthInfoContainer* truth, double target_radius)
+{
+  Projection result;
+  if (!photon || !truth || !(target_radius > 0.0)) return result;
+  const PHG4VtxPoint* vertex = truth->GetVtx(photon->get_vtx_id());
+  if (!vertex) return result;
+  const double px = photon->get_px();
+  const double py = photon->get_py();
+  const double pz = photon->get_pz();
+  const double momentum = std::sqrt(px * px + py * py + pz * pz);
+  if (!(momentum > 0.0) || !std::isfinite(vertex->get_x()) || !std::isfinite(vertex->get_y()) || !std::isfinite(vertex->get_z())) return result;
+  const double ux = px / momentum;
+  const double uy = py / momentum;
+  const double uz = pz / momentum;
+  const double a = ux * ux + uy * uy;
+  const double b = 2.0 * (vertex->get_x() * ux + vertex->get_y() * uy);
+  const double c = vertex->get_x() * vertex->get_x() + vertex->get_y() * vertex->get_y() - target_radius * target_radius;
+  const double discriminant = b * b - 4.0 * a * c;
+  if (a <= std::numeric_limits<double>::epsilon() || discriminant < 0.0) return result;
+  const double root = std::sqrt(discriminant);
+  const double first = (-b + root) / (2.0 * a);
+  const double second = (-b - root) / (2.0 * a);
+  double distance = std::numeric_limits<double>::infinity();
+  if (first > 0.0) distance = std::min(distance, first);
+  if (second > 0.0) distance = std::min(distance, second);
+  if (!std::isfinite(distance)) return result;
+  const double x = vertex->get_x() + distance * ux;
+  const double y = vertex->get_y() + distance * uy;
+  const double z = vertex->get_z() + distance * uz;
+  const double radius = std::hypot(x, y);
+  if (!(radius > 0.0) || !std::isfinite(z)) return result;
+  result.eta = std::asinh(z / radius);
+  result.phi = std::atan2(y, x);
+  result.valid = std::isfinite(result.eta) && std::isfinite(result.phi);
+  return result;
+}
+
+void fill_photon_kinematics(photon_tree::Pi0TopologyCandidateRecord& record, std::size_t index, const PHG4Particle* photon,
+                            PHG4TruthInfoContainer* truth, double target_radius, double acceptance_eta_max)
 {
   record.photon_track_ids[index] = photon ? photon->get_track_id() : -999;
   double pt = 0.0;
-  if (!finite_g4_kinematics(photon, record.photon_energy[index], pt,
-                            record.photon_eta[index], record.photon_phi[index]))
+  if (!finite_g4_kinematics(photon, record.photon_energy[index], pt, record.photon_eta[index], record.photon_phi[index]))
   {
     record.photon_energy[index] = photon ? photon->get_e() : 0.0;
     record.photon_eta[index] = 0.0;
     record.photon_phi[index] = 0.0;
+  }
+  const Projection projection = project_photon(photon, truth, target_radius);
+  record.photon_projection_valid[index] = projection.valid;
+  if (projection.valid)
+  {
+    record.photon_projection_eta[index] = projection.eta;
+    record.photon_projection_phi[index] = projection.phi;
+    record.photon_in_cemc_acceptance[index] = std::abs(projection.eta) < acceptance_eta_max;
   }
 }
 }
@@ -239,6 +312,18 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value)
   return "unknown";
 }
 
+const char* pi0_missing_category_name(Pi0MissingCategory value)
+{
+  switch (value)
+  {
+  case Pi0MissingCategory::not_missing: return "not_missing";
+  case Pi0MissingCategory::energy_threshold: return "energy_threshold";
+  case Pi0MissingCategory::acceptance: return "acceptance";
+  case Pi0MissingCategory::other: return "other";
+  }
+  return "unknown";
+}
+
 const char* pi0_missing_detail_name(Pi0MissingDetail value)
 {
   switch (value)
@@ -249,6 +334,8 @@ const char* pi0_missing_detail_name(Pi0MissingDetail value)
   case Pi0MissingDetail::partner_cluster_below_energy_threshold_below_recovery: return "partner_cluster_below_energy_threshold_below_recovery";
   case Pi0MissingDetail::partner_direct_match_incomplete: return "partner_direct_match_incomplete";
   case Pi0MissingDetail::partner_no_direct_deposit: return "partner_no_direct_deposit";
+  case Pi0MissingDetail::partner_outside_cemc_acceptance: return "partner_outside_cemc_acceptance";
+  case Pi0MissingDetail::partner_projection_invalid: return "partner_projection_invalid";
   }
   return "unknown";
 }
@@ -269,6 +356,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
   auto* truth_cells = findNode::getClass<PHG4CellContainer>(topNode, config_.truth_cell_node_name);
   auto* truth_hits = findNode::getClass<PHG4HitContainer>(topNode, config_.truth_hit_node_name);
   auto* clusters = findNode::getClass<RawClusterContainer>(topNode, config_.cluster_node_name);
+  auto* geometry = findNode::getClass<RawTowerGeomContainer>(topNode, config_.tower_geom_node_name);
 
   const bool pythia = config_.sample_mode == Pi0SampleMode::pythia;
   const PHHepMCGenEvent* signal_event = pythia && event_map
@@ -323,6 +411,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
   {
     return result;
   }
+  const double projection_radius = cemc_radius(geometry);
 
   std::map<int, std::vector<const PHG4Particle*>> children_by_parent;
   const auto secondary_range = truth->GetSecondaryParticleRange();
@@ -376,8 +465,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         {
           continue;
         }
-        fill_photon_kinematics(work.record, 0, found->second[0]);
-        fill_photon_kinematics(work.record, 1, found->second[1]);
+        fill_photon_kinematics(work.record, 0, found->second[0], truth, projection_radius, config_.cemc_acceptance_eta_max);
+        fill_photon_kinematics(work.record, 1, found->second[1], truth, projection_radius, config_.cemc_acceptance_eta_max);
         work.hepmc_parent = hepmc_particle;
         candidates.push_back(std::move(work));
         ++result.g4_candidate_count;
@@ -413,8 +502,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       {
         continue;
       }
-      fill_photon_kinematics(work.record, 0, pending.photons[0]);
-      fill_photon_kinematics(work.record, 1, pending.photons[1]);
+      fill_photon_kinematics(work.record, 0, pending.photons[0], truth, projection_radius, config_.cemc_acceptance_eta_max);
+      fill_photon_kinematics(work.record, 1, pending.photons[1], truth, projection_radius, config_.cemc_acceptance_eta_max);
       work.hepmc_parent = pending.parent;
       candidates.push_back(std::move(work));
       ++result.generator_candidate_count;
@@ -448,8 +537,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       {
         continue;
       }
-      fill_photon_kinematics(work.record, 0, found->second[0]);
-      fill_photon_kinematics(work.record, 1, found->second[1]);
+      fill_photon_kinematics(work.record, 0, found->second[0], truth, projection_radius, config_.cemc_acceptance_eta_max);
+      fill_photon_kinematics(work.record, 1, found->second[1], truth, projection_radius, config_.cemc_acceptance_eta_max);
       candidates.push_back(std::move(work));
       ++result.g4_candidate_count;
     }
@@ -703,11 +792,12 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
                                          double cluster_eta, double cluster_phi, bool below_threshold,
                                          const Pi0ClusterTruthMatch& match) {
         if (candidate.recovered[photon]) return;
-        const double delta_phi = std::atan2(
-            std::sin(cluster_phi - candidate.photon_phi[photon]),
-            std::cos(cluster_phi - candidate.photon_phi[photon]));
-        const double delta_r = std::hypot(
-            cluster_eta - candidate.photon_eta[photon], delta_phi);
+        const double reference_eta = candidate.photon_projection_valid[photon]
+            ? candidate.photon_projection_eta[photon] : candidate.photon_eta[photon];
+        const double reference_phi = candidate.photon_projection_valid[photon]
+            ? candidate.photon_projection_phi[photon] : candidate.photon_phi[photon];
+        const double delta_phi = std::atan2(std::sin(cluster_phi - reference_phi), std::cos(cluster_phi - reference_phi));
+        const double delta_r = std::hypot(cluster_eta - reference_eta, delta_phi);
         const double fraction = match.total_edep > 0.0F
             ? match.gamma_edep[photon] / match.total_edep : 0.0;
         const bool has_direct_deposit = match.usable &&
@@ -756,10 +846,12 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         for (std::size_t photon = 0; photon < 2U; ++photon)
         {
           if (candidate.recovered[photon]) continue;
-          const double delta_phi = std::atan2(
-              std::sin(cluster.phi - candidate.photon_phi[photon]),
-              std::cos(cluster.phi - candidate.photon_phi[photon]));
-          const double delta_r = std::hypot(cluster.eta - candidate.photon_eta[photon], delta_phi);
+          const double reference_eta = candidate.photon_projection_valid[photon]
+              ? candidate.photon_projection_eta[photon] : candidate.photon_eta[photon];
+          const double reference_phi = candidate.photon_projection_valid[photon]
+              ? candidate.photon_projection_phi[photon] : candidate.photon_phi[photon];
+          const double delta_phi = std::atan2(std::sin(cluster.phi - reference_phi), std::cos(cluster.phi - reference_phi));
+          const double delta_r = std::hypot(cluster.eta - reference_eta, delta_phi);
           if (delta_r <= config_.missing_diagnostic_max_delta_r) near_unrecovered_photon = true;
         }
         if (!near_unrecovered_photon) continue;
@@ -813,25 +905,38 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         anchor.partner_photon_index = is_best0 ? 1 : 0;
         const std::size_t partner = static_cast<std::size_t>(anchor.partner_photon_index);
         const auto& diagnostic = candidate.partner_diagnostics[partner];
-        if (diagnostic.found && diagnostic.below_energy_threshold &&
-            diagnostic.has_direct_deposit)
+        const bool projection_valid = candidate.photon_projection_valid[partner];
+        if (projection_valid && !candidate.photon_in_cemc_acceptance[partner])
         {
-          anchor.missing_detail =
-              diagnostic.recovery >= config_.min_photon_energy_recovery
+          anchor.missing_category = Pi0MissingCategory::acceptance;
+          anchor.missing_detail = Pi0MissingDetail::partner_outside_cemc_acceptance;
+        }
+        else if (diagnostic.found && diagnostic.below_energy_threshold && diagnostic.has_direct_deposit)
+        {
+          anchor.missing_category = Pi0MissingCategory::energy_threshold;
+          anchor.missing_detail = diagnostic.recovery >= config_.min_photon_energy_recovery
               ? Pi0MissingDetail::partner_cluster_below_energy_threshold_recovered
               : Pi0MissingDetail::partner_cluster_below_energy_threshold_below_recovery;
         }
-        else if (candidate.best_cluster[partner] != invalid_index)
-        {
-          anchor.missing_detail = Pi0MissingDetail::partner_best_below_recovery;
-        }
-        else if (diagnostic.found && !diagnostic.match.usable)
-        {
-          anchor.missing_detail = Pi0MissingDetail::partner_direct_match_incomplete;
-        }
         else
         {
-          anchor.missing_detail = Pi0MissingDetail::partner_no_direct_deposit;
+          anchor.missing_category = Pi0MissingCategory::other;
+          if (!projection_valid)
+          {
+            anchor.missing_detail = Pi0MissingDetail::partner_projection_invalid;
+          }
+          else if (candidate.best_cluster[partner] != invalid_index)
+          {
+            anchor.missing_detail = Pi0MissingDetail::partner_best_below_recovery;
+          }
+          else if (diagnostic.found && !diagnostic.match.usable)
+          {
+            anchor.missing_detail = Pi0MissingDetail::partner_direct_match_incomplete;
+          }
+          else
+          {
+            anchor.missing_detail = Pi0MissingDetail::partner_no_direct_deposit;
+          }
         }
       }
       else

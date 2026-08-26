@@ -42,6 +42,7 @@ int RunPythiaTopologyEventDump(
     const bool write_detail = true,
     const double anchor_cluster_eta_max = 0.7,
     const double partner_cluster_eta_max = -1.0,
+    const double cemc_acceptance_eta_max = 1.1,
     const double min_cluster_energy = 0.2,
     const double anchor_pi0_fraction_min = 0.5,
     const double min_energy_contribution_fraction = 0.0,
@@ -140,6 +141,7 @@ int RunPythiaTopologyEventDump(
   display->set_first_event(first_event);
   display->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
   display->set_partner_cluster_eta_max(partner_cluster_eta_max);
+  display->set_cemc_acceptance_eta_max(cemc_acceptance_eta_max);
   display->set_min_cluster_energy(min_cluster_energy);
   display->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);
   display->set_min_energy_contribution_fraction(min_energy_contribution_fraction);

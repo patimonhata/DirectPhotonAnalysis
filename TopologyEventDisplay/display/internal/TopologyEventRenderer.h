@@ -62,6 +62,10 @@ struct Candidate
   double photon_energy[2] = {0.0, 0.0};
   double photon_eta[2] = {0.0, 0.0};
   double photon_phi[2] = {0.0, 0.0};
+  int photon_projection_valid[2] = {0, 0};
+  double photon_projection_eta[2] = {-999.0, -999.0};
+  double photon_projection_phi[2] = {-999.0, -999.0};
+  int photon_in_cemc_acceptance[2] = {0, 0};
   int best_cluster[2] = {-999, -999};
   double maximum_edep[2] = {-1.0, -1.0};
   double reconstructed[2] = {0.0, 0.0};
@@ -79,6 +83,8 @@ struct Anchor
   std::string topology_name;
   int reason = 0;
   std::string reason_name;
+  int missing_category = 0;
+  std::string missing_category_name;
   int missing_detail = 0;
   std::string missing_detail_name;
   int partner_photon = -1;
@@ -277,6 +283,14 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   candidates->SetBranchAddress("photon1_eta", &candidate.photon_eta[1]);
   candidates->SetBranchAddress("photon0_phi", &candidate.photon_phi[0]);
   candidates->SetBranchAddress("photon1_phi", &candidate.photon_phi[1]);
+  if (candidates->GetBranch("photon0_projection_valid")) candidates->SetBranchAddress("photon0_projection_valid", &candidate.photon_projection_valid[0]);
+  if (candidates->GetBranch("photon1_projection_valid")) candidates->SetBranchAddress("photon1_projection_valid", &candidate.photon_projection_valid[1]);
+  if (candidates->GetBranch("photon0_projection_eta")) candidates->SetBranchAddress("photon0_projection_eta", &candidate.photon_projection_eta[0]);
+  if (candidates->GetBranch("photon1_projection_eta")) candidates->SetBranchAddress("photon1_projection_eta", &candidate.photon_projection_eta[1]);
+  if (candidates->GetBranch("photon0_projection_phi")) candidates->SetBranchAddress("photon0_projection_phi", &candidate.photon_projection_phi[0]);
+  if (candidates->GetBranch("photon1_projection_phi")) candidates->SetBranchAddress("photon1_projection_phi", &candidate.photon_projection_phi[1]);
+  if (candidates->GetBranch("photon0_in_cemc_acceptance")) candidates->SetBranchAddress("photon0_in_cemc_acceptance", &candidate.photon_in_cemc_acceptance[0]);
+  if (candidates->GetBranch("photon1_in_cemc_acceptance")) candidates->SetBranchAddress("photon1_in_cemc_acceptance", &candidate.photon_in_cemc_acceptance[1]);
   candidates->SetBranchAddress("best_cluster0_id", &candidate.best_cluster[0]);
   candidates->SetBranchAddress("best_cluster1_id", &candidate.best_cluster[1]);
   candidates->SetBranchAddress("maximum_edep0", &candidate.maximum_edep[0]);
@@ -302,6 +316,7 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   };
   std::string* topology_name = nullptr;
   std::string* reason_name = nullptr;
+  std::string* missing_category_name = nullptr;
   std::string* missing_detail_name = nullptr;
   std::string* match_status_name = nullptr;
   std::string* match_failure_name = nullptr;
@@ -317,6 +332,8 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   anchors->SetBranchAddress("topology_name", &topology_name);
   anchors->SetBranchAddress("reason", &anchor.reason);
   anchors->SetBranchAddress("reason_name", &reason_name);
+  bind_anchor("missing_category", &anchor.missing_category);
+  bind_anchor("missing_category_name", &missing_category_name);
   bind_anchor("missing_detail", &anchor.missing_detail);
   bind_anchor("missing_detail_name", &missing_detail_name);
   bind_anchor("partner_photon_index", &anchor.partner_photon);
@@ -371,6 +388,7 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
     {
       anchor.topology_name = topology_name ? *topology_name : "unknown";
       anchor.reason_name = reason_name ? *reason_name : "unknown";
+      anchor.missing_category_name = missing_category_name ? *missing_category_name : "not_recorded";
       anchor.missing_detail_name = missing_detail_name ? *missing_detail_name : "not_recorded";
       anchor.match_status_name = match_status_name ? *match_status_name : (anchor.match_valid ? "complete" : "invalid");
       anchor.match_failure_name = match_failure_name ? *match_failure_name : "not_recorded";
@@ -681,7 +699,9 @@ inline void draw_eta_phi(const DisplayData& data, int selected_family = -1)
     if (selected_family >= 0 && candidate.id != selected_family) continue;
     for (int gamma = 0; gamma < 2; ++gamma)
     {
-      auto* marker = new TMarker(candidate.photon_eta[gamma], candidate.photon_phi[gamma], 29);
+      const double eta = candidate.photon_projection_valid[gamma] ? candidate.photon_projection_eta[gamma] : candidate.photon_eta[gamma];
+      const double phi = candidate.photon_projection_valid[gamma] ? candidate.photon_projection_phi[gamma] : candidate.photon_phi[gamma];
+      auto* marker = new TMarker(eta, phi, 29);
       marker->SetMarkerColor(family_color(candidate.id));
       marker->SetMarkerSize(1.6); marker->Draw();
     }
@@ -865,7 +885,20 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
   text.SetTextSize(0.030); text.DrawLatex(0.04, y, Form("reason: %s", anchor.reason_name.c_str())); y -= 0.045;
   if (anchor.topology == 3)
   {
-    text.DrawLatex(0.04, y, Form("missing: %s  (partner #gamma%d)", anchor.missing_detail_name.c_str(), anchor.partner_photon)); y -= 0.045;
+    text.DrawLatex(0.04, y, Form("missing: %s / %s  (partner #gamma%d)", anchor.missing_category_name.c_str(), anchor.missing_detail_name.c_str(), anchor.partner_photon)); y -= 0.045;
+    if (candidate && anchor.partner_photon >= 0 && anchor.partner_photon < 2)
+    {
+      const int partner = anchor.partner_photon;
+      if (candidate->photon_projection_valid[partner])
+      {
+        text.DrawLatex(0.04, y, Form("partner projection: #eta=%.4f  #phi=%.4f  in acceptance=%s", candidate->photon_projection_eta[partner],
+            candidate->photon_projection_phi[partner], candidate->photon_in_cemc_acceptance[partner] ? "yes" : "no")); y -= 0.045;
+      }
+      else
+      {
+        text.DrawLatex(0.04, y, "partner projection: invalid"); y -= 0.045;
+      }
+    }
   }
   text.SetTextSize(0.036);
   text.DrawLatex(0.04, y, Form("E = %.3f GeV    E_{T} = %.3f GeV", anchor.energy, anchor.et)); y -= 0.048;

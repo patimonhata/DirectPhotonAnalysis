@@ -42,8 +42,10 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_truth_cell_node_name(const std::string& value) { config_.truth_cell_node_name = value; }
   void set_truth_hit_node_name(const std::string& value) { config_.truth_hit_node_name = value; }
   void set_cluster_node_name(const std::string& value) { config_.cluster_node_name = value; }
+  void set_tower_geom_node_name(const std::string& value) { config_.tower_geom_node_name = value; }
   void set_anchor_cluster_eta_max(double value) { config_.anchor_cluster_eta_max = value; }
   void set_partner_cluster_eta_max(double value) { config_.partner_cluster_eta_max = value; }
+  void set_cemc_acceptance_eta_max(double value) { config_.cemc_acceptance_eta_max = value; }
   void set_min_cluster_energy(double value) { config_.min_cluster_energy = value; }
   void set_dominant_fraction_min(double value) { config_.dominant_fraction_min = value; }
   void set_anchor_pi0_fraction_min(double value) { config_.anchor_pi0_fraction_min = value; }
@@ -55,7 +57,7 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; config_.verbosity = value; }
 
  private:
-  static constexpr int schema_version_ = 3;
+  static constexpr int schema_version_ = 4;
   static constexpr int invalid_int_ = -999;
   static constexpr double invalid_double_ = -999.0;
 
@@ -128,6 +130,14 @@ class TopologyEventDisplayDump : public SubsysReco
   double b_photon1_eta_ = invalid_double_;
   double b_photon0_phi_ = invalid_double_;
   double b_photon1_phi_ = invalid_double_;
+  int b_photon0_projection_valid_ = 0;
+  int b_photon1_projection_valid_ = 0;
+  double b_photon0_projection_eta_ = invalid_double_;
+  double b_photon1_projection_eta_ = invalid_double_;
+  double b_photon0_projection_phi_ = invalid_double_;
+  double b_photon1_projection_phi_ = invalid_double_;
+  int b_photon0_in_cemc_acceptance_ = 0;
+  int b_photon1_in_cemc_acceptance_ = 0;
   int b_best_cluster0_id_ = invalid_int_;
   int b_best_cluster1_id_ = invalid_int_;
   double b_maximum_edep0_ = invalid_double_;
@@ -144,6 +154,8 @@ class TopologyEventDisplayDump : public SubsysReco
   std::string b_topology_name_;
   int b_reason_ = 0;
   std::string b_reason_name_;
+  int b_missing_category_ = 0;
+  std::string b_missing_category_name_;
   int b_missing_detail_ = 0;
   std::string b_missing_detail_name_;
   int b_partner_photon_index_ = invalid_int_;

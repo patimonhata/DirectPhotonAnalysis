@@ -112,11 +112,15 @@ eta-phi, the classification inputs, a local tower energy map and a
 self-contained legend.  Detail pages are grouped by pi0
 candidate; the stored anchor IDs and intermediate trees are unchanged.  Nested
 tower outlines identify the anchor and the two best daughter-photon clusters
-using the same line grammar.  Within a selected pi0 family, fallback projection
-to the calorimeter radius is reserved for the pi0 and its two direct photons;
-terminal shower descendants without a child vertex are omitted.  Truth segments
-are straight display guides between G4 vertices or to the calorimeter radius;
-they are not magnetic-field-propagated charged tracks.
+using the same line grammar.  Within a selected pi0 family, a direct photon with
+stored daughters stops at its first daughter-production vertex instead of being
+projected to the calorimeter.  Pre-CEMC descendants are drawn as thin branch
+lines: successive daughter-production vertices on one parent track are joined
+in time order and clipped at the CEMC inner surface.  Fallback projection to the
+calorimeter is reserved for terminal pi0 and direct-photon tracks; terminal
+shower descendants without a child vertex are omitted.  Truth segments are
+straight display guides between G4 vertices or to the calorimeter radius; they
+are not magnetic-field-propagated charged tracks.
 
 ## Anchor and direct-match diagnostics
 

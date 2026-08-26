@@ -24,10 +24,12 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace
 {
 constexpr std::size_t invalid_index = std::numeric_limits<std::size_t>::max();
+constexpr double display_cemc_inner_radius = 93.0;
 
 int cluster_id_from_index(const photon_tree::Pi0AnchorTopologyEventResult& result, std::size_t index)
 {
@@ -504,19 +506,55 @@ void TopologyEventDisplayDump::fill_truth(PHCompositeNode* topNode, const photon
   {
     return;
   }
-  std::map<int, const PHG4VtxPoint*> first_child_vertex;
+  std::map<int, std::vector<const PHG4VtxPoint*>> child_vertices;
   const auto all = truth->GetParticleRange();
   for (auto iterator = all.first; iterator != all.second; ++iterator)
   {
     const PHG4Particle* particle = iterator->second;
     const PHG4VtxPoint* vertex = particle
         ? truth->GetVtx(particle->get_vtx_id()) : nullptr;
-    if (particle && vertex && particle->get_parent_id() != 0 &&
-        first_child_vertex.count(particle->get_parent_id()) == 0U)
+    if (particle && vertex && particle->get_parent_id() != 0)
     {
-      first_child_vertex[particle->get_parent_id()] = vertex;
+      auto& vertices = child_vertices[particle->get_parent_id()];
+      if (std::find(vertices.begin(), vertices.end(), vertex) == vertices.end()) vertices.push_back(vertex);
     }
   }
+  for (auto& [parent, vertices] : child_vertices)
+  {
+    static_cast<void>(parent);
+    std::stable_sort(vertices.begin(), vertices.end(), [](const PHG4VtxPoint* left, const PHG4VtxPoint* right) {
+      return left->get_t() < right->get_t();
+    });
+  }
+
+  const auto fill_segment = [&](double x0, double y0, double z0, double x1, double y1, double z1) {
+    if (!std::isfinite(x0) || !std::isfinite(y0) || !std::isfinite(z0) ||
+        !std::isfinite(x1) || !std::isfinite(y1) || !std::isfinite(z1) ||
+        (x0 == x1 && y0 == y1 && z0 == z1)) return;
+    b_x0_ = x0; b_y0_ = y0; b_z0_ = z0;
+    b_x1_ = x1; b_y1_ = y1; b_z1_ = z1;
+    truth_segments_tree_->Fill();
+  };
+  const auto clip_to_inner_radius = [](double x0, double y0, double z0, double x1, double y1, double z1,
+                                       double& clipped_x, double& clipped_y, double& clipped_z) {
+    const double dx = x1 - x0;
+    const double dy = y1 - y0;
+    const double dz = z1 - z0;
+    const double a = dx * dx + dy * dy;
+    const double b = 2.0 * (x0 * dx + y0 * dy);
+    const double c = x0 * x0 + y0 * y0 - display_cemc_inner_radius * display_cemc_inner_radius;
+    const double discriminant = b * b - 4.0 * a * c;
+    if (!(a > 0.0) || discriminant < 0.0 || !std::isfinite(discriminant)) return false;
+    const double root = std::sqrt(discriminant);
+    double scale = std::numeric_limits<double>::infinity();
+    for (const double candidate : {(-b - root) / (2.0 * a), (-b + root) / (2.0 * a)})
+      if (candidate > 0.0 && candidate <= 1.0) scale = std::min(scale, candidate);
+    if (!std::isfinite(scale)) return false;
+    clipped_x = x0 + scale * dx;
+    clipped_y = y0 + scale * dy;
+    clipped_z = z0 + scale * dz;
+    return std::isfinite(clipped_x) && std::isfinite(clipped_y) && std::isfinite(clipped_z);
+  };
 
   for (auto iterator = all.first; iterator != all.second; ++iterator)
   {
@@ -560,30 +598,51 @@ void TopologyEventDisplayDump::fill_truth(PHCompositeNode* topNode, const photon
     {
       continue;
     }
-    b_x0_ = b_vx_;
-    b_y0_ = b_vy_;
-    b_z0_ = b_vz_;
-    const auto child = first_child_vertex.find(b_track_id_);
-    bool have_end = false;
-    if (child != first_child_vertex.end())
+    const auto children = child_vertices.find(b_track_id_);
+    const bool core_track = is_selected_candidate_core_track(b_track_id_, result);
+    if (children != child_vertices.end() && !children->second.empty())
     {
-      b_x1_ = child->second->get_x();
-      b_y1_ = child->second->get_y();
-      b_z1_ = child->second->get_z();
-      have_end = true;
+      if (b_family_candidate_id_ < 0 || core_track)
+      {
+        const PHG4VtxPoint* child = children->second.front();
+        fill_segment(b_vx_, b_vy_, b_vz_, child->get_x(), child->get_y(), child->get_z());
+      }
+      else
+      {
+        double x0 = b_vx_;
+        double y0 = b_vy_;
+        double z0 = b_vz_;
+        for (const PHG4VtxPoint* child : children->second)
+        {
+          if (std::hypot(x0, y0) >= display_cemc_inner_radius) break;
+          const double x1 = child->get_x();
+          const double y1 = child->get_y();
+          const double z1 = child->get_z();
+          if (std::hypot(x1, y1) <= display_cemc_inner_radius)
+          {
+            fill_segment(x0, y0, z0, x1, y1, z1);
+            x0 = x1; y0 = y1; z0 = z1;
+            continue;
+          }
+          double clipped_x = 0.0;
+          double clipped_y = 0.0;
+          double clipped_z = 0.0;
+          if (clip_to_inner_radius(x0, y0, z0, x1, y1, z1, clipped_x, clipped_y, clipped_z))
+            fill_segment(x0, y0, z0, clipped_x, clipped_y, clipped_z);
+          break;
+        }
+      }
+      continue;
     }
-    if (!have_end &&
-        (b_family_candidate_id_ < 0 || is_selected_candidate_core_track(b_track_id_, result)))
+    if (b_family_candidate_id_ < 0 || core_track)
     {
       // Terminal selected-family shower descendants have no stored end vertex.
       // Projecting an inward descendant to r=100 cm would create a false detector-spanning chord.
-      have_end = project_to_radius(
-          b_x0_, b_y0_, b_z0_, b_px_, b_py_, b_pz_,
-          100.0, b_x1_, b_y1_, b_z1_);
-    }
-    if (have_end)
-    {
-      truth_segments_tree_->Fill();
+      double x1 = 0.0;
+      double y1 = 0.0;
+      double z1 = 0.0;
+      if (project_to_radius(b_vx_, b_vy_, b_vz_, b_px_, b_py_, b_pz_, 100.0, x1, y1, z1))
+        fill_segment(b_vx_, b_vy_, b_vz_, x1, y1, z1);
     }
   }
 }

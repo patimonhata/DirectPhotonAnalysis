@@ -206,6 +206,13 @@ inline int family_line_style(int gamma)
   return 1;
 }
 
+inline bool is_core_segment(const DisplayData& data, const Segment& segment)
+{
+  for (const auto& candidate : data.candidates)
+    if (segment.track == candidate.g4_parent || segment.track == candidate.photon_track[0] || segment.track == candidate.photon_track[1]) return true;
+  return false;
+}
+
 inline bool load_event(TFile* file, int event_id, DisplayData& data)
 {
   if (!file || file->IsZombie()) return false;
@@ -601,7 +608,7 @@ inline void draw_xy(const DisplayData& data, int selected_family = -1)
     if (selected_family >= 0 && segment.family != selected_family) continue;
     auto* line = new TLine(segment.x0, segment.y0, segment.x1, segment.y1);
     line->SetLineColor(family_color(segment.family));
-    line->SetLineWidth(segment.family >= 0 ? 2 : 1);
+    line->SetLineWidth(segment.family >= 0 && is_core_segment(data, segment) ? 2 : 1);
     line->SetLineStyle(segment.family >= 0 ? family_line_style(segment.gamma) : 3);
     line->Draw();
   }
@@ -638,7 +645,7 @@ inline void draw_zr(const DisplayData& data, int selected_family = -1)
     auto* line = new TLine(segment.z0, std::hypot(segment.x0, segment.y0),
                            segment.z1, std::hypot(segment.x1, segment.y1));
     line->SetLineColor(family_color(segment.family));
-    line->SetLineWidth(segment.family >= 0 ? 2 : 1);
+    line->SetLineWidth(segment.family >= 0 && is_core_segment(data, segment) ? 2 : 1);
     line->SetLineStyle(segment.family >= 0 ? family_line_style(segment.gamma) : 3); line->Draw();
   }
   for (const auto& candidate : data.candidates)
@@ -782,6 +789,7 @@ inline void draw_display_legend(int family = -1, bool tower_detail = false,
   draw_legend_line(y, color, 1, 3, "#pi^{0} direction / segment", text_size); y -= step;
   draw_legend_line(y, color, photon0_line_style, 2, "photon: fine dash", text_size); y -= step;
   draw_legend_line(y, color, photon1_line_style, 2, "partner photon: coarse dash", text_size); y -= step;
+  draw_legend_line(y, color, photon0_line_style, 1, "pre-CEMC descendants: thin", text_size); y -= step;
   if (family < 0)
   {
     draw_legend_line(y, kGray + 1, 3, 1, "other G4 truth segment", text_size);

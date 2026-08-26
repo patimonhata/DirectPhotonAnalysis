@@ -116,7 +116,6 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   int n_bins = 0;
   int pi0_truth_matching_algorithm_version = 0;
   double et_max = 0.0;
-  double truth_eta_max = 0.0;
   double cluster_eta_max = 0.0;
   double min_cluster_energy = 0.0;
   double dominant_fraction_min = 0.0;
@@ -175,7 +174,6 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   ok &= bind(metadata, "signal_embedding_id", &signal_embedding_id);
   ok &= bind(metadata, "n_bins", &n_bins);
   ok &= bind(metadata, "et_max", &et_max);
-  ok &= bind(metadata, "truth_eta_max", &truth_eta_max);
   ok &= bind(metadata, "cluster_eta_max", &cluster_eta_max);
   ok &= bind(metadata, "min_cluster_energy", &min_cluster_energy);
   ok &= bind(metadata, "dominant_fraction_min", &dominant_fraction_min);
@@ -219,7 +217,7 @@ int check_pythia_cluster_et_partial(const std::string input_file)
   }
 
   const unsigned long long candidate_count = candidate_g4_count + candidate_generator_count;
-  const bool valid_metadata = schema_version == 3 && manifest_path &&
+  const bool valid_metadata = schema_version == 4 && manifest_path &&
       !manifest_path->empty() && manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() && last_suffix && !last_suffix->empty() &&
       cluster_collection && *cluster_collection == "split" && prompt_selection &&
@@ -240,7 +238,7 @@ int check_pythia_cluster_et_partial(const std::string input_file)
       energy_candidate_selection && *energy_candidate_selection ==
           "summed_pi0_daughter_primary_contributor_fraction" &&
       pi0_truth_matching_algorithm_version == 2 && signal_embedding_id == 1 &&
-      n_bins > 0 && et_max > 0.0 && truth_eta_max > 0.0 &&
+      n_bins > 0 && et_max > 0.0 &&
       cluster_eta_max > 0.0 && min_cluster_energy >= 0.0 &&
       dominant_fraction_min >= 0.0 && dominant_fraction_min <= 1.0 &&
       pi0_contributor_fraction_min >= 0.0 && pi0_contributor_fraction_min <= 1.0 &&

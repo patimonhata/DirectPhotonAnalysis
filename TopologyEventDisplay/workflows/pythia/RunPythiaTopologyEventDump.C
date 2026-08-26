@@ -40,7 +40,6 @@ int RunPythiaTopologyEventDump(
     const std::string output_file,
     const int n_events = 0,
     const bool write_detail = true,
-    const double truth_eta_max = 0.7,
     const double anchor_cluster_eta_max = 0.7,
     const double partner_cluster_eta_max = -1.0,
     const double min_cluster_energy = 0.2,
@@ -139,7 +138,6 @@ int RunPythiaTopologyEventDump(
   display->set_sample_mode(photon_tree::Pi0SampleMode::pythia);
   display->set_signal_embedding_id(1);
   display->set_first_event(first_event);
-  display->set_truth_eta_max(truth_eta_max);
   display->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
   display->set_partner_cluster_eta_max(partner_cluster_eta_max);
   display->set_min_cluster_energy(min_cluster_energy);

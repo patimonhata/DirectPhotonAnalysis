@@ -75,9 +75,9 @@ int CheckTopologyEventDump(const char* input_file)
   metadata->SetBranchAddress("schema_version", &schema_version);
   metadata->GetEntry(0);
   metadata->ResetBranchAddresses();
-  if (schema_version != 2)
+  if (schema_version != 3)
   {
-    std::cerr << "CheckTopologyEventDump - expected schema version 2, got "
+    std::cerr << "CheckTopologyEventDump - expected schema version 3, got "
               << schema_version << std::endl;
     ok = false;
   }

@@ -65,7 +65,6 @@ TopologyEventDisplayDump::~TopologyEventDisplayDump()
 int TopologyEventDisplayDump::Init(PHCompositeNode*)
 {
   const bool valid = !output_file_name_.empty() &&
-      std::isfinite(config_.truth_eta_max) && config_.truth_eta_max > 0.0 &&
       std::isfinite(config_.anchor_cluster_eta_max) &&
       config_.anchor_cluster_eta_max > 0.0 &&
       std::isfinite(config_.partner_cluster_eta_max) &&
@@ -751,7 +750,6 @@ void TopologyEventDisplayDump::create_output()
   metadata_tree_->Branch("manifest_end", &manifest_end_);
   metadata_tree_->Branch("cluster_node", &config_.cluster_node_name);
   metadata_tree_->Branch("first_event", &first_event_);
-  metadata_tree_->Branch("truth_eta_max", &config_.truth_eta_max);
   metadata_tree_->Branch("anchor_cluster_eta_max", &config_.anchor_cluster_eta_max);
   metadata_tree_->Branch("partner_cluster_eta_max", &config_.partner_cluster_eta_max);
   metadata_tree_->Branch("min_cluster_energy", &config_.min_cluster_energy);

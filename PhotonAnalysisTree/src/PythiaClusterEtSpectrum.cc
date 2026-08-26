@@ -131,22 +131,6 @@ Pi0Origin trace_pi0_origin(const HepMC::GenParticle* photon)
   return result;
 }
 
-bool finite_eta(const HepMC::GenParticle* particle, double& eta)
-{
-  if (!particle)
-  {
-    return false;
-  }
-  const HepMC::FourVector& momentum = particle->momentum();
-  const double pt = std::hypot(momentum.px(), momentum.py());
-  if (!(pt > 0.0) || !std::isfinite(momentum.pz()))
-  {
-    return false;
-  }
-  eta = std::asinh(momentum.pz() / pt);
-  return std::isfinite(eta);
-}
-
 double particle_pt(const PHG4Particle* particle)
 {
   return particle ? std::hypot(particle->get_px(), particle->get_py()) : 0.0;
@@ -310,7 +294,6 @@ int PythiaClusterEtSpectrum::Init(PHCompositeNode* /*topNode*/)
       manifest_begin_ >= 0 && manifest_end_ > manifest_begin_ &&
       !first_suffix_.empty() && !last_suffix_.empty() && signal_embedding_id_ > 0 &&
       n_bins_ > 0 && std::isfinite(et_max_) && et_max_ > 0.0 &&
-      std::isfinite(truth_eta_max_) && truth_eta_max_ > 0.0 &&
       std::isfinite(cluster_eta_max_) && cluster_eta_max_ > 0.0 &&
       std::isfinite(min_cluster_energy_) && min_cluster_energy_ >= 0.0 &&
       dominant_fraction_min_ >= 0.0 && dominant_fraction_min_ <= 1.0 &&
@@ -405,31 +388,23 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
       continue;
     }
     const HepMC::GenParticle* particle = contributor_hepmc_particle(dominant, event_map);
-    double truth_eta = 0.0;
-    if (dominant.g4_pdg_id == 22 &&
-        (dominant.photon_category == 1 || dominant.photon_category == 2) &&
-        finite_eta(particle, truth_eta) && std::abs(truth_eta) < truth_eta_max_)
+    if (dominant.g4_pdg_id == 22 && particle &&
+        (dominant.photon_category == 1 || dominant.photon_category == 2))
     {
       h_prompt_->Fill(cluster.et);
       ++n_prompt_cluster_;
     }
     bool from_pi0 = false;
     if (dominant.g4_pdg_id == 111 && particle && particle->pdg_id() == 111) {
-      double parent_eta = 0.0;
-      from_pi0 = finite_eta(particle, parent_eta) && std::abs(parent_eta) < truth_eta_max_;
-      if (from_pi0) {
-        ++n_pi0_cluster_g4_decay_;
-      }
+      from_pi0 = true;
+      ++n_pi0_cluster_g4_decay_;
     }
     else if (dominant.g4_pdg_id == 22)
     {
       const Pi0Origin origin = trace_pi0_origin(particle);
       if (origin.valid && origin.parent) {
-        double parent_eta = 0.0;
-        from_pi0 = finite_eta(origin.parent, parent_eta) && std::abs(parent_eta) < truth_eta_max_;
-        if (from_pi0) {
-          ++n_pi0_cluster_generator_decay_;
-        }
+        from_pi0 = true;
+        ++n_pi0_cluster_generator_decay_;
       }
     }
     if (from_pi0) {
@@ -484,17 +459,6 @@ int PythiaClusterEtSpectrum::process_event(PHCompositeNode* topNode)
 
   const double target_radius = cemc_radius(geometry);
   for (const Pi0Candidate& candidate : candidates) {
-    double parent_eta = 0.0;
-    bool valid_parent_eta = finite_eta(candidate.parent, parent_eta);
-    if (candidate.g4_parent) {
-      const double parent_pt = particle_pt(candidate.g4_parent);
-      valid_parent_eta = parent_pt > 0.0;
-      parent_eta = valid_parent_eta
-          ? std::asinh(candidate.g4_parent->get_pz() / parent_pt) : 0.0;
-    }
-    if (!valid_parent_eta || !std::isfinite(parent_eta) || std::abs(parent_eta) >= truth_eta_max_) {
-      continue;
-    }
     if (candidate.photons.size() != 2U) {
       ++n_pi0_malformed_daughters_;
       continue;
@@ -767,7 +731,6 @@ void PythiaClusterEtSpectrum::create_output()
   metadata_tree_->Branch("signal_embedding_id", &signal_embedding_id_);
   metadata_tree_->Branch("n_bins", &n_bins_);
   metadata_tree_->Branch("et_max", &et_max_);
-  metadata_tree_->Branch("truth_eta_max", &truth_eta_max_);
   metadata_tree_->Branch("cluster_eta_max", &cluster_eta_max_);
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);
   metadata_tree_->Branch("dominant_fraction_min", &dominant_fraction_min_);

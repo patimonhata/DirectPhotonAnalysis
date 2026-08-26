@@ -29,7 +29,6 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
       !first_suffix_.empty() && !last_suffix_.empty() &&
       signal_embedding_id_ > 0 && n_bins_ > 0 &&
       std::isfinite(et_max_) && et_max_ > 0.0 &&
-      std::isfinite(truth_eta_max_) && truth_eta_max_ > 0.0 &&
       std::isfinite(anchor_cluster_eta_max_) &&
       anchor_cluster_eta_max_ > 0.0 &&
       std::isfinite(partner_cluster_eta_max_) &&
@@ -59,7 +58,6 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
   topology_config.truth_hit_node_name = truth_hit_node_name_;
   topology_config.cluster_node_name = split_cluster_node_name_;
   topology_config.signal_embedding_id = signal_embedding_id_;
-  topology_config.truth_eta_max = truth_eta_max_;
   topology_config.anchor_cluster_eta_max = anchor_cluster_eta_max_;
   topology_config.partner_cluster_eta_max = partner_cluster_eta_max_;
   topology_config.min_cluster_energy = min_cluster_energy_;
@@ -252,7 +250,6 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("signal_embedding_id", &signal_embedding_id_);
   metadata_tree_->Branch("n_bins", &n_bins_);
   metadata_tree_->Branch("et_max", &et_max_);
-  metadata_tree_->Branch("truth_eta_max", &truth_eta_max_);
   metadata_tree_->Branch("anchor_cluster_eta_max", &anchor_cluster_eta_max_);
   metadata_tree_->Branch("partner_cluster_eta_max", &partner_cluster_eta_max_);
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);

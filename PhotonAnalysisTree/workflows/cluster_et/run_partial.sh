@@ -3,7 +3,7 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../.." && pwd)
-usage="usage: workflows/cluster_et/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [ET_MAX] [TRUTH_ETA_MAX] [CLUSTER_ETA_MAX] [MIN_CLUSTER_ENERGY] [DOMINANT_FRACTION_MIN] [PI0_CONTRIBUTOR_FRACTION_MIN] [MIN_ENERGY_CONTRIBUTION_FRACTION] [SEPARATED_DR] [MERGED_DR] [RESPONSE_MIN] [RESPONSE_MAX]"
+usage="usage: workflows/cluster_et/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [ET_MAX] [CLUSTER_ETA_MAX] [MIN_CLUSTER_ENERGY] [DOMINANT_FRACTION_MIN] [PI0_CONTRIBUTOR_FRACTION_MIN] [MIN_ENERGY_CONTRIBUTION_FRACTION] [SEPARATED_DR] [MERGED_DR] [RESPONSE_MIN] [RESPONSE_MAX]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
 total_files=${3:?$usage}
@@ -12,16 +12,15 @@ input_manifest=${5:?$usage}
 output_directory=${6:?$usage}
 n_bins=${7:-100}
 et_max=${8:-20.0}
-truth_eta_max=${9:-0.7}
-cluster_eta_max=${10:-0.7}
-min_cluster_energy=${11:-0.2}
-dominant_fraction_min=${12:-0.5}
-pi0_contributor_fraction_min=${13:-0.5}
-min_energy_contribution_fraction=${14:-0.0}
-separated_dr=${15:-0.03}
-merged_dr=${16:-0.06}
-response_min=${17:-0.5}
-response_max=${18:-1.5}
+cluster_eta_max=${9:-0.7}
+min_cluster_energy=${10:-0.2}
+dominant_fraction_min=${11:-0.5}
+pi0_contributor_fraction_min=${12:-0.5}
+min_energy_contribution_fraction=${13:-0.0}
+separated_dr=${14:-0.03}
+merged_dr=${15:-0.06}
+response_min=${16:-0.5}
+response_max=${17:-1.5}
 
 for value in "$job_index" "$chunk_offset" "$total_files" "$files_per_job" "$n_bins"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
@@ -67,7 +66,7 @@ trap cleanup EXIT
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 root -l -b -q \
-  "$workflow_dir/Fun4All_PythiaClusterEtSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${truth_eta_max},${cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${pi0_contributor_fraction_min},${min_energy_contribution_fraction},${separated_dr},${merged_dr},${response_min},${response_max})"
+  "$workflow_dir/Fun4All_PythiaClusterEtSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${pi0_contributor_fraction_min},${min_energy_contribution_fraction},${separated_dr},${merged_dr},${response_min},${response_max})"
 root -l -b -q \
   "$workflow_dir/check_pythia_cluster_et_partial.C(\"${temporary_output}\")"
 

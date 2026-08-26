@@ -36,9 +36,8 @@ Equal-leading assignments are retained in the anchor denominator but classified
 as other.
 
 Selected pi0s are either transported G4-primary pi0 decays or generator pi0
-decays represented by exactly two G4-primary photons. Detector-secondary pi0s
-and Dalitz decays are excluded. The default truth-parent acceptance is
-|eta_pi0| < 0.7.
+decays represented by exactly two G4-primary photons. Detector-secondary pi0s and Dalitz decays are excluded. No truth-eta
+selection is applied to the parent pi0 or either daughter photon.
 
 The anchor requires |eta_cluster| < 0.7. Partner lookup uses the same
 configurable cluster-energy cut as the anchor, but its eta cut is disabled by

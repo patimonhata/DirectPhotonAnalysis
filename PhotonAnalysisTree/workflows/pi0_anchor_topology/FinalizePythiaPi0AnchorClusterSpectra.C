@@ -84,7 +84,6 @@ struct PartialMetadata {
   int n_bins = 0;
   int matcher_version = 0;
   double et_max = 0.0;
-  double truth_eta_max = 0.0;
   double anchor_cluster_eta_max = 0.0;
   double partner_cluster_eta_max = 0.0;
   double min_cluster_energy = 0.0;
@@ -159,7 +158,6 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "signal_embedding_id", &value.signal_embedding_id);
   ok &= bind(tree, "n_bins", &value.n_bins);
   ok &= bind(tree, "et_max", &value.et_max);
-  ok &= bind(tree, "truth_eta_max", &value.truth_eta_max);
   ok &= bind(tree, "anchor_cluster_eta_max", &value.anchor_cluster_eta_max);
   ok &= bind(tree, "partner_cluster_eta_max", &value.partner_cluster_eta_max);
   ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
@@ -212,7 +210,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
 }
 
 bool valid_metadata(const PartialMetadata& value) {
-  return value.schema_version == 4 &&
+  return value.schema_version == 5 &&
       !value.manifest_path.empty() &&
       value.manifest_begin >= 0 &&
       value.manifest_end > value.manifest_begin &&
@@ -226,7 +224,7 @@ bool valid_metadata(const PartialMetadata& value) {
       value.photon_recovery_policy == "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
       value.vertex_selection == "signal_hepmc_collision_vertex_abs_z_lt_max" &&
       value.signal_embedding_id > 0 && value.n_bins > 0 &&
-      value.et_max > 0.0 && value.truth_eta_max > 0.0 &&
+      value.et_max > 0.0 &&
       value.anchor_cluster_eta_max > 0.0 &&
       std::isfinite(value.partner_cluster_eta_max) &&
       value.min_cluster_energy >= 0.0 &&
@@ -268,7 +266,6 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference) 
       value.n_bins == reference.n_bins &&
       value.matcher_version == reference.matcher_version &&
       same_double(value.et_max, reference.et_max) &&
-      same_double(value.truth_eta_max, reference.truth_eta_max) &&
       same_double(value.anchor_cluster_eta_max, reference.anchor_cluster_eta_max) &&
       same_double(value.partner_cluster_eta_max, reference.partner_cluster_eta_max) &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&
@@ -667,7 +664,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     histogram->Write();
   }
 
-  int output_schema_version = 4;
+  int output_schema_version = 5;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -694,7 +691,6 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("signal_embedding_id", &total.signal_embedding_id);
   metadata.Branch("n_bins", &total.n_bins);
   metadata.Branch("et_max", &total.et_max);
-  metadata.Branch("truth_eta_max", &total.truth_eta_max);
   metadata.Branch("anchor_cluster_eta_max", &total.anchor_cluster_eta_max);
   metadata.Branch("partner_cluster_eta_max", &total.partner_cluster_eta_max);
   metadata.Branch("min_cluster_energy", &total.min_cluster_energy);

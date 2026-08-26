@@ -49,7 +49,6 @@ class PythiaClusterEtSpectrum : public SubsysReco
     n_bins_ = n_bins;
     et_max_ = et_max;
   }
-  void set_truth_eta_max(double value) { truth_eta_max_ = value; }
   void set_cluster_eta_max(double value) { cluster_eta_max_ = value; }
   void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
   void set_dominant_fraction_min(double value) { dominant_fraction_min_ = value; }
@@ -65,7 +64,7 @@ class PythiaClusterEtSpectrum : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 3;
+  static constexpr int schema_version_ = 4;
 
   void create_output_directory() const;
   void create_output();
@@ -96,7 +95,6 @@ class PythiaClusterEtSpectrum : public SubsysReco
   int signal_embedding_id_ = 1;
   int n_bins_ = 100;
   double et_max_ = 20.0;
-  double truth_eta_max_ = 0.7;
   double cluster_eta_max_ = 0.7;
   double min_cluster_energy_ = 0.2;
   double dominant_fraction_min_ = 0.5;

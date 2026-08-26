@@ -90,7 +90,6 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   long long manifest_begin = -1;
   long long manifest_end = -1;
   double et_max = 0.0;
-  double truth_eta_max = 0.0;
   double anchor_cluster_eta_max = 0.0;
   double partner_cluster_eta_max = 0.0;
   double min_cluster_energy = 0.0;
@@ -152,7 +151,6 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   ok &= bind(metadata, "signal_embedding_id", &signal_embedding_id);
   ok &= bind(metadata, "n_bins", &n_bins);
   ok &= bind(metadata, "et_max", &et_max);
-  ok &= bind(metadata, "truth_eta_max", &truth_eta_max);
   ok &= bind(metadata, "anchor_cluster_eta_max", &anchor_cluster_eta_max);
   ok &= bind(metadata, "partner_cluster_eta_max", &partner_cluster_eta_max);
   ok &= bind(metadata, "min_cluster_energy", &min_cluster_energy);
@@ -196,7 +194,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   }
 
   const bool valid_metadata =
-      schema_version == 4 && manifest_path && !manifest_path->empty() &&
+      schema_version == 5 && manifest_path && !manifest_path->empty() &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() &&
       last_suffix && !last_suffix->empty() &&
@@ -225,7 +223,6 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       *vertex_selection == "signal_hepmc_collision_vertex_abs_z_lt_max" &&
       signal_embedding_id > 0 && n_bins > 0 &&
       std::isfinite(et_max) && et_max > 0.0 &&
-      std::isfinite(truth_eta_max) && truth_eta_max > 0.0 &&
       std::isfinite(anchor_cluster_eta_max) &&
       anchor_cluster_eta_max > 0.0 &&
       std::isfinite(partner_cluster_eta_max) &&

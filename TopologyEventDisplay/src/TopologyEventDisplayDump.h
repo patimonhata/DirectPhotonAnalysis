@@ -42,7 +42,6 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_truth_cell_node_name(const std::string& value) { config_.truth_cell_node_name = value; }
   void set_truth_hit_node_name(const std::string& value) { config_.truth_hit_node_name = value; }
   void set_cluster_node_name(const std::string& value) { config_.cluster_node_name = value; }
-  void set_truth_eta_max(double value) { config_.truth_eta_max = value; }
   void set_anchor_cluster_eta_max(double value) { config_.anchor_cluster_eta_max = value; }
   void set_partner_cluster_eta_max(double value) { config_.partner_cluster_eta_max = value; }
   void set_min_cluster_energy(double value) { config_.min_cluster_energy = value; }
@@ -56,7 +55,7 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; config_.verbosity = value; }
 
  private:
-  static constexpr int schema_version_ = 2;
+  static constexpr int schema_version_ = 3;
   static constexpr int invalid_int_ = -999;
   static constexpr double invalid_double_ = -999.0;
 

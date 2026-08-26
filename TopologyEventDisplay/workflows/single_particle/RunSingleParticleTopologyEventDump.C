@@ -26,7 +26,6 @@ int RunSingleParticleTopologyEventDump(
     const std::string cluster_node = "CLUSTERINFO_CEMC",
     const bool write_detail = true,
     const bool rebuild_truth_nodes = false,
-    const double truth_eta_max = 1.2,
     const double anchor_cluster_eta_max = 1.1,
     const double partner_cluster_eta_max = -1.0,
     const double min_cluster_energy = 0.0,
@@ -80,7 +79,6 @@ int RunSingleParticleTopologyEventDump(
   display->set_sample_mode(photon_tree::Pi0SampleMode::single_particle);
   display->set_cluster_node_name(cluster_node);
   display->set_first_event(first_event);
-  display->set_truth_eta_max(truth_eta_max);
   display->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
   display->set_partner_cluster_eta_max(partner_cluster_eta_max);
   display->set_min_cluster_energy(min_cluster_energy);

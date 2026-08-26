@@ -62,7 +62,6 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
     n_bins_ = bins;
     et_max_ = et_max;
   }
-  void set_truth_eta_max(double value) { truth_eta_max_ = value; }
   void set_anchor_cluster_eta_max(double value)
   {
     anchor_cluster_eta_max_ = value;
@@ -93,7 +92,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 4;
+  static constexpr int schema_version_ = 5;
 
   void create_output_directory() const;
   void create_output();
@@ -124,7 +123,6 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   int signal_embedding_id_ = 1;
   int n_bins_ = 100;
   double et_max_ = 20.0;
-  double truth_eta_max_ = 0.7;
   double anchor_cluster_eta_max_ = 0.7;
   double partner_cluster_eta_max_ = -1.0;
   double min_cluster_energy_ = 0.2;

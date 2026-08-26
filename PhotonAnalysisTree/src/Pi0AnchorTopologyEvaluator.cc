@@ -372,8 +372,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         work.record.parent_barcode = hepmc_particle->barcode();
         work.record.g4_parent_track_id = primary->get_track_id();
         if (!finite_g4_kinematics(primary, work.record.energy, work.record.pt,
-                                  work.record.eta, work.record.phi) ||
-            std::abs(work.record.eta) >= config_.truth_eta_max)
+                                  work.record.eta, work.record.phi))
         {
           continue;
         }
@@ -410,8 +409,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       work.record.parent_barcode = barcode;
       if (!finite_hepmc_kinematics(
               pending.parent, work.record.energy, work.record.pt,
-              work.record.eta, work.record.phi) ||
-          std::abs(work.record.eta) >= config_.truth_eta_max)
+              work.record.eta, work.record.phi))
       {
         continue;
       }
@@ -446,8 +444,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       work.record.parent_barcode = primary->get_barcode();
       work.record.g4_parent_track_id = primary->get_track_id();
       if (!finite_g4_kinematics(primary, work.record.energy, work.record.pt,
-                                work.record.eta, work.record.phi) ||
-          std::abs(work.record.eta) >= config_.truth_eta_max)
+                                work.record.eta, work.record.phi))
       {
         continue;
       }
@@ -546,7 +543,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       double phi = 0.0;
       if (finite_hepmc_kinematics(
               contributor_hepmc_particle(dominant, event_map),
-              energy, pt, eta, phi) && std::abs(eta) < config_.truth_eta_max)
+              energy, pt, eta, phi))
       {
         result.prompt_cluster[index] = 1U;
       }

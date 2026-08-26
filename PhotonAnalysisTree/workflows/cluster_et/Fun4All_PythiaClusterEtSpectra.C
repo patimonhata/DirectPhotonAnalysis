@@ -37,7 +37,6 @@ int Fun4All_PythiaClusterEtSpectra(
     const std::string output_file,
     const int n_bins = 100,
     const double et_max = 20.0,
-    const double truth_eta_max = 0.7,
     const double cluster_eta_max = 0.7,
     const double min_cluster_energy = 0.2,
     const double dominant_fraction_min = 0.5,
@@ -144,7 +143,6 @@ int Fun4All_PythiaClusterEtSpectra(
   accumulator->set_tower_geom_node_name("TOWERGEOM_CEMC");
   accumulator->set_split_cluster_node_name("CLUSTERINFO_CEMC");
   accumulator->set_binning(n_bins, et_max);
-  accumulator->set_truth_eta_max(truth_eta_max);
   accumulator->set_cluster_eta_max(cluster_eta_max);
   accumulator->set_min_cluster_energy(min_cluster_energy);
   accumulator->set_dominant_fraction_min(dominant_fraction_min);

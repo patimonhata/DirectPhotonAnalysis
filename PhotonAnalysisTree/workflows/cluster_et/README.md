@@ -20,13 +20,13 @@ The default selection requires reconstructed cluster energy above 0.2 GeV,
 dominant truth-contribution fraction of at least 0.5.
 
 - Prompt clusters have a dominant G4-primary photon whose HepMC classifier
-  category is direct (1) or fragmentation (2), with `|eta_truth| < 0.7`.
+  category is direct (1) or fragmentation (2).
 - Pi0-origin clusters include two production pathways. A HepMC pi0 transported
   into Geant4 is identified through its matching G4 primary. A pi0 decayed by
   the generator is identified through the G4-primary photon and its HepMC
-  photon-copy chain. The eta cut is applied to the parent pi0. G4-secondary
-  pi0s produced during detector transport are excluded from both the inclusive
-  pi0-origin histogram and all topology classifications.
+  photon-copy chain. No truth-eta cut is applied to the prompt photon, parent
+  pi0, or daughter photons. G4-secondary pi0s produced during detector transport are
+  excluded from both the inclusive pi0-origin histogram and all topology classifications.
 
 Pathway-specific counters are retained so that the Detroit-production
 assumption can be checked rather than imposed.
@@ -91,7 +91,7 @@ complete contiguous range with:
 
 ```bash
 root -l -b -q \
-  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_primary_generator_pi0_eta07_energy_contribution_0p3/partial_*.root","output/plots/cluster_et_prompt_primary_generator_pi0_eta07",0,200000)'
+  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_primary_generator_pi0_cluster_eta07_energy_contribution_0p3/partial_*.root","output/plots/cluster_et_prompt_primary_generator_pi0_cluster_eta07",0,200000)'
 ```
 
 

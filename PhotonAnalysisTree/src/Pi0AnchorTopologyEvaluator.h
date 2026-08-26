@@ -73,7 +73,6 @@ struct Pi0AnchorTopologyConfig
   std::string truth_hit_node_name = "G4HIT_CEMC";
   std::string cluster_node_name = "CLUSTERINFO_CEMC";
   int signal_embedding_id = 1;
-  double truth_eta_max = 0.7;
   double anchor_cluster_eta_max = 0.7;
   double partner_cluster_eta_max = -1.0;
   double min_cluster_energy = 0.2;
@@ -176,7 +175,7 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 3;
+  static constexpr int kAlgorithmVersion = 4;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

@@ -48,7 +48,6 @@ struct PartialMetadata
   int n_bins = 0;
   int pi0_truth_matching_algorithm_version = 0;
   double et_max = 0.0;
-  double truth_eta_max = 0.0;
   double cluster_eta_max = 0.0;
   double min_cluster_energy = 0.0;
   double dominant_fraction_min = 0.0;
@@ -138,7 +137,6 @@ bool read_metadata(const std::string& path, PartialMetadata& value)
   ok &= bind(tree, "pi0_truth_matching_algorithm_version",
              &value.pi0_truth_matching_algorithm_version);
   ok &= bind(tree, "et_max", &value.et_max);
-  ok &= bind(tree, "truth_eta_max", &value.truth_eta_max);
   ok &= bind(tree, "cluster_eta_max", &value.cluster_eta_max);
   ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
   ok &= bind(tree, "dominant_fraction_min", &value.dominant_fraction_min);
@@ -231,7 +229,7 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
   const unsigned long long candidate_count =
       value.pi0_candidate_g4_decay_count +
       value.pi0_candidate_generator_decay_count;
-  return value.schema_version == 3 &&
+  return value.schema_version == 4 &&
       value.manifest_path == reference.manifest_path &&
       value.cluster_collection == reference.cluster_collection &&
       value.prompt_selection == reference.prompt_selection &&
@@ -249,7 +247,6 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
           reference.pi0_truth_matching_algorithm_version &&
       value.n_bins == reference.n_bins &&
       same_double(value.et_max, reference.et_max) &&
-      same_double(value.truth_eta_max, reference.truth_eta_max) &&
       same_double(value.cluster_eta_max, reference.cluster_eta_max) &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&
       same_double(value.dominant_fraction_min, reference.dominant_fraction_min) &&
@@ -338,8 +335,8 @@ double smallest_positive(const std::array<std::unique_ptr<TH1D>, kHistogramCount
 }
 
 int FinalizePythiaClusterEtSpectra(
-    const std::string partial_pattern = "output/cluster_et_partial_jet3/prompt_primary_generator_pi0_eta07_energy_contribution_anchor_0p3/partial_*.root",
-    const std::string output_base = "output/plots/cluster_et_prompt_primary_generator_pi0_eta07_anchor_0p3",
+    const std::string partial_pattern = "output/cluster_et_partial_jet3/prompt_primary_generator_pi0_cluster_eta07_energy_contribution_anchor_0p3/partial_*.root",
+    const std::string output_base = "output/plots/cluster_et_prompt_primary_generator_pi0_cluster_eta07_anchor_0p3",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {
@@ -572,9 +569,7 @@ int FinalizePythiaClusterEtSpectra(
         label.DrawLatex(0.23, 0.92, "#it{#bf{sPHENIX}} Internal");
         label.DrawLatex(0.23, 0.84, "Pythia8 p+p minimum bias");
         std::ostringstream eta_label;
-        eta_label << "|#eta^{truth}| < " << reference.truth_eta_max
-                  << ", |#eta^{cluster}| < "
-                  << reference.cluster_eta_max;
+        eta_label << "|#eta^{cluster}| < " << reference.cluster_eta_max;
         label.DrawLatex(0.23, 0.76, eta_label.str().c_str());
         label.DrawLatex(0.23, 0.68, matching_label);
         canvas.RedrawAxis();
@@ -600,7 +595,7 @@ int FinalizePythiaClusterEtSpectra(
     density[index]->Write();
   }
 
-  int output_schema_version = 3;
+  int output_schema_version = 4;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -633,7 +628,6 @@ int FinalizePythiaClusterEtSpectra(
   metadata.Branch("pi0_truth_matching_algorithm_version",
                   &total.pi0_truth_matching_algorithm_version);
   metadata.Branch("et_max", &total.et_max);
-  metadata.Branch("truth_eta_max", &total.truth_eta_max);
   metadata.Branch("cluster_eta_max", &total.cluster_eta_max);
   metadata.Branch("min_cluster_energy", &total.min_cluster_energy);
   metadata.Branch("dominant_fraction_min",

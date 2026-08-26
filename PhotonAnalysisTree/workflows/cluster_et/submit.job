@@ -15,11 +15,10 @@ files_per_job      = 50
 n_chunks           = 4000
 chunk_offset       = 0
 input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/minimum_bias/segments.list
-partial_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/cluster_et_partial/prompt_primary_generator_pi0_eta07_energy_contribution_anchor_0p3
+partial_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/cluster_et_partial/prompt_primary_generator_pi0_cluster_eta07_energy_contribution_anchor_0p3
 log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
 n_bins             = 100
 et_max             = 20.0
-truth_eta_max      = 0.7
 cluster_eta_max    = 0.7
 min_cluster_energy = 0.2
 dominant_fraction_min = 0.5
@@ -33,7 +32,7 @@ response_max       = 1.5
 Output             = $(log_directory)/pythia_cluster_et_partial_$(ProcId).out
 Error              = $(log_directory)/pythia_cluster_et_partial_$(ProcId).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-cluster-et-partial_$(ProcId).log
-Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(partial_output_directory) $(n_bins) $(et_max) $(truth_eta_max) $(cluster_eta_max) $(min_cluster_energy) $(dominant_fraction_min) $(pi0_contributor_fraction_min) $(min_energy_contribution_fraction) $(separated_dr) $(merged_dr) $(response_min) $(response_max)"
+Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(partial_output_directory) $(n_bins) $(et_max) $(cluster_eta_max) $(min_cluster_energy) $(dominant_fraction_min) $(pi0_contributor_fraction_min) $(min_energy_contribution_fraction) $(separated_dr) $(merged_dr) $(response_min) $(response_max)"
 
 # Require n_chunks = ceil(total_files / files_per_job) - chunk_offset.
 Queue $(n_chunks)

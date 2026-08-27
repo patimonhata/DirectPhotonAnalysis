@@ -699,8 +699,8 @@ inline void draw_eta_phi(const DisplayData& data, int selected_family = -1)
     if (selected_family >= 0 && candidate.id != selected_family) continue;
     for (int gamma = 0; gamma < 2; ++gamma)
     {
-      const double eta = candidate.photon_projection_valid[gamma] ? candidate.photon_projection_eta[gamma] : candidate.photon_eta[gamma];
-      const double phi = candidate.photon_projection_valid[gamma] ? candidate.photon_projection_phi[gamma] : candidate.photon_phi[gamma];
+      const double eta = candidate.photon_eta[gamma];
+      const double phi = candidate.photon_phi[gamma];
       auto* marker = new TMarker(eta, phi, 29);
       marker->SetMarkerColor(family_color(candidate.id));
       marker->SetMarkerSize(1.6); marker->Draw();
@@ -822,7 +822,7 @@ inline void draw_display_legend(int family = -1, bool tower_detail = false,
 
   auto* star = new TMarker(0.15, y, 29);
   star->SetMarkerColor(color); star->SetMarkerSize(1.4); star->Draw();
-  TLatex text; text.SetTextSize(text_size); text.SetTextAlign(12); text.DrawLatex(0.30, y, "truth photon in #eta-#phi"); y -= step;
+  TLatex text; text.SetTextSize(text_size); text.SetTextAlign(12); text.DrawLatex(0.30, y, "truth photon momentum in #eta-#phi"); y -= step;
 
   auto* cluster = new TMarker(0.15, y, 20);
   cluster->SetMarkerColor(kGray + 2); cluster->SetMarkerSize(1.2); cluster->Draw();

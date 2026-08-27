@@ -109,9 +109,12 @@ open cluster ring uses the same family color, and the filled cluster marker
 encodes the anchor topology.  Each anchor then gets a clearly labeled detail
 page showing only that family's G4 truth segments in x-y and z-r, together with
 eta-phi, the classification inputs, a local tower energy map and a
-self-contained legend.  Detail pages are grouped by pi0
-candidate; the stored anchor IDs and intermediate trees are unchanged.  Nested
-tower outlines identify the anchor and the two best daughter-photon clusters
+self-contained legend.  Stars in eta-phi use the daughter-photon momentum
+eta and phi, matching the vertex-corrected cluster coordinates.  The separate
+CEMC projection eta and phi remain available for acceptance and missing-partner
+diagnostics, but are not used as star coordinates.  Detail pages are grouped by
+pi0 candidate; the stored anchor IDs and intermediate trees are unchanged.
+Nested tower outlines identify the anchor and the two best daughter-photon clusters
 using the same line grammar.  Within a selected pi0 family, a direct photon with
 stored daughters stops at its first daughter-production vertex instead of being
 projected to the calorimeter.  Pre-CEMC descendants are drawn as thin branch

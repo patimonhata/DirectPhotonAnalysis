@@ -44,7 +44,11 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
     const double anchor_pi0_fraction_min = 0.5,
     const double min_energy_contribution_fraction = 0.0,
     const double min_photon_energy_recovery = 0.5,
-    const double max_abs_vertex_z = 60.0)
+    const double max_abs_vertex_z = 60.0,
+    const double cemc_acceptance_eta_max = 1.1,
+    const double min_direct_match_cluster_energy_coverage = 0.5,
+    const double missing_diagnostic_max_delta_r = 0.15,
+    const bool enable_missing_diagnostics = true)
 {
   if (manifest_path.empty() || output_file.empty() || manifest_begin < 0 ||
       manifest_end <= manifest_begin)
@@ -148,14 +152,19 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
   accumulator->set_truth_cell_node_name("G4CELL_CEMC");
   accumulator->set_truth_hit_node_name("G4HIT_CEMC");
   accumulator->set_split_cluster_node_name("CLUSTERINFO_CEMC");
+  accumulator->set_tower_geom_node_name("TOWERGEOM_CEMC");
   accumulator->set_binning(n_bins, et_max);
   accumulator->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
   accumulator->set_partner_cluster_eta_max(partner_cluster_eta_max);
+  accumulator->set_cemc_acceptance_eta_max(cemc_acceptance_eta_max);
   accumulator->set_min_cluster_energy(min_cluster_energy);
   accumulator->set_dominant_fraction_min(dominant_fraction_min);
   accumulator->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);
   accumulator->set_min_energy_contribution_fraction(min_energy_contribution_fraction);
   accumulator->set_min_photon_energy_recovery(min_photon_energy_recovery);
+  accumulator->set_min_direct_match_cluster_energy_coverage(min_direct_match_cluster_energy_coverage);
+  accumulator->set_missing_diagnostic_max_delta_r(missing_diagnostic_max_delta_r);
+  accumulator->set_enable_missing_diagnostics(enable_missing_diagnostics);
   accumulator->set_max_abs_vertex_z(max_abs_vertex_z);
   accumulator->set_verbosity(1);
   server->registerSubsystem(accumulator);

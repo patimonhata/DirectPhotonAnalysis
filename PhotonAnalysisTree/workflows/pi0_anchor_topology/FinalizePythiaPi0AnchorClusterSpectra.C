@@ -25,8 +25,9 @@
 
 namespace
 {
-constexpr std::size_t kHistogramCount = 6;
-constexpr std::size_t kCategoryCount = 4;
+constexpr std::size_t kHistogramCount = 9;
+constexpr std::size_t kCategoryCount = 6;
+constexpr std::array<std::size_t, kCategoryCount> kCategoryHistogramIndices = {2, 3, 5, 6, 7, 8};
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
 constexpr double kPlotAreaTop = 0.62;
@@ -70,11 +71,13 @@ struct PartialMetadata {
   int schema_version = 0;
   std::string manifest_path;
   std::string cluster_collection;
+  std::string tower_geom_node;
   std::string classification_unit;
   std::string pi0_selection;
   std::string partner_selection;
   std::string topology_definition;
   std::string topology_priority;
+  std::string missing_category_priority;
   std::string response_policy;
   std::string photon_recovery_policy;
   std::string vertex_selection;
@@ -83,14 +86,19 @@ struct PartialMetadata {
   int signal_embedding_id = 0;
   int n_bins = 0;
   int matcher_version = 0;
+  int topology_version = 0;
   double et_max = 0.0;
   double anchor_cluster_eta_max = 0.0;
   double partner_cluster_eta_max = 0.0;
+  double cemc_acceptance_eta_max = 0.0;
   double min_cluster_energy = 0.0;
   double dominant_fraction_min = 0.0;
   double anchor_pi0_fraction_min = 0.0;
   double min_energy_contribution_fraction = 0.0;
   double min_photon_energy_recovery = 0.0;
+  double min_direct_match_cluster_energy_coverage = 0.0;
+  double missing_diagnostic_max_delta_r = 0.0;
+  bool enable_missing_diagnostics = false;
   double max_abs_vertex_z = 0.0;
   unsigned char bin_width_normalized = 1U;
   unsigned long long events_processed = 0;
@@ -111,6 +119,9 @@ struct PartialMetadata {
   unsigned long long separated_count = 0;
   unsigned long long merged_count = 0;
   unsigned long long missing_count = 0;
+  unsigned long long missing_energy_threshold_count = 0;
+  unsigned long long missing_acceptance_count = 0;
+  unsigned long long missing_other_count = 0;
   unsigned long long other_count = 0;
 };
 
@@ -133,11 +144,13 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
 
   std::string* manifest_path = nullptr;
   std::string* cluster_collection = nullptr;
+  std::string* tower_geom_node = nullptr;
   std::string* classification_unit = nullptr;
   std::string* pi0_selection = nullptr;
   std::string* partner_selection = nullptr;
   std::string* topology_definition = nullptr;
   std::string* topology_priority = nullptr;
+  std::string* missing_category_priority = nullptr;
   std::string* response_policy = nullptr;
   std::string* photon_recovery_policy = nullptr;
   std::string* vertex_selection = nullptr;
@@ -147,11 +160,13 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "manifest_begin", &value.manifest_begin);
   ok &= bind(tree, "manifest_end", &value.manifest_end);
   ok &= bind(tree, "cluster_collection", &cluster_collection);
+  ok &= bind(tree, "tower_geom_node", &tower_geom_node);
   ok &= bind(tree, "classification_unit", &classification_unit);
   ok &= bind(tree, "pi0_selection", &pi0_selection);
   ok &= bind(tree, "partner_selection", &partner_selection);
   ok &= bind(tree, "topology_definition", &topology_definition);
   ok &= bind(tree, "topology_priority", &topology_priority);
+  ok &= bind(tree, "missing_category_priority", &missing_category_priority);
   ok &= bind(tree, "response_policy", &response_policy);
   ok &= bind(tree, "photon_recovery_policy", &photon_recovery_policy);
   ok &= bind(tree, "vertex_selection", &vertex_selection);
@@ -160,13 +175,18 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "et_max", &value.et_max);
   ok &= bind(tree, "anchor_cluster_eta_max", &value.anchor_cluster_eta_max);
   ok &= bind(tree, "partner_cluster_eta_max", &value.partner_cluster_eta_max);
+  ok &= bind(tree, "cemc_acceptance_eta_max", &value.cemc_acceptance_eta_max);
   ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
   ok &= bind(tree, "dominant_fraction_min", &value.dominant_fraction_min);
   ok &= bind(tree, "anchor_pi0_fraction_min", &value.anchor_pi0_fraction_min);
   ok &= bind(tree, "min_energy_contribution_fraction", &value.min_energy_contribution_fraction);
   ok &= bind(tree, "min_photon_energy_recovery", &value.min_photon_energy_recovery);
+  ok &= bind(tree, "min_direct_match_cluster_energy_coverage", &value.min_direct_match_cluster_energy_coverage);
+  ok &= bind(tree, "missing_diagnostic_max_delta_r", &value.missing_diagnostic_max_delta_r);
+  ok &= bind(tree, "enable_missing_diagnostics", &value.enable_missing_diagnostics);
   ok &= bind(tree, "max_abs_vertex_z", &value.max_abs_vertex_z);
   ok &= bind(tree, "pi0_truth_matching_algorithm_version", &value.matcher_version);
+  ok &= bind(tree, "pi0_topology_algorithm_version", &value.topology_version);
   ok &= bind(tree, "bin_width_normalized", &value.bin_width_normalized);
   ok &= bind(tree, "events_processed", &value.events_processed);
   ok &= bind(tree, "events_written", &value.events_written);
@@ -186,10 +206,14 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "separated_count", &value.separated_count);
   ok &= bind(tree, "merged_count", &value.merged_count);
   ok &= bind(tree, "missing_count", &value.missing_count);
+  ok &= bind(tree, "missing_energy_threshold_count", &value.missing_energy_threshold_count);
+  ok &= bind(tree, "missing_acceptance_count", &value.missing_acceptance_count);
+  ok &= bind(tree, "missing_other_count", &value.missing_other_count);
   ok &= bind(tree, "other_count", &value.other_count);
   if (!ok || tree->GetEntry(0) <= 0 || !manifest_path ||
-      !cluster_collection || !classification_unit || !pi0_selection ||
+      !cluster_collection || !tower_geom_node || !classification_unit || !pi0_selection ||
       !partner_selection || !topology_definition || !topology_priority ||
+      !missing_category_priority ||
       !response_policy || !photon_recovery_policy || !vertex_selection)
   {
     return false;
@@ -198,11 +222,13 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   value.path = path;
   value.manifest_path = *manifest_path;
   value.cluster_collection = *cluster_collection;
+  value.tower_geom_node = *tower_geom_node;
   value.classification_unit = *classification_unit;
   value.pi0_selection = *pi0_selection;
   value.partner_selection = *partner_selection;
   value.topology_definition = *topology_definition;
   value.topology_priority = *topology_priority;
+  value.missing_category_priority = *missing_category_priority;
   value.response_policy = *response_policy;
   value.photon_recovery_policy = *photon_recovery_policy;
   value.vertex_selection = *vertex_selection;
@@ -210,16 +236,18 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
 }
 
 bool valid_metadata(const PartialMetadata& value) {
-  return value.schema_version == 5 &&
+  return value.schema_version == 6 &&
       !value.manifest_path.empty() &&
       value.manifest_begin >= 0 &&
       value.manifest_end > value.manifest_begin &&
       value.cluster_collection == "split" &&
+      !value.tower_geom_node.empty() &&
       value.classification_unit == "every_cluster_with_selected_pi0_as_grouped_main_contributor" &&
       value.pi0_selection == "signal_g4_primary_pi0_or_generator_pi0_with_exactly_two_g4_photons" &&
       value.partner_selection == "same_energy_cut_as_anchor_partner_eta_cut_configurable" &&
       value.topology_definition == "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters" &&
       value.topology_priority == "ambiguous_main_to_other_then_merged_then_separated_then_missing_then_other" &&
+      value.missing_category_priority == "acceptance_then_energy_threshold_then_other" &&
       value.response_policy == "not_used_for_classification" &&
       value.photon_recovery_policy == "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
       value.vertex_selection == "signal_hepmc_collision_vertex_abs_z_lt_max" &&
@@ -227,6 +255,7 @@ bool valid_metadata(const PartialMetadata& value) {
       value.et_max > 0.0 &&
       value.anchor_cluster_eta_max > 0.0 &&
       std::isfinite(value.partner_cluster_eta_max) &&
+      std::isfinite(value.cemc_acceptance_eta_max) && value.cemc_acceptance_eta_max > 0.0 &&
       value.min_cluster_energy >= 0.0 &&
       value.dominant_fraction_min >= 0.0 &&
       value.dominant_fraction_min <= 1.0 &&
@@ -237,8 +266,11 @@ bool valid_metadata(const PartialMetadata& value) {
       std::isfinite(value.min_photon_energy_recovery) &&
       value.min_photon_energy_recovery >= 0.0 &&
       value.min_photon_energy_recovery <= 1.0 &&
+      value.min_direct_match_cluster_energy_coverage >= 0.0 &&
+      value.min_direct_match_cluster_energy_coverage <= 1.0 &&
+      std::isfinite(value.missing_diagnostic_max_delta_r) && value.missing_diagnostic_max_delta_r > 0.0 &&
       std::isfinite(value.max_abs_vertex_z) && value.max_abs_vertex_z > 0.0 &&
-      value.matcher_version > 0 &&
+      value.matcher_version > 0 && value.topology_version > 0 &&
       value.bin_width_normalized == 0U &&
       value.events_processed > 0 &&
       value.events_written + value.events_invalid +
@@ -246,6 +278,8 @@ bool valid_metadata(const PartialMetadata& value) {
       value.cluster_invalid_truth <= value.cluster_considered &&
       value.anchor_count == value.anchor_g4 + value.anchor_generator &&
       value.anchor_count == value.separated_count + value.merged_count + value.missing_count + value.other_count &&
+      value.missing_count == value.missing_energy_threshold_count + value.missing_acceptance_count + value.missing_other_count &&
+      (value.enable_missing_diagnostics || value.missing_energy_threshold_count == 0) &&
       value.ambiguous_main <= value.other_count;
 }
 
@@ -254,25 +288,32 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference) 
       value.schema_version == reference.schema_version &&
       value.manifest_path == reference.manifest_path &&
       value.cluster_collection == reference.cluster_collection &&
+      value.tower_geom_node == reference.tower_geom_node &&
       value.classification_unit == reference.classification_unit &&
       value.pi0_selection == reference.pi0_selection &&
       value.partner_selection == reference.partner_selection &&
       value.topology_definition == reference.topology_definition &&
       value.topology_priority == reference.topology_priority &&
+      value.missing_category_priority == reference.missing_category_priority &&
       value.response_policy == reference.response_policy &&
       value.photon_recovery_policy == reference.photon_recovery_policy &&
       value.vertex_selection == reference.vertex_selection &&
       value.signal_embedding_id == reference.signal_embedding_id &&
       value.n_bins == reference.n_bins &&
       value.matcher_version == reference.matcher_version &&
+      value.topology_version == reference.topology_version &&
       same_double(value.et_max, reference.et_max) &&
       same_double(value.anchor_cluster_eta_max, reference.anchor_cluster_eta_max) &&
       same_double(value.partner_cluster_eta_max, reference.partner_cluster_eta_max) &&
+      same_double(value.cemc_acceptance_eta_max, reference.cemc_acceptance_eta_max) &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&
       same_double(value.dominant_fraction_min, reference.dominant_fraction_min) &&
       same_double(value.anchor_pi0_fraction_min, reference.anchor_pi0_fraction_min) &&
       same_double(value.min_energy_contribution_fraction, reference.min_energy_contribution_fraction) &&
       same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) &&
+      same_double(value.min_direct_match_cluster_energy_coverage, reference.min_direct_match_cluster_energy_coverage) &&
+      same_double(value.missing_diagnostic_max_delta_r, reference.missing_diagnostic_max_delta_r) &&
+      value.enable_missing_diagnostics == reference.enable_missing_diagnostics &&
       same_double(value.max_abs_vertex_z, reference.max_abs_vertex_z);
 }
 
@@ -379,6 +420,9 @@ int FinalizePythiaPi0AnchorClusterSpectra(
       "h_pi0_anchor_separated_cluster_et_raw",
       "h_pi0_anchor_merged_cluster_et_raw",
       "h_pi0_anchor_missing_cluster_et_raw",
+      "h_pi0_anchor_missing_energy_threshold_cluster_et_raw",
+      "h_pi0_anchor_missing_acceptance_cluster_et_raw",
+      "h_pi0_anchor_missing_other_cluster_et_raw",
       "h_pi0_anchor_other_cluster_et_raw"};
   const std::array<std::string, kHistogramCount> density_names = {
       "h_prompt_cluster_et_density",
@@ -386,6 +430,9 @@ int FinalizePythiaPi0AnchorClusterSpectra(
       "h_pi0_anchor_separated_cluster_et_density",
       "h_pi0_anchor_merged_cluster_et_density",
       "h_pi0_anchor_missing_cluster_et_density",
+      "h_pi0_anchor_missing_energy_threshold_cluster_et_density",
+      "h_pi0_anchor_missing_acceptance_cluster_et_density",
+      "h_pi0_anchor_missing_other_cluster_et_density",
       "h_pi0_anchor_other_cluster_et_density"};
 
   std::array<std::unique_ptr<TH1D>, kHistogramCount> raw;
@@ -403,14 +450,16 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   total.anchor_g4 = total.anchor_generator = total.ambiguous_main = 0;
   total.energy_match_invalid = 0;
   total.separated_count = total.merged_count = 0;
-  total.missing_count = total.other_count = 0;
+  total.missing_count = total.missing_energy_threshold_count = 0;
+  total.missing_acceptance_count = total.missing_other_count = total.other_count = 0;
 
   for (const PartialMetadata& partial : partials) {
     TFile input(partial.path.c_str(), "READ");
     const std::array<unsigned long long, kHistogramCount> counts = {
         partial.prompt_count, partial.anchor_count,
         partial.separated_count, partial.merged_count,
-        partial.missing_count, partial.other_count};
+        partial.missing_count, partial.missing_energy_threshold_count,
+        partial.missing_acceptance_count, partial.missing_other_count, partial.other_count};
     std::array<TH1D*, kHistogramCount> partial_histograms{};
     for (std::size_t index = 0; index < raw.size(); ++index) {
       input.GetObject(raw_names[index].c_str(), partial_histograms[index]);
@@ -425,12 +474,12 @@ int FinalizePythiaPi0AnchorClusterSpectra(
       }
     }
     for (int bin = 0; bin <= partial.n_bins + 1; ++bin) {
-      const double categories =
-          partial_histograms[2]->GetBinContent(bin) +
-          partial_histograms[3]->GetBinContent(bin) +
-          partial_histograms[4]->GetBinContent(bin) +
-          partial_histograms[5]->GetBinContent(bin);
-      if (std::abs(partial_histograms[1]->GetBinContent(bin) - categories) > 1e-9) {
+      const double missing_categories = partial_histograms[5]->GetBinContent(bin) +
+          partial_histograms[6]->GetBinContent(bin) + partial_histograms[7]->GetBinContent(bin);
+      const double categories = partial_histograms[2]->GetBinContent(bin) +
+          partial_histograms[3]->GetBinContent(bin) + missing_categories + partial_histograms[8]->GetBinContent(bin);
+      if (std::abs(partial_histograms[4]->GetBinContent(bin) - missing_categories) > 1e-9 ||
+          std::abs(partial_histograms[1]->GetBinContent(bin) - categories) > 1e-9) {
         return 5;
       }
     }
@@ -453,22 +502,27 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     total.separated_count += partial.separated_count;
     total.merged_count += partial.merged_count;
     total.missing_count += partial.missing_count;
+    total.missing_energy_threshold_count += partial.missing_energy_threshold_count;
+    total.missing_acceptance_count += partial.missing_acceptance_count;
+    total.missing_other_count += partial.missing_other_count;
     total.other_count += partial.other_count;
   }
 
   for (int bin = 0; bin <= reference.n_bins + 1; ++bin) {
+    const double missing_categories = raw[5]->GetBinContent(bin) +
+        raw[6]->GetBinContent(bin) + raw[7]->GetBinContent(bin);
     const double categories = raw[2]->GetBinContent(bin) +
-        raw[3]->GetBinContent(bin) + raw[4]->GetBinContent(bin) +
-        raw[5]->GetBinContent(bin);
-    if (std::abs(raw[1]->GetBinContent(bin) - categories) > 1e-9) {
+        raw[3]->GetBinContent(bin) + missing_categories + raw[8]->GetBinContent(bin);
+    if (std::abs(raw[4]->GetBinContent(bin) - missing_categories) > 1e-9 ||
+        std::abs(raw[1]->GetBinContent(bin) - categories) > 1e-9) {
       return 5;
     }
   }
 
   std::array<std::unique_ptr<TH1D>, kHistogramCount> density;
   const std::array<int, kHistogramCount> colors = {
-      kRed + 1, kBlue + 1, kAzure + 7, kMagenta + 1,
-      kGreen + 2, kGray + 2};
+      kRed + 1, kBlue + 1, kAzure + 7, kMagenta + 1, kGreen + 2,
+      kOrange + 7, kViolet + 1, kGreen + 3, kGray + 2};
   for (std::size_t index = 0; index < raw.size(); ++index) {
     density[index].reset(static_cast<TH1D*>(raw[index]->Clone(density_names[index].c_str())));
     density[index]->SetDirectory(nullptr);
@@ -491,16 +545,19 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   const std::array<std::string, kCategoryCount> fraction_names = {
       "h_pi0_anchor_separated_fraction",
       "h_pi0_anchor_merged_fraction",
-      "h_pi0_anchor_missing_fraction",
+      "h_pi0_anchor_missing_energy_threshold_fraction",
+      "h_pi0_anchor_missing_acceptance_fraction",
+      "h_pi0_anchor_missing_other_fraction",
       "h_pi0_anchor_other_fraction"};
   std::array<std::unique_ptr<TH1D>, kCategoryCount> fractions;
   for (std::size_t index = 0; index < fractions.size(); ++index) {
-    fractions[index].reset(static_cast<TH1D*>(raw[index + 2]->Clone(fraction_names[index].c_str())));
+    const std::size_t histogram_index = kCategoryHistogramIndices[index];
+    fractions[index].reset(static_cast<TH1D*>(raw[histogram_index]->Clone(fraction_names[index].c_str())));
     fractions[index]->SetDirectory(nullptr);
-    fractions[index]->Divide(raw[index + 2].get(), raw[1].get(), 1.0, 1.0, "B");
+    fractions[index]->Divide(raw[histogram_index].get(), raw[1].get(), 1.0, 1.0, "B");
     fractions[index]->SetStats(false);
-    fractions[index]->SetLineColor(colors[index + 2]);
-    fractions[index]->SetMarkerColor(colors[index + 2]);
+    fractions[index]->SetLineColor(colors[histogram_index]);
+    fractions[index]->SetMarkerColor(colors[histogram_index]);
     fractions[index]->SetMarkerStyle(20 + static_cast<int>(index));
     fractions[index]->SetMarkerSize(0.9);
     fractions[index]->SetLineWidth(2);
@@ -514,7 +571,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     stacked_fractions[index].reset(static_cast<TH1D*>(fractions[index]->Clone(
         (fraction_names[index] + "_stack_component").c_str())));
     stacked_fractions[index]->SetDirectory(nullptr);
-    stacked_fractions[index]->SetFillColor(colors[index + 2]);
+    stacked_fractions[index]->SetFillColor(colors[kCategoryHistogramIndices[index]]);
     stacked_fractions[index]->SetLineColor(kBlack);
     stacked_fractions[index]->SetLineWidth(1);
     stacked_fractions[index]->SetMarkerStyle(0);
@@ -540,7 +597,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     raw[index]->Draw("HIST SAME");
   }
   spectrum_canvas.cd();
-  TLegend spectrum_legend(kLegendX, 0.63, 0.94, 0.95);
+  TLegend spectrum_legend(kLegendX, 0.51, 0.94, 0.95);
   spectrum_legend.SetBorderSize(0);
   spectrum_legend.SetFillStyle(0);
   spectrum_legend.SetTextSize(kTextSize);
@@ -548,8 +605,11 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   spectrum_legend.AddEntry(raw[1].get(), "#pi^{0}-main anchor", "l");
   spectrum_legend.AddEntry(raw[2].get(), "Separated", "l");
   spectrum_legend.AddEntry(raw[3].get(), "Merged", "l");
-  spectrum_legend.AddEntry(raw[4].get(), "Missing partner", "l");
-  spectrum_legend.AddEntry(raw[5].get(), "Other", "l");
+  spectrum_legend.AddEntry(raw[4].get(), "Missing (total)", "l");
+  spectrum_legend.AddEntry(raw[5].get(), "Missing: energy threshold", "l");
+  spectrum_legend.AddEntry(raw[6].get(), "Missing: acceptance", "l");
+  spectrum_legend.AddEntry(raw[7].get(), "Missing: other", "l");
+  spectrum_legend.AddEntry(raw[8].get(), "Other", "l");
   spectrum_legend.Draw();
 
   TLatex spectrum_label;
@@ -586,14 +646,16 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     fractions[index]->Draw("E1 SAME");
   }
   fraction_canvas.cd();
-  TLegend fraction_legend(kLegendX, 0.72, 0.94, 0.95);
+  TLegend fraction_legend(kLegendX, 0.61, 0.94, 0.95);
   fraction_legend.SetBorderSize(0);
   fraction_legend.SetFillStyle(0);
   fraction_legend.SetTextSize(kTextSize);
   fraction_legend.AddEntry(fractions[0].get(), "Separated", "lep");
   fraction_legend.AddEntry(fractions[1].get(), "Merged", "lep");
-  fraction_legend.AddEntry(fractions[2].get(), "Missing partner", "lep");
-  fraction_legend.AddEntry(fractions[3].get(), "Other", "lep");
+  fraction_legend.AddEntry(fractions[2].get(), "Missing: energy threshold", "lep");
+  fraction_legend.AddEntry(fractions[3].get(), "Missing: acceptance", "lep");
+  fraction_legend.AddEntry(fractions[4].get(), "Missing: other", "lep");
+  fraction_legend.AddEntry(fractions[5].get(), "Other", "lep");
   fraction_legend.Draw();
   TLatex fraction_label;
   fraction_label.SetNDC();
@@ -626,14 +688,16 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   style_plot_axes(fraction_stack.GetXaxis(), fraction_stack.GetYaxis());
 
   fraction_stack_canvas.cd();
-  TLegend fraction_stack_legend(kLegendX, 0.72, 0.94, 0.95);
+  TLegend fraction_stack_legend(kLegendX, 0.61, 0.94, 0.95);
   fraction_stack_legend.SetBorderSize(0);
   fraction_stack_legend.SetFillStyle(0);
   fraction_stack_legend.SetTextSize(kTextSize);
   fraction_stack_legend.AddEntry(stacked_fractions[0].get(), "Separated", "f");
   fraction_stack_legend.AddEntry(stacked_fractions[1].get(), "Merged", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[2].get(), "Missing partner", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[3].get(), "Other", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[2].get(), "Missing: energy threshold", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[3].get(), "Missing: acceptance", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[4].get(), "Missing: other", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[5].get(), "Other", "f");
   fraction_stack_legend.Draw();
 
   TLatex fraction_stack_label;
@@ -664,7 +728,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     histogram->Write();
   }
 
-  int output_schema_version = 5;
+  int output_schema_version = 6;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -680,11 +744,13 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("partial_file_count", &partial_file_count);
   metadata.Branch("input_file_count", &input_file_count);
   metadata.Branch("cluster_collection", &total.cluster_collection);
+  metadata.Branch("tower_geom_node", &total.tower_geom_node);
   metadata.Branch("classification_unit", &total.classification_unit);
   metadata.Branch("pi0_selection", &total.pi0_selection);
   metadata.Branch("partner_selection", &total.partner_selection);
   metadata.Branch("topology_definition", &total.topology_definition);
   metadata.Branch("topology_priority", &total.topology_priority);
+  metadata.Branch("missing_category_priority", &total.missing_category_priority);
   metadata.Branch("response_policy", &total.response_policy);
   metadata.Branch("photon_recovery_policy", &total.photon_recovery_policy);
   metadata.Branch("vertex_selection", &total.vertex_selection);
@@ -693,13 +759,18 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("et_max", &total.et_max);
   metadata.Branch("anchor_cluster_eta_max", &total.anchor_cluster_eta_max);
   metadata.Branch("partner_cluster_eta_max", &total.partner_cluster_eta_max);
+  metadata.Branch("cemc_acceptance_eta_max", &total.cemc_acceptance_eta_max);
   metadata.Branch("min_cluster_energy", &total.min_cluster_energy);
   metadata.Branch("dominant_fraction_min", &total.dominant_fraction_min);
   metadata.Branch("anchor_pi0_fraction_min", &total.anchor_pi0_fraction_min);
   metadata.Branch("min_energy_contribution_fraction", &total.min_energy_contribution_fraction);
   metadata.Branch("min_photon_energy_recovery", &total.min_photon_energy_recovery);
+  metadata.Branch("min_direct_match_cluster_energy_coverage", &total.min_direct_match_cluster_energy_coverage);
+  metadata.Branch("missing_diagnostic_max_delta_r", &total.missing_diagnostic_max_delta_r);
+  metadata.Branch("enable_missing_diagnostics", &total.enable_missing_diagnostics);
   metadata.Branch("max_abs_vertex_z", &total.max_abs_vertex_z);
   metadata.Branch("pi0_truth_matching_algorithm_version", &total.matcher_version);
+  metadata.Branch("pi0_topology_algorithm_version", &total.topology_version);
   metadata.Branch("contains_raw_histograms", &contains_raw_histograms);
   metadata.Branch("contains_bin_width_normalized_histograms", &contains_bin_width_normalized_histograms);
   metadata.Branch("contains_category_fractions", &contains_category_fractions);
@@ -721,6 +792,9 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("separated_count", &total.separated_count);
   metadata.Branch("merged_count", &total.merged_count);
   metadata.Branch("missing_count", &total.missing_count);
+  metadata.Branch("missing_energy_threshold_count", &total.missing_energy_threshold_count);
+  metadata.Branch("missing_acceptance_count", &total.missing_acceptance_count);
+  metadata.Branch("missing_other_count", &total.missing_other_count);
   metadata.Branch("other_count", &total.other_count);
   metadata.Fill();
   metadata.Write();
@@ -732,11 +806,13 @@ int FinalizePythiaPi0AnchorClusterSpectra(
 
   std::cout
       << "FinalizePythiaPi0AnchorClusterSpectra - partials/files/events"
-      << "/vertex-rejected/anchor/separated/merged/missing/other = "
+      << "/vertex-rejected/anchor/separated/merged/missing(energy/acceptance/other)/other = "
       << partial_file_count << "/" << input_file_count << "/"
       << total.events_processed << "/" << total.events_vertex_rejected << "/"
       << total.anchor_count << "/"
       << total.separated_count << "/" << total.merged_count << "/"
-      << total.missing_count << "/" << total.other_count << std::endl;
+      << total.missing_count << "(" << total.missing_energy_threshold_count << "/"
+      << total.missing_acceptance_count << "/" << total.missing_other_count << ")/"
+      << total.other_count << std::endl;
   return 0;
 }

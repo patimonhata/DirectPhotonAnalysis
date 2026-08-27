@@ -2,12 +2,19 @@
 
 This workflow starts from every selected central SPLIT CEMC cluster for which a
 selected pi0 is the grouped main truth contributor. Each anchor cluster is
-filled exactly once into separated, merged, missing, or other, so that
+filled exactly once into separated, merged,
+missing(energy-threshold), missing(acceptance), missing(other), or other, so
+that
 
-    N_pi0-main anchor = N_separated + N_merged + N_missing + N_other
+    N_pi0-main anchor = N_separated + N_merged + N_missing-energy-threshold
+                       + N_missing-acceptance + N_missing-other + N_other
 
 holds both globally and in every cluster-ET bin, including underflow and
-overflow.
+overflow. An aggregate missing spectrum is also retained and satisfies
+
+    N_missing = N_missing-energy-threshold + N_missing-acceptance + N_missing-other
+
+in every bin.
 
 ## Event selection
 
@@ -70,9 +77,33 @@ For one anchor cluster:
 - separated: it is the recovered maximum-deposit cluster of one daughter and
   the other daughter has a distinct recovered maximum-deposit partner cluster;
 - missing: it is the recovered maximum-deposit cluster of one daughter and the
-  other daughter has no cluster passing the photon-energy recovery cut;
+  other daughter has no cluster passing the photon-energy recovery cut. Missing
+  is split with the following exclusive priority:
+
+  1. acceptance: the partner projection at the CEMC radius is valid and
+     |eta_projection| >= cemc_acceptance_eta_max (default 1.1);
+  2. energy-threshold: within missing_diagnostic_max_delta_r (default 0.15) of
+     the in-acceptance partner projection, a cluster below min_cluster_energy
+     has usable direct daughter deposit;
+  3. missing-other: every remaining missing case, including invalid projection,
+     best cluster below recovery, incomplete direct matching, or no direct
+     deposit;
+
 - other: the anchor is the maximum-deposit cluster of neither daughter, its
   main-contributor assignment is tied, or no preceding definition applies.
+
+The acceptance test is based on the projected partner photon, not on parent or
+daughter truth eta. The boundary is exclusive: exactly
+|eta_projection| = cemc_acceptance_eta_max is outside. Acceptance takes
+priority over the energy-threshold diagnostic.
+
+The anchor-spectrum workflow enables low-threshold missing diagnostics by
+default. Set enable_missing_diagnostics=false to avoid the additional matching
+cost; then no missing event can be labeled energy-threshold and such events fall
+into missing-other unless acceptance applies. Partial metadata records the
+acceptance boundary, direct-match energy-coverage threshold, diagnostic delta-R,
+diagnostic enable flag, and topology algorithm version so incompatible
+productions cannot be combined.
 
 If one pi0 produces extra pi0-main fragment clusters, only daughter
 maximum-deposit clusters can be merged, separated, or missing; the extra
@@ -92,14 +123,21 @@ file/job counts, and parameters before submitting manually:
     condor_submit workflows/pi0_anchor_topology/submit.job
 
 No repository script submits jobs automatically. Each job writes
-transactionally and validates its partial before publication.
+transactionally and validates its partial before publication. This change uses
+partial schema 6; do not mix it with schema-5 partials. Point the next
+production at a new, empty output directory. run_partial.sh
+accepts optional CEMC_ACCEPTANCE_ETA_MAX,
+MIN_DIRECT_MATCH_CLUSTER_ENERGY_COVERAGE, MISSING_DIAGNOSTIC_MAX_DELTA_R, and
+ENABLE_MISSING_DIAGNOSTICS arguments after MAX_ABS_VERTEX_Z; their defaults are
+1.1, 0.5, 0.15, and true.
 
 Finalize a complete production with:
 
     root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000,"Pythia8 p+p MB")'
 
-The finalizer writes the combined raw and bin-width-normalized spectra, category
-fractions relative to the anchor spectrum, output_base.pdf, and
+The finalizer writes the combined raw and bin-width-normalized spectra, the
+aggregate missing spectrum, and six exclusive category fractions relative to
+the anchor spectrum, output_base.pdf, and
 output_base_category_fractions.pdf. It also writes the stacked category-fraction
 plot output_base_category_fraction_stack.pdf. Plot annotations and legends are
 placed outside the histogram frame.

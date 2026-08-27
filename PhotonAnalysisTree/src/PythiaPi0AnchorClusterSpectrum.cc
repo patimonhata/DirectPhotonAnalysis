@@ -32,6 +32,7 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
       std::isfinite(anchor_cluster_eta_max_) &&
       anchor_cluster_eta_max_ > 0.0 &&
       std::isfinite(partner_cluster_eta_max_) &&
+      std::isfinite(cemc_acceptance_eta_max_) && cemc_acceptance_eta_max_ > 0.0 &&
       std::isfinite(min_cluster_energy_) && min_cluster_energy_ >= 0.0 &&
       dominant_fraction_min_ >= 0.0 && dominant_fraction_min_ <= 1.0 &&
       anchor_pi0_fraction_min_ >= 0.0 &&
@@ -41,6 +42,8 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
       std::isfinite(min_photon_energy_recovery_) &&
       min_photon_energy_recovery_ >= 0.0 &&
       min_photon_energy_recovery_ <= 1.0 &&
+      min_direct_match_cluster_energy_coverage_ >= 0.0 && min_direct_match_cluster_energy_coverage_ <= 1.0 &&
+      std::isfinite(missing_diagnostic_max_delta_r_) && missing_diagnostic_max_delta_r_ > 0.0 &&
       std::isfinite(max_abs_vertex_z_) && max_abs_vertex_z_ > 0.0;
   if (!valid)
   {
@@ -57,14 +60,19 @@ int PythiaPi0AnchorClusterSpectrum::Init(PHCompositeNode* /*topNode*/)
   topology_config.truth_cell_node_name = truth_cell_node_name_;
   topology_config.truth_hit_node_name = truth_hit_node_name_;
   topology_config.cluster_node_name = split_cluster_node_name_;
+  topology_config.tower_geom_node_name = tower_geom_node_name_;
   topology_config.signal_embedding_id = signal_embedding_id_;
   topology_config.anchor_cluster_eta_max = anchor_cluster_eta_max_;
   topology_config.partner_cluster_eta_max = partner_cluster_eta_max_;
+  topology_config.cemc_acceptance_eta_max = cemc_acceptance_eta_max_;
   topology_config.min_cluster_energy = min_cluster_energy_;
   topology_config.dominant_fraction_min = dominant_fraction_min_;
   topology_config.anchor_pi0_fraction_min = anchor_pi0_fraction_min_;
   topology_config.min_energy_contribution_fraction = min_energy_contribution_fraction_;
   topology_config.min_photon_energy_recovery = min_photon_energy_recovery_;
+  topology_config.min_direct_match_cluster_energy_coverage = min_direct_match_cluster_energy_coverage_;
+  topology_config.missing_diagnostic_max_delta_r = missing_diagnostic_max_delta_r_;
+  topology_config.enable_missing_diagnostics = enable_missing_diagnostics_;
   topology_config.max_abs_vertex_z = max_abs_vertex_z_;
   topology_config.verbosity = verbosity_;
   topology_evaluator_.configure(topology_config);
@@ -147,6 +155,24 @@ int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
     case photon_tree::Pi0AnchorTopology::missing:
       h_missing_->Fill(et);
       ++n_missing_;
+      switch (anchor.missing_category)
+      {
+      case photon_tree::Pi0MissingCategory::energy_threshold:
+        h_missing_energy_threshold_->Fill(et);
+        ++n_missing_energy_threshold_;
+        break;
+      case photon_tree::Pi0MissingCategory::acceptance:
+        h_missing_acceptance_->Fill(et);
+        ++n_missing_acceptance_;
+        break;
+      case photon_tree::Pi0MissingCategory::other:
+        h_missing_other_->Fill(et);
+        ++n_missing_other_;
+        break;
+      case photon_tree::Pi0MissingCategory::not_missing:
+        ++n_events_invalid_;
+        return Fun4AllReturnCodes::ABORTEVENT;
+      }
       break;
     case photon_tree::Pi0AnchorTopology::other:
       h_other_->Fill(et);
@@ -176,10 +202,11 @@ int PythiaPi0AnchorClusterSpectrum::End(PHCompositeNode* /*topNode*/)
   const bool write_error = output_file_->TestBit(TFile::kWriteError);
   close_output();
   std::cout
-      << "PythiaPi0AnchorClusterSpectrum - processed/written/vertex-rejected/invalid/anchors/separated/merged/missing/other = "
+      << "PythiaPi0AnchorClusterSpectrum - processed/written/vertex-rejected/invalid/anchors/separated/merged/missing(energy/acceptance/other)/other = "
       << n_events_processed_ << "/" << n_events_written_ << "/"
       << n_events_vertex_rejected_ << "/" << n_events_invalid_ << "/" << n_anchor_cluster_ << "/"
-      << n_separated_ << "/" << n_merged_ << "/" << n_missing_ << "/"
+      << n_separated_ << "/" << n_merged_ << "/" << n_missing_ << "("
+      << n_missing_energy_threshold_ << "/" << n_missing_acceptance_ << "/" << n_missing_other_ << ")/"
       << n_other_ << std::endl;
   return write_error ? Fun4AllReturnCodes::ABORTRUN
                      : Fun4AllReturnCodes::EVENT_OK;
@@ -219,12 +246,18 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   h_missing_ = new TH1D(
       "h_pi0_anchor_missing_cluster_et_raw", "",
       n_bins_, 0.0, et_max_);
+  h_missing_energy_threshold_ = new TH1D(
+      "h_pi0_anchor_missing_energy_threshold_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_missing_acceptance_ = new TH1D(
+      "h_pi0_anchor_missing_acceptance_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_missing_other_ = new TH1D(
+      "h_pi0_anchor_missing_other_cluster_et_raw", "", n_bins_, 0.0, et_max_);
   h_other_ = new TH1D(
       "h_pi0_anchor_other_cluster_et_raw", "",
       n_bins_, 0.0, et_max_);
   for (TH1D* histogram : {
            h_prompt_, h_anchor_, h_separated_, h_merged_, h_missing_,
-           h_other_})
+           h_missing_energy_threshold_, h_missing_acceptance_, h_missing_other_, h_other_})
   {
     histogram->Sumw2();
   }
@@ -239,11 +272,13 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("first_suffix", &first_suffix_);
   metadata_tree_->Branch("last_suffix", &last_suffix_);
   metadata_tree_->Branch("cluster_collection", &cluster_collection_);
+  metadata_tree_->Branch("tower_geom_node", &tower_geom_node_name_);
   metadata_tree_->Branch("classification_unit", &classification_unit_);
   metadata_tree_->Branch("pi0_selection", &pi0_selection_);
   metadata_tree_->Branch("partner_selection", &partner_selection_);
   metadata_tree_->Branch("topology_definition", &topology_definition_);
   metadata_tree_->Branch("topology_priority", &topology_priority_);
+  metadata_tree_->Branch("missing_category_priority", &missing_category_priority_);
   metadata_tree_->Branch("response_policy", &response_policy_);
   metadata_tree_->Branch("photon_recovery_policy", &photon_recovery_policy_);
   metadata_tree_->Branch("vertex_selection", &vertex_selection_);
@@ -252,13 +287,18 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("et_max", &et_max_);
   metadata_tree_->Branch("anchor_cluster_eta_max", &anchor_cluster_eta_max_);
   metadata_tree_->Branch("partner_cluster_eta_max", &partner_cluster_eta_max_);
+  metadata_tree_->Branch("cemc_acceptance_eta_max", &cemc_acceptance_eta_max_);
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);
   metadata_tree_->Branch("dominant_fraction_min", &dominant_fraction_min_);
   metadata_tree_->Branch("anchor_pi0_fraction_min", &anchor_pi0_fraction_min_);
   metadata_tree_->Branch("min_energy_contribution_fraction", &min_energy_contribution_fraction_);
   metadata_tree_->Branch("min_photon_energy_recovery", &min_photon_energy_recovery_);
+  metadata_tree_->Branch("min_direct_match_cluster_energy_coverage", &min_direct_match_cluster_energy_coverage_);
+  metadata_tree_->Branch("missing_diagnostic_max_delta_r", &missing_diagnostic_max_delta_r_);
+  metadata_tree_->Branch("enable_missing_diagnostics", &enable_missing_diagnostics_);
   metadata_tree_->Branch("max_abs_vertex_z", &max_abs_vertex_z_);
   metadata_tree_->Branch("pi0_truth_matching_algorithm_version", &pi0_truth_matching_algorithm_version_);
+  metadata_tree_->Branch("pi0_topology_algorithm_version", &pi0_topology_algorithm_version_);
   metadata_tree_->Branch("bin_width_normalized", &bin_width_normalized);
   metadata_tree_->Branch("events_processed", &n_events_processed_);
   metadata_tree_->Branch("events_written", &n_events_written_);
@@ -278,6 +318,9 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("separated_count", &n_separated_);
   metadata_tree_->Branch("merged_count", &n_merged_);
   metadata_tree_->Branch("missing_count", &n_missing_);
+  metadata_tree_->Branch("missing_energy_threshold_count", &n_missing_energy_threshold_);
+  metadata_tree_->Branch("missing_acceptance_count", &n_missing_acceptance_);
+  metadata_tree_->Branch("missing_other_count", &n_missing_other_);
   metadata_tree_->Branch("other_count", &n_other_);
 }
 
@@ -297,6 +340,9 @@ void PythiaPi0AnchorClusterSpectrum::close_output()
   h_separated_ = nullptr;
   h_merged_ = nullptr;
   h_missing_ = nullptr;
+  h_missing_energy_threshold_ = nullptr;
+  h_missing_acceptance_ = nullptr;
+  h_missing_other_ = nullptr;
   h_other_ = nullptr;
   metadata_tree_ = nullptr;
 }

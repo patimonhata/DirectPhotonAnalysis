@@ -196,6 +196,14 @@ inline int topology_color(int topology)
 
 constexpr int photon0_line_style = 11;
 constexpr int photon1_line_style = 12;
+constexpr double cluster_fill_threshold_gev = 0.1;
+
+inline double cluster_marker_size(double energy, double maximum_size)
+{
+  const double nonnegative_energy = std::max(0.0, energy);
+  if (nonnegative_energy < cluster_fill_threshold_gev) return 0.18 + 1.2 * nonnegative_energy;
+  return std::min(maximum_size, 1.0 + 0.18 * (nonnegative_energy - cluster_fill_threshold_gev));
+}
 
 inline int family_color(int family)
 {
@@ -642,7 +650,7 @@ inline void draw_xy(const DisplayData& data, int selected_family = -1)
   for (const auto& cluster : data.clusters)
   {
     draw_cluster_marker(data, cluster, cluster.x, cluster.y,
-        std::min(2.2, 0.7 + 0.12 * std::max(0.0, cluster.energy)),
+        cluster_marker_size(cluster.energy, 2.2),
         selected_family);
   }
 }
@@ -677,7 +685,7 @@ inline void draw_zr(const DisplayData& data, int selected_family = -1)
   for (const auto& cluster : data.clusters)
   {
     draw_cluster_marker(data, cluster, cluster.z, cluster.r,
-        std::min(2.2, 0.7 + 0.12 * std::max(0.0, cluster.energy)),
+        cluster_marker_size(cluster.energy, 2.2),
         selected_family);
   }
 }
@@ -691,7 +699,7 @@ inline void draw_eta_phi(const DisplayData& data, int selected_family = -1)
   {
     if (!std::isfinite(cluster.eta) || !std::isfinite(cluster.phi)) continue;
     draw_cluster_marker(data, cluster, cluster.eta, cluster.phi,
-        std::min(2.0, 0.7 + 0.12 * std::max(0.0, cluster.energy)),
+        cluster_marker_size(cluster.energy, 2.0),
         selected_family);
   }
   for (const auto& candidate : data.candidates)
@@ -824,11 +832,13 @@ inline void draw_display_legend(int family = -1, bool tower_detail = false,
   star->SetMarkerColor(color); star->SetMarkerSize(1.4); star->Draw();
   TLatex text; text.SetTextSize(text_size); text.SetTextAlign(12); text.DrawLatex(0.30, y, "truth photon momentum in #eta-#phi"); y -= step;
 
-  auto* cluster = new TMarker(0.15, y, 20);
+  auto* low_energy_cluster = new TMarker(0.09, y, 20);
+  low_energy_cluster->SetMarkerColor(kGray + 2); low_energy_cluster->SetMarkerSize(0.3); low_energy_cluster->Draw();
+  auto* cluster = new TMarker(0.18, y, 20);
   cluster->SetMarkerColor(kGray + 2); cluster->SetMarkerSize(1.2); cluster->Draw();
-  auto* ring = new TMarker(0.15, y, 24);
+  auto* ring = new TMarker(0.18, y, 24);
   ring->SetMarkerColor(color); ring->SetMarkerSize(1.55); ring->Draw();
-  text.DrawLatex(0.30, y, "cluster: fill=topology, ring=#pi^{0} family"); y -= step;
+  text.DrawLatex(0.28, y, "cluster size: E<0.1 small, E#geq0.1 large"); y -= step;
 
   draw_legend_line(y, kGray + 2, 2, 1, "CEMC inner / outer surface", text_size); y -= step;
   text.SetTextColor(kGreen + 2); text.DrawLatex(0.05, y, "S separated");

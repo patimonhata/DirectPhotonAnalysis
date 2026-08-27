@@ -105,7 +105,8 @@ BrowseTopologyEvents("output/topology_pythia.root",
 Every event starts with an overview page containing x-y, z-r and eta-phi
 views.  One color consistently identifies one selected pi0 family: the pi0 is
 solid, while its two daughter-photon branches use fine and coarse dashes.  The
-open cluster ring uses the same family color, and the filled cluster marker
+open cluster ring uses the same family color.  Cluster markers below 0.1 GeV use a
+separate compressed size scale, while markers at or above 0.1 GeV start from a substantially larger size; the fill color
 encodes the anchor topology.  Each anchor then gets a clearly labeled detail
 page showing only that family's G4 truth segments in x-y and z-r, together with
 eta-phi, the classification inputs, a local tower energy map and a

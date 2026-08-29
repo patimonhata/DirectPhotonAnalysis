@@ -28,7 +28,7 @@ struct PartialMetadata
   std::string photon_selection;
   std::string pi0_decay_photon_selection;
   std::string manifest_path;
-  std::string input_directory;
+  std::string input_file_prefix;
   Long64_t manifest_begin = -1;
   Long64_t manifest_end = -1;
   Long64_t files_added = 0;
@@ -65,13 +65,13 @@ bool read_metadata(const std::string& path, PartialMetadata& result)
   std::string* photon_selection = nullptr;
   std::string* pi0_decay_photon_selection = nullptr;
   std::string* manifest_path = nullptr;
-  std::string* input_directory = nullptr;
+  std::string* input_file_prefix = nullptr;
   bool ok = true;
   ok &= bind_branch(tree, "schema_version", &result.schema_version);
   ok &= bind_branch(tree, "photon_selection", &photon_selection);
   ok &= bind_branch(tree, "pi0_decay_photon_selection", &pi0_decay_photon_selection);
   ok &= bind_branch(tree, "manifest_path", &manifest_path);
-  ok &= bind_branch(tree, "input_directory", &input_directory);
+  ok &= bind_branch(tree, "input_file_prefix", &input_file_prefix);
   ok &= bind_branch(tree, "manifest_begin", &result.manifest_begin);
   ok &= bind_branch(tree, "manifest_end", &result.manifest_end);
   ok &= bind_branch(tree, "files_added", &result.files_added);
@@ -89,7 +89,7 @@ bool read_metadata(const std::string& path, PartialMetadata& result)
   ok &= bind_branch(tree, "malformed_event_count", &result.malformed_event_count);
   ok &= bind_branch(tree, "invalid_weight_event_count", &result.invalid_weight_event_count);
   if (!ok || tree->GetEntry(0) <= 0 || !photon_selection ||
-      !pi0_decay_photon_selection || !manifest_path || !input_directory)
+      !pi0_decay_photon_selection || !manifest_path || !input_file_prefix)
   {
     return false;
   }
@@ -97,13 +97,13 @@ bool read_metadata(const std::string& path, PartialMetadata& result)
   result.photon_selection = *photon_selection;
   result.pi0_decay_photon_selection = *pi0_decay_photon_selection;
   result.manifest_path = *manifest_path;
-  result.input_directory = *input_directory;
+  result.input_file_prefix = *input_file_prefix;
   return true;
 }
 
 bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
 {
-  return value.schema_version == 2 &&
+  return value.schema_version == 3 &&
       value.photon_selection == "prompt_category_1_or_2" &&
       value.photon_selection == reference.photon_selection &&
       value.pi0_decay_photon_selection ==
@@ -111,7 +111,7 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference)
           "g4_immediate_photon_daughter_of_signal_primary_pi0" &&
       value.pi0_decay_photon_selection == reference.pi0_decay_photon_selection &&
       value.manifest_path == reference.manifest_path &&
-      value.input_directory == reference.input_directory &&
+      value.input_file_prefix == "G4Hits_" && value.input_file_prefix == reference.input_file_prefix &&
       value.n_bins == reference.n_bins &&
       std::abs(value.pt_max - reference.pt_max) < 1e-12 &&
       std::abs(value.max_abs_eta - reference.max_abs_eta) < 1e-12 &&
@@ -204,8 +204,8 @@ double smallest_positive_bin(const std::vector<TH1D*>& histograms)
 }
 
 int FinalizePythiaTruthPtSpectra(
-    const std::string partial_pattern = "output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root",
-    const std::string output_base = "output/plots/turth_pT/minbias_prompt_eta07_inclusive_pi0_decay",
+    const std::string partial_pattern = "output/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root",
+    const std::string output_base = "output/plots/truth_pT/minbias/prompt_eta07_inclusive_pi0_decay",
     const Long64_t expected_manifest_begin = 0,
     const Long64_t expected_manifest_end = -1)
 {
@@ -393,7 +393,7 @@ int FinalizePythiaTruthPtSpectra(
   std::string photon_selection = reference.photon_selection;
   std::string pi0_decay_photon_selection = reference.pi0_decay_photon_selection;
   std::string manifest_path = reference.manifest_path;
-  std::string input_directory = reference.input_directory;
+  std::string input_file_prefix = reference.input_file_prefix;
   Long64_t manifest_begin = partials.front().manifest_begin;
   Long64_t manifest_end = partials.back().manifest_end;
   Long64_t partial_file_count = static_cast<Long64_t>(partials.size());
@@ -408,7 +408,7 @@ int FinalizePythiaTruthPtSpectra(
   metadata.Branch("photon_selection", &photon_selection);
   metadata.Branch("pi0_decay_photon_selection", &pi0_decay_photon_selection);
   metadata.Branch("manifest_path", &manifest_path);
-  metadata.Branch("input_directory", &input_directory);
+  metadata.Branch("input_file_prefix", &input_file_prefix);
   metadata.Branch("manifest_begin", &manifest_begin);
   metadata.Branch("manifest_end", &manifest_end);
   metadata.Branch("partial_file_count", &partial_file_count);

@@ -2,18 +2,18 @@
 set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
-usage="usage: workflows/truth_pt/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST TREE_INPUT_DIRECTORY OUTPUT_DIRECTORY [N_BINS] [PT_MAX] [MAX_ABS_ETA] [USE_EVENT_WEIGHT]"
+module_dir=$(cd "$workflow_dir/../.." && pwd)
+usage="usage: workflows/truth_pt/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [PT_MAX] [MAX_ABS_ETA] [USE_EVENT_WEIGHT]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
 total_files=${3:?$usage}
 files_per_job=${4:?$usage}
 input_manifest=${5:?$usage}
-tree_input_directory=${6:?$usage}
-output_directory=${7:?$usage}
-n_bins=${8:-100}
-pt_max=${9:-20.0}
-max_abs_eta=${10:-0.7}
-use_event_weight=${11:-false}
+output_directory=${6:?$usage}
+n_bins=${7:-100}
+pt_max=${8:-20.0}
+max_abs_eta=${9:-0.7}
+use_event_weight=${10:-false}
 
 for value in "$job_index" "$chunk_offset" "$total_files" "$files_per_job" "$n_bins"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
@@ -33,10 +33,6 @@ if [[ "$use_event_weight" != "true" && "$use_event_weight" != "false" &&
 fi
 if [[ ! -r "$input_manifest" ]]; then
   echo "Input manifest is not readable: $input_manifest" >&2
-  exit 2
-fi
-if [[ ! -d "$tree_input_directory" ]]; then
-  echo "Tree input directory does not exist: $tree_input_directory" >&2
   exit 2
 fi
 
@@ -71,8 +67,9 @@ cleanup()
 trap cleanup EXIT
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
+export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 root -l -b -q \
-  "$workflow_dir/AccumulatePythiaTruthPtSpectra.C(\"${input_manifest}\",\"${tree_input_directory}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${pt_max},${max_abs_eta},${use_event_weight})"
+  "$workflow_dir/Fun4All_PythiaTruthPtSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${pt_max},${max_abs_eta},${use_event_weight})"
 root -l -b -q \
   "$workflow_dir/check_pythia_truth_pt_partial.C(\"${temporary_output}\")"
 

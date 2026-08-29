@@ -121,7 +121,7 @@ int check_pythia_truth_pt_partial(const std::string input_file)
   std::string* photon_selection = nullptr;
   std::string* pi0_decay_photon_selection = nullptr;
   std::string* manifest_path = nullptr;
-  std::string* input_directory = nullptr;
+  std::string* input_file_prefix = nullptr;
   Long64_t manifest_begin = -1;
   Long64_t manifest_end = -1;
   Long64_t files_added = 0;
@@ -146,7 +146,7 @@ int check_pythia_truth_pt_partial(const std::string input_file)
   ok &= bind_branch(metadata, "photon_selection", &photon_selection);
   ok &= bind_branch(metadata, "pi0_decay_photon_selection", &pi0_decay_photon_selection);
   ok &= bind_branch(metadata, "manifest_path", &manifest_path);
-  ok &= bind_branch(metadata, "input_directory", &input_directory);
+  ok &= bind_branch(metadata, "input_file_prefix", &input_file_prefix);
   ok &= bind_branch(metadata, "manifest_begin", &manifest_begin);
   ok &= bind_branch(metadata, "manifest_end", &manifest_end);
   ok &= bind_branch(metadata, "files_added", &files_added);
@@ -170,14 +170,14 @@ int check_pythia_truth_pt_partial(const std::string input_file)
     return 3;
   }
 
-  const bool valid_metadata = schema_version == 2 && photon_selection &&
+  const bool valid_metadata = schema_version == 3 && photon_selection &&
       *photon_selection == "prompt_category_1_or_2" &&
       pi0_decay_photon_selection &&
       *pi0_decay_photon_selection ==
           "hepmc_final_photon_with_valid_single_pi0_origin_plus_"
           "g4_immediate_photon_daughter_of_signal_primary_pi0" &&
       manifest_path &&
-      !manifest_path->empty() && input_directory && !input_directory->empty() &&
+      !manifest_path->empty() && input_file_prefix && *input_file_prefix == "G4Hits_" &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       files_added == manifest_end - manifest_begin && first_suffix &&
       !first_suffix->empty() && last_suffix && !last_suffix->empty() &&

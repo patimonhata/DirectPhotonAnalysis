@@ -2,7 +2,8 @@
 
 This directory is the complete truth-pT analysis workflow:
 
-- `AccumulatePythiaTruthPtSpectra.C`: map truth trees to partial histograms;
+- `PythiaTruthPtSpectrum`: accumulate truth-pT histograms directly from G4Hits DST nodes;
+- `Fun4All_PythiaTruthPtSpectra.C`: map a manifest range of G4Hits DSTs to one partial;
 - `check_pythia_truth_pt_partial.C`: validate each partial;
 - `FinalizePythiaTruthPtSpectra.C`: reduce partials and write ROOT/PDF outputs;
 - `run_partial.sh` and `submit.job`: execute and submit the map jobs.
@@ -34,21 +35,21 @@ and unweighted particle counts.
 
 ## Map step
 
-`AccumulatePythiaTruthPtSpectra.C` reads a half-open range `[begin:end]` from
-the suffix manifest. Every expected truth-spectrum ROOT file must exist. It
-enables only the required branches and writes:
+`Fun4All_PythiaTruthPtSpectra.C` reads a half-open range `[begin:end]` from
+the suffix manifest, adds each `G4Hits_<suffix>` directly to a Fun4All input
+manager, and writes:
 
 - `h_prompt_photon_truth_pt_raw`
 - `h_pi0_truth_pt_raw`
 - `h_pi0_decay_photon_truth_pt_raw`, the HepMC+G4 total
 - `h_hepmc_pi0_decay_photon_truth_pt_raw`
 - `h_g4_pi0_decay_photon_truth_pt_raw`
-- one-entry schema-v2 `metadata`
+- one-entry schema-v3 `metadata`
 
 The histograms include underflow and overflow and retain `Sumw2`. They are raw:
 no bin-width or event-count normalization is applied. Metadata records the exact
-manifest range, first and last suffix, input file and event counts, binning,
-eta selection, weight policy, the exact pi0-decay selection string, and total
+manifest range, first and last suffix, G4Hits prefix and node configuration,
+input file and event counts, binning, eta selection, weight policy, and total
 plus stage-specific particle counts. The checker requires the total histogram
 and count to equal the HepMC and G4 component sums.
 
@@ -56,10 +57,10 @@ and count to equal the HepMC and G4 component sums.
 `check_pythia_truth_pt_partial.C`, and only then renames the output to
 `partial_NNNNNN.root`. Existing partials are never overwritten.
 
-The Condor defaults are 200,000 files, 500 files per partial, and 400 jobs. The
-schema-v2 default output directory is
-`truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay`, keeping it
-separate from existing schema-v1 partials.
+The Condor defaults are 200,000 G4Hits DSTs, 50 files per partial, and 4,000 jobs.
+The schema-v3 default output directory is
+`truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay`,
+keeping direct-DST partials separate from old tree-based partials.
 `chunk_offset` makes it possible to extend a completed range without
 resubmitting existing chunks. The required relation is:
 
@@ -72,13 +73,13 @@ n_chunks = ceil(total_files / files_per_job) - chunk_offset
 From the `PhotonAnalysisTree` directory, submit the full production with:
 
 ```bash
-condor_submit -maxjobs 400 workflows/truth_pt/submit.job
+condor_submit -maxjobs 4000 workflows/truth_pt/submit.job
 ```
 
 Reduce the complete contiguous range with:
 
 ```bash
-root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
+root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
 ## Reduce and plot step

@@ -212,12 +212,12 @@ condor_submit -append "input_manifest = input/jet5/segments.list" -append "manif
 
 ## Minimum-bias truth pT spectra
 
-cluster reconstructionを必要としないtruth粒子数の測定には、G4Hits DSTだけを読む軽量な
-`PythiaTruthSpectrumTree`を使います。prompt photon候補とpi0はsignal HepMC eventから保存します。
+cluster reconstructionを必要としないtruth粒子数の測定には、`workflows/truth_pt`の
+map-reduce workflowがG4Hits DSTを直接読みます。中間truth treeは生成しません。
 pi0 decay photonのpT spectrumは、HepMC内で崩壊したpi0由来のfinal photonと、
 Geant4に委譲されたsignal-primary pi0由来のphotonを合算します。HepMC/G4別の
-diagnostic histogramも保存します。詳細な粒子定義とbranchは
-`docs/pythia_truth_spectrum_schema.md`を参照してください。
+diagnostic histogramも保存します。詳細な粒子定義は
+`workflows/truth_pt/README.md`を参照してください。
 
 4 stream listのsuffix同期を検証してfull manifestを作ります。
 
@@ -226,34 +226,20 @@ cd /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
 ./make_pythia_input_manifest.sh input/minimum_bias input/minimum_bias/segments.list
 ```
 
-1 fileの先頭eventだけを確認する場合:
-
-```bash
-./run_truth_spectrum_pythia.sh \
-  pythia8_Detroit-0000000028-000000.root 1 output/truth_root
-```
-
-defaultのCondor jobはmanifestのhalf-open slice `[0:1000]`、つまり先頭1000 filesだけを
-queueします。`-maxjobs`は切り詰めではなく誤投入防止です。
-
-```bash
-condor_submit -maxjobs 1000 run_truth_spectrum_pythia.job
-```
-
 truth pT spectrumの集計とplotは、`workflows/truth_pt`のmap-reduce workflowを
 使います。photonはclassifier category 1 (direct)または2 (fragmentation)、
-pi0 decay photonはHepMC/G4成分の合計です。defaultは全200,000 truth treesを
-500 filesずつ、400 partial jobsへ分割します。
+pi0 decay photonはHepMC/G4成分の合計です。defaultは全200,000 G4Hits DSTsを
+50 filesずつ、4,000 partial jobsへ分割します。
 
 ```bash
-condor_submit -maxjobs 400 workflows/truth_pt/submit.job
+condor_submit -maxjobs 4000 workflows/truth_pt/submit.job
 ```
 
 partialの範囲・解析条件を検証して統合し、最後にbin幅で規格化してplotします。
 `expected_manifest_end`を指定するため、partialの欠落も検出します。
 
 ```bash
-root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial_new/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
+root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
 粒子選択、partial schema、再開方法は

@@ -51,6 +51,7 @@ add_library(
   PhotonTreeCommon.cc
   PythiaClusterTruthMatcher.cc
   PythiaPhotonAnalysisTree.cc
+  PythiaTruthPtSpectrum.cc
   PythiaTruthSpectrumTree.cc
 )
 target_include_directories(
@@ -113,6 +114,7 @@ install(
     PythiaPi0AnchorClusterSpectrum.h
     PythiaPi0ClusterMultiplicity.h
     PythiaPhotonAnalysisTree.h
+    PythiaTruthPtSpectrum.h
     PythiaTruthSpectrumTree.h
     ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h
   DESTINATION include

@@ -167,9 +167,25 @@ int PythiaPi0AnchorClusterSpectrum::process_event(PHCompositeNode* topNode)
         h_missing_energy_threshold_->Fill(et);
         ++n_missing_energy_threshold_;
         break;
+      case photon_tree::Pi0MissingCategory::displaced_partner_cluster:
+        h_missing_displaced_partner_cluster_->Fill(et);
+        ++n_missing_displaced_partner_cluster_;
+        break;
       case photon_tree::Pi0MissingCategory::acceptance:
         h_missing_acceptance_->Fill(et);
         ++n_missing_acceptance_;
+        break;
+      case photon_tree::Pi0MissingCategory::no_cemc_deposit:
+        h_missing_no_cemc_deposit_->Fill(et);
+        ++n_missing_no_cemc_deposit_;
+        break;
+      case photon_tree::Pi0MissingCategory::unclustered_deposit:
+        h_missing_unclustered_deposit_->Fill(et);
+        ++n_missing_unclustered_deposit_;
+        break;
+      case photon_tree::Pi0MissingCategory::match_incomplete:
+        h_missing_match_incomplete_->Fill(et);
+        ++n_missing_match_incomplete_;
         break;
       case photon_tree::Pi0MissingCategory::other:
         h_missing_other_->Fill(et);
@@ -208,11 +224,13 @@ int PythiaPi0AnchorClusterSpectrum::End(PHCompositeNode* /*topNode*/)
   const bool write_error = output_file_->TestBit(TFile::kWriteError);
   close_output();
   std::cout
-      << "PythiaPi0AnchorClusterSpectrum - processed/written/vertex-rejected/invalid/anchors/separated/merged/single-contaminated/missing(energy/acceptance/other)/other = "
+      << "PythiaPi0AnchorClusterSpectrum - processed/written/vertex-rejected/invalid/anchors/separated/merged/single-contaminated/missing(energy/displaced/acceptance/no-cemc/unclustered/match-incomplete/other)/other = "
       << n_events_processed_ << "/" << n_events_written_ << "/"
       << n_events_vertex_rejected_ << "/" << n_events_invalid_ << "/" << n_anchor_cluster_ << "/"
       << n_separated_ << "/" << n_merged_ << "/" << n_single_contaminated_ << "/" << n_missing_ << "("
-      << n_missing_energy_threshold_ << "/" << n_missing_acceptance_ << "/" << n_missing_other_ << ")/"
+      << n_missing_energy_threshold_ << "/" << n_missing_displaced_partner_cluster_ << "/"
+      << n_missing_acceptance_ << "/" << n_missing_no_cemc_deposit_ << "/" << n_missing_unclustered_deposit_ << "/"
+      << n_missing_match_incomplete_ << "/" << n_missing_other_ << ")/"
       << n_other_ << std::endl;
   return write_error ? Fun4AllReturnCodes::ABORTRUN
                      : Fun4AllReturnCodes::EVENT_OK;
@@ -256,8 +274,16 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
       n_bins_, 0.0, et_max_);
   h_missing_energy_threshold_ = new TH1D(
       "h_pi0_anchor_missing_energy_threshold_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_missing_displaced_partner_cluster_ = new TH1D(
+      "h_pi0_anchor_missing_displaced_partner_cluster_et_raw", "", n_bins_, 0.0, et_max_);
   h_missing_acceptance_ = new TH1D(
       "h_pi0_anchor_missing_acceptance_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_missing_no_cemc_deposit_ = new TH1D(
+      "h_pi0_anchor_missing_no_cemc_deposit_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_missing_unclustered_deposit_ = new TH1D(
+      "h_pi0_anchor_missing_unclustered_deposit_cluster_et_raw", "", n_bins_, 0.0, et_max_);
+  h_missing_match_incomplete_ = new TH1D(
+      "h_pi0_anchor_missing_match_incomplete_cluster_et_raw", "", n_bins_, 0.0, et_max_);
   h_missing_other_ = new TH1D(
       "h_pi0_anchor_missing_other_cluster_et_raw", "", n_bins_, 0.0, et_max_);
   h_other_ = new TH1D(
@@ -265,7 +291,8 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
       n_bins_, 0.0, et_max_);
   for (TH1D* histogram : {
            h_prompt_, h_anchor_, h_separated_, h_merged_, h_single_contaminated_, h_missing_,
-           h_missing_energy_threshold_, h_missing_acceptance_, h_missing_other_, h_other_})
+           h_missing_energy_threshold_, h_missing_displaced_partner_cluster_, h_missing_acceptance_, h_missing_no_cemc_deposit_,
+           h_missing_unclustered_deposit_, h_missing_match_incomplete_, h_missing_other_, h_other_})
   {
     histogram->Sumw2();
   }
@@ -329,7 +356,11 @@ void PythiaPi0AnchorClusterSpectrum::create_output()
   metadata_tree_->Branch("single_contaminated_count", &n_single_contaminated_);
   metadata_tree_->Branch("missing_count", &n_missing_);
   metadata_tree_->Branch("missing_energy_threshold_count", &n_missing_energy_threshold_);
+  metadata_tree_->Branch("missing_displaced_partner_cluster_count", &n_missing_displaced_partner_cluster_);
   metadata_tree_->Branch("missing_acceptance_count", &n_missing_acceptance_);
+  metadata_tree_->Branch("missing_no_cemc_deposit_count", &n_missing_no_cemc_deposit_);
+  metadata_tree_->Branch("missing_unclustered_deposit_count", &n_missing_unclustered_deposit_);
+  metadata_tree_->Branch("missing_match_incomplete_count", &n_missing_match_incomplete_);
   metadata_tree_->Branch("missing_other_count", &n_missing_other_);
   metadata_tree_->Branch("other_count", &n_other_);
 }
@@ -352,7 +383,11 @@ void PythiaPi0AnchorClusterSpectrum::close_output()
   h_single_contaminated_ = nullptr;
   h_missing_ = nullptr;
   h_missing_energy_threshold_ = nullptr;
+  h_missing_displaced_partner_cluster_ = nullptr;
   h_missing_acceptance_ = nullptr;
+  h_missing_no_cemc_deposit_ = nullptr;
+  h_missing_unclustered_deposit_ = nullptr;
+  h_missing_match_incomplete_ = nullptr;
   h_missing_other_ = nullptr;
   h_other_ = nullptr;
   metadata_tree_ = nullptr;

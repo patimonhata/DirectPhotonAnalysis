@@ -29,6 +29,7 @@ struct CandidateProjection
   std::array<int, 2> first_daughter_valid = {0, 0};
   std::array<double, 2> first_daughter_radius = {-999.0, -999.0};
   std::array<int, 2> pre_cemc = {0, 0};
+  std::array<double, 2> cemc_edep = {0.0, 0.0};
 };
 }
 
@@ -66,11 +67,13 @@ int CheckTopologyEventDump(const char* input_file)
                              "photon0_in_cemc_acceptance", "photon1_in_cemc_acceptance",
                              "photon0_first_daughter_vertex_valid", "photon1_first_daughter_vertex_valid",
                              "photon0_first_daughter_radius", "photon1_first_daughter_radius",
-                             "photon0_pre_cemc_interaction", "photon1_pre_cemc_interaction"})
+                             "photon0_pre_cemc_interaction", "photon1_pre_cemc_interaction",
+                             "photon0_cemc_edep", "photon1_cemc_edep"})
     ok &= require_branch(candidates, branch);
   for (const char* branch : {
            "event", "candidate_id", "cluster_id", "topology", "reason", "main_fraction",
            "missing_category", "missing_detail", "partner_photon_index", "pre_cemc_photon_index",
+           "partner_cemc_edep", "partner_diagnostic_invariant_mass",
            "best_cluster0_id", "best_cluster1_id", "recovered0", "recovered1",
            "match_valid", "match_usable", "match_status", "match_failure",
            "match_failure_ieta", "match_failure_iphi", "match_tower_count",
@@ -97,18 +100,23 @@ int CheckTopologyEventDump(const char* input_file)
   int schema_version = 0;
   double cemc_acceptance_eta_max = 0.0;
   double pre_cemc_interaction_radius = 0.0;
+  double missing_diagnostic_max_delta_r = 0.0;
+  bool enable_missing_diagnostics = false;
   metadata->SetBranchAddress("schema_version", &schema_version);
   metadata->SetBranchAddress("cemc_acceptance_eta_max", &cemc_acceptance_eta_max);
   metadata->SetBranchAddress("pre_cemc_interaction_radius", &pre_cemc_interaction_radius);
+  metadata->SetBranchAddress("missing_diagnostic_max_delta_r", &missing_diagnostic_max_delta_r);
+  metadata->SetBranchAddress("enable_missing_diagnostics", &enable_missing_diagnostics);
   metadata->GetEntry(0);
   metadata->ResetBranchAddresses();
-  if (schema_version != 5)
+  if (schema_version != 6)
   {
-    std::cerr << "CheckTopologyEventDump - expected schema version 5, got " << schema_version << std::endl;
+    std::cerr << "CheckTopologyEventDump - expected schema version 6, got " << schema_version << std::endl;
     ok = false;
   }
   if (!std::isfinite(cemc_acceptance_eta_max) || !(cemc_acceptance_eta_max > 0.0) ||
-      !std::isfinite(pre_cemc_interaction_radius) || !(pre_cemc_interaction_radius > 0.0))
+      !std::isfinite(pre_cemc_interaction_radius) || !(pre_cemc_interaction_radius > 0.0) ||
+      !std::isfinite(missing_diagnostic_max_delta_r) || !(missing_diagnostic_max_delta_r > 0.0))
   {
     std::cerr << "CheckTopologyEventDump - invalid CEMC acceptance or pre-CEMC radius" << std::endl;
     ok = false;
@@ -155,6 +163,8 @@ int CheckTopologyEventDump(const char* input_file)
   candidates->SetBranchAddress("photon1_first_daughter_radius", &projection.first_daughter_radius[1]);
   candidates->SetBranchAddress("photon0_pre_cemc_interaction", &projection.pre_cemc[0]);
   candidates->SetBranchAddress("photon1_pre_cemc_interaction", &projection.pre_cemc[1]);
+  candidates->SetBranchAddress("photon0_cemc_edep", &projection.cemc_edep[0]);
+  candidates->SetBranchAddress("photon1_cemc_edep", &projection.cemc_edep[1]);
   for (Long64_t entry = 0; entry < candidates->GetEntries(); ++entry)
   {
     candidates->GetEntry(entry);
@@ -174,6 +184,7 @@ int CheckTopologyEventDump(const char* input_file)
       {
         invalid_projection |= projection.in_acceptance[photon] != 0;
       }
+      invalid_projection |= !std::isfinite(projection.cemc_edep[photon]) || projection.cemc_edep[photon] < 0.0;
       invalid_projection |= (projection.first_daughter_valid[photon] != 0 && projection.first_daughter_valid[photon] != 1) ||
           (projection.pre_cemc[photon] != 0 && projection.pre_cemc[photon] != 1);
       if (projection.first_daughter_valid[photon])
@@ -212,7 +223,8 @@ int CheckTopologyEventDump(const char* input_file)
   int match_failure_ieta = -999, match_failure_iphi = -999;
   unsigned int match_towers = 0, match_matched_towers = 0;
   double match_coverage = 0.0;
-  int diagnostic_found = 0, diagnostic_match_usable = 0;
+  double partner_cemc_edep = 0.0, diagnostic_invariant_mass = -999.0;
+  int diagnostic_found = 0, diagnostic_below_threshold = 0, diagnostic_has_direct = 0, diagnostic_match_usable = 0;
   int diagnostic_match_status = 0, diagnostic_match_failure = 0;
   double diagnostic_delta_r = -999.0, diagnostic_match_coverage = 0.0;
   anchors->SetBranchAddress("event", &event);
@@ -224,6 +236,8 @@ int CheckTopologyEventDump(const char* input_file)
   anchors->SetBranchAddress("missing_detail", &missing_detail);
   anchors->SetBranchAddress("partner_photon_index", &partner_photon);
   anchors->SetBranchAddress("pre_cemc_photon_index", &pre_cemc_photon);
+  anchors->SetBranchAddress("partner_cemc_edep", &partner_cemc_edep);
+  anchors->SetBranchAddress("partner_diagnostic_invariant_mass", &diagnostic_invariant_mass);
   anchors->SetBranchAddress("best_cluster0_id", &best_cluster0);
   anchors->SetBranchAddress("best_cluster1_id", &best_cluster1);
   anchors->SetBranchAddress("recovered0", &recovered0);
@@ -238,6 +252,8 @@ int CheckTopologyEventDump(const char* input_file)
   anchors->SetBranchAddress("match_matched_tower_count", &match_matched_towers);
   anchors->SetBranchAddress("match_cluster_member_energy_coverage", &match_coverage);
   anchors->SetBranchAddress("partner_diagnostic_found", &diagnostic_found);
+  anchors->SetBranchAddress("partner_diagnostic_below_energy_threshold", &diagnostic_below_threshold);
+  anchors->SetBranchAddress("partner_diagnostic_has_direct_deposit", &diagnostic_has_direct);
   anchors->SetBranchAddress("partner_diagnostic_delta_r", &diagnostic_delta_r);
   anchors->SetBranchAddress("partner_diagnostic_match_usable", &diagnostic_match_usable);
   anchors->SetBranchAddress("partner_diagnostic_match_status", &diagnostic_match_status);
@@ -252,26 +268,54 @@ int CheckTopologyEventDump(const char* input_file)
     bool invalid_missing_detail = false;
     if (topology == 3)
     {
-      invalid_missing_detail = missing_category < 1 || missing_category > 3 ||
-          missing_detail < 1 || missing_detail > 7 || partner_photon < 0 || partner_photon > 1;
+      invalid_missing_detail = missing_category < 1 || missing_category > 7 ||
+          missing_detail < 1 || missing_detail > 11 || partner_photon < 0 || partner_photon > 1;
       const auto projection_it = candidate_projection.find({event, candidate_id});
       invalid_missing_detail |= projection_it == candidate_projection.end();
       if (!invalid_missing_detail)
       {
         const bool projection_valid = projection_it->second.valid[partner_photon];
         const bool in_acceptance = projection_it->second.in_acceptance[partner_photon];
+        const double expected_cemc_edep = projection_it->second.cemc_edep[partner_photon];
+        invalid_missing_detail |= !std::isfinite(partner_cemc_edep) || partner_cemc_edep < 0.0 ||
+            std::abs(partner_cemc_edep - expected_cemc_edep) > 1e-9 * std::max(1.0, expected_cemc_edep);
         if (missing_category == 2)
         {
-          invalid_missing_detail = missing_detail != 6 || !projection_valid || in_acceptance;
+          invalid_missing_detail |= missing_detail != 6 || !projection_valid || in_acceptance;
         }
         else if (missing_category == 1)
         {
-          invalid_missing_detail = (missing_detail != 2 && missing_detail != 3) || (projection_valid && !in_acceptance);
+          invalid_missing_detail |= (missing_detail != 2 && missing_detail != 3) || !projection_valid || !in_acceptance ||
+              !diagnostic_found || !diagnostic_below_threshold || !diagnostic_has_direct ||
+              diagnostic_delta_r > missing_diagnostic_max_delta_r ||
+              !std::isfinite(diagnostic_invariant_mass) || diagnostic_invariant_mass < 0.0;
+        }
+        else if (missing_category == 4)
+        {
+          invalid_missing_detail |= (missing_detail != 8 && missing_detail != 9) || !projection_valid || !in_acceptance ||
+              !diagnostic_found || !diagnostic_below_threshold || !diagnostic_has_direct ||
+              diagnostic_delta_r <= missing_diagnostic_max_delta_r ||
+              !std::isfinite(diagnostic_invariant_mass) || diagnostic_invariant_mass < 0.0;
+        }
+        else if (missing_category == 5)
+        {
+          invalid_missing_detail |= missing_detail != 5 || !projection_valid || !in_acceptance || partner_cemc_edep > 0.0;
+        }
+        else if (missing_category == 6)
+        {
+          invalid_missing_detail |= missing_detail != 10 || !projection_valid || !in_acceptance || !(partner_cemc_edep > 0.0);
+        }
+        else if (missing_category == 7)
+        {
+          invalid_missing_detail |= missing_detail != 4 || !projection_valid || !in_acceptance ||
+              !diagnostic_found || diagnostic_match_usable;
         }
         else
         {
-          invalid_missing_detail = (missing_detail != 1 && missing_detail != 4 && missing_detail != 5 && missing_detail != 7) ||
-              (missing_detail == 7 ? projection_valid : (!projection_valid || !in_acceptance));
+          invalid_missing_detail |= (missing_detail != 1 && missing_detail != 7 && missing_detail != 11) ||
+              (missing_detail == 7 && projection_valid) ||
+              (missing_detail == 1 && (!projection_valid || !in_acceptance)) ||
+              (missing_detail == 11 && enable_missing_diagnostics);
         }
       }
     }

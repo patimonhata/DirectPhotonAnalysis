@@ -157,41 +157,57 @@ Only `missing` is subdivided by `missing_category_name`:
 - `acceptance`: the unrecovered partner photon has a valid projection to the
   CEMC radius with `abs(eta_projection) >= cemc_acceptance_eta_max` (1.1 by
   default).
-- `energy_threshold`: a nearby partner-derived cluster exists below
-  `min_cluster_energy`.
-- `other`: the remaining missing cases, including an invalid projection.
+- `no_cemc_deposit`: no CEMC G4 hit energy can be traced to the partner photon
+  or any of its descendants.
+- `energy_threshold`: the maximum direct-deposit partner-derived cluster is
+  below `min_cluster_energy` and lies within `missing_diagnostic_max_delta_r`
+  of the partner projection.
+- `displaced_partner_cluster`: the same kind of below-threshold partner-derived
+  cluster exists, but lies farther from the projection.
+- `unclustered_deposit`: partner-descendant CEMC energy exists, but no usable
+  direct-deposit cluster is found.
+- `match_incomplete`: a geometrically local cluster exists, but its direct
+  truth match is not usable because too little cluster-member energy could be
+  traced.
+- `other`: invalid projection, an above-threshold best cluster below the photon
+  recovery cut, disabled missing diagnostics, or another remaining case.
 
-The priority is acceptance, energy threshold, then other. A recovered partner
-therefore remains separated or merged even if its truth projection is outside
-the fiducial boundary. `missing_detail_name` retains the finer cause:
+The exclusive priority is invalid projection, acceptance, CEMC-deposit
+presence, near/displaced below-threshold cluster, photon recovery, incomplete
+local matching, unclustered deposit, then other. A recovered partner therefore
+remains separated or merged even if its truth projection is outside the
+fiducial boundary.
 
-- `partner_best_below_recovery`
-- `partner_cluster_below_energy_threshold_recovered`
-- `partner_cluster_below_energy_threshold_below_recovery`
-- `partner_direct_match_incomplete`
-- `partner_no_direct_deposit`
-- `partner_outside_cemc_acceptance`
-- `partner_projection_invalid`
+Below-threshold clusters are direct-matched globally. The maximum partner
+truth-deposit cluster is retained first, then its distance to the photon
+projection decides `energy_threshold` versus `displaced_partner_cluster`.
+Unusable candidates remain restricted to `missing_diagnostic_max_delta_r`
+(0.15 by default), preventing unrelated detector noise from producing
+`match_incomplete`. The dump also records the total partner-descendant CEMC
+truth deposit and the anchor-plus-diagnostic-cluster invariant mass. The photon
+recovery condition is unchanged.
 
-Below-threshold diagnostics search within
-`missing_diagnostic_max_delta_r` (0.15 by default) of the unrecovered photon
-projection. These diagnostics are recorded even with `write_detail=false`;
-that flag still controls the large geometry/truth tables.
+`missing_detail_name` retains whether a below-threshold cluster passes the
+existing recovery requirement, as well as the finer recovery, projection,
+matching, no-deposit, unclustered-deposit, and diagnostics-disabled causes.
+These diagnostics are recorded even with `write_detail=false`; that flag still
+controls the large geometry/truth tables.
 
 ## Intermediate ROOT schema
 
 - `metadata`: schema/algorithm versions, sample mode, source range,
   thresholds (including `pre_cemc_interaction_radius`), detail flag and
-  processing counters. The current schema version is 5.
+  processing counters. The current schema version is 6.
 - `events`: pi0 population, truth/cluster population and topology counts.
 - `pi0_candidates`: the two supported Pythia pathways (or gun pathway),
   daughter photons, CEMC projection validity/eta/phi/fiducial status, each
-  photon's first daughter-production radius/pre-CEMC flag, best clusters and
-  recovery decision.
+  photon's first daughter-production radius/pre-CEMC flag and total descendant
+  CEMC truth deposit, best clusters and recovery decision.
 - `anchor_decisions`: one row per anchor, including topology, reason,
-  coarse and detailed missing reasons, the pre-CEMC photon index for
-  single-contaminated anchors, strict/usable direct-match status, failure
-  location, coverage and any nearby below-threshold partner diagnostic.
+  coarse and detailed missing reasons, partner CEMC truth deposit and diagnostic
+  invariant mass, the pre-CEMC photon index for single-contaminated anchors,
+  strict/usable direct-match status, failure location, coverage and the selected
+  below-threshold partner diagnostic.
 - `candidate_cluster_truth`: direct daughter-photon deposit and recovery
   quantities plus strict/usable match status, failure and coverage for every
   evaluated candidate/cluster pair.

@@ -58,7 +58,7 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; config_.verbosity = value; }
 
  private:
-  static constexpr int schema_version_ = 5;
+  static constexpr int schema_version_ = 6;
   static constexpr int invalid_int_ = -999;
   static constexpr double invalid_double_ = -999.0;
 
@@ -145,6 +145,8 @@ class TopologyEventDisplayDump : public SubsysReco
   double b_photon1_first_daughter_radius_ = invalid_double_;
   int b_photon0_pre_cemc_interaction_ = 0;
   int b_photon1_pre_cemc_interaction_ = 0;
+  double b_photon0_cemc_edep_ = 0.0;
+  double b_photon1_cemc_edep_ = 0.0;
   int b_best_cluster0_id_ = invalid_int_;
   int b_best_cluster1_id_ = invalid_int_;
   double b_maximum_edep0_ = invalid_double_;
@@ -167,6 +169,8 @@ class TopologyEventDisplayDump : public SubsysReco
   std::string b_missing_detail_name_;
   int b_partner_photon_index_ = invalid_int_;
   int b_pre_cemc_photon_index_ = invalid_int_;
+  double b_partner_cemc_edep_ = 0.0;
+  double b_partner_diagnostic_invariant_mass_ = invalid_double_;
   double b_main_fraction_ = invalid_double_;
   double b_second_fraction_ = invalid_double_;
   double b_unmatched_max_fraction_ = invalid_double_;

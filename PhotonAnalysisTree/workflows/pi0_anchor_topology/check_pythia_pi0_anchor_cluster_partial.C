@@ -63,7 +63,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       "h_pi0_anchor_single_contaminated_cluster_et_raw",
       "h_pi0_anchor_missing_cluster_et_raw",
       "h_pi0_anchor_missing_energy_threshold_cluster_et_raw",
+      "h_pi0_anchor_missing_displaced_partner_cluster_et_raw",
       "h_pi0_anchor_missing_acceptance_cluster_et_raw",
+      "h_pi0_anchor_missing_no_cemc_deposit_cluster_et_raw",
+      "h_pi0_anchor_missing_unclustered_deposit_cluster_et_raw",
+      "h_pi0_anchor_missing_match_incomplete_cluster_et_raw",
       "h_pi0_anchor_missing_other_cluster_et_raw",
       "h_pi0_anchor_other_cluster_et_raw", "metadata"};
   std::set<std::string> observed_keys;
@@ -143,7 +147,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   unsigned long long single_contaminated_count = 0;
   unsigned long long missing_count = 0;
   unsigned long long missing_energy_threshold_count = 0;
+  unsigned long long missing_displaced_partner_cluster_count = 0;
   unsigned long long missing_acceptance_count = 0;
+  unsigned long long missing_no_cemc_deposit_count = 0;
+  unsigned long long missing_unclustered_deposit_count = 0;
+  unsigned long long missing_match_incomplete_count = 0;
   unsigned long long missing_other_count = 0;
   unsigned long long other_count = 0;
 
@@ -213,7 +221,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   ok &= bind(metadata, "single_contaminated_count", &single_contaminated_count);
   ok &= bind(metadata, "missing_count", &missing_count);
   ok &= bind(metadata, "missing_energy_threshold_count", &missing_energy_threshold_count);
+  ok &= bind(metadata, "missing_displaced_partner_cluster_count", &missing_displaced_partner_cluster_count);
   ok &= bind(metadata, "missing_acceptance_count", &missing_acceptance_count);
+  ok &= bind(metadata, "missing_no_cemc_deposit_count", &missing_no_cemc_deposit_count);
+  ok &= bind(metadata, "missing_unclustered_deposit_count", &missing_unclustered_deposit_count);
+  ok &= bind(metadata, "missing_match_incomplete_count", &missing_match_incomplete_count);
   ok &= bind(metadata, "missing_other_count", &missing_other_count);
   ok &= bind(metadata, "other_count", &other_count);
   if (!ok || metadata->GetEntry(0) <= 0)
@@ -222,7 +234,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   }
 
   const bool valid_metadata =
-      schema_version == 7 && manifest_path && !manifest_path->empty() &&
+      schema_version == 8 && manifest_path && !manifest_path->empty() &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() &&
       last_suffix && !last_suffix->empty() &&
@@ -244,7 +256,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       *topology_priority ==
           "ambiguous_main_to_other_then_single_contaminated_then_merged_then_separated_then_missing_then_other" &&
       missing_category_priority &&
-      *missing_category_priority == "acceptance_then_energy_threshold_then_other" &&
+      *missing_category_priority == "projection_then_acceptance_then_cemc_deposit_then_threshold_near_or_displaced_then_recovery_then_match_incomplete_then_unclustered_then_other" &&
       response_policy &&
       *response_policy == "not_used_for_classification" &&
       photon_recovery_policy &&
@@ -280,8 +292,10 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       anchor_count == anchor_g4 + anchor_generator &&
       anchor_count ==
           separated_count + merged_count + single_contaminated_count + missing_count + other_count &&
-      missing_count == missing_energy_threshold_count + missing_acceptance_count + missing_other_count &&
-      (enable_missing_diagnostics || missing_energy_threshold_count == 0) &&
+      missing_count == missing_energy_threshold_count + missing_displaced_partner_cluster_count + missing_acceptance_count +
+          missing_no_cemc_deposit_count + missing_unclustered_deposit_count + missing_match_incomplete_count + missing_other_count &&
+      (enable_missing_diagnostics || (missing_energy_threshold_count == 0 && missing_displaced_partner_cluster_count == 0 &&
+          missing_no_cemc_deposit_count == 0 && missing_unclustered_deposit_count == 0 && missing_match_incomplete_count == 0)) &&
       ambiguous_main <= other_count;
   if (!valid_metadata)
   {
@@ -291,64 +305,60 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
     return 4;
   }
 
-  const std::array<const char*, 10> names = {
+  const std::array<const char*, 14> names = {
       "h_prompt_cluster_et_raw", "h_pi0_anchor_cluster_et_raw",
       "h_pi0_anchor_separated_cluster_et_raw",
       "h_pi0_anchor_merged_cluster_et_raw",
       "h_pi0_anchor_single_contaminated_cluster_et_raw",
       "h_pi0_anchor_missing_cluster_et_raw",
       "h_pi0_anchor_missing_energy_threshold_cluster_et_raw",
+      "h_pi0_anchor_missing_displaced_partner_cluster_et_raw",
       "h_pi0_anchor_missing_acceptance_cluster_et_raw",
+      "h_pi0_anchor_missing_no_cemc_deposit_cluster_et_raw",
+      "h_pi0_anchor_missing_unclustered_deposit_cluster_et_raw",
+      "h_pi0_anchor_missing_match_incomplete_cluster_et_raw",
       "h_pi0_anchor_missing_other_cluster_et_raw",
       "h_pi0_anchor_other_cluster_et_raw"};
-  const std::array<unsigned long long, 10> counts = {
-      prompt_count, anchor_count, separated_count, merged_count, single_contaminated_count,
-      missing_count, missing_energy_threshold_count, missing_acceptance_count,
+  const std::array<unsigned long long, 14> counts = {
+      prompt_count, anchor_count, separated_count, merged_count, single_contaminated_count, missing_count,
+      missing_energy_threshold_count, missing_displaced_partner_cluster_count, missing_acceptance_count,
+      missing_no_cemc_deposit_count, missing_unclustered_deposit_count, missing_match_incomplete_count,
       missing_other_count, other_count};
-  std::array<TH1D*, 10> histograms{};
+  std::array<TH1D*, 14> histograms{};
   for (std::size_t index = 0; index < names.size(); ++index)
   {
     input.GetObject(names[index], histograms[index]);
-    if (!valid_histogram(
-            histograms[index], n_bins, et_max, counts[index]))
+    if (!valid_histogram(histograms[index], n_bins, et_max, counts[index]))
     {
-      std::cerr
-          << "check_pythia_pi0_anchor_cluster_partial - invalid histogram: "
-          << names[index] << std::endl;
+      std::cerr << "check_pythia_pi0_anchor_cluster_partial - invalid histogram: " << names[index] << std::endl;
       return 5;
     }
   }
 
   for (int bin = 0; bin <= n_bins + 1; ++bin)
   {
-    const double missing_categories =
-        histograms[6]->GetBinContent(bin) +
-        histograms[7]->GetBinContent(bin) +
-        histograms[8]->GetBinContent(bin);
-    const double categories =
-        histograms[2]->GetBinContent(bin) +
-        histograms[3]->GetBinContent(bin) +
-        histograms[4]->GetBinContent(bin) +
-        missing_categories + histograms[9]->GetBinContent(bin);
+    double missing_categories = 0.0;
+    for (std::size_t index = 6; index <= 12; ++index) missing_categories += histograms[index]->GetBinContent(bin);
+    const double categories = histograms[2]->GetBinContent(bin) + histograms[3]->GetBinContent(bin) +
+        histograms[4]->GetBinContent(bin) + missing_categories + histograms[13]->GetBinContent(bin);
     if (std::abs(histograms[5]->GetBinContent(bin) - missing_categories) > 1e-9 ||
         std::abs(histograms[1]->GetBinContent(bin) - categories) > 1e-9)
     {
-      std::cerr
-          << "check_pythia_pi0_anchor_cluster_partial - bin partition failure"
-          << std::endl;
+      std::cerr << "check_pythia_pi0_anchor_cluster_partial - bin partition failure" << std::endl;
       return 5;
     }
   }
 
   std::cout
       << "check_pythia_pi0_anchor_cluster_partial - range/events/vertex-rejected/anchor"
-      << "/separated/merged/single-contaminated/missing(energy/acceptance/other)/other = ["
+      << "/separated/merged/single-contaminated/missing(energy/displaced/acceptance/no-CEMC/unclustered/match-incomplete/other)/other = ["
       << manifest_begin << ":" << manifest_end << "]/"
       << events_processed << "/" << events_vertex_rejected << "/"
       << anchor_count << "/"
       << separated_count << "/" << merged_count << "/" << single_contaminated_count << "/"
-      << missing_count << "(" << missing_energy_threshold_count << "/"
-      << missing_acceptance_count << "/" << missing_other_count << ")/"
+      << missing_count << "(" << missing_energy_threshold_count << "/" << missing_displaced_partner_cluster_count << "/"
+      << missing_acceptance_count << "/" << missing_no_cemc_deposit_count << "/" << missing_unclustered_deposit_count << "/"
+      << missing_match_incomplete_count << "/" << missing_other_count << ")/"
       << other_count << std::endl;
   return 0;
 }

@@ -93,6 +93,8 @@ struct Anchor
   std::string missing_detail_name;
   int partner_photon = -1;
   int pre_cemc_photon = -1;
+  double partner_cemc_edep = 0.0;
+  double diagnostic_invariant_mass = -999.0;
   double main_fraction = -1.0;
   double second_fraction = -1.0;
   double unmatched_fraction = 0.0;
@@ -359,6 +361,8 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   bind_anchor("missing_detail_name", &missing_detail_name);
   bind_anchor("partner_photon_index", &anchor.partner_photon);
   bind_anchor("pre_cemc_photon_index", &anchor.pre_cemc_photon);
+  bind_anchor("partner_cemc_edep", &anchor.partner_cemc_edep);
+  bind_anchor("partner_diagnostic_invariant_mass", &anchor.diagnostic_invariant_mass);
   anchors->SetBranchAddress("main_fraction", &anchor.main_fraction);
   anchors->SetBranchAddress("second_fraction", &anchor.second_fraction);
   anchors->SetBranchAddress("unmatched_max_fraction", &anchor.unmatched_fraction);
@@ -915,6 +919,7 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
   if (anchor.topology == 3)
   {
     text.DrawLatex(0.04, y, Form("missing: %s / %s  (partner #gamma%d)", anchor.missing_category_name.c_str(), anchor.missing_detail_name.c_str(), anchor.partner_photon)); y -= 0.045;
+    text.DrawLatex(0.04, y, Form("partner CEMC truth Edep = %.4g GeV", anchor.partner_cemc_edep)); y -= 0.045;
     if (candidate && anchor.partner_photon >= 0 && anchor.partner_photon < 2)
     {
       const int partner = anchor.partner_photon;
@@ -972,6 +977,10 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
         anchor.diagnostic_reconstructed, anchor.diagnostic_recovery,
         anchor.diagnostic_match_status_name.c_str(), anchor.diagnostic_match_usable,
         anchor.diagnostic_match_coverage)); y -= 0.038;
+    if (anchor.diagnostic_invariant_mass >= 0.0)
+    {
+      text.DrawLatex(0.04, y, Form("anchor+diagnostic m_{#gamma#gamma}=%.4f GeV", anchor.diagnostic_invariant_mass)); y -= 0.038;
+    }
     text.DrawLatex(0.04, y, Form("diagnostic failure=%s at (%d,%d)",
         anchor.diagnostic_match_failure_name.c_str(), anchor.diagnostic_failure_ieta, anchor.diagnostic_failure_iphi));
   }

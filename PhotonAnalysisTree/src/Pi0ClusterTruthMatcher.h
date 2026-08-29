@@ -61,7 +61,7 @@ const char* pi0_cluster_truth_match_failure_name(Pi0ClusterTruthMatchFailure val
 class Pi0ClusterTruthMatcher
 {
  public:
-  static constexpr int kAlgorithmVersion = 3;
+  static constexpr int kAlgorithmVersion = 4;
 
   Pi0ClusterTruthMatch match(
       const RawCluster* cluster,
@@ -71,6 +71,15 @@ class Pi0ClusterTruthMatcher
       PHG4HitContainer* hits,
       PHG4TruthInfoContainer* truth,
       const std::array<int, 2>& direct_gamma_track_ids,
+      bool allocate_split_tower_energy) const;
+  std::vector<Pi0ClusterTruthMatch> match_many(
+      const RawCluster* cluster,
+      TowerInfoContainer* towers,
+      RawTowerContainer* raw_truth_towers,
+      PHG4CellContainer* cells,
+      PHG4HitContainer* hits,
+      PHG4TruthInfoContainer* truth,
+      const std::vector<std::array<int, 2>>& direct_gamma_track_ids,
       bool allocate_split_tower_energy) const;
 
  private:

@@ -8,6 +8,7 @@
 #include <calobase/RawTowerGeomContainer.h>
 #include <calobase/TowerInfoContainer.h>
 #include <g4detectors/PHG4CellContainer.h>
+#include <g4main/PHG4Hit.h>
 #include <g4main/PHG4HitContainer.h>
 #include <g4main/PHG4Particle.h>
 #include <g4main/PHG4TruthInfoContainer.h>
@@ -289,6 +290,50 @@ void fill_first_daughter_diagnostic(photon_tree::Pi0TopologyCandidateRecord& rec
   record.photon_first_daughter_radius[index] = radius;
   record.photon_pre_cemc_interaction[index] = radius < pre_cemc_interaction_radius;
 }
+void fill_cemc_edep(std::vector<photon_tree::Pi0TopologyCandidateRecord>& candidates,
+                    PHG4HitContainer* hits, PHG4TruthInfoContainer* truth)
+{
+  if (!hits || !truth || candidates.empty()) return;
+  std::map<int, std::vector<std::pair<std::size_t, std::size_t>>> owners;
+  for (std::size_t candidate = 0; candidate < candidates.size(); ++candidate)
+    for (std::size_t photon = 0; photon < 2U; ++photon)
+    {
+      const int track_id = candidates[candidate].photon_track_ids[photon];
+      if (track_id != 0 && track_id != -999) owners[track_id].push_back({candidate, photon});
+    }
+
+  const PHG4HitContainer::ConstRange range = hits->getHits();
+  for (auto iterator = range.first; iterator != range.second; ++iterator)
+  {
+    const PHG4Hit* hit = iterator->second;
+    const double edep = hit ? hit->get_edep() : 0.0;
+    if (!(edep > 0.0) || !std::isfinite(edep)) continue;
+    int track_id = hit->get_trkid();
+    std::set<int> visited;
+    while (track_id != 0 && visited.insert(track_id).second)
+    {
+      const auto owner = owners.find(track_id);
+      if (owner != owners.end())
+      {
+        for (const auto& [candidate, photon] : owner->second) candidates[candidate].photon_cemc_edep[photon] += edep;
+        break;
+      }
+      const PHG4Particle* particle = truth->GetParticle(track_id);
+      if (!particle) break;
+      track_id = particle->get_parent_id();
+    }
+  }
+}
+
+double diphoton_invariant_mass(const photon_tree::Pi0TopologyClusterRecord& anchor,
+                               const photon_tree::Pi0PartnerDiagnosticRecord& partner)
+{
+  if (!(anchor.energy > 0.0) || !(partner.cluster_energy > 0.0)) return -1.0;
+  const double delta_phi = std::atan2(std::sin(anchor.phi - partner.cluster_phi), std::cos(anchor.phi - partner.cluster_phi));
+  const double mass_squared = 2.0 * anchor.energy * partner.cluster_energy *
+      (std::cosh(anchor.eta - partner.cluster_eta) - std::cos(delta_phi));
+  return mass_squared >= 0.0 && std::isfinite(mass_squared) ? std::sqrt(mass_squared) : -1.0;
+}
 }
 
 namespace photon_tree
@@ -347,6 +392,10 @@ const char* pi0_missing_category_name(Pi0MissingCategory value)
   case Pi0MissingCategory::energy_threshold: return "energy_threshold";
   case Pi0MissingCategory::acceptance: return "acceptance";
   case Pi0MissingCategory::other: return "other";
+  case Pi0MissingCategory::displaced_partner_cluster: return "displaced_partner_cluster";
+  case Pi0MissingCategory::no_cemc_deposit: return "no_cemc_deposit";
+  case Pi0MissingCategory::unclustered_deposit: return "unclustered_deposit";
+  case Pi0MissingCategory::match_incomplete: return "match_incomplete";
   }
   return "unknown";
 }
@@ -360,9 +409,13 @@ const char* pi0_missing_detail_name(Pi0MissingDetail value)
   case Pi0MissingDetail::partner_cluster_below_energy_threshold_recovered: return "partner_cluster_below_energy_threshold_recovered";
   case Pi0MissingDetail::partner_cluster_below_energy_threshold_below_recovery: return "partner_cluster_below_energy_threshold_below_recovery";
   case Pi0MissingDetail::partner_direct_match_incomplete: return "partner_direct_match_incomplete";
-  case Pi0MissingDetail::partner_no_direct_deposit: return "partner_no_direct_deposit";
+  case Pi0MissingDetail::partner_no_cemc_deposit: return "partner_no_cemc_deposit";
   case Pi0MissingDetail::partner_outside_cemc_acceptance: return "partner_outside_cemc_acceptance";
   case Pi0MissingDetail::partner_projection_invalid: return "partner_projection_invalid";
+  case Pi0MissingDetail::partner_displaced_cluster_below_energy_threshold_recovered: return "partner_displaced_cluster_below_energy_threshold_recovered";
+  case Pi0MissingDetail::partner_displaced_cluster_below_energy_threshold_below_recovery: return "partner_displaced_cluster_below_energy_threshold_below_recovery";
+  case Pi0MissingDetail::partner_unclustered_cemc_deposit: return "partner_unclustered_cemc_deposit";
+  case Pi0MissingDetail::partner_diagnostics_disabled: return "partner_diagnostics_disabled";
   }
   return "unknown";
 }
@@ -676,6 +729,10 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     for (std::size_t photon = 0; photon < 2U; ++photon)
       fill_first_daughter_diagnostic(candidate, photon, truth, children_by_parent, config_.pre_cemc_interaction_radius);
   }
+  if (config_.enable_missing_diagnostics)
+  {
+    fill_cemc_edep(result.candidates, truth_hits, truth);
+  }
 
   std::map<int, std::size_t> g4_candidate_by_barcode;
   std::map<int, std::size_t> generator_candidate_by_barcode;
@@ -817,91 +874,93 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
               candidate.photon_energy[photon] >= config_.min_photon_energy_recovery;
     }
 
-    if (config_.enable_missing_diagnostics &&
-        (!candidate.recovered[0] || !candidate.recovered[1]))
-    {
-      const auto update_diagnostic = [&](std::size_t photon, unsigned int cluster_id, double cluster_energy,
-                                         double cluster_eta, double cluster_phi, bool below_threshold,
-                                         const Pi0ClusterTruthMatch& match) {
-        if (candidate.recovered[photon]) return;
-        const double reference_eta = candidate.photon_projection_valid[photon]
-            ? candidate.photon_projection_eta[photon] : candidate.photon_eta[photon];
-        const double reference_phi = candidate.photon_projection_valid[photon]
-            ? candidate.photon_projection_phi[photon] : candidate.photon_phi[photon];
-        const double delta_phi = std::atan2(std::sin(cluster_phi - reference_phi), std::cos(cluster_phi - reference_phi));
-        const double delta_r = std::hypot(cluster_eta - reference_eta, delta_phi);
-        const double fraction = match.total_edep > 0.0F
-            ? match.gamma_edep[photon] / match.total_edep : 0.0;
-        const bool has_direct_deposit = match.usable &&
-            match.gamma_edep[photon] > 0.0F &&
-            fraction > config_.min_energy_contribution_fraction;
-        if (delta_r > config_.missing_diagnostic_max_delta_r) return;
-        auto& diagnostic = candidate.partner_diagnostics[photon];
-        const int priority = has_direct_deposit ? 2 : (!match.usable ? 1 : 0);
-        const int current_priority = !diagnostic.found ? -1
-            : (diagnostic.has_direct_deposit ? 2 : (!diagnostic.match.usable ? 1 : 0));
-        const bool replace = !diagnostic.found || priority > current_priority ||
-            (priority == 2 && current_priority == 2 &&
-             match.gamma_edep[photon] > diagnostic.match.gamma_edep[photon]) ||
-            (priority < 2 && priority == current_priority &&
-             delta_r < diagnostic.delta_r);
-        if (!replace) return;
-        diagnostic.found = true;
-        diagnostic.below_energy_threshold = below_threshold;
-        diagnostic.has_direct_deposit = has_direct_deposit;
-        diagnostic.cluster_id = cluster_id;
-        diagnostic.cluster_energy = cluster_energy;
-        diagnostic.cluster_eta = cluster_eta;
-        diagnostic.cluster_phi = cluster_phi;
-        diagnostic.delta_r = delta_r;
-        diagnostic.match = match;
-        diagnostic.reconstructed_photon_energy =
-            has_direct_deposit ? cluster_energy * fraction : 0.0;
-        diagnostic.recovery = candidate.photon_energy[photon] > 0.0
-            ? diagnostic.reconstructed_photon_energy /
-                  candidate.photon_energy[photon] : 0.0;
-      };
+  }
 
-      for (std::size_t cluster_index = 0;
-           cluster_index < result.clusters.size(); ++cluster_index)
+  const auto update_diagnostic = [&](Pi0TopologyCandidateRecord& candidate, std::size_t photon,
+                                     unsigned int cluster_id, double cluster_energy,
+                                     double cluster_eta, double cluster_phi, bool below_threshold,
+                                     const Pi0ClusterTruthMatch& match) {
+    if (candidate.recovered[photon]) return;
+    const double reference_eta = candidate.photon_projection_valid[photon]
+        ? candidate.photon_projection_eta[photon] : candidate.photon_eta[photon];
+    const double reference_phi = candidate.photon_projection_valid[photon]
+        ? candidate.photon_projection_phi[photon] : candidate.photon_phi[photon];
+    const double delta_phi = std::atan2(std::sin(cluster_phi - reference_phi), std::cos(cluster_phi - reference_phi));
+    const double delta_r = std::hypot(cluster_eta - reference_eta, delta_phi);
+    const double fraction = match.total_edep > 0.0F ? match.gamma_edep[photon] / match.total_edep : 0.0;
+    const bool has_direct_deposit = match.usable && match.gamma_edep[photon] > 0.0F &&
+        fraction > config_.min_energy_contribution_fraction;
+    if (!has_direct_deposit && delta_r > config_.missing_diagnostic_max_delta_r) return;
+    auto& diagnostic = candidate.partner_diagnostics[photon];
+    const int priority = has_direct_deposit ? 2 : (!match.usable ? 1 : 0);
+    const int current_priority = !diagnostic.found ? -1
+        : (diagnostic.has_direct_deposit ? 2 : (!diagnostic.match.usable ? 1 : 0));
+    const bool replace = !diagnostic.found || priority > current_priority ||
+        (priority == 2 && current_priority == 2 && match.gamma_edep[photon] > diagnostic.match.gamma_edep[photon]) ||
+        (priority < 2 && priority == current_priority && delta_r < diagnostic.delta_r);
+    if (!replace) return;
+    diagnostic.found = true;
+    diagnostic.below_energy_threshold = below_threshold;
+    diagnostic.has_direct_deposit = has_direct_deposit;
+    diagnostic.cluster_id = cluster_id;
+    diagnostic.cluster_energy = cluster_energy;
+    diagnostic.cluster_eta = cluster_eta;
+    diagnostic.cluster_phi = cluster_phi;
+    diagnostic.delta_r = delta_r;
+    diagnostic.match = match;
+    diagnostic.reconstructed_photon_energy = has_direct_deposit ? cluster_energy * fraction : 0.0;
+    diagnostic.recovery = candidate.photon_energy[photon] > 0.0
+        ? diagnostic.reconstructed_photon_energy / candidate.photon_energy[photon] : 0.0;
+  };
+
+  if (config_.enable_missing_diagnostics)
+  {
+    std::vector<std::size_t> diagnostic_candidate_indices;
+    std::vector<std::array<int, 2>> diagnostic_track_ids;
+    for (std::size_t candidate_index = 0; candidate_index < result.candidates.size(); ++candidate_index)
+    {
+      const auto& candidate = result.candidates[candidate_index];
+      if (!candidate.topology_evaluated || (candidate.recovered[0] && candidate.recovered[1])) continue;
+      diagnostic_candidate_indices.push_back(candidate_index);
+      diagnostic_track_ids.push_back(candidate.photon_track_ids);
+    }
+
+    for (const std::size_t candidate_index : diagnostic_candidate_indices)
+    {
+      auto& candidate = result.candidates[candidate_index];
+      for (std::size_t cluster_index = 0; cluster_index < result.clusters.size(); ++cluster_index)
       {
         const auto& match = candidate.cluster_matches[cluster_index];
         if (match.usable) continue;
         const auto& cluster = result.clusters[cluster_index];
         for (std::size_t photon = 0; photon < 2U; ++photon)
-          update_diagnostic(photon, cluster.cluster_id, cluster.energy,
-                            cluster.eta, cluster.phi, false, match);
-      }
-      for (const auto& cluster : below_threshold_clusters)
-      {
-        bool near_unrecovered_photon = false;
-        for (std::size_t photon = 0; photon < 2U; ++photon)
-        {
-          if (candidate.recovered[photon]) continue;
-          const double reference_eta = candidate.photon_projection_valid[photon]
-              ? candidate.photon_projection_eta[photon] : candidate.photon_eta[photon];
-          const double reference_phi = candidate.photon_projection_valid[photon]
-              ? candidate.photon_projection_phi[photon] : candidate.photon_phi[photon];
-          const double delta_phi = std::atan2(std::sin(cluster.phi - reference_phi), std::cos(cluster.phi - reference_phi));
-          const double delta_r = std::hypot(cluster.eta - reference_eta, delta_phi);
-          if (delta_r <= config_.missing_diagnostic_max_delta_r) near_unrecovered_photon = true;
-        }
-        if (!near_unrecovered_photon) continue;
-        auto match = pi0_truth_matcher_.match(
-            cluster.cluster, towers, raw_truth_towers, truth_cells,
-            truth_hits, truth, candidate.photon_track_ids, true);
-        if (match.status == Pi0ClusterTruthMatchStatus::partial &&
-            match.cluster_member_energy_coverage >=
-                config_.min_direct_match_cluster_energy_coverage)
-        {
-          match.usable = true;
-        }
-        for (std::size_t photon = 0; photon < 2U; ++photon)
-          update_diagnostic(photon, cluster.id, cluster.energy,
-                            cluster.eta, cluster.phi, true, match);
+          update_diagnostic(candidate, photon, cluster.cluster_id, cluster.energy, cluster.eta, cluster.phi, false, match);
       }
     }
 
+    for (const auto& cluster : below_threshold_clusters)
+    {
+      auto matches = pi0_truth_matcher_.match_many(
+          cluster.cluster, towers, raw_truth_towers, truth_cells, truth_hits, truth, diagnostic_track_ids, true);
+      for (std::size_t position = 0; position < matches.size(); ++position)
+      {
+        auto& match = matches[position];
+        if (match.status == Pi0ClusterTruthMatchStatus::partial &&
+            match.cluster_member_energy_coverage >= config_.min_direct_match_cluster_energy_coverage)
+        {
+          match.usable = true;
+        }
+        auto& candidate = result.candidates[diagnostic_candidate_indices[position]];
+        for (std::size_t photon = 0; photon < 2U; ++photon)
+          update_diagnostic(candidate, photon, cluster.id, cluster.energy, cluster.eta, cluster.phi, true, match);
+      }
+    }
+  }
+
+  for (std::size_t candidate_index = 0; candidate_index < result.candidates.size(); ++candidate_index)
+  {
+    if (anchors_by_candidate[candidate_index].empty() && !config_.evaluate_all_candidates) continue;
+    auto& candidate = result.candidates[candidate_index];
     for (const std::size_t anchor_position :
          anchors_by_candidate[candidate_index])
     {
@@ -949,37 +1008,66 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         const std::size_t partner = static_cast<std::size_t>(anchor.partner_photon_index);
         const auto& diagnostic = candidate.partner_diagnostics[partner];
         const bool projection_valid = candidate.photon_projection_valid[partner];
-        if (projection_valid && !candidate.photon_in_cemc_acceptance[partner])
+        const bool has_cemc_deposit = candidate.photon_cemc_edep[partner] > 0.0 ||
+            candidate.best_cluster[partner] != invalid_index || diagnostic.has_direct_deposit;
+        if (diagnostic.found && diagnostic.has_direct_deposit)
+        {
+          anchor.partner_diagnostic_invariant_mass =
+              diphoton_invariant_mass(result.clusters[anchor.cluster_index], diagnostic);
+        }
+        if (!projection_valid)
+        {
+          anchor.missing_category = Pi0MissingCategory::other;
+          anchor.missing_detail = Pi0MissingDetail::partner_projection_invalid;
+        }
+        else if (!candidate.photon_in_cemc_acceptance[partner])
         {
           anchor.missing_category = Pi0MissingCategory::acceptance;
           anchor.missing_detail = Pi0MissingDetail::partner_outside_cemc_acceptance;
         }
-        else if (diagnostic.found && diagnostic.below_energy_threshold && diagnostic.has_direct_deposit)
-        {
-          anchor.missing_category = Pi0MissingCategory::energy_threshold;
-          anchor.missing_detail = diagnostic.recovery >= config_.min_photon_energy_recovery
-              ? Pi0MissingDetail::partner_cluster_below_energy_threshold_recovered
-              : Pi0MissingDetail::partner_cluster_below_energy_threshold_below_recovery;
-        }
-        else
+        else if (!config_.enable_missing_diagnostics)
         {
           anchor.missing_category = Pi0MissingCategory::other;
-          if (!projection_valid)
+          anchor.missing_detail = Pi0MissingDetail::partner_diagnostics_disabled;
+        }
+        else if (!has_cemc_deposit)
+        {
+          anchor.missing_category = Pi0MissingCategory::no_cemc_deposit;
+          anchor.missing_detail = Pi0MissingDetail::partner_no_cemc_deposit;
+        }
+        else if (diagnostic.found && diagnostic.below_energy_threshold && diagnostic.has_direct_deposit)
+        {
+          const bool displaced = diagnostic.delta_r > config_.missing_diagnostic_max_delta_r;
+          anchor.missing_category = displaced
+              ? Pi0MissingCategory::displaced_partner_cluster
+              : Pi0MissingCategory::energy_threshold;
+          if (displaced)
           {
-            anchor.missing_detail = Pi0MissingDetail::partner_projection_invalid;
-          }
-          else if (candidate.best_cluster[partner] != invalid_index)
-          {
-            anchor.missing_detail = Pi0MissingDetail::partner_best_below_recovery;
-          }
-          else if (diagnostic.found && !diagnostic.match.usable)
-          {
-            anchor.missing_detail = Pi0MissingDetail::partner_direct_match_incomplete;
+            anchor.missing_detail = diagnostic.recovery >= config_.min_photon_energy_recovery
+                ? Pi0MissingDetail::partner_displaced_cluster_below_energy_threshold_recovered
+                : Pi0MissingDetail::partner_displaced_cluster_below_energy_threshold_below_recovery;
           }
           else
           {
-            anchor.missing_detail = Pi0MissingDetail::partner_no_direct_deposit;
+            anchor.missing_detail = diagnostic.recovery >= config_.min_photon_energy_recovery
+                ? Pi0MissingDetail::partner_cluster_below_energy_threshold_recovered
+                : Pi0MissingDetail::partner_cluster_below_energy_threshold_below_recovery;
           }
+        }
+        else if (candidate.best_cluster[partner] != invalid_index)
+        {
+          anchor.missing_category = Pi0MissingCategory::other;
+          anchor.missing_detail = Pi0MissingDetail::partner_best_below_recovery;
+        }
+        else if (diagnostic.found && !diagnostic.match.usable)
+        {
+          anchor.missing_category = Pi0MissingCategory::match_incomplete;
+          anchor.missing_detail = Pi0MissingDetail::partner_direct_match_incomplete;
+        }
+        else
+        {
+          anchor.missing_category = Pi0MissingCategory::unclustered_deposit;
+          anchor.missing_detail = Pi0MissingDetail::partner_unclustered_cemc_deposit;
         }
       }
       else

@@ -266,6 +266,8 @@ void TopologyEventDisplayDump::fill_candidates(const photon_tree::Pi0AnchorTopol
     b_photon1_first_daughter_radius_ = candidate.photon_first_daughter_radius[1];
     b_photon0_pre_cemc_interaction_ = candidate.photon_pre_cemc_interaction[0] ? 1 : 0;
     b_photon1_pre_cemc_interaction_ = candidate.photon_pre_cemc_interaction[1] ? 1 : 0;
+    b_photon0_cemc_edep_ = candidate.photon_cemc_edep[0];
+    b_photon1_cemc_edep_ = candidate.photon_cemc_edep[1];
     b_best_cluster0_id_ = cluster_id_from_index(result, candidate.best_cluster[0]);
     b_best_cluster1_id_ = cluster_id_from_index(result, candidate.best_cluster[1]);
     b_maximum_edep0_ = candidate.maximum_edep[0];
@@ -305,6 +307,9 @@ void TopologyEventDisplayDump::fill_anchors(const photon_tree::Pi0AnchorTopology
     b_missing_detail_name_ = photon_tree::pi0_missing_detail_name(anchor.missing_detail);
     b_partner_photon_index_ = anchor.partner_photon_index;
     b_pre_cemc_photon_index_ = anchor.pre_cemc_photon_index;
+    b_partner_cemc_edep_ = anchor.partner_photon_index >= 0 && anchor.partner_photon_index < 2
+        ? candidate.photon_cemc_edep[static_cast<std::size_t>(anchor.partner_photon_index)] : 0.0;
+    b_partner_diagnostic_invariant_mass_ = anchor.partner_diagnostic_invariant_mass;
     b_main_fraction_ = anchor.main_fraction;
     b_second_fraction_ = anchor.second_fraction;
     b_unmatched_max_fraction_ = anchor.unmatched_max_fraction;
@@ -816,6 +821,7 @@ void TopologyEventDisplayDump::create_output()
   CANDIDATE_BRANCH(photon0_first_daughter_vertex_valid); CANDIDATE_BRANCH(photon1_first_daughter_vertex_valid);
   CANDIDATE_BRANCH(photon0_first_daughter_radius); CANDIDATE_BRANCH(photon1_first_daughter_radius);
   CANDIDATE_BRANCH(photon0_pre_cemc_interaction); CANDIDATE_BRANCH(photon1_pre_cemc_interaction);
+  CANDIDATE_BRANCH(photon0_cemc_edep); CANDIDATE_BRANCH(photon1_cemc_edep);
   CANDIDATE_BRANCH(best_cluster0_id); CANDIDATE_BRANCH(best_cluster1_id);
   CANDIDATE_BRANCH(maximum_edep0); CANDIDATE_BRANCH(maximum_edep1);
   CANDIDATE_BRANCH(reconstructed_photon0_energy); CANDIDATE_BRANCH(reconstructed_photon1_energy);
@@ -827,7 +833,8 @@ void TopologyEventDisplayDump::create_output()
   ANCHOR_BRANCH(event); ANCHOR_BRANCH(anchor_id); ANCHOR_BRANCH(candidate_id); ANCHOR_BRANCH(cluster_id);
   ANCHOR_BRANCH(energy); ANCHOR_BRANCH(et); ANCHOR_BRANCH(topology); ANCHOR_BRANCH(topology_name);
   ANCHOR_BRANCH(reason); ANCHOR_BRANCH(reason_name); ANCHOR_BRANCH(missing_category); ANCHOR_BRANCH(missing_category_name); ANCHOR_BRANCH(missing_detail); ANCHOR_BRANCH(missing_detail_name);
-  ANCHOR_BRANCH(partner_photon_index); ANCHOR_BRANCH(pre_cemc_photon_index); ANCHOR_BRANCH(main_fraction);
+  ANCHOR_BRANCH(partner_photon_index); ANCHOR_BRANCH(pre_cemc_photon_index); ANCHOR_BRANCH(partner_cemc_edep);
+  ANCHOR_BRANCH(partner_diagnostic_invariant_mass); ANCHOR_BRANCH(main_fraction);
   ANCHOR_BRANCH(second_fraction); ANCHOR_BRANCH(unmatched_max_fraction); ANCHOR_BRANCH(ambiguous_main);
   ANCHOR_BRANCH(best_cluster0_id); ANCHOR_BRANCH(best_cluster1_id);
   ANCHOR_BRANCH(photon0_energy); ANCHOR_BRANCH(photon1_energy);

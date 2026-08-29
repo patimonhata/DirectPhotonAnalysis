@@ -84,31 +84,41 @@ For one anchor cluster:
   pre-CEMC;
 - separated: it is the recovered maximum-deposit cluster of one daughter and
   the other daughter has a distinct recovered maximum-deposit partner cluster;
-- missing: it is the recovered maximum-deposit cluster of one daughter and the
-  other daughter has no cluster passing the photon-energy recovery cut. Missing
-  is split with the following exclusive priority:
+- missing: it is the recovered maximum-deposit cluster of one daughter and
+  the other daughter has no cluster passing the photon-energy recovery cut.
+  Missing is split with the following exclusive priority:
 
-  1. acceptance: the partner projection at the CEMC radius is valid and
+  1. invalid projection -> missing-other;
+  2. acceptance: the valid partner projection satisfies
      |eta_projection| >= cemc_acceptance_eta_max (default 1.1);
-  2. energy-threshold: within missing_diagnostic_max_delta_r (default 0.15) of
-     the in-acceptance partner projection, a cluster below min_cluster_energy
-     has usable direct daughter deposit;
-  3. missing-other: every remaining missing case, including invalid projection,
-     best cluster below recovery, incomplete direct matching, or no direct
-     deposit;
+  3. no-CEMC-deposit: no G4 hit energy in CEMC can be traced to the partner
+     photon or its descendants;
+  4. energy-threshold or displaced-partner-cluster: the global maximum
+     direct-deposit partner-derived cluster is below min_cluster_energy, split
+     by whether delta-R to the projection is at most
+     missing_diagnostic_max_delta_r (default 0.15);
+  5. missing-other when an above-threshold maximum-deposit cluster exists but
+     fails the unchanged photon-energy recovery requirement;
+  6. match-incomplete when a local candidate cluster cannot be matched with
+     sufficient cluster-member energy coverage;
+  7. unclustered-deposit when partner-descendant CEMC energy exists but no
+     usable direct-deposit cluster is found;
+  8. missing-other for remaining or diagnostics-disabled cases;
 
 - other: the anchor is the maximum-deposit cluster of neither daughter, its
   main-contributor assignment is tied, or no preceding definition applies.
 
 The acceptance test is based on the projected partner photon, not on parent or
 daughter truth eta. The boundary is exclusive: exactly
-|eta_projection| = cemc_acceptance_eta_max is outside. Acceptance takes
-priority over the energy-threshold diagnostic.
+|eta_projection| = cemc_acceptance_eta_max is outside. Below-threshold direct
+matching searches globally and only then uses delta-R to distinguish near from
+displaced partner clusters; unusable match candidates remain local so unrelated
+noise does not create match-incomplete classifications.
 
 The anchor-spectrum workflow enables low-threshold missing diagnostics by
-default. Set enable_missing_diagnostics=false to avoid the additional matching
-cost; then no missing event can be labeled energy-threshold and such events fall
-into missing-other unless acceptance applies. Partial metadata records the
+default. Set enable_missing_diagnostics=false to avoid the additional CEMC-hit
+scan and low-threshold matching cost; then diagnostic-dependent missing cases
+fall into missing-other unless acceptance applies. Partial metadata records the
 acceptance boundary, pre-CEMC interaction radius, direct-match energy-coverage
 threshold, diagnostic delta-R, diagnostic enable flag, and topology algorithm
 version so incompatible productions cannot be combined.

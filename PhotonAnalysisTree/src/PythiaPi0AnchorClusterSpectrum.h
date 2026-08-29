@@ -98,7 +98,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 7;
+  static constexpr int schema_version_ = 8;
 
   void create_output_directory() const;
   void create_output();
@@ -122,7 +122,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   std::string partner_selection_ = "same_energy_cut_as_anchor_partner_eta_cut_configurable";
   std::string topology_definition_ = "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters_with_single_contaminated_pre_cemc_split";
   std::string topology_priority_ = "ambiguous_main_to_other_then_single_contaminated_then_merged_then_separated_then_missing_then_other";
-  std::string missing_category_priority_ = "acceptance_then_energy_threshold_then_other";
+  std::string missing_category_priority_ = "projection_then_acceptance_then_cemc_deposit_then_threshold_near_or_displaced_then_recovery_then_match_incomplete_then_unclustered_then_other";
   std::string response_policy_ = "not_used_for_classification";
   std::string photon_recovery_policy_ = "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold";
   std::string vertex_selection_ = "signal_hepmc_collision_vertex_abs_z_lt_max";
@@ -157,7 +157,11 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   TH1D* h_single_contaminated_ = nullptr;
   TH1D* h_missing_ = nullptr;
   TH1D* h_missing_energy_threshold_ = nullptr;
+  TH1D* h_missing_displaced_partner_cluster_ = nullptr;
   TH1D* h_missing_acceptance_ = nullptr;
+  TH1D* h_missing_no_cemc_deposit_ = nullptr;
+  TH1D* h_missing_unclustered_deposit_ = nullptr;
+  TH1D* h_missing_match_incomplete_ = nullptr;
   TH1D* h_missing_other_ = nullptr;
   TH1D* h_other_ = nullptr;
   TTree* metadata_tree_ = nullptr;
@@ -182,7 +186,11 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   unsigned long long n_single_contaminated_ = 0;
   unsigned long long n_missing_ = 0;
   unsigned long long n_missing_energy_threshold_ = 0;
+  unsigned long long n_missing_displaced_partner_cluster_ = 0;
   unsigned long long n_missing_acceptance_ = 0;
+  unsigned long long n_missing_no_cemc_deposit_ = 0;
+  unsigned long long n_missing_unclustered_deposit_ = 0;
+  unsigned long long n_missing_match_incomplete_ = 0;
   unsigned long long n_missing_other_ = 0;
   unsigned long long n_other_ = 0;
 };

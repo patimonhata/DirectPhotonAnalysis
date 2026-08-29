@@ -32,7 +32,8 @@ enum class Pi0AnchorTopology : int
   other = 0,
   separated = 1,
   merged = 2,
-  missing = 3
+  missing = 3,
+  single_contaminated = 4
 };
 
 enum class Pi0AnchorReason : int
@@ -42,7 +43,8 @@ enum class Pi0AnchorReason : int
   merged_shared_recovered_cluster = 2,
   missing_unrecovered_partner = 3,
   ambiguous_main_contributor = 4,
-  other_best_cluster_below_recovery = 5
+  other_best_cluster_below_recovery = 5,
+  single_contaminated_pre_cemc_partner = 6
 };
 
 enum class Pi0MissingDetail : int
@@ -87,6 +89,7 @@ struct Pi0AnchorTopologyConfig
   double anchor_cluster_eta_max = 0.7;
   double partner_cluster_eta_max = -1.0;
   double cemc_acceptance_eta_max = 1.1;
+  double pre_cemc_interaction_radius = 90.0;
   double min_cluster_energy = 0.2;
   double dominant_fraction_min = 0.5;
   double anchor_pi0_fraction_min = 0.5;
@@ -145,6 +148,9 @@ struct Pi0TopologyCandidateRecord
   std::array<double, 2> photon_projection_eta = {-999.0, -999.0};
   std::array<double, 2> photon_projection_phi = {-999.0, -999.0};
   std::array<bool, 2> photon_in_cemc_acceptance = {false, false};
+  std::array<bool, 2> photon_first_daughter_vertex_valid = {false, false};
+  std::array<double, 2> photon_first_daughter_radius = {-999.0, -999.0};
+  std::array<bool, 2> photon_pre_cemc_interaction = {false, false};
   bool topology_evaluated = false;
   std::array<std::size_t, 2> best_cluster = {static_cast<std::size_t>(-1), static_cast<std::size_t>(-1)};
   std::array<double, 2> maximum_edep = {-1.0, -1.0};
@@ -167,6 +173,7 @@ struct Pi0TopologyAnchorRecord
   Pi0MissingCategory missing_category = Pi0MissingCategory::not_missing;
   Pi0MissingDetail missing_detail = Pi0MissingDetail::not_missing;
   int partner_photon_index = -1;
+  int pre_cemc_photon_index = -1;
 };
 
 struct Pi0AnchorTopologyEventResult
@@ -193,7 +200,7 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 5;
+  static constexpr int kAlgorithmVersion = 6;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

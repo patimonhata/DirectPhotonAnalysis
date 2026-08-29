@@ -265,6 +265,30 @@ void fill_photon_kinematics(photon_tree::Pi0TopologyCandidateRecord& record, std
     record.photon_in_cemc_acceptance[index] = std::abs(projection.eta) < acceptance_eta_max;
   }
 }
+
+void fill_first_daughter_diagnostic(photon_tree::Pi0TopologyCandidateRecord& record, std::size_t index,
+                                    PHG4TruthInfoContainer* truth,
+                                    const std::map<int, std::vector<const PHG4Particle*>>& children_by_parent,
+                                    double pre_cemc_interaction_radius)
+{
+  const auto found = children_by_parent.find(record.photon_track_ids[index]);
+  if (found == children_by_parent.end()) return;
+  const PHG4VtxPoint* first_vertex = nullptr;
+  double first_time = std::numeric_limits<double>::infinity();
+  for (const PHG4Particle* child : found->second)
+  {
+    const PHG4VtxPoint* vertex = child && truth ? truth->GetVtx(child->get_vtx_id()) : nullptr;
+    if (!vertex || !std::isfinite(vertex->get_t()) || vertex->get_t() >= first_time) continue;
+    first_vertex = vertex;
+    first_time = vertex->get_t();
+  }
+  if (!first_vertex) return;
+  const double radius = std::hypot(first_vertex->get_x(), first_vertex->get_y());
+  if (!std::isfinite(radius)) return;
+  record.photon_first_daughter_vertex_valid[index] = true;
+  record.photon_first_daughter_radius[index] = radius;
+  record.photon_pre_cemc_interaction[index] = radius < pre_cemc_interaction_radius;
+}
 }
 
 namespace photon_tree
@@ -287,6 +311,7 @@ const char* pi0_anchor_topology_name(Pi0AnchorTopology value)
   case Pi0AnchorTopology::separated: return "separated";
   case Pi0AnchorTopology::merged: return "merged";
   case Pi0AnchorTopology::missing: return "missing";
+  case Pi0AnchorTopology::single_contaminated: return "single_contaminated";
   case Pi0AnchorTopology::other: return "other";
   }
   return "unknown";
@@ -308,6 +333,8 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value)
     return "ambiguous_main_contributor";
   case Pi0AnchorReason::other_best_cluster_below_recovery:
     return "other_best_cluster_below_recovery";
+  case Pi0AnchorReason::single_contaminated_pre_cemc_partner:
+    return "single_contaminated_pre_cemc_partner";
   }
   return "unknown";
 }
@@ -644,6 +671,11 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
   {
     result.candidates.push_back(std::move(candidate.record));
   }
+  for (auto& candidate : result.candidates)
+  {
+    for (std::size_t photon = 0; photon < 2U; ++photon)
+      fill_first_daughter_diagnostic(candidate, photon, truth, children_by_parent, config_.pre_cemc_interaction_radius);
+  }
 
   std::map<int, std::size_t> g4_candidate_by_barcode;
   std::map<int, std::size_t> generator_candidate_by_barcode;
@@ -886,8 +918,19 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
           candidate.best_cluster[1] == anchor.cluster_index;
       if (is_best0 && is_best1)
       {
-        anchor.topology = Pi0AnchorTopology::merged;
-        anchor.reason = Pi0AnchorReason::merged_shared_recovered_cluster;
+        const bool pre_cemc0 = candidate.photon_pre_cemc_interaction[0];
+        const bool pre_cemc1 = candidate.photon_pre_cemc_interaction[1];
+        if (pre_cemc0 != pre_cemc1)
+        {
+          anchor.topology = Pi0AnchorTopology::single_contaminated;
+          anchor.reason = Pi0AnchorReason::single_contaminated_pre_cemc_partner;
+          anchor.pre_cemc_photon_index = pre_cemc0 ? 0 : 1;
+        }
+        else
+        {
+          anchor.topology = Pi0AnchorTopology::merged;
+          anchor.reason = Pi0AnchorReason::merged_shared_recovered_cluster;
+        }
       }
       else if ((is_best0 && candidate.recovered[1] &&
                 candidate.best_cluster[1] != anchor.cluster_index) ||

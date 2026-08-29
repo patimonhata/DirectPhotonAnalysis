@@ -48,7 +48,8 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
     const double cemc_acceptance_eta_max = 1.1,
     const double min_direct_match_cluster_energy_coverage = 0.5,
     const double missing_diagnostic_max_delta_r = 0.15,
-    const bool enable_missing_diagnostics = true)
+    const bool enable_missing_diagnostics = true,
+    const double pre_cemc_interaction_radius = 90.0)
 {
   if (manifest_path.empty() || output_file.empty() || manifest_begin < 0 ||
       manifest_end <= manifest_begin)
@@ -157,6 +158,7 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
   accumulator->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
   accumulator->set_partner_cluster_eta_max(partner_cluster_eta_max);
   accumulator->set_cemc_acceptance_eta_max(cemc_acceptance_eta_max);
+  accumulator->set_pre_cemc_interaction_radius(pre_cemc_interaction_radius);
   accumulator->set_min_cluster_energy(min_cluster_energy);
   accumulator->set_dominant_fraction_min(dominant_fraction_min);
   accumulator->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);

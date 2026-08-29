@@ -43,6 +43,7 @@ struct Event
   int anchors = 0;
   int separated = 0;
   int merged = 0;
+  int single_contaminated = 0;
   int missing = 0;
   int other = 0;
 };
@@ -66,6 +67,9 @@ struct Candidate
   double photon_projection_eta[2] = {-999.0, -999.0};
   double photon_projection_phi[2] = {-999.0, -999.0};
   int photon_in_cemc_acceptance[2] = {0, 0};
+  int photon_first_daughter_vertex_valid[2] = {0, 0};
+  double photon_first_daughter_radius[2] = {-999.0, -999.0};
+  int photon_pre_cemc_interaction[2] = {0, 0};
   int best_cluster[2] = {-999, -999};
   double maximum_edep[2] = {-1.0, -1.0};
   double reconstructed[2] = {0.0, 0.0};
@@ -88,6 +92,7 @@ struct Anchor
   int missing_detail = 0;
   std::string missing_detail_name;
   int partner_photon = -1;
+  int pre_cemc_photon = -1;
   double main_fraction = -1.0;
   double second_fraction = -1.0;
   double unmatched_fraction = 0.0;
@@ -191,6 +196,7 @@ inline int topology_color(int topology)
   if (topology == 1) return kGreen + 2;
   if (topology == 2) return kMagenta + 1;
   if (topology == 3) return kOrange + 7;
+  if (topology == 4) return kAzure + 2;
   return kGray + 2;
 }
 
@@ -255,6 +261,7 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   events->SetBranchAddress("n_anchors", &data.event.anchors);
   events->SetBranchAddress("n_separated", &data.event.separated);
   events->SetBranchAddress("n_merged", &data.event.merged);
+  if (events->GetBranch("n_single_contaminated")) events->SetBranchAddress("n_single_contaminated", &data.event.single_contaminated);
   events->SetBranchAddress("n_missing", &data.event.missing);
   events->SetBranchAddress("n_other", &data.event.other);
   bool found = false;
@@ -299,6 +306,12 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   if (candidates->GetBranch("photon1_projection_phi")) candidates->SetBranchAddress("photon1_projection_phi", &candidate.photon_projection_phi[1]);
   if (candidates->GetBranch("photon0_in_cemc_acceptance")) candidates->SetBranchAddress("photon0_in_cemc_acceptance", &candidate.photon_in_cemc_acceptance[0]);
   if (candidates->GetBranch("photon1_in_cemc_acceptance")) candidates->SetBranchAddress("photon1_in_cemc_acceptance", &candidate.photon_in_cemc_acceptance[1]);
+  if (candidates->GetBranch("photon0_first_daughter_vertex_valid")) candidates->SetBranchAddress("photon0_first_daughter_vertex_valid", &candidate.photon_first_daughter_vertex_valid[0]);
+  if (candidates->GetBranch("photon1_first_daughter_vertex_valid")) candidates->SetBranchAddress("photon1_first_daughter_vertex_valid", &candidate.photon_first_daughter_vertex_valid[1]);
+  if (candidates->GetBranch("photon0_first_daughter_radius")) candidates->SetBranchAddress("photon0_first_daughter_radius", &candidate.photon_first_daughter_radius[0]);
+  if (candidates->GetBranch("photon1_first_daughter_radius")) candidates->SetBranchAddress("photon1_first_daughter_radius", &candidate.photon_first_daughter_radius[1]);
+  if (candidates->GetBranch("photon0_pre_cemc_interaction")) candidates->SetBranchAddress("photon0_pre_cemc_interaction", &candidate.photon_pre_cemc_interaction[0]);
+  if (candidates->GetBranch("photon1_pre_cemc_interaction")) candidates->SetBranchAddress("photon1_pre_cemc_interaction", &candidate.photon_pre_cemc_interaction[1]);
   candidates->SetBranchAddress("best_cluster0_id", &candidate.best_cluster[0]);
   candidates->SetBranchAddress("best_cluster1_id", &candidate.best_cluster[1]);
   candidates->SetBranchAddress("maximum_edep0", &candidate.maximum_edep[0]);
@@ -345,6 +358,7 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   bind_anchor("missing_detail", &anchor.missing_detail);
   bind_anchor("missing_detail_name", &missing_detail_name);
   bind_anchor("partner_photon_index", &anchor.partner_photon);
+  bind_anchor("pre_cemc_photon_index", &anchor.pre_cemc_photon);
   anchors->SetBranchAddress("main_fraction", &anchor.main_fraction);
   anchors->SetBranchAddress("second_fraction", &anchor.second_fraction);
   anchors->SetBranchAddress("unmatched_max_fraction", &anchor.unmatched_fraction);
@@ -842,9 +856,10 @@ inline void draw_display_legend(int family = -1, bool tower_detail = false,
 
   draw_legend_line(y, kGray + 2, 2, 1, "CEMC inner / outer surface", text_size); y -= step;
   text.SetTextColor(kGreen + 2); text.DrawLatex(0.05, y, "S separated");
-  text.SetTextColor(kMagenta + 1); text.DrawLatex(0.34, y, "M merged");
-  text.SetTextColor(kOrange + 7); text.DrawLatex(0.58, y, "X missing");
-  text.SetTextColor(kGray + 2); text.DrawLatex(0.82, y, "O other");
+  text.SetTextColor(kMagenta + 1); text.DrawLatex(0.24, y, "M merged");
+  text.SetTextColor(kAzure + 2); text.DrawLatex(0.43, y, "C contaminated");
+  text.SetTextColor(kOrange + 7); text.DrawLatex(0.67, y, "X missing");
+  text.SetTextColor(kGray + 2); text.DrawLatex(0.84, y, "O other");
   text.SetTextColor(kBlack);
 
   if (!tower_detail) return;
@@ -863,9 +878,9 @@ inline void draw_overview_text(const DisplayData& data)
   text.DrawLatex(0.04, y, Form("vertex = (%.2f, %.2f, %.2f) cm", data.event.cx, data.event.cy, data.event.cz)); y -= 0.07;
   text.DrawLatex(0.04, y, Form("selected #pi^{0}: %d   G4-primary: %d   generator: %d",
       data.event.candidates, data.event.g4_primary, data.event.generator)); y -= 0.065;
-  text.DrawLatex(0.04, y, Form("clusters: %d   anchors: %d   S/M/X/O = %d/%d/%d/%d",
+  text.DrawLatex(0.04, y, Form("clusters: %d   anchors: %d   S/M/C/X/O = %d/%d/%d/%d/%d",
       data.event.clusters, data.event.anchors, data.event.separated,
-      data.event.merged, data.event.missing, data.event.other)); y -= 0.075;
+      data.event.merged, data.event.single_contaminated, data.event.missing, data.event.other)); y -= 0.075;
 
   const auto anchors = ordered_anchors(data);
   text.SetTextSize(0.038);
@@ -893,6 +908,10 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
   text.DrawLatex(0.04, y, Form("%s", anchor.topology_name.c_str()));
   text.SetTextColor(kBlack); y -= 0.050;
   text.SetTextSize(0.030); text.DrawLatex(0.04, y, Form("reason: %s", anchor.reason_name.c_str())); y -= 0.045;
+  if (anchor.topology == 4)
+  {
+    text.DrawLatex(0.04, y, Form("pre-CEMC interacting photon: #gamma%d", anchor.pre_cemc_photon)); y -= 0.045;
+  }
   if (anchor.topology == 3)
   {
     text.DrawLatex(0.04, y, Form("missing: %s / %s  (partner #gamma%d)", anchor.missing_category_name.c_str(), anchor.missing_detail_name.c_str(), anchor.partner_photon)); y -= 0.045;
@@ -929,7 +948,13 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
     text.DrawLatex(0.19, y, Form("#gamma%d Cbest=%d  recovered=%s", photon, anchor.best_cluster[photon],
         anchor.recovered[photon] ? "yes" : "no")); y -= 0.038;
     text.DrawLatex(0.19, y, Form("Etruth=%.3f  Erec=%.3f  ratio=%.3f",
-        anchor.truth_energy[photon], anchor.reconstructed[photon], recovery)); y -= 0.043;
+        anchor.truth_energy[photon], anchor.reconstructed[photon], recovery)); y -= 0.038;
+    if (candidate->photon_first_daughter_vertex_valid[photon])
+      text.DrawLatex(0.19, y, Form("first daughter r=%.3f cm  pre-CEMC=%s", candidate->photon_first_daughter_radius[photon],
+          candidate->photon_pre_cemc_interaction[photon] ? "yes" : "no"));
+    else
+      text.DrawLatex(0.19, y, "first daughter vertex: not stored");
+    y -= 0.043;
   }
   text.DrawLatex(0.04, y, Form("anchor match: strict=%d usable=%d  %s  coverage=%.3f",
       anchor.match_valid, anchor.match_usable, anchor.match_status_name.c_str(), anchor.match_coverage)); y -= 0.038;

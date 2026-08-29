@@ -46,6 +46,7 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_anchor_cluster_eta_max(double value) { config_.anchor_cluster_eta_max = value; }
   void set_partner_cluster_eta_max(double value) { config_.partner_cluster_eta_max = value; }
   void set_cemc_acceptance_eta_max(double value) { config_.cemc_acceptance_eta_max = value; }
+  void set_pre_cemc_interaction_radius(double value) { config_.pre_cemc_interaction_radius = value; }
   void set_min_cluster_energy(double value) { config_.min_cluster_energy = value; }
   void set_dominant_fraction_min(double value) { config_.dominant_fraction_min = value; }
   void set_anchor_pi0_fraction_min(double value) { config_.anchor_pi0_fraction_min = value; }
@@ -57,7 +58,7 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; config_.verbosity = value; }
 
  private:
-  static constexpr int schema_version_ = 4;
+  static constexpr int schema_version_ = 5;
   static constexpr int invalid_int_ = -999;
   static constexpr double invalid_double_ = -999.0;
 
@@ -138,6 +139,12 @@ class TopologyEventDisplayDump : public SubsysReco
   double b_photon1_projection_phi_ = invalid_double_;
   int b_photon0_in_cemc_acceptance_ = 0;
   int b_photon1_in_cemc_acceptance_ = 0;
+  int b_photon0_first_daughter_vertex_valid_ = 0;
+  int b_photon1_first_daughter_vertex_valid_ = 0;
+  double b_photon0_first_daughter_radius_ = invalid_double_;
+  double b_photon1_first_daughter_radius_ = invalid_double_;
+  int b_photon0_pre_cemc_interaction_ = 0;
+  int b_photon1_pre_cemc_interaction_ = 0;
   int b_best_cluster0_id_ = invalid_int_;
   int b_best_cluster1_id_ = invalid_int_;
   double b_maximum_edep0_ = invalid_double_;
@@ -159,6 +166,7 @@ class TopologyEventDisplayDump : public SubsysReco
   int b_missing_detail_ = 0;
   std::string b_missing_detail_name_;
   int b_partner_photon_index_ = invalid_int_;
+  int b_pre_cemc_photon_index_ = invalid_int_;
   double b_main_fraction_ = invalid_double_;
   double b_second_fraction_ = invalid_double_;
   double b_unmatched_max_fraction_ = invalid_double_;
@@ -257,6 +265,7 @@ class TopologyEventDisplayDump : public SubsysReco
   int b_n_anchors_ = 0;
   int b_n_separated_ = 0;
   int b_n_merged_ = 0;
+  int b_n_single_contaminated_ = 0;
   int b_n_missing_ = 0;
   int b_n_other_ = 0;
   double b_collision_x_ = 0.0;

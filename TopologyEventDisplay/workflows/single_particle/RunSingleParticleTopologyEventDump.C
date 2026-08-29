@@ -35,7 +35,8 @@ int RunSingleParticleTopologyEventDump(
     const double min_photon_energy_recovery = 0.5,
     const double min_direct_match_cluster_energy_coverage = 0.5,
     const double missing_diagnostic_max_delta_r = 0.15,
-    const int first_event = 0)
+    const int first_event = 0,
+    const double pre_cemc_interaction_radius = 90.0)
 {
   if (input_file.empty() || output_file.empty() || n_events < 0 || first_event < 0)
   {
@@ -83,6 +84,7 @@ int RunSingleParticleTopologyEventDump(
   display->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
   display->set_partner_cluster_eta_max(partner_cluster_eta_max);
   display->set_cemc_acceptance_eta_max(cemc_acceptance_eta_max);
+  display->set_pre_cemc_interaction_radius(pre_cemc_interaction_radius);
   display->set_min_cluster_energy(min_cluster_energy);
   display->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);
   display->set_min_energy_contribution_fraction(min_energy_contribution_fraction);

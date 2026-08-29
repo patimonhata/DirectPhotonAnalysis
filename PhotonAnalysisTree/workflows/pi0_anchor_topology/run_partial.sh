@@ -3,7 +3,7 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../.." && pwd)
-usage="usage: workflows/pi0_anchor_topology/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [ET_MAX] [ANCHOR_CLUSTER_ETA_MAX] [PARTNER_CLUSTER_ETA_MAX] [MIN_CLUSTER_ENERGY] [DOMINANT_FRACTION_MIN] [ANCHOR_PI0_FRACTION_MIN] [MIN_ENERGY_CONTRIBUTION_FRACTION] [MIN_PHOTON_ENERGY_RECOVERY] [MAX_ABS_VERTEX_Z] [CEMC_ACCEPTANCE_ETA_MAX] [MIN_DIRECT_MATCH_CLUSTER_ENERGY_COVERAGE] [MISSING_DIAGNOSTIC_MAX_DELTA_R] [ENABLE_MISSING_DIAGNOSTICS]"
+usage="usage: workflows/pi0_anchor_topology/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [ET_MAX] [ANCHOR_CLUSTER_ETA_MAX] [PARTNER_CLUSTER_ETA_MAX] [MIN_CLUSTER_ENERGY] [DOMINANT_FRACTION_MIN] [ANCHOR_PI0_FRACTION_MIN] [MIN_ENERGY_CONTRIBUTION_FRACTION] [MIN_PHOTON_ENERGY_RECOVERY] [MAX_ABS_VERTEX_Z] [CEMC_ACCEPTANCE_ETA_MAX] [MIN_DIRECT_MATCH_CLUSTER_ENERGY_COVERAGE] [MISSING_DIAGNOSTIC_MAX_DELTA_R] [ENABLE_MISSING_DIAGNOSTICS] [PRE_CEMC_INTERACTION_RADIUS]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
 total_files=${3:?$usage}
@@ -24,6 +24,7 @@ cemc_acceptance_eta_max=${17:-1.1}
 min_direct_match_cluster_energy_coverage=${18:-0.5}
 missing_diagnostic_max_delta_r=${19:-0.15}
 enable_missing_diagnostics=${20:-true}
+pre_cemc_interaction_radius=${21:-90.0}
 
 for value in "$job_index" "$chunk_offset" "$total_files" "$files_per_job" "$n_bins"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
@@ -72,7 +73,7 @@ trap cleanup EXIT
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
-root -l -b -q   "$workflow_dir/Fun4All_PythiaPi0AnchorClusterSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${anchor_cluster_eta_max},${partner_cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${anchor_pi0_fraction_min},${min_energy_contribution_fraction},${min_photon_energy_recovery},${max_abs_vertex_z},${cemc_acceptance_eta_max},${min_direct_match_cluster_energy_coverage},${missing_diagnostic_max_delta_r},${enable_missing_diagnostics})"
+root -l -b -q   "$workflow_dir/Fun4All_PythiaPi0AnchorClusterSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${anchor_cluster_eta_max},${partner_cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${anchor_pi0_fraction_min},${min_energy_contribution_fraction},${min_photon_energy_recovery},${max_abs_vertex_z},${cemc_acceptance_eta_max},${min_direct_match_cluster_energy_coverage},${missing_diagnostic_max_delta_r},${enable_missing_diagnostics},${pre_cemc_interaction_radius})"
 root -l -b -q   "$workflow_dir/check_pythia_pi0_anchor_cluster_partial.C(\"${temporary_output}\")"
 
 mv -- "$temporary_output" "$final_output"

@@ -78,7 +78,7 @@ root -l -b -q 'TopologyEventDisplay/display/MakeTopologyEventBook.C("output/topo
 
 The next three arguments are `topology_filter`, `pathway_filter`, and
 `max_events`.  Use `-1` for no filter.  Topology codes are 0 other,
-1 separated, 2 merged, and 3 missing.  Pathway codes are 1 G4-primary pi0
+1 separated, 2 merged, 3 missing, and 4 single-contaminated.  Pathway codes are 1 G4-primary pi0
 decay, 2 generator-level pi0 decay, and 3 single-particle G4 decay.
 
 Four optional range arguments follow: `vertex_z_min`, `vertex_z_max`,
@@ -144,7 +144,14 @@ default). The first unresolved tower is recorded together with a failure name:
 continues to mean strict completeness; `match_usable` is the quantity used by
 the topology evaluator.
 
-The top-level topology remains `separated`, `merged`, `missing`, or `other`.
+The top-level topology is `separated`, `merged`, `single_contaminated`,
+`missing`, or `other`. A would-be merged anchor is reclassified as
+`single_contaminated` when exactly one of its two direct daughter photons has
+its first daughter-production vertex at transverse radius
+`r < pre_cemc_interaction_radius` (90 cm by default). Neither/both pre-CEMC
+interactions remain `merged`; the boundary is strict. The selected photon index
+is stored as `pre_cemc_photon_index`.
+
 Only `missing` is subdivided by `missing_category_name`:
 
 - `acceptance`: the unrecovered partner photon has a valid projection to the
@@ -174,13 +181,16 @@ that flag still controls the large geometry/truth tables.
 ## Intermediate ROOT schema
 
 - `metadata`: schema/algorithm versions, sample mode, source range,
-  thresholds, detail flag and processing counters.
+  thresholds (including `pre_cemc_interaction_radius`), detail flag and
+  processing counters. The current schema version is 5.
 - `events`: pi0 population, truth/cluster population and topology counts.
 - `pi0_candidates`: the two supported Pythia pathways (or gun pathway),
-  daughter photons, CEMC projection validity/eta/phi/fiducial status, best
-  clusters and recovery decision.
+  daughter photons, CEMC projection validity/eta/phi/fiducial status, each
+  photon's first daughter-production radius/pre-CEMC flag, best clusters and
+  recovery decision.
 - `anchor_decisions`: one row per anchor, including topology, reason,
-  coarse and detailed missing reasons, strict/usable direct-match status, failure
+  coarse and detailed missing reasons, the pre-CEMC photon index for
+  single-contaminated anchors, strict/usable direct-match status, failure
   location, coverage and any nearby below-threshold partner diagnostic.
 - `candidate_cluster_truth`: direct daughter-photon deposit and recovery
   quantities plus strict/usable match status, failure and coverage for every
@@ -204,5 +214,6 @@ root -l -b -q 'TopologyEventDisplay/validation/CheckTopologyEventDump.C("output/
 ```
 
 It checks required trees and branches, category closure, anchor references,
-projection/fiducial consistency, missing-category priority, key uniqueness and
+projection/fiducial consistency, the strict 90 cm pre-CEMC flag and
+single-contaminated XOR condition, missing-category priority, key uniqueness and
 direct energy-deposit closure.

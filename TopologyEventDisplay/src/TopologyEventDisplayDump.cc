@@ -70,6 +70,8 @@ int TopologyEventDisplayDump::Init(PHCompositeNode*)
       std::isfinite(config_.partner_cluster_eta_max) &&
       std::isfinite(config_.cemc_acceptance_eta_max) &&
       config_.cemc_acceptance_eta_max > 0.0 &&
+      std::isfinite(config_.pre_cemc_interaction_radius) &&
+      config_.pre_cemc_interaction_radius > 0.0 &&
       std::isfinite(config_.min_cluster_energy) &&
       config_.min_cluster_energy >= 0.0 &&
       config_.dominant_fraction_min >= 0.0 &&
@@ -211,6 +213,7 @@ void TopologyEventDisplayDump::fill_event(PHCompositeNode*, const photon_tree::P
   b_n_anchors_ = static_cast<int>(result.anchors.size());
   b_n_separated_ = 0;
   b_n_merged_ = 0;
+  b_n_single_contaminated_ = 0;
   b_n_missing_ = 0;
   b_n_other_ = 0;
   for (const auto& anchor : result.anchors)
@@ -219,6 +222,7 @@ void TopologyEventDisplayDump::fill_event(PHCompositeNode*, const photon_tree::P
     {
     case photon_tree::Pi0AnchorTopology::separated: ++b_n_separated_; break;
     case photon_tree::Pi0AnchorTopology::merged: ++b_n_merged_; break;
+    case photon_tree::Pi0AnchorTopology::single_contaminated: ++b_n_single_contaminated_; break;
     case photon_tree::Pi0AnchorTopology::missing: ++b_n_missing_; break;
     case photon_tree::Pi0AnchorTopology::other: ++b_n_other_; break;
     }
@@ -256,6 +260,12 @@ void TopologyEventDisplayDump::fill_candidates(const photon_tree::Pi0AnchorTopol
     b_photon1_projection_phi_ = candidate.photon_projection_phi[1];
     b_photon0_in_cemc_acceptance_ = candidate.photon_in_cemc_acceptance[0] ? 1 : 0;
     b_photon1_in_cemc_acceptance_ = candidate.photon_in_cemc_acceptance[1] ? 1 : 0;
+    b_photon0_first_daughter_vertex_valid_ = candidate.photon_first_daughter_vertex_valid[0] ? 1 : 0;
+    b_photon1_first_daughter_vertex_valid_ = candidate.photon_first_daughter_vertex_valid[1] ? 1 : 0;
+    b_photon0_first_daughter_radius_ = candidate.photon_first_daughter_radius[0];
+    b_photon1_first_daughter_radius_ = candidate.photon_first_daughter_radius[1];
+    b_photon0_pre_cemc_interaction_ = candidate.photon_pre_cemc_interaction[0] ? 1 : 0;
+    b_photon1_pre_cemc_interaction_ = candidate.photon_pre_cemc_interaction[1] ? 1 : 0;
     b_best_cluster0_id_ = cluster_id_from_index(result, candidate.best_cluster[0]);
     b_best_cluster1_id_ = cluster_id_from_index(result, candidate.best_cluster[1]);
     b_maximum_edep0_ = candidate.maximum_edep[0];
@@ -294,6 +304,7 @@ void TopologyEventDisplayDump::fill_anchors(const photon_tree::Pi0AnchorTopology
     b_missing_detail_ = static_cast<int>(anchor.missing_detail);
     b_missing_detail_name_ = photon_tree::pi0_missing_detail_name(anchor.missing_detail);
     b_partner_photon_index_ = anchor.partner_photon_index;
+    b_pre_cemc_photon_index_ = anchor.pre_cemc_photon_index;
     b_main_fraction_ = anchor.main_fraction;
     b_second_fraction_ = anchor.second_fraction;
     b_unmatched_max_fraction_ = anchor.unmatched_max_fraction;
@@ -766,6 +777,7 @@ void TopologyEventDisplayDump::create_output()
   metadata_tree_->Branch("anchor_cluster_eta_max", &config_.anchor_cluster_eta_max);
   metadata_tree_->Branch("partner_cluster_eta_max", &config_.partner_cluster_eta_max);
   metadata_tree_->Branch("cemc_acceptance_eta_max", &config_.cemc_acceptance_eta_max);
+  metadata_tree_->Branch("pre_cemc_interaction_radius", &config_.pre_cemc_interaction_radius);
   metadata_tree_->Branch("min_cluster_energy", &config_.min_cluster_energy);
   metadata_tree_->Branch("dominant_fraction_min", &config_.dominant_fraction_min);
   metadata_tree_->Branch("anchor_pi0_fraction_min", &config_.anchor_pi0_fraction_min);
@@ -785,7 +797,7 @@ void TopologyEventDisplayDump::create_output()
   EVENT_BRANCH(n_candidates); EVENT_BRANCH(n_g4_primary_pi0); EVENT_BRANCH(n_generator_pi0);
   EVENT_BRANCH(n_g4_secondary_pi0); EVENT_BRANCH(n_selected_family_particles); EVENT_BRANCH(n_truth_particles);
   EVENT_BRANCH(n_clusters); EVENT_BRANCH(n_topology_clusters); EVENT_BRANCH(n_anchors);
-  EVENT_BRANCH(n_separated); EVENT_BRANCH(n_merged); EVENT_BRANCH(n_missing); EVENT_BRANCH(n_other);
+  EVENT_BRANCH(n_separated); EVENT_BRANCH(n_merged); EVENT_BRANCH(n_single_contaminated); EVENT_BRANCH(n_missing); EVENT_BRANCH(n_other);
 #undef EVENT_BRANCH
 
   candidates_tree_ = new TTree("pi0_candidates", "Selected pi0 candidates");
@@ -801,6 +813,9 @@ void TopologyEventDisplayDump::create_output()
   CANDIDATE_BRANCH(photon0_projection_eta); CANDIDATE_BRANCH(photon1_projection_eta);
   CANDIDATE_BRANCH(photon0_projection_phi); CANDIDATE_BRANCH(photon1_projection_phi);
   CANDIDATE_BRANCH(photon0_in_cemc_acceptance); CANDIDATE_BRANCH(photon1_in_cemc_acceptance);
+  CANDIDATE_BRANCH(photon0_first_daughter_vertex_valid); CANDIDATE_BRANCH(photon1_first_daughter_vertex_valid);
+  CANDIDATE_BRANCH(photon0_first_daughter_radius); CANDIDATE_BRANCH(photon1_first_daughter_radius);
+  CANDIDATE_BRANCH(photon0_pre_cemc_interaction); CANDIDATE_BRANCH(photon1_pre_cemc_interaction);
   CANDIDATE_BRANCH(best_cluster0_id); CANDIDATE_BRANCH(best_cluster1_id);
   CANDIDATE_BRANCH(maximum_edep0); CANDIDATE_BRANCH(maximum_edep1);
   CANDIDATE_BRANCH(reconstructed_photon0_energy); CANDIDATE_BRANCH(reconstructed_photon1_energy);
@@ -812,7 +827,7 @@ void TopologyEventDisplayDump::create_output()
   ANCHOR_BRANCH(event); ANCHOR_BRANCH(anchor_id); ANCHOR_BRANCH(candidate_id); ANCHOR_BRANCH(cluster_id);
   ANCHOR_BRANCH(energy); ANCHOR_BRANCH(et); ANCHOR_BRANCH(topology); ANCHOR_BRANCH(topology_name);
   ANCHOR_BRANCH(reason); ANCHOR_BRANCH(reason_name); ANCHOR_BRANCH(missing_category); ANCHOR_BRANCH(missing_category_name); ANCHOR_BRANCH(missing_detail); ANCHOR_BRANCH(missing_detail_name);
-  ANCHOR_BRANCH(partner_photon_index); ANCHOR_BRANCH(main_fraction);
+  ANCHOR_BRANCH(partner_photon_index); ANCHOR_BRANCH(pre_cemc_photon_index); ANCHOR_BRANCH(main_fraction);
   ANCHOR_BRANCH(second_fraction); ANCHOR_BRANCH(unmatched_max_fraction); ANCHOR_BRANCH(ambiguous_main);
   ANCHOR_BRANCH(best_cluster0_id); ANCHOR_BRANCH(best_cluster1_id);
   ANCHOR_BRANCH(photon0_energy); ANCHOR_BRANCH(photon1_energy);

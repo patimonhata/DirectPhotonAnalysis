@@ -25,9 +25,9 @@
 
 namespace
 {
-constexpr std::size_t kHistogramCount = 9;
-constexpr std::size_t kCategoryCount = 6;
-constexpr std::array<std::size_t, kCategoryCount> kCategoryHistogramIndices = {2, 3, 5, 6, 7, 8};
+constexpr std::size_t kHistogramCount = 10;
+constexpr std::size_t kCategoryCount = 7;
+constexpr std::array<std::size_t, kCategoryCount> kCategoryHistogramIndices = {2, 3, 4, 6, 7, 8, 9};
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
 constexpr double kPlotAreaTop = 0.62;
@@ -91,6 +91,7 @@ struct PartialMetadata {
   double anchor_cluster_eta_max = 0.0;
   double partner_cluster_eta_max = 0.0;
   double cemc_acceptance_eta_max = 0.0;
+  double pre_cemc_interaction_radius = 0.0;
   double min_cluster_energy = 0.0;
   double dominant_fraction_min = 0.0;
   double anchor_pi0_fraction_min = 0.0;
@@ -118,6 +119,7 @@ struct PartialMetadata {
   unsigned long long energy_match_invalid = 0;
   unsigned long long separated_count = 0;
   unsigned long long merged_count = 0;
+  unsigned long long single_contaminated_count = 0;
   unsigned long long missing_count = 0;
   unsigned long long missing_energy_threshold_count = 0;
   unsigned long long missing_acceptance_count = 0;
@@ -176,6 +178,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "anchor_cluster_eta_max", &value.anchor_cluster_eta_max);
   ok &= bind(tree, "partner_cluster_eta_max", &value.partner_cluster_eta_max);
   ok &= bind(tree, "cemc_acceptance_eta_max", &value.cemc_acceptance_eta_max);
+  ok &= bind(tree, "pre_cemc_interaction_radius", &value.pre_cemc_interaction_radius);
   ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
   ok &= bind(tree, "dominant_fraction_min", &value.dominant_fraction_min);
   ok &= bind(tree, "anchor_pi0_fraction_min", &value.anchor_pi0_fraction_min);
@@ -205,6 +208,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
   ok &= bind(tree, "energy_match_invalid_count", &value.energy_match_invalid);
   ok &= bind(tree, "separated_count", &value.separated_count);
   ok &= bind(tree, "merged_count", &value.merged_count);
+  ok &= bind(tree, "single_contaminated_count", &value.single_contaminated_count);
   ok &= bind(tree, "missing_count", &value.missing_count);
   ok &= bind(tree, "missing_energy_threshold_count", &value.missing_energy_threshold_count);
   ok &= bind(tree, "missing_acceptance_count", &value.missing_acceptance_count);
@@ -236,7 +240,7 @@ bool read_metadata(const std::string& path, PartialMetadata& value) {
 }
 
 bool valid_metadata(const PartialMetadata& value) {
-  return value.schema_version == 6 &&
+  return value.schema_version == 7 &&
       !value.manifest_path.empty() &&
       value.manifest_begin >= 0 &&
       value.manifest_end > value.manifest_begin &&
@@ -245,8 +249,8 @@ bool valid_metadata(const PartialMetadata& value) {
       value.classification_unit == "every_cluster_with_selected_pi0_as_grouped_main_contributor" &&
       value.pi0_selection == "signal_g4_primary_pi0_or_generator_pi0_with_exactly_two_g4_photons" &&
       value.partner_selection == "same_energy_cut_as_anchor_partner_eta_cut_configurable" &&
-      value.topology_definition == "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters" &&
-      value.topology_priority == "ambiguous_main_to_other_then_merged_then_separated_then_missing_then_other" &&
+      value.topology_definition == "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters_with_single_contaminated_pre_cemc_split" &&
+      value.topology_priority == "ambiguous_main_to_other_then_single_contaminated_then_merged_then_separated_then_missing_then_other" &&
       value.missing_category_priority == "acceptance_then_energy_threshold_then_other" &&
       value.response_policy == "not_used_for_classification" &&
       value.photon_recovery_policy == "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
@@ -256,6 +260,7 @@ bool valid_metadata(const PartialMetadata& value) {
       value.anchor_cluster_eta_max > 0.0 &&
       std::isfinite(value.partner_cluster_eta_max) &&
       std::isfinite(value.cemc_acceptance_eta_max) && value.cemc_acceptance_eta_max > 0.0 &&
+      std::isfinite(value.pre_cemc_interaction_radius) && value.pre_cemc_interaction_radius > 0.0 &&
       value.min_cluster_energy >= 0.0 &&
       value.dominant_fraction_min >= 0.0 &&
       value.dominant_fraction_min <= 1.0 &&
@@ -277,7 +282,7 @@ bool valid_metadata(const PartialMetadata& value) {
           value.events_vertex_rejected == value.events_processed &&
       value.cluster_invalid_truth <= value.cluster_considered &&
       value.anchor_count == value.anchor_g4 + value.anchor_generator &&
-      value.anchor_count == value.separated_count + value.merged_count + value.missing_count + value.other_count &&
+      value.anchor_count == value.separated_count + value.merged_count + value.single_contaminated_count + value.missing_count + value.other_count &&
       value.missing_count == value.missing_energy_threshold_count + value.missing_acceptance_count + value.missing_other_count &&
       (value.enable_missing_diagnostics || value.missing_energy_threshold_count == 0) &&
       value.ambiguous_main <= value.other_count;
@@ -306,6 +311,7 @@ bool compatible(const PartialMetadata& value, const PartialMetadata& reference) 
       same_double(value.anchor_cluster_eta_max, reference.anchor_cluster_eta_max) &&
       same_double(value.partner_cluster_eta_max, reference.partner_cluster_eta_max) &&
       same_double(value.cemc_acceptance_eta_max, reference.cemc_acceptance_eta_max) &&
+      same_double(value.pre_cemc_interaction_radius, reference.pre_cemc_interaction_radius) &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&
       same_double(value.dominant_fraction_min, reference.dominant_fraction_min) &&
       same_double(value.anchor_pi0_fraction_min, reference.anchor_pi0_fraction_min) &&
@@ -419,6 +425,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
       "h_prompt_cluster_et_raw", "h_pi0_anchor_cluster_et_raw",
       "h_pi0_anchor_separated_cluster_et_raw",
       "h_pi0_anchor_merged_cluster_et_raw",
+      "h_pi0_anchor_single_contaminated_cluster_et_raw",
       "h_pi0_anchor_missing_cluster_et_raw",
       "h_pi0_anchor_missing_energy_threshold_cluster_et_raw",
       "h_pi0_anchor_missing_acceptance_cluster_et_raw",
@@ -429,6 +436,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
       "h_pi0_anchor_cluster_et_density",
       "h_pi0_anchor_separated_cluster_et_density",
       "h_pi0_anchor_merged_cluster_et_density",
+      "h_pi0_anchor_single_contaminated_cluster_et_density",
       "h_pi0_anchor_missing_cluster_et_density",
       "h_pi0_anchor_missing_energy_threshold_cluster_et_density",
       "h_pi0_anchor_missing_acceptance_cluster_et_density",
@@ -449,7 +457,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   total.malformed_daughters = total.anchor_count = 0;
   total.anchor_g4 = total.anchor_generator = total.ambiguous_main = 0;
   total.energy_match_invalid = 0;
-  total.separated_count = total.merged_count = 0;
+  total.separated_count = total.merged_count = total.single_contaminated_count = 0;
   total.missing_count = total.missing_energy_threshold_count = 0;
   total.missing_acceptance_count = total.missing_other_count = total.other_count = 0;
 
@@ -457,7 +465,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     TFile input(partial.path.c_str(), "READ");
     const std::array<unsigned long long, kHistogramCount> counts = {
         partial.prompt_count, partial.anchor_count,
-        partial.separated_count, partial.merged_count,
+        partial.separated_count, partial.merged_count, partial.single_contaminated_count,
         partial.missing_count, partial.missing_energy_threshold_count,
         partial.missing_acceptance_count, partial.missing_other_count, partial.other_count};
     std::array<TH1D*, kHistogramCount> partial_histograms{};
@@ -474,11 +482,11 @@ int FinalizePythiaPi0AnchorClusterSpectra(
       }
     }
     for (int bin = 0; bin <= partial.n_bins + 1; ++bin) {
-      const double missing_categories = partial_histograms[5]->GetBinContent(bin) +
-          partial_histograms[6]->GetBinContent(bin) + partial_histograms[7]->GetBinContent(bin);
-      const double categories = partial_histograms[2]->GetBinContent(bin) +
-          partial_histograms[3]->GetBinContent(bin) + missing_categories + partial_histograms[8]->GetBinContent(bin);
-      if (std::abs(partial_histograms[4]->GetBinContent(bin) - missing_categories) > 1e-9 ||
+      const double missing_categories = partial_histograms[6]->GetBinContent(bin) +
+          partial_histograms[7]->GetBinContent(bin) + partial_histograms[8]->GetBinContent(bin);
+      const double categories = partial_histograms[2]->GetBinContent(bin) + partial_histograms[3]->GetBinContent(bin) +
+          partial_histograms[4]->GetBinContent(bin) + missing_categories + partial_histograms[9]->GetBinContent(bin);
+      if (std::abs(partial_histograms[5]->GetBinContent(bin) - missing_categories) > 1e-9 ||
           std::abs(partial_histograms[1]->GetBinContent(bin) - categories) > 1e-9) {
         return 5;
       }
@@ -501,6 +509,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     total.energy_match_invalid += partial.energy_match_invalid;
     total.separated_count += partial.separated_count;
     total.merged_count += partial.merged_count;
+    total.single_contaminated_count += partial.single_contaminated_count;
     total.missing_count += partial.missing_count;
     total.missing_energy_threshold_count += partial.missing_energy_threshold_count;
     total.missing_acceptance_count += partial.missing_acceptance_count;
@@ -509,11 +518,11 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   }
 
   for (int bin = 0; bin <= reference.n_bins + 1; ++bin) {
-    const double missing_categories = raw[5]->GetBinContent(bin) +
-        raw[6]->GetBinContent(bin) + raw[7]->GetBinContent(bin);
-    const double categories = raw[2]->GetBinContent(bin) +
-        raw[3]->GetBinContent(bin) + missing_categories + raw[8]->GetBinContent(bin);
-    if (std::abs(raw[4]->GetBinContent(bin) - missing_categories) > 1e-9 ||
+    const double missing_categories = raw[6]->GetBinContent(bin) +
+        raw[7]->GetBinContent(bin) + raw[8]->GetBinContent(bin);
+    const double categories = raw[2]->GetBinContent(bin) + raw[3]->GetBinContent(bin) +
+        raw[4]->GetBinContent(bin) + missing_categories + raw[9]->GetBinContent(bin);
+    if (std::abs(raw[5]->GetBinContent(bin) - missing_categories) > 1e-9 ||
         std::abs(raw[1]->GetBinContent(bin) - categories) > 1e-9) {
       return 5;
     }
@@ -521,8 +530,8 @@ int FinalizePythiaPi0AnchorClusterSpectra(
 
   std::array<std::unique_ptr<TH1D>, kHistogramCount> density;
   const std::array<int, kHistogramCount> colors = {
-      kRed + 1, kBlue + 1, kAzure + 7, kMagenta + 1, kGreen + 2,
-      kOrange + 7, kViolet + 1, kGreen + 3, kGray + 2};
+      kRed + 1, kBlue + 1, kAzure + 7, kMagenta + 1, kCyan + 2,
+      kGreen + 2, kOrange + 7, kViolet + 1, kGreen + 3, kGray + 2};
   for (std::size_t index = 0; index < raw.size(); ++index) {
     density[index].reset(static_cast<TH1D*>(raw[index]->Clone(density_names[index].c_str())));
     density[index]->SetDirectory(nullptr);
@@ -545,6 +554,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   const std::array<std::string, kCategoryCount> fraction_names = {
       "h_pi0_anchor_separated_fraction",
       "h_pi0_anchor_merged_fraction",
+      "h_pi0_anchor_single_contaminated_fraction",
       "h_pi0_anchor_missing_energy_threshold_fraction",
       "h_pi0_anchor_missing_acceptance_fraction",
       "h_pi0_anchor_missing_other_fraction",
@@ -605,11 +615,12 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   spectrum_legend.AddEntry(raw[1].get(), "#pi^{0}-main anchor", "l");
   spectrum_legend.AddEntry(raw[2].get(), "Separated", "l");
   spectrum_legend.AddEntry(raw[3].get(), "Merged", "l");
-  spectrum_legend.AddEntry(raw[4].get(), "Missing (total)", "l");
-  spectrum_legend.AddEntry(raw[5].get(), "Missing: energy threshold", "l");
-  spectrum_legend.AddEntry(raw[6].get(), "Missing: acceptance", "l");
-  spectrum_legend.AddEntry(raw[7].get(), "Missing: other", "l");
-  spectrum_legend.AddEntry(raw[8].get(), "Other", "l");
+  spectrum_legend.AddEntry(raw[4].get(), "Single contaminated", "l");
+  spectrum_legend.AddEntry(raw[5].get(), "Missing (total)", "l");
+  spectrum_legend.AddEntry(raw[6].get(), "Missing: energy threshold", "l");
+  spectrum_legend.AddEntry(raw[7].get(), "Missing: acceptance", "l");
+  spectrum_legend.AddEntry(raw[8].get(), "Missing: other", "l");
+  spectrum_legend.AddEntry(raw[9].get(), "Other", "l");
   spectrum_legend.Draw();
 
   TLatex spectrum_label;
@@ -652,10 +663,11 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_legend.SetTextSize(kTextSize);
   fraction_legend.AddEntry(fractions[0].get(), "Separated", "lep");
   fraction_legend.AddEntry(fractions[1].get(), "Merged", "lep");
-  fraction_legend.AddEntry(fractions[2].get(), "Missing: energy threshold", "lep");
-  fraction_legend.AddEntry(fractions[3].get(), "Missing: acceptance", "lep");
-  fraction_legend.AddEntry(fractions[4].get(), "Missing: other", "lep");
-  fraction_legend.AddEntry(fractions[5].get(), "Other", "lep");
+  fraction_legend.AddEntry(fractions[2].get(), "Single contaminated", "lep");
+  fraction_legend.AddEntry(fractions[3].get(), "Missing: energy threshold", "lep");
+  fraction_legend.AddEntry(fractions[4].get(), "Missing: acceptance", "lep");
+  fraction_legend.AddEntry(fractions[5].get(), "Missing: other", "lep");
+  fraction_legend.AddEntry(fractions[6].get(), "Other", "lep");
   fraction_legend.Draw();
   TLatex fraction_label;
   fraction_label.SetNDC();
@@ -694,10 +706,11 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   fraction_stack_legend.SetTextSize(kTextSize);
   fraction_stack_legend.AddEntry(stacked_fractions[0].get(), "Separated", "f");
   fraction_stack_legend.AddEntry(stacked_fractions[1].get(), "Merged", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[2].get(), "Missing: energy threshold", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[3].get(), "Missing: acceptance", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[4].get(), "Missing: other", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[5].get(), "Other", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[2].get(), "Single contaminated", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[3].get(), "Missing: energy threshold", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[4].get(), "Missing: acceptance", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[5].get(), "Missing: other", "f");
+  fraction_stack_legend.AddEntry(stacked_fractions[6].get(), "Other", "f");
   fraction_stack_legend.Draw();
 
   TLatex fraction_stack_label;
@@ -728,7 +741,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     histogram->Write();
   }
 
-  int output_schema_version = 6;
+  int output_schema_version = 7;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -760,6 +773,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("anchor_cluster_eta_max", &total.anchor_cluster_eta_max);
   metadata.Branch("partner_cluster_eta_max", &total.partner_cluster_eta_max);
   metadata.Branch("cemc_acceptance_eta_max", &total.cemc_acceptance_eta_max);
+  metadata.Branch("pre_cemc_interaction_radius", &total.pre_cemc_interaction_radius);
   metadata.Branch("min_cluster_energy", &total.min_cluster_energy);
   metadata.Branch("dominant_fraction_min", &total.dominant_fraction_min);
   metadata.Branch("anchor_pi0_fraction_min", &total.anchor_pi0_fraction_min);
@@ -791,6 +805,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("energy_match_invalid_count", &total.energy_match_invalid);
   metadata.Branch("separated_count", &total.separated_count);
   metadata.Branch("merged_count", &total.merged_count);
+  metadata.Branch("single_contaminated_count", &total.single_contaminated_count);
   metadata.Branch("missing_count", &total.missing_count);
   metadata.Branch("missing_energy_threshold_count", &total.missing_energy_threshold_count);
   metadata.Branch("missing_acceptance_count", &total.missing_acceptance_count);
@@ -806,11 +821,11 @@ int FinalizePythiaPi0AnchorClusterSpectra(
 
   std::cout
       << "FinalizePythiaPi0AnchorClusterSpectra - partials/files/events"
-      << "/vertex-rejected/anchor/separated/merged/missing(energy/acceptance/other)/other = "
+      << "/vertex-rejected/anchor/separated/merged/single-contaminated/missing(energy/acceptance/other)/other = "
       << partial_file_count << "/" << input_file_count << "/"
       << total.events_processed << "/" << total.events_vertex_rejected << "/"
       << total.anchor_count << "/"
-      << total.separated_count << "/" << total.merged_count << "/"
+      << total.separated_count << "/" << total.merged_count << "/" << total.single_contaminated_count << "/"
       << total.missing_count << "(" << total.missing_energy_threshold_count << "/"
       << total.missing_acceptance_count << "/" << total.missing_other_count << ")/"
       << total.other_count << std::endl;

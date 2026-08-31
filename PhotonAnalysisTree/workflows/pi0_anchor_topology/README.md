@@ -151,7 +151,7 @@ MAX_ABS_VERTEX_Z; their defaults are 1.1, 0.5, 0.15, true, and 90.0 cm.
 
 Finalize a complete production with:
 
-    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000,"Pythia8 p+p MB")'
+    root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/intermediate_files/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000,"Pythia8 p+p MB")'
 
 The finalizer writes the combined raw and bin-width-normalized spectra, the
 aggregate missing spectrum, and detailed and summary category fractions relative

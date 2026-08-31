@@ -381,8 +381,8 @@ double smallest_positive(const std::array<std::unique_ptr<TH1D>, kHistogramCount
 }
 
 int FinalizePythiaPi0AnchorClusterSpectra(
-    const std::string partial_pattern = "output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p2_clusterenergy/partial_*.root",
-    const std::string output_base = "output/plots/pi0_anchor_topology/minimum_bias/with_vertex_cut60",
+    const std::string partial_pattern = "output/intermediate_files/pi0_anchor_topology_partial/minimum_bias/eta07_zvtx60_full_partner_fgamma0p0_recovery0p2_clusterenergy_scheme8/partial_*.root",
+    const std::string output_base = "output/plots/pi0_anchor_topology/minimum_bias/with_vertex_cut60_scheme8",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1,
     const std::string sample_label = "Pythia8 p+p MB")

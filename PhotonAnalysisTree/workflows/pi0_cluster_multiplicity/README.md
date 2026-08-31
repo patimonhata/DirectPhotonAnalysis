@@ -71,7 +71,7 @@ Reduce the complete pilot range with:
 
 ```bash
 root -l -b -q \
-  'workflows/pi0_cluster_multiplicity/FinalizePythiaPi0ClusterMultiplicity.C("output/pi0_cluster_multiplicity_partial/pilot_primary_generator_truth_eta07_no_cluster_eta_or_energy_cut/partial_*.root","output/plots/pi0_cluster_multiplicity_primary_generator_truth_eta07_no_cluster_eta_or_energy_cut",0,100)'
+  'workflows/pi0_cluster_multiplicity/FinalizePythiaPi0ClusterMultiplicity.C("output/intermediate_files/pi0_cluster_multiplicity_partial/pilot_primary_generator_truth_eta07_no_cluster_eta_or_energy_cut/partial_*.root","output/plots/pi0_cluster_multiplicity_primary_generator_truth_eta07_no_cluster_eta_or_energy_cut",0,100)'
 ```
 
 For full production, change `total_files`, `files_per_job`, `n_chunks`, and the

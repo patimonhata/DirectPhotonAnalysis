@@ -239,7 +239,7 @@ partialの範囲・解析条件を検証して統合し、最後にbin幅で規�
 `expected_manifest_end`を指定するため、partialの欠落も検出します。
 
 ```bash
-root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
+root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/intermediate_files/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
 粒子選択、partial schema、再開方法は

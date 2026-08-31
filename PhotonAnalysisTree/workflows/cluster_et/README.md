@@ -91,7 +91,7 @@ complete contiguous range with:
 
 ```bash
 root -l -b -q \
-  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/cluster_et_partial/prompt_primary_generator_pi0_cluster_eta07_energy_contribution_0p3/partial_*.root","output/plots/cluster_et_prompt_primary_generator_pi0_cluster_eta07",0,200000)'
+  'workflows/cluster_et/FinalizePythiaClusterEtSpectra.C("output/intermediate_files/cluster_et_partial/prompt_primary_generator_pi0_cluster_eta07_energy_contribution_0p3/partial_*.root","output/plots/cluster_et_prompt_primary_generator_pi0_cluster_eta07",0,200000)'
 ```
 
 

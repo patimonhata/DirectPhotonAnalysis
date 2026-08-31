@@ -79,7 +79,7 @@ condor_submit -maxjobs 4000 workflows/truth_pt/submit.job
 Reduce the complete contiguous range with:
 
 ```bash
-root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
+root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/intermediate_files/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
 ## Reduce and plot step

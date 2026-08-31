@@ -142,7 +142,7 @@ file/job counts, and parameters before submitting manually:
 
 No repository script submits jobs automatically. Each job writes
 transactionally and validates its partial before publication. This change uses
-partial schema 7; do not mix it with earlier partial schemas. Point the next
+partial schema 8; do not mix it with earlier partial schemas. Point the next
 production at a new, empty output directory. run_partial.sh
 accepts optional CEMC_ACCEPTANCE_ETA_MAX,
 MIN_DIRECT_MATCH_CLUSTER_ENERGY_COVERAGE, MISSING_DIAGNOSTIC_MAX_DELTA_R, and
@@ -154,8 +154,23 @@ Finalize a complete production with:
     root -l -b -q 'workflows/pi0_anchor_topology/FinalizePythiaPi0AnchorClusterSpectra.C("output/pi0_anchor_topology_partial/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy/partial_*.root","output/plots/pi0_anchor_topology/minimum_bias/eta07_zvtx60_full_partner_fgamma0p0_recovery0p5_clusterenergy",0,200000,"Pythia8 p+p MB")'
 
 The finalizer writes the combined raw and bin-width-normalized spectra, the
-aggregate missing spectrum, and seven exclusive category fractions relative to
-the anchor spectrum, output_base.pdf, and
-output_base_category_fractions.pdf. It also writes the stacked category-fraction
-plot output_base_category_fraction_stack.pdf. Plot annotations and legends are
-placed outside the histogram frame.
+aggregate missing spectrum, and detailed and summary category fractions relative
+to the anchor spectrum. It produces two spectrum PDFs:
+
+- `output_base.pdf`: summary spectrum with the prompt-photon reference, all
+  anchors, and the five exclusive topology categories;
+- `output_base_detailed.pdf`: detailed spectrum retaining the total missing
+  spectrum and its seven exclusive subcategories.
+
+The summary category plots use five exclusive categories:
+separated, merged, single contaminated, missing, and other. The detailed plots
+retain the seven exclusive missing subcategories. Four category PDFs are
+produced:
+
+- `output_base_category_fractions.pdf`: summary line plot;
+- `output_base_category_fraction_stack.pdf`: summary stacked plot;
+- `output_base_category_fractions_detailed.pdf`: detailed line plot;
+- `output_base_category_fraction_stack_detailed.pdf`: detailed stacked plot.
+
+The final ROOT schema is 9 and stores both detailed and summary fraction
+histograms. Plot annotations and legends are placed outside the histogram frame.

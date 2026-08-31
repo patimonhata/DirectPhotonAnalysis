@@ -28,6 +28,10 @@ namespace
 constexpr std::size_t kHistogramCount = 14;
 constexpr std::size_t kCategoryCount = 11;
 constexpr std::array<std::size_t, kCategoryCount> kCategoryHistogramIndices = {2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13};
+constexpr std::size_t kSummaryCategoryCount = 5;
+constexpr std::array<std::size_t, kSummaryCategoryCount> kSummaryCategoryHistogramIndices = {2, 3, 4, 5, 13};
+constexpr std::size_t kSummarySpectrumCount = 7;
+constexpr std::array<std::size_t, kSummarySpectrumCount> kSummarySpectrumHistogramIndices = {0, 1, 2, 3, 4, 5, 13};
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
 constexpr double kPlotAreaTop = 0.62;
@@ -555,7 +559,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   std::array<std::unique_ptr<TH1D>, kHistogramCount> density;
   const std::array<int, kHistogramCount> colors = {
       kRed + 1, kBlue + 1, kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2,
-      kOrange + 7, kPink + 7, kViolet + 1, kGreen + 2, kSpring + 5, kTeal + 3, kGreen + 3, kGray + 2};
+      kOrange + 7, kPink + 7, kViolet + 1, kYellow + 2, kSpring + 5, kBlue + 3, kGreen + 3, kGray + 2};
   for (std::size_t index = 0; index < raw.size(); ++index) {
     density[index].reset(static_cast<TH1D*>(raw[index]->Clone(density_names[index].c_str())));
     density[index]->SetDirectory(nullptr);
@@ -575,7 +579,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     style_plot_axes(raw[index]->GetXaxis(), raw[index]->GetYaxis());
   }
 
-  const std::array<std::string, kCategoryCount> fraction_names = {
+  const std::array<std::string, kCategoryCount> detailed_fraction_names = {
       "h_pi0_anchor_separated_fraction",
       "h_pi0_anchor_merged_fraction",
       "h_pi0_anchor_single_contaminated_fraction",
@@ -587,32 +591,66 @@ int FinalizePythiaPi0AnchorClusterSpectra(
       "h_pi0_anchor_missing_match_incomplete_fraction",
       "h_pi0_anchor_missing_other_fraction",
       "h_pi0_anchor_other_fraction"};
-  std::array<std::unique_ptr<TH1D>, kCategoryCount> fractions;
-  for (std::size_t index = 0; index < fractions.size(); ++index) {
+  std::array<std::unique_ptr<TH1D>, kCategoryCount> detailed_fractions;
+  for (std::size_t index = 0; index < detailed_fractions.size(); ++index) {
     const std::size_t histogram_index = kCategoryHistogramIndices[index];
-    fractions[index].reset(static_cast<TH1D*>(raw[histogram_index]->Clone(fraction_names[index].c_str())));
-    fractions[index]->SetDirectory(nullptr);
-    fractions[index]->Divide(raw[histogram_index].get(), raw[1].get(), 1.0, 1.0, "B");
-    fractions[index]->SetStats(false);
-    fractions[index]->SetLineColor(colors[histogram_index]);
-    fractions[index]->SetMarkerColor(colors[histogram_index]);
-    fractions[index]->SetMarkerStyle(20 + static_cast<int>(index));
-    fractions[index]->SetMarkerSize(0.9);
-    fractions[index]->SetLineWidth(2);
-    fractions[index]->GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
-    fractions[index]->GetYaxis()->SetTitle("Fraction");
-    style_plot_axes(fractions[index]->GetXaxis(), fractions[index]->GetYaxis());
+    detailed_fractions[index].reset(static_cast<TH1D*>(raw[histogram_index]->Clone(detailed_fraction_names[index].c_str())));
+    detailed_fractions[index]->SetDirectory(nullptr);
+    detailed_fractions[index]->Divide(raw[histogram_index].get(), raw[1].get(), 1.0, 1.0, "B");
+    detailed_fractions[index]->SetStats(false);
+    detailed_fractions[index]->SetLineColor(colors[histogram_index]);
+    detailed_fractions[index]->SetMarkerColor(colors[histogram_index]);
+    detailed_fractions[index]->SetMarkerStyle(20 + static_cast<int>(index));
+    detailed_fractions[index]->SetMarkerSize(0.9);
+    detailed_fractions[index]->SetLineWidth(2);
+    detailed_fractions[index]->GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
+    detailed_fractions[index]->GetYaxis()->SetTitle("Fraction");
+    style_plot_axes(detailed_fractions[index]->GetXaxis(), detailed_fractions[index]->GetYaxis());
   }
 
-  std::array<std::unique_ptr<TH1D>, kCategoryCount> stacked_fractions;
-  for (std::size_t index = 0; index < stacked_fractions.size(); ++index) {
-    stacked_fractions[index].reset(static_cast<TH1D*>(fractions[index]->Clone(
-        (fraction_names[index] + "_stack_component").c_str())));
-    stacked_fractions[index]->SetDirectory(nullptr);
-    stacked_fractions[index]->SetFillColor(colors[kCategoryHistogramIndices[index]]);
-    stacked_fractions[index]->SetLineColor(kBlack);
-    stacked_fractions[index]->SetLineWidth(1);
-    stacked_fractions[index]->SetMarkerStyle(0);
+  std::array<std::unique_ptr<TH1D>, kCategoryCount> detailed_stacked_fractions;
+  for (std::size_t index = 0; index < detailed_stacked_fractions.size(); ++index) {
+    detailed_stacked_fractions[index].reset(static_cast<TH1D*>(detailed_fractions[index]->Clone(
+        (detailed_fraction_names[index] + "_stack_component").c_str())));
+    detailed_stacked_fractions[index]->SetDirectory(nullptr);
+    detailed_stacked_fractions[index]->SetFillColor(colors[kCategoryHistogramIndices[index]]);
+    detailed_stacked_fractions[index]->SetLineColor(kBlack);
+    detailed_stacked_fractions[index]->SetLineWidth(1);
+    detailed_stacked_fractions[index]->SetMarkerStyle(0);
+  }
+
+  const std::array<std::string, kSummaryCategoryCount> summary_fraction_names = {
+      "h_pi0_anchor_summary_separated_fraction",
+      "h_pi0_anchor_summary_merged_fraction",
+      "h_pi0_anchor_summary_single_contaminated_fraction",
+      "h_pi0_anchor_summary_missing_fraction",
+      "h_pi0_anchor_summary_other_fraction"};
+  std::array<std::unique_ptr<TH1D>, kSummaryCategoryCount> summary_fractions;
+  for (std::size_t index = 0; index < summary_fractions.size(); ++index) {
+    const std::size_t histogram_index = kSummaryCategoryHistogramIndices[index];
+    summary_fractions[index].reset(static_cast<TH1D*>(raw[histogram_index]->Clone(summary_fraction_names[index].c_str())));
+    summary_fractions[index]->SetDirectory(nullptr);
+    summary_fractions[index]->Divide(raw[histogram_index].get(), raw[1].get(), 1.0, 1.0, "B");
+    summary_fractions[index]->SetStats(false);
+    summary_fractions[index]->SetLineColor(colors[histogram_index]);
+    summary_fractions[index]->SetMarkerColor(colors[histogram_index]);
+    summary_fractions[index]->SetMarkerStyle(20 + static_cast<int>(index));
+    summary_fractions[index]->SetMarkerSize(0.9);
+    summary_fractions[index]->SetLineWidth(2);
+    summary_fractions[index]->GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
+    summary_fractions[index]->GetYaxis()->SetTitle("Fraction");
+    style_plot_axes(summary_fractions[index]->GetXaxis(), summary_fractions[index]->GetYaxis());
+  }
+
+  std::array<std::unique_ptr<TH1D>, kSummaryCategoryCount> summary_stacked_fractions;
+  for (std::size_t index = 0; index < summary_stacked_fractions.size(); ++index) {
+    summary_stacked_fractions[index].reset(static_cast<TH1D*>(summary_fractions[index]->Clone(
+        (summary_fraction_names[index] + "_stack_component").c_str())));
+    summary_stacked_fractions[index]->SetDirectory(nullptr);
+    summary_stacked_fractions[index]->SetFillColor(colors[kSummaryCategoryHistogramIndices[index]]);
+    summary_stacked_fractions[index]->SetLineColor(kBlack);
+    summary_stacked_fractions[index]->SetLineWidth(1);
+    summary_stacked_fractions[index]->SetMarkerStyle(0);
   }
 
   if (!make_output_directory(output_base)) {
@@ -635,11 +673,10 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     raw[index]->Draw("HIST SAME");
   }
   spectrum_canvas.cd();
-  TLegend spectrum_legend(kLegendX, 0.51, 0.94, 0.95);
+  TLegend spectrum_legend(0.50, 0.62, 0.95, 0.97);
   spectrum_legend.SetBorderSize(0);
   spectrum_legend.SetFillStyle(0);
-  spectrum_legend.SetTextSize(kTextSize);
-  spectrum_legend.SetNColumns(2);
+  spectrum_legend.SetTextSize(0.016);
   spectrum_legend.AddEntry(raw[0].get(), "Prompt-#gamma cluster", "l");
   spectrum_legend.AddEntry(raw[1].get(), "#pi^{0}-main anchor", "l");
   spectrum_legend.AddEntry(raw[2].get(), "Separated", "l");
@@ -678,99 +715,180 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   spectrum_plot_pad->cd();
   spectrum_plot_pad->RedrawAxis();
   spectrum_canvas.cd();
-  spectrum_canvas.SaveAs((output_base + ".pdf").c_str());
+  spectrum_canvas.SaveAs((output_base + "_detailed.pdf").c_str());
 
-  TCanvas fraction_canvas("c_pythia_pi0_anchor_category_fractions", "Pythia pi0 anchor category fractions", kCanvasWidth, kCanvasHeight);
-  fraction_canvas.SetCanvasSize(kCanvasWidth, kCanvasHeight);
-  auto fraction_plot_pad = make_plot_pad("pythia_pi0_anchor_category_fractions_plot");
-  fractions[0]->SetMinimum(0.0);
-  fractions[0]->SetMaximum(1.05);
-  fractions[0]->Draw("E1");
-  for (std::size_t index = 1; index < fractions.size(); ++index)  {
-    fractions[index]->Draw("E1 SAME");
+  double summary_spectrum_maximum = 0.0;
+  double summary_spectrum_minimum = std::numeric_limits<double>::infinity();
+  for (const std::size_t histogram_index : kSummarySpectrumHistogramIndices) {
+    summary_spectrum_maximum = std::max(summary_spectrum_maximum, raw[histogram_index]->GetMaximum());
+    for (int bin = 1; bin <= raw[histogram_index]->GetNbinsX(); ++bin) {
+      const double value = raw[histogram_index]->GetBinContent(bin);
+      if (value > 0.0) summary_spectrum_minimum = std::min(summary_spectrum_minimum, value);
+    }
   }
-  fraction_canvas.cd();
-  TLegend fraction_legend(kLegendX, 0.61, 0.94, 0.95);
-  fraction_legend.SetBorderSize(0);
-  fraction_legend.SetFillStyle(0);
-  fraction_legend.SetTextSize(kTextSize);
-  fraction_legend.SetNColumns(2);
-  fraction_legend.AddEntry(fractions[0].get(), "Separated", "lep");
-  fraction_legend.AddEntry(fractions[1].get(), "Merged", "lep");
-  fraction_legend.AddEntry(fractions[2].get(), "Single contaminated", "lep");
-  fraction_legend.AddEntry(fractions[3].get(), "Missing: energy threshold", "lep");
-  fraction_legend.AddEntry(fractions[4].get(), "Missing: displaced partner cluster", "lep");
-  fraction_legend.AddEntry(fractions[5].get(), "Missing: acceptance", "lep");
-  fraction_legend.AddEntry(fractions[6].get(), "Missing: no CEMC deposit", "lep");
-  fraction_legend.AddEntry(fractions[7].get(), "Missing: unclustered deposit", "lep");
-  fraction_legend.AddEntry(fractions[8].get(), "Missing: match incomplete", "lep");
-  fraction_legend.AddEntry(fractions[9].get(), "Missing: other", "lep");
-  fraction_legend.AddEntry(fractions[10].get(), "Other", "lep");
-  fraction_legend.Draw();
-  TLatex fraction_label;
-  fraction_label.SetNDC();
-  fraction_label.SetTextAlign(13);
-  fraction_label.SetTextSize(kTextSize);
-  fraction_label.DrawLatex(kAnnotationX, 0.96, "#it{#bf{sPHENIX}} Internal");
-  fraction_label.DrawLatex(kAnnotationX, 0.91, sample_label.c_str());
-  fraction_label.DrawLatex(kAnnotationX, 0.86, "Denominator: all #pi^{0}-main anchors");
-  fraction_label.DrawLatex(kAnnotationX, 0.81, anchor_label.str().c_str());
-  fraction_label.DrawLatex(kAnnotationX, 0.76, min_cluster_energy_label.str().c_str());
-  fraction_label.DrawLatex(kAnnotationX, 0.71, recovery_label.str().c_str());
-  fraction_label.DrawLatex(kAnnotationX, 0.66, vertex_label.str().c_str());
-  fraction_plot_pad->cd();
-  fraction_plot_pad->RedrawAxis();
-  fraction_canvas.cd();
-  fraction_canvas.SaveAs((output_base + "_category_fractions.pdf").c_str());
+  if (!std::isfinite(summary_spectrum_minimum)) summary_spectrum_minimum = 0.0;
 
-  TCanvas fraction_stack_canvas("c_pythia_pi0_anchor_category_fraction_stack", "Pythia pi0 anchor category fraction stack", kCanvasWidth, kCanvasHeight);
-  fraction_stack_canvas.SetCanvasSize(kCanvasWidth, kCanvasHeight);
-  auto fraction_stack_plot_pad = make_plot_pad("pythia_pi0_anchor_category_fraction_stack_plot");
-  THStack fraction_stack("stack_pythia_pi0_anchor_category_fractions", "");
-  for (auto& histogram : stacked_fractions) {
-    fraction_stack.Add(histogram.get());
-  }
-  fraction_stack.SetMinimum(0.0);
-  fraction_stack.SetMaximum(1.05);
-  fraction_stack.Draw("HIST");
-  fraction_stack.GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
-  fraction_stack.GetYaxis()->SetTitle("Fraction");
-  style_plot_axes(fraction_stack.GetXaxis(), fraction_stack.GetYaxis());
+  TCanvas summary_spectrum_canvas("c_pythia_pi0_anchor_cluster_et_summary", "Summary Pythia pi0 anchor cluster spectra", kCanvasWidth, kCanvasHeight);
+  summary_spectrum_canvas.SetCanvasSize(kCanvasWidth, kCanvasHeight);
+  auto summary_spectrum_plot_pad = make_plot_pad("pythia_pi0_anchor_cluster_et_summary_plot", true);
+  raw[0]->SetMinimum(summary_spectrum_minimum > 0.0 ? 0.5 * summary_spectrum_minimum : 0.5);
+  raw[0]->SetMaximum(summary_spectrum_maximum > 0.0 ? 2.0 * summary_spectrum_maximum : 1.0);
+  raw[0]->Draw("HIST");
+  for (std::size_t index = 1; index < kSummarySpectrumHistogramIndices.size(); ++index) raw[kSummarySpectrumHistogramIndices[index]]->Draw("HIST SAME");
+  summary_spectrum_canvas.cd();
+  TLegend summary_spectrum_legend(0.55, 0.65, 0.94, 0.95);
+  summary_spectrum_legend.SetBorderSize(0);
+  summary_spectrum_legend.SetFillStyle(0);
+  summary_spectrum_legend.SetTextSize(kTextSize);
+  summary_spectrum_legend.AddEntry(raw[0].get(), "Prompt-#gamma cluster", "l");
+  summary_spectrum_legend.AddEntry(raw[1].get(), "#pi^{0}-main anchor", "l");
+  summary_spectrum_legend.AddEntry(raw[2].get(), "Separated", "l");
+  summary_spectrum_legend.AddEntry(raw[3].get(), "Merged", "l");
+  summary_spectrum_legend.AddEntry(raw[4].get(), "Single contaminated", "l");
+  summary_spectrum_legend.AddEntry(raw[5].get(), "Missing", "l");
+  summary_spectrum_legend.AddEntry(raw[13].get(), "Other", "l");
+  summary_spectrum_legend.Draw();
+  spectrum_label.DrawLatex(kAnnotationX, 0.96, "#it{#bf{sPHENIX}} Internal");
+  spectrum_label.DrawLatex(kAnnotationX, 0.91, sample_label.c_str());
+  spectrum_label.DrawLatex(kAnnotationX, 0.86, "Category unit: #pi^{0}-main anchor cluster");
+  spectrum_label.DrawLatex(kAnnotationX, 0.81, anchor_label.str().c_str());
+  spectrum_label.DrawLatex(kAnnotationX, 0.76, min_cluster_energy_label.str().c_str());
+  spectrum_label.DrawLatex(kAnnotationX, 0.71, recovery_label.str().c_str());
+  spectrum_label.DrawLatex(kAnnotationX, 0.66, vertex_label.str().c_str());
+  summary_spectrum_plot_pad->cd();
+  summary_spectrum_plot_pad->RedrawAxis();
+  summary_spectrum_canvas.cd();
+  summary_spectrum_canvas.SaveAs((output_base + ".pdf").c_str());
 
-  fraction_stack_canvas.cd();
-  TLegend fraction_stack_legend(kLegendX, 0.61, 0.94, 0.95);
-  fraction_stack_legend.SetBorderSize(0);
-  fraction_stack_legend.SetFillStyle(0);
-  fraction_stack_legend.SetTextSize(kTextSize);
-  fraction_stack_legend.SetNColumns(2);
-  fraction_stack_legend.AddEntry(stacked_fractions[0].get(), "Separated", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[1].get(), "Merged", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[2].get(), "Single contaminated", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[3].get(), "Missing: energy threshold", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[4].get(), "Missing: displaced partner cluster", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[5].get(), "Missing: acceptance", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[6].get(), "Missing: no CEMC deposit", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[7].get(), "Missing: unclustered deposit", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[8].get(), "Missing: match incomplete", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[9].get(), "Missing: other", "f");
-  fraction_stack_legend.AddEntry(stacked_fractions[10].get(), "Other", "f");
-  fraction_stack_legend.Draw();
+  const auto draw_category_annotation = [&]() {
+    TLatex label;
+    label.SetNDC();
+    label.SetTextAlign(13);
+    label.SetTextSize(kTextSize);
+    label.DrawLatex(kAnnotationX, 0.96, "#it{#bf{sPHENIX}} Internal");
+    label.DrawLatex(kAnnotationX, 0.91, sample_label.c_str());
+    label.DrawLatex(kAnnotationX, 0.86, "Denominator: all #pi^{0}-main anchors");
+    label.DrawLatex(kAnnotationX, 0.81, anchor_label.str().c_str());
+    label.DrawLatex(kAnnotationX, 0.76, min_cluster_energy_label.str().c_str());
+    label.DrawLatex(kAnnotationX, 0.71, recovery_label.str().c_str());
+    label.DrawLatex(kAnnotationX, 0.66, vertex_label.str().c_str());
+  };
 
-  TLatex fraction_stack_label;
-  fraction_stack_label.SetNDC();
-  fraction_stack_label.SetTextAlign(13);
-  fraction_stack_label.SetTextSize(kTextSize);
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.96, "#it{#bf{sPHENIX}} Internal");
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.91, sample_label.c_str());
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.86, "Denominator: all #pi^{0}-main anchors");
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.81, anchor_label.str().c_str());
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.76, min_cluster_energy_label.str().c_str());
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.71, recovery_label.str().c_str());
-  fraction_stack_label.DrawLatex(kAnnotationX, 0.66, vertex_label.str().c_str());
-  fraction_stack_plot_pad->cd();
-  fraction_stack_plot_pad->RedrawAxis();
-  fraction_stack_canvas.cd();
-  fraction_stack_canvas.SaveAs((output_base + "_category_fraction_stack.pdf").c_str());
+  TCanvas detailed_fraction_canvas("c_pythia_pi0_anchor_detailed_category_fractions", "Detailed Pythia pi0 anchor category fractions", kCanvasWidth, kCanvasHeight);
+  detailed_fraction_canvas.SetCanvasSize(kCanvasWidth, kCanvasHeight);
+  auto detailed_fraction_plot_pad = make_plot_pad("pythia_pi0_anchor_detailed_category_fractions_plot");
+  detailed_fractions[0]->SetMinimum(0.0);
+  detailed_fractions[0]->SetMaximum(1.05);
+  detailed_fractions[0]->Draw("E1");
+  for (std::size_t index = 1; index < detailed_fractions.size(); ++index) detailed_fractions[index]->Draw("E1 SAME");
+  detailed_fraction_canvas.cd();
+  TLegend detailed_fraction_legend(0.50, 0.60, 0.95, 0.97);
+  detailed_fraction_legend.SetBorderSize(0);
+  detailed_fraction_legend.SetFillStyle(0);
+  detailed_fraction_legend.SetTextSize(0.020);
+  detailed_fraction_legend.AddEntry(detailed_fractions[0].get(), "Separated", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[1].get(), "Merged", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[2].get(), "Single contaminated", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[3].get(), "Missing: energy threshold", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[4].get(), "Missing: displaced partner cluster", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[5].get(), "Missing: acceptance", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[6].get(), "Missing: no CEMC deposit", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[7].get(), "Missing: unclustered deposit", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[8].get(), "Missing: match incomplete", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[9].get(), "Missing: other", "lep");
+  detailed_fraction_legend.AddEntry(detailed_fractions[10].get(), "Other", "lep");
+  detailed_fraction_legend.Draw();
+  draw_category_annotation();
+  detailed_fraction_plot_pad->cd();
+  detailed_fraction_plot_pad->RedrawAxis();
+  detailed_fraction_canvas.cd();
+  detailed_fraction_canvas.SaveAs((output_base + "_category_fractions_detailed.pdf").c_str());
+
+  TCanvas summary_fraction_canvas("c_pythia_pi0_anchor_summary_category_fractions", "Summary Pythia pi0 anchor category fractions", kCanvasWidth, kCanvasHeight);
+  summary_fraction_canvas.SetCanvasSize(kCanvasWidth, kCanvasHeight);
+  auto summary_fraction_plot_pad = make_plot_pad("pythia_pi0_anchor_summary_category_fractions_plot");
+  summary_fractions[0]->SetMinimum(0.0);
+  summary_fractions[0]->SetMaximum(1.05);
+  summary_fractions[0]->Draw("E1");
+  for (std::size_t index = 1; index < summary_fractions.size(); ++index) summary_fractions[index]->Draw("E1 SAME");
+  summary_fraction_canvas.cd();
+  TLegend summary_fraction_legend(0.55, 0.72, 0.94, 0.95);
+  summary_fraction_legend.SetBorderSize(0);
+  summary_fraction_legend.SetFillStyle(0);
+  summary_fraction_legend.SetTextSize(kTextSize);
+  summary_fraction_legend.AddEntry(summary_fractions[0].get(), "Separated", "lep");
+  summary_fraction_legend.AddEntry(summary_fractions[1].get(), "Merged", "lep");
+  summary_fraction_legend.AddEntry(summary_fractions[2].get(), "Single contaminated", "lep");
+  summary_fraction_legend.AddEntry(summary_fractions[3].get(), "Missing", "lep");
+  summary_fraction_legend.AddEntry(summary_fractions[4].get(), "Other", "lep");
+  summary_fraction_legend.Draw();
+  draw_category_annotation();
+  summary_fraction_plot_pad->cd();
+  summary_fraction_plot_pad->RedrawAxis();
+  summary_fraction_canvas.cd();
+  summary_fraction_canvas.SaveAs((output_base + "_category_fractions.pdf").c_str());
+
+  TCanvas detailed_fraction_stack_canvas("c_pythia_pi0_anchor_detailed_category_fraction_stack", "Detailed Pythia pi0 anchor category fraction stack", kCanvasWidth, kCanvasHeight);
+  detailed_fraction_stack_canvas.SetCanvasSize(kCanvasWidth, kCanvasHeight);
+  auto detailed_fraction_stack_plot_pad = make_plot_pad("pythia_pi0_anchor_detailed_category_fraction_stack_plot");
+  THStack detailed_fraction_stack("stack_pythia_pi0_anchor_detailed_category_fractions", "");
+  for (auto& histogram : detailed_stacked_fractions) detailed_fraction_stack.Add(histogram.get());
+  detailed_fraction_stack.SetMinimum(0.0);
+  detailed_fraction_stack.SetMaximum(1.05);
+  detailed_fraction_stack.Draw("HIST");
+  detailed_fraction_stack.GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
+  detailed_fraction_stack.GetYaxis()->SetTitle("Fraction");
+  style_plot_axes(detailed_fraction_stack.GetXaxis(), detailed_fraction_stack.GetYaxis());
+  detailed_fraction_stack_canvas.cd();
+  TLegend detailed_fraction_stack_legend(0.50, 0.60, 0.95, 0.97);
+  detailed_fraction_stack_legend.SetBorderSize(0);
+  detailed_fraction_stack_legend.SetFillStyle(0);
+  detailed_fraction_stack_legend.SetTextSize(0.020);
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[0].get(), "Separated", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[1].get(), "Merged", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[2].get(), "Single contaminated", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[3].get(), "Missing: energy threshold", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[4].get(), "Missing: displaced partner cluster", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[5].get(), "Missing: acceptance", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[6].get(), "Missing: no CEMC deposit", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[7].get(), "Missing: unclustered deposit", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[8].get(), "Missing: match incomplete", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[9].get(), "Missing: other", "f");
+  detailed_fraction_stack_legend.AddEntry(detailed_stacked_fractions[10].get(), "Other", "f");
+  detailed_fraction_stack_legend.Draw();
+  draw_category_annotation();
+  detailed_fraction_stack_plot_pad->cd();
+  detailed_fraction_stack_plot_pad->RedrawAxis();
+  detailed_fraction_stack_canvas.cd();
+  detailed_fraction_stack_canvas.SaveAs((output_base + "_category_fraction_stack_detailed.pdf").c_str());
+
+  TCanvas summary_fraction_stack_canvas("c_pythia_pi0_anchor_summary_category_fraction_stack", "Summary Pythia pi0 anchor category fraction stack", kCanvasWidth, kCanvasHeight);
+  summary_fraction_stack_canvas.SetCanvasSize(kCanvasWidth, kCanvasHeight);
+  auto summary_fraction_stack_plot_pad = make_plot_pad("pythia_pi0_anchor_summary_category_fraction_stack_plot");
+  THStack summary_fraction_stack("stack_pythia_pi0_anchor_summary_category_fractions", "");
+  for (auto& histogram : summary_stacked_fractions) summary_fraction_stack.Add(histogram.get());
+  summary_fraction_stack.SetMinimum(0.0);
+  summary_fraction_stack.SetMaximum(1.05);
+  summary_fraction_stack.Draw("HIST");
+  summary_fraction_stack.GetXaxis()->SetTitle("Anchor Cluster E_{T} [GeV]");
+  summary_fraction_stack.GetYaxis()->SetTitle("Fraction");
+  style_plot_axes(summary_fraction_stack.GetXaxis(), summary_fraction_stack.GetYaxis());
+  summary_fraction_stack_canvas.cd();
+  TLegend summary_fraction_stack_legend(0.55, 0.72, 0.94, 0.95);
+  summary_fraction_stack_legend.SetBorderSize(0);
+  summary_fraction_stack_legend.SetFillStyle(0);
+  summary_fraction_stack_legend.SetTextSize(kTextSize);
+  summary_fraction_stack_legend.AddEntry(summary_stacked_fractions[0].get(), "Separated", "f");
+  summary_fraction_stack_legend.AddEntry(summary_stacked_fractions[1].get(), "Merged", "f");
+  summary_fraction_stack_legend.AddEntry(summary_stacked_fractions[2].get(), "Single contaminated", "f");
+  summary_fraction_stack_legend.AddEntry(summary_stacked_fractions[3].get(), "Missing", "f");
+  summary_fraction_stack_legend.AddEntry(summary_stacked_fractions[4].get(), "Other", "f");
+  summary_fraction_stack_legend.Draw();
+  draw_category_annotation();
+  summary_fraction_stack_plot_pad->cd();
+  summary_fraction_stack_plot_pad->RedrawAxis();
+  summary_fraction_stack_canvas.cd();
+  summary_fraction_stack_canvas.SaveAs((output_base + "_category_fraction_stack.pdf").c_str());
 
   TFile output((output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) {
@@ -780,11 +898,10 @@ int FinalizePythiaPi0AnchorClusterSpectra(
     raw[index]->Write();
     density[index]->Write();
   }
-  for (auto& histogram : fractions) {
-    histogram->Write();
-  }
+  for (auto& histogram : detailed_fractions) histogram->Write();
+  for (auto& histogram : summary_fractions) histogram->Write();
 
-  int output_schema_version = 8;
+  int output_schema_version = 9;
   long long manifest_begin = partials.front().manifest_begin;
   long long manifest_end = partials.back().manifest_end;
   long long partial_file_count = static_cast<long long>(partials.size());
@@ -792,6 +909,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   unsigned char contains_raw_histograms = 1U;
   unsigned char contains_bin_width_normalized_histograms = 1U;
   unsigned char contains_category_fractions = 1U;
+  unsigned char contains_summary_category_fractions = 1U;
   TTree metadata("metadata", "Final Pythia pi0 anchor-cluster metadata");
   metadata.Branch("schema_version", &output_schema_version);
   metadata.Branch("manifest_path", &total.manifest_path);
@@ -831,6 +949,7 @@ int FinalizePythiaPi0AnchorClusterSpectra(
   metadata.Branch("contains_raw_histograms", &contains_raw_histograms);
   metadata.Branch("contains_bin_width_normalized_histograms", &contains_bin_width_normalized_histograms);
   metadata.Branch("contains_category_fractions", &contains_category_fractions);
+  metadata.Branch("contains_summary_category_fractions", &contains_summary_category_fractions);
   metadata.Branch("events_processed", &total.events_processed);
   metadata.Branch("events_written", &total.events_written);
   metadata.Branch("events_invalid", &total.events_invalid);

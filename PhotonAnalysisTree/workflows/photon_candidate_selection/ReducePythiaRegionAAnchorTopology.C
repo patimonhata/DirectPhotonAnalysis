@@ -162,7 +162,7 @@ bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
       value.manifest_end > value.manifest_begin && value.input_file_count == value.manifest_end - value.manifest_begin &&
       same_double(value.cross_section_pb, sample.cross_section_pb) && same_double(value.window_min, sample.window_min) &&
       same_double(value.window_max, sample.window_max) && value.upper_unbounded == sample.upper_unbounded &&
-      std::isfinite(value.sum_generator_weight_processed) && value.sum_generator_weight_processed > 0.0 &&
+      std::isfinite(value.sum_generator_weight_processed) &&
       value.events_processed == value.events_written + value.events_vertex_rejected + value.events_invalid;
 }
 

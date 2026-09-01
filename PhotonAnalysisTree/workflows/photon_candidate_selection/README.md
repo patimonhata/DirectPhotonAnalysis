@@ -51,7 +51,25 @@ PhotonAnalysisTree/workflows/photon_candidate_selection/run_map.sh \
 
 The final `10` limits the test to ten events. Omit it, or use `0`, for all events in the selected DST range. `run_map.sh` writes to a temporary file, runs the ROOT validator, and only then atomically publishes `map_<chunk>.root`. It refuses to overwrite an existing output.
 
-The older `run.sh` and `Fun4All_PythiaPhotonCandidateTree.C` remain useful for a single-segment debug run; production should use the manifest-based map interface.
+All map production, including single-chunk tests, uses this manifest-based interface.
+
+## Small-sample end-to-end QA
+
+`run_small_sample.sh` runs the production map code over the first contiguous part of one sample manifest and then runs the matching Jet- or PhotonJet-family reduce in partial-production mode. For example, this command processes the first 30 Jet12 segments in three maps of 10 segments each and makes the final plots:
+
+~~~bash
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_small_sample.sh jet12 30 10
+~~~
+
+Its interface is:
+
+~~~text
+run_small_sample.sh SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [OUTPUT_ROOT] [N_EVENTS_PER_MAP]
+~~~
+
+The default output root is `PhotonAnalysisTree/output/qa/photon_candidate_selection/<sample>_<N>segments`. It contains `maps/<sample>/map_*.root` and the reduce products under `plots/`. Existing map files are never overwritten. `N_EVENTS_PER_MAP` defaults to zero, meaning every event in each selected map range.
+
+This mode requires the selected manifest range to start at row zero and remain contiguous, matching the reducer's map-completeness checks. It uses only the selected sample and normalizes with only the maps present, so its products are for code, schema, and plot QA only—not a physics result. A handful of segments can be enough for a smoke test, but 30--100 segments is more likely to populate the Region-A topology plots.
 
 ## Region A/B/C/D content
 

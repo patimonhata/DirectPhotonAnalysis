@@ -89,28 +89,36 @@ The map runs `Pi0AnchorTopologyEvaluator` with its Pythia defaults, `min_cluster
 
 ## Condor production
 
-There is one submit file per requested jet sample, so each `condor_submit` invocation creates a separate Condor cluster:
+There is one submit file per sample, so each `condor_submit` invocation creates a separate Condor cluster:
 
+- `submit_jet3.job`: 10,001 DST segments, 1,001 jobs
 - `submit_jet5.job`: 10,001 DST segments, 1,001 jobs
 - `submit_jet8.job`: 10,000 DST segments, 1,000 jobs
 - `submit_jet12.job`: 100,000 DST segments, 10,000 jobs
 - `submit_jet20.job`: 10,000 DST segments, 1,000 jobs
 - `submit_jet30.job`: 10,000 DST segments, 1,000 jobs
 - `submit_jet40.job`: 10,000 DST segments, 1,000 jobs
-
-`submit_jet8.job` is configured for the full schema-3 regeneration and writes to `output/intermediate_files/photon_candidate_selection/jet8/schema3_iso_double`. This preserves the existing schema-2 Jet8 maps and prevents accidental mixed-schema reduction.
+- `submit_photonjet3.job`: 10,000 DST segments, 1,000 jobs
+- `submit_photonjet5.job`: 10,000 DST segments, 1,000 jobs
+- `submit_photonjet10.job`: 10,000 DST segments, 1,000 jobs
+- `submit_photonjet20.job`: 10,000 DST segments, 1,000 jobs
 
 Create the shared log directory once, review the paths and counts, then submit manually:
 
 ~~~bash
 mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection
 
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet3.job
 condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet5.job
 condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet8.job
 condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet12.job
 condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet20.job
 condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet30.job
 condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet40.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_photonjet3.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_photonjet5.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_photonjet10.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_photonjet20.job
 ~~~
 
 No repository script submits jobs automatically.
@@ -125,14 +133,6 @@ Use a third argument of `true` to rerun the full ROOT validator on every file:
 
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/check_sample_map_outputs.sh jet5 10 true
-~~~
-
-For the regenerated Jet8 output, pass its explicit output directory as the fourth argument:
-
-~~~bash
-PhotonAnalysisTree/workflows/photon_candidate_selection/check_sample_map_outputs.sh \
-  jet8 10 true \
-  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/jet8/schema3_iso_double
 ~~~
 
 ## Stitching and normalization

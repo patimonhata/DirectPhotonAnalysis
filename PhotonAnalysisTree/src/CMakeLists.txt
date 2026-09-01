@@ -12,7 +12,7 @@ if(NOT DEFINED ENV{OFFLINE_MAIN})
 endif()
 
 set(SPHENIX_PREFIX "$ENV{OFFLINE_MAIN}")
-find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist)
+find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist TMVA TMVAUtils)
 
 find_path(
   PI0RECONSTRUCTION_INCLUDE_DIR
@@ -50,6 +50,7 @@ add_library(
   PythiaPi0ClusterMultiplicity.cc
   PhotonTreeCommon.cc
   PythiaClusterTruthMatcher.cc
+  PythiaPhotonCandidateTree.cc
   PythiaPhotonAnalysisTree.cc
   PythiaTruthPtSpectrum.cc
   PythiaTruthSpectrumTree.cc
@@ -72,6 +73,8 @@ target_link_libraries(
     ROOT::RIO
     ROOT::Tree
     ROOT::Hist
+    ROOT::TMVA
+    ROOT::TMVAUtils
 )
 target_compile_options(PhotonAnalysisTree PRIVATE -Wall -Wextra -Wpedantic)
 
@@ -114,9 +117,14 @@ install(
     PythiaPi0AnchorClusterSpectrum.h
     PythiaPi0ClusterMultiplicity.h
     PythiaPhotonAnalysisTree.h
+    PythiaPhotonCandidateTree.h
     PythiaTruthPtSpectrum.h
     PythiaTruthSpectrumTree.h
     ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h
   DESTINATION include
 )
-install(FILES ../models/best_model.onnx ../models/onnx_metadata.json DESTINATION ${CMAKE_INSTALL_DATADIR}/PhotonAnalysisTree/models)
+install(FILES
+  ../models/best_model.onnx
+  ../models/onnx_metadata.json
+  ../models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/PhotonAnalysisTree/models)

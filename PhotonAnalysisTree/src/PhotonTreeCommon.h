@@ -106,14 +106,17 @@ class PhotonTreeCommon
   PhotonTreeCommon();
 
   void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
+  void set_min_cluster_energy_inclusive(bool value) { min_cluster_energy_inclusive_ = value; }
   void set_shower_shape_min_tower_energy(double value) { shower_shape_min_tower_energy_ = value; }
   void set_store_shower_shape_tower_patch(bool value) { store_shower_shape_tower_patch_ = value; }
+  void set_store_cluster_pairs(bool value) { store_cluster_pairs_ = value; }
 
   double min_cluster_energy() const { return min_cluster_energy_; }
   double shower_shape_min_tower_energy() const { return shower_shape_min_tower_energy_; }
   int shower_shape_algorithm_version() const { return shower_shape_algorithm_version_; }
   int shower_shape_patch_side() const { return shower_shape_patch_side_; }
   bool store_shower_shape_tower_patch() const { return store_shower_shape_tower_patch_; }
+  bool store_cluster_pairs() const { return store_cluster_pairs_; }
 
   bool initialize();
   void clear_event();
@@ -142,10 +145,12 @@ class PhotonTreeCommon
   static double phi_from_xy(double x, double y);
 
   double min_cluster_energy_ = 0.0;
+  bool min_cluster_energy_inclusive_ = true;
   double shower_shape_min_tower_energy_ = 0.070;
   int shower_shape_algorithm_version_ = ShowerShapeCalculator::kAlgorithmVersion;
   int shower_shape_patch_side_ = ShowerShapeCalculator::kPatchSide;
   bool store_shower_shape_tower_patch_ = true;
+  bool store_cluster_pairs_ = true;
   ShowerShapeCalculator shower_shape_calculator_;
   FilledCollection split_;
   FilledCollection nosplit_;

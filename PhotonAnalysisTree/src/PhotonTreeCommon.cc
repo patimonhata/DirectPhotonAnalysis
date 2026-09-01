@@ -78,7 +78,10 @@ bool PhotonTreeCommon::fill_collection(RawClusterContainer* clusters,
     {
       return false;
     }
-    if (cluster->get_energy() >= min_cluster_energy_)
+    const bool passes_energy = min_cluster_energy_inclusive_
+        ? cluster->get_energy() >= min_cluster_energy_
+        : cluster->get_energy() > min_cluster_energy_;
+    if (passes_energy)
     {
       filled.ordered_clusters.push_back(cluster);
     }
@@ -185,21 +188,22 @@ bool PhotonTreeCommon::fill_collection(RawClusterContainer* clusters,
 
   output.ncluster = static_cast<unsigned int>(output.cluster_id.size());
   output.ntower = static_cast<unsigned int>(output.tower_key.size());
-  for (std::size_t i = 0; i < output.ncluster; ++i)
+  if (store_cluster_pairs_)
   {
-    for (std::size_t j = i + 1; j < output.ncluster; ++j)
+    for (std::size_t i = 0; i < output.ncluster; ++i)
     {
-      const double total_e = output.cluster_e[i] + output.cluster_e[j];
-      const double px = output.cluster_px[i] + output.cluster_px[j];
-      const double py = output.cluster_py[i] + output.cluster_py[j];
-      const double pz = output.cluster_pz[i] + output.cluster_pz[j];
-      const double mass2 = total_e * total_e - px * px - py * py - pz * pz;
-      output.pair_cluster_i.push_back(static_cast<unsigned int>(i));
-      output.pair_cluster_j.push_back(static_cast<unsigned int>(j));
-      output.pair_m_gg.push_back(std::sqrt(std::max(0.0, mass2)));
-      output.pair_e_asym.push_back(total_e > 0.0
-                                       ? std::abs(output.cluster_e[i] - output.cluster_e[j]) / total_e
-                                       : kInvalidDouble);
+      for (std::size_t j = i + 1; j < output.ncluster; ++j)
+      {
+        const double total_e = output.cluster_e[i] + output.cluster_e[j];
+        const double px = output.cluster_px[i] + output.cluster_px[j];
+        const double py = output.cluster_py[i] + output.cluster_py[j];
+        const double pz = output.cluster_pz[i] + output.cluster_pz[j];
+        const double mass2 = total_e * total_e - px * px - py * py - pz * pz;
+        output.pair_cluster_i.push_back(static_cast<unsigned int>(i));
+        output.pair_cluster_j.push_back(static_cast<unsigned int>(j));
+        output.pair_m_gg.push_back(std::sqrt(std::max(0.0, mass2)));
+        output.pair_e_asym.push_back(total_e > 0.0 ? std::abs(output.cluster_e[i] - output.cluster_e[j]) / total_e : kInvalidDouble);
+      }
     }
   }
   return true;

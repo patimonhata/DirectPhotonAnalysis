@@ -1,0 +1,27 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection/run_map.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
+request_memory     = 6GB
+Priority           = 20
+job_lease_duration = 86400
+
+sample_name        = jet40
+total_files        = 10000
+files_per_job      = 10
+n_chunks           = 1000
+chunk_offset       = 0
+input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/jet40/segments.list
+map_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/jet40
+log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection
+
+Output             = $(log_directory)/jet40_$(ClusterId)_$(ProcId).out
+Error              = $(log_directory)/jet40_$(ClusterId)_$(ProcId).err
+Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-jet40_$(ClusterId)_$(ProcId).log
+Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(sample_name) $(map_output_directory)"
+
+# n_chunks = ceil(total_files / files_per_job) - chunk_offset.
+Queue $(n_chunks)

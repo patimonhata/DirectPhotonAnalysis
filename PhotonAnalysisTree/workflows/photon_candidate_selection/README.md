@@ -181,23 +181,39 @@ where `weight_numerator_pb = sample_cross_section_pb * generator_weight`. The de
 
 `ReducePythiaRegionAAnchorTopology.C` reads the completed map production, validates every sample's schema, metadata compatibility, and contiguous manifest coverage, calculates the full-sample normalization above, and makes the Region-A topology plots without reopening DSTs. Jet and PhotonJet are separate families and are never mixed.
 
-Run the Jet-family reduce with:
+The event loop disables every branch by default, activates only the 11 scalar/vector branches used by this reduce, and gives those branches a 64 MiB `TTreeCache` per open map file. Keep future event-branch bindings on the `bind_active` path so new inputs are both enabled and cached.
+
+Run the compiled Jet-family reduce locally with:
 
 ~~~bash
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-root -l -b -q \
-  'PhotonAnalysisTree/workflows/photon_candidate_selection/ReducePythiaRegionAAnchorTopology.C("jet")'
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh \
+  jet \
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1 \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/jet/region_a_pi0_anchor_topology \
+  true
 ~~~
 
-Run the PhotonJet-family reduce independently with:
+Run the PhotonJet family independently by replacing `jet` with `photonjet` in both the family argument and output path:
 
 ~~~bash
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-root -l -b -q \
-  'PhotonAnalysisTree/workflows/photon_candidate_selection/ReducePythiaRegionAAnchorTopology.C("photonjet")'
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh \
+  photonjet \
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1 \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/photonjet/region_a_pi0_anchor_topology \
+  true
 ~~~
 
 Production mode requires every expected map from every sample in the selected family. The optional fourth argument `require_complete=false` is only for development with partial productions; its cross-section normalization uses only the maps present and is not a physics result.
+
+For a disconnect-safe batch run, submit the Jet and PhotonJet reducers as separate one-job Condor clusters:
+
+~~~bash
+mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_photonjet.job
+~~~
+
+The submit files default to `configuration = cluster_e_gt_0p1` and `require_complete = true`. Edit both values as needed before submission. Each output base must have at most one active reducer; the repository never submits these jobs automatically.
 
 The cluster selections are:
 

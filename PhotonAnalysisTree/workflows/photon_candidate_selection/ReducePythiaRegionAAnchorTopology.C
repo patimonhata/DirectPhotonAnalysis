@@ -44,6 +44,7 @@ constexpr std::array<std::size_t, 11> kDetailedCategories = {2, 3, 4, 6, 7, 8, 9
 constexpr std::array<std::size_t, 5> kSummaryCategories = {2, 3, 4, 5, 13};
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
+constexpr Long64_t kEventTreeCacheSize = 64LL * 1024LL * 1024LL;
 
 struct SampleDefinition
 {
@@ -107,6 +108,15 @@ template <class T>
 bool bind(TTree* tree, const char* name, T* address)
 {
   return tree->GetBranch(name) && tree->SetBranchAddress(name, address) >= 0;
+}
+
+template <class T>
+bool bind_active(TTree* tree, const char* name, T* address)
+{
+  if (!tree->GetBranch(name)) return false;
+  tree->SetBranchStatus(name, true);
+  tree->AddBranchToCache(name, true);
+  return tree->SetBranchAddress(name, address) >= 0;
 }
 
 bool same_double(double left, double right)
@@ -516,6 +526,8 @@ int ReducePythiaRegionAAnchorTopology(
       auto* tree = file.Get<TTree>("event_tree");
       if (file.IsZombie() || !tree) return 5;
       unsigned int ncluster = 0;
+      tree->SetBranchStatus("*", false);
+      tree->SetCacheSize(kEventTreeCacheSize);
       unsigned char event_weight_valid = 0;
       unsigned char stitching_valid = 0;
       unsigned char stitching_pass = 0;
@@ -527,20 +539,21 @@ int ReducePythiaRegionAAnchorTopology(
       std::vector<int>* topology = nullptr;
       std::vector<int>* missing_category = nullptr;
       bool ok = true;
-      ok &= bind(tree, "split_ncluster", &ncluster);
-      ok &= bind(tree, "event_weight_valid", &event_weight_valid);
-      ok &= bind(tree, "sample_stitching_valid", &stitching_valid);
-      ok &= bind(tree, "sample_stitching_pass", &stitching_pass);
-      ok &= bind(tree, "weight_numerator_pb", &weight_numerator_pb);
-      ok &= bind(tree, "split_cluster_et", &cluster_et);
-      ok &= bind(tree, "split_cluster_pass_region_a", &region_a);
-      ok &= bind(tree, "split_cluster_truth_prompt_cluster", &prompt);
-      ok &= bind(tree, "split_cluster_pi0_anchor_valid", &anchor_valid);
-      ok &= bind(tree, "split_cluster_pi0_anchor_topology", &topology);
-      ok &= bind(tree, "split_cluster_pi0_anchor_missing_category", &missing_category);
+      ok &= bind_active(tree, "split_ncluster", &ncluster);
+      ok &= bind_active(tree, "event_weight_valid", &event_weight_valid);
+      ok &= bind_active(tree, "sample_stitching_valid", &stitching_valid);
+      ok &= bind_active(tree, "sample_stitching_pass", &stitching_pass);
+      ok &= bind_active(tree, "weight_numerator_pb", &weight_numerator_pb);
+      ok &= bind_active(tree, "split_cluster_et", &cluster_et);
+      ok &= bind_active(tree, "split_cluster_pass_region_a", &region_a);
+      ok &= bind_active(tree, "split_cluster_truth_prompt_cluster", &prompt);
+      ok &= bind_active(tree, "split_cluster_pi0_anchor_valid", &anchor_valid);
+      ok &= bind_active(tree, "split_cluster_pi0_anchor_topology", &topology);
+      ok &= bind_active(tree, "split_cluster_pi0_anchor_missing_category", &missing_category);
       if (!ok) return 5;
 
       events_written += static_cast<unsigned long long>(tree->GetEntries());
+      tree->StopCacheLearningPhase();
       for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
       {
         tree->GetEntry(entry);

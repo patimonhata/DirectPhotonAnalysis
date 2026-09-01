@@ -34,6 +34,8 @@ A production map job processes all events in several DST segments and writes one
 PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/<sample>/map_<chunk>.root
 ~~~
 
+The current output schema is version 3. The four isolation branches `split_cluster_iso_raw_et`, `split_cluster_iso_corrected_et`, `split_cluster_iso_boundary`, and `split_cluster_noniso_boundary` are stored as `std::vector<double>`. Schema-2 files stored these branches as floats and must not be mixed with schema-3 files in one reduce input.
+
 The default Condor configuration uses 10 DST segments per ROOT file. This is deliberately configurable through `files_per_job`; after measuring the first jobs, change both `files_per_job` and `n_chunks = ceil(total_files / files_per_job)` together if a different file size is preferable.
 
 For a local one-chunk test:
@@ -96,6 +98,8 @@ There is one submit file per requested jet sample, so each `condor_submit` invoc
 - `submit_jet30.job`: 10,000 DST segments, 1,000 jobs
 - `submit_jet40.job`: 10,000 DST segments, 1,000 jobs
 
+`submit_jet8.job` is configured for the full schema-3 regeneration and writes to `output/intermediate_files/photon_candidate_selection/jet8/schema3_iso_double`. This preserves the existing schema-2 Jet8 maps and prevents accidental mixed-schema reduction.
+
 Create the shared log directory once, review the paths and counts, then submit manually:
 
 ~~~bash
@@ -121,6 +125,14 @@ Use a third argument of `true` to rerun the full ROOT validator on every file:
 
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/check_sample_map_outputs.sh jet5 10 true
+~~~
+
+For the regenerated Jet8 output, pass its explicit output directory as the fourth argument:
+
+~~~bash
+PhotonAnalysisTree/workflows/photon_candidate_selection/check_sample_map_outputs.sh \
+  jet8 10 true \
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/jet8/schema3_iso_double
 ~~~
 
 ## Stitching and normalization

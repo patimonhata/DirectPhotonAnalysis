@@ -54,7 +54,7 @@ int check_pythia_photon_candidate_map(const char* path)
   ok &= map_bind(metadata, "n_clusters_region_c", &n_clusters_region_c);
   ok &= map_bind(metadata, "n_clusters_region_d", &n_clusters_region_d);
   ok &= map_bind(metadata, "n_clusters_final_photon", &n_clusters_final_photon);
-  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 2 || !input_manifest || input_manifest->empty() ||
+  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 3 || !input_manifest || input_manifest->empty() ||
       manifest_begin < 0 || manifest_end <= manifest_begin || input_file_count != manifest_end - manifest_begin ||
       !first_input_suffix || first_input_suffix->empty() || !last_input_suffix || last_input_suffix->empty() ||
       !sample_name || sample_name->empty() || n_events_written != static_cast<unsigned long long>(events->GetEntries()))

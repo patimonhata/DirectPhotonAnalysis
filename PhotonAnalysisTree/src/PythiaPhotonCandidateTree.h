@@ -38,10 +38,10 @@ struct PhotonCandidateSelectionBranches
   std::vector<unsigned char> pass_tight;
   std::vector<unsigned char> pass_nontight;
 
-  std::vector<float> iso_raw_et;
-  std::vector<float> iso_corrected_et;
-  std::vector<float> iso_boundary;
-  std::vector<float> noniso_boundary;
+  std::vector<double> iso_raw_et;
+  std::vector<double> iso_corrected_et;
+  std::vector<double> iso_boundary;
+  std::vector<double> noniso_boundary;
   std::vector<unsigned int> iso_topocluster_count;
   std::vector<unsigned char> pass_isolated;
   std::vector<unsigned char> pass_nonisolated;
@@ -181,7 +181,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 2;
+  static constexpr int schema_version_ = 3;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);

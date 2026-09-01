@@ -3,10 +3,11 @@ set -euo pipefail
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module_dir=$(cd "$workflow_dir/../.." && pwd)
-usage="usage: workflows/photon_candidate_selection/check_sample_map_outputs.sh SAMPLE_NAME [FILES_PER_JOB] [DEEP_VALIDATION]"
+usage="usage: workflows/photon_candidate_selection/check_sample_map_outputs.sh SAMPLE_NAME [FILES_PER_JOB] [DEEP_VALIDATION] [OUTPUT_DIRECTORY]"
 sample_name=${1:?$usage}
 files_per_job=${2:-10}
 deep_validation=${3:-false}
+output_directory=${4:-}
 
 case "$sample_name" in
   photonjet3|photonjet5|photonjet10|photonjet20|jet3|jet5|jet8|jet12|jet20|jet30|jet40) ;;
@@ -25,7 +26,9 @@ if [[ "$deep_validation" != true && "$deep_validation" != false ]]; then
 fi
 
 input_manifest="$module_dir/input/$sample_name/segments.list"
-output_directory="$module_dir/output/intermediate_files/photon_candidate_selection/$sample_name"
+if [[ -z "$output_directory" ]]; then
+  output_directory="$module_dir/output/intermediate_files/photon_candidate_selection/$sample_name"
+fi
 if [[ ! -r "$input_manifest" ]]; then
   echo "Input manifest is not readable: $input_manifest" >&2
   exit 2

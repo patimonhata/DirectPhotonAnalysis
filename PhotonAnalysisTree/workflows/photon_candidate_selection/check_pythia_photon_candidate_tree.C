@@ -42,10 +42,10 @@ int check_pythia_photon_candidate_tree(const char* path)
   std::vector<unsigned char>* preselection = nullptr;
   std::vector<unsigned char>* tight = nullptr;
   std::vector<unsigned char>* nontight = nullptr;
-  std::vector<float>* iso_raw = nullptr;
-  std::vector<float>* iso_corrected = nullptr;
-  std::vector<float>* iso_boundary = nullptr;
-  std::vector<float>* noniso_boundary = nullptr;
+  std::vector<double>* iso_raw = nullptr;
+  std::vector<double>* iso_corrected = nullptr;
+  std::vector<double>* iso_boundary = nullptr;
+  std::vector<double>* noniso_boundary = nullptr;
   std::vector<unsigned char>* isolated = nullptr;
   std::vector<unsigned char>* nonisolated = nullptr;
   std::vector<unsigned char>* region_a = nullptr;

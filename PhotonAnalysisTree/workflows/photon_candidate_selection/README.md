@@ -148,4 +148,50 @@ event_weight_pb = event.weight_numerator_pb / sumw_sample
 
 where `weight_numerator_pb = sample_cross_section_pb * generator_weight`. The denominator includes events rejected later by the vertex cut. Do not normalize map files independently. Cross sections and half-open stitching windows are stored in metadata; `jet40` has no upper bound.
 
-Plotting, cross-map normalization finalization, ABCD purity extraction, and final Region-A topology aggregation are intentionally separate reduce/plot stages and are not part of this map workflow.
+## Region-A pi0-anchor topology reduce
+
+`ReducePythiaRegionAAnchorTopology.C` reads the completed map production, validates every sample's schema, metadata compatibility, and contiguous manifest coverage, calculates the full-sample normalization above, and makes the Region-A topology plots without reopening DSTs. Jet and PhotonJet are separate families and are never mixed.
+
+Run the Jet-family reduce with:
+
+~~~bash
+source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
+root -l -b -q \
+  'PhotonAnalysisTree/workflows/photon_candidate_selection/ReducePythiaRegionAAnchorTopology.C("jet")'
+~~~
+
+Run the PhotonJet-family reduce independently with:
+
+~~~bash
+source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
+root -l -b -q \
+  'PhotonAnalysisTree/workflows/photon_candidate_selection/ReducePythiaRegionAAnchorTopology.C("photonjet")'
+~~~
+
+Production mode requires every expected map from every sample in the selected family. The optional fourth argument `require_complete=false` is only for development with partial productions; its cross-section normalization uses only the maps present and is not a physics result.
+
+The cluster selections are:
+
+- pi0 anchor: `sample_stitching_valid && sample_stitching_pass && split_cluster_pass_region_a && split_cluster_pi0_anchor_valid`;
+- prompt reference: `sample_stitching_valid && sample_stitching_pass && split_cluster_pass_region_a && split_cluster_truth_prompt_cluster`.
+
+The stored topology classification uses the map-time strict `E_cluster > 0.1 GeV` threshold. The reduce does not reclassify topology. Its default binning matches the current `pi0_anchor_topology` production: 200 bins over `0 <= ET < 40 GeV`.
+
+Each family produces one ROOT file and six PDFs under
+
+~~~text
+output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/<family>/
+~~~
+
+The PDFs are:
+
+- `region_a_pi0_anchor_topology.pdf`: summary differential-cross-section spectrum;
+- `region_a_pi0_anchor_topology_detailed.pdf`: detailed spectrum with missing subcategories;
+- `region_a_pi0_anchor_topology_category_fractions.pdf`: summary fraction lines;
+- `region_a_pi0_anchor_topology_category_fraction_stack.pdf`: summary stacked fractions;
+- `region_a_pi0_anchor_topology_category_fractions_detailed.pdf`: detailed fraction lines;
+- `region_a_pi0_anchor_topology_category_fraction_stack_detailed.pdf`: detailed stacked fractions.
+
+The ROOT file stores unweighted counts, cross-section-weighted spectra in pb, bin-width-normalized spectra in pb/GeV, category fractions, and compact reduce provenance. The topology categories are checked to partition the Region-A anchor denominator in every ET bin, including underflow and overflow.
+
+ABCD purity extraction remains a separate future reduce stage.

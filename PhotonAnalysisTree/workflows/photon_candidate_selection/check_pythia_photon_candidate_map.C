@@ -1,5 +1,6 @@
 #include "check_pythia_photon_candidate_tree.C"
 
+#include <cmath>
 #include <string>
 
 namespace
@@ -11,7 +12,7 @@ bool map_bind(TTree* tree, const char* name, T* address)
 }
 }
 
-int check_pythia_photon_candidate_map(const char* path)
+int check_pythia_photon_candidate_map(const char* path, const double expected_min_cluster_energy = 0.1)
 {
   const int tree_status = check_pythia_photon_candidate_tree(path);
   if (tree_status != 0)
@@ -33,6 +34,7 @@ int check_pythia_photon_candidate_map(const char* path)
   unsigned int map_chunk_id = 0U;
   unsigned long long n_events_written = 0ULL;
   unsigned long long n_clusters_region_a = 0ULL;
+  double min_cluster_energy = -1.0;
   unsigned long long n_clusters_region_b = 0ULL;
   unsigned long long n_clusters_region_c = 0ULL;
   unsigned long long n_clusters_region_d = 0ULL;
@@ -48,6 +50,7 @@ int check_pythia_photon_candidate_map(const char* path)
   ok &= map_bind(metadata, "last_input_suffix", &last_input_suffix);
   ok &= map_bind(metadata, "map_chunk_id", &map_chunk_id);
   ok &= map_bind(metadata, "sample_name", &sample_name);
+  ok &= map_bind(metadata, "min_cluster_energy", &min_cluster_energy);
   ok &= map_bind(metadata, "n_events_written", &n_events_written);
   ok &= map_bind(metadata, "n_clusters_region_a", &n_clusters_region_a);
   ok &= map_bind(metadata, "n_clusters_region_b", &n_clusters_region_b);
@@ -57,7 +60,9 @@ int check_pythia_photon_candidate_map(const char* path)
   if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 3 || !input_manifest || input_manifest->empty() ||
       manifest_begin < 0 || manifest_end <= manifest_begin || input_file_count != manifest_end - manifest_begin ||
       !first_input_suffix || first_input_suffix->empty() || !last_input_suffix || last_input_suffix->empty() ||
-      !sample_name || sample_name->empty() || n_events_written != static_cast<unsigned long long>(events->GetEntries()))
+      !sample_name || sample_name->empty() || !std::isfinite(min_cluster_energy) || min_cluster_energy < 0.0 ||
+      !std::isfinite(expected_min_cluster_energy) || std::abs(min_cluster_energy - expected_min_cluster_energy) > 1e-12 ||
+      n_events_written != static_cast<unsigned long long>(events->GetEntries()))
   {
     std::cerr << "Invalid photon-candidate map metadata" << std::endl;
     return 4;
@@ -125,8 +130,8 @@ int check_pythia_photon_candidate_map(const char* path)
     return 7;
   }
 
-  std::cout << "check_pythia_photon_candidate_map - chunk/range/files/A/B/C/D/final = "
+  std::cout << "check_pythia_photon_candidate_map - chunk/range/files/min-cluster-E/A/B/C/D/final = "
             << map_chunk_id << "/[" << manifest_begin << ":" << manifest_end << "]/" << input_file_count << "/"
-            << total_a << "/" << total_b << "/" << total_c << "/" << total_d << "/" << total_final << std::endl;
+            << min_cluster_energy << "/" << total_a << "/" << total_b << "/" << total_c << "/" << total_d << "/" << total_final << std::endl;
   return 0;
 }

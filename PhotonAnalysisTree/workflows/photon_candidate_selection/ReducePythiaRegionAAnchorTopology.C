@@ -97,6 +97,7 @@ struct MapMetadata
   bool upper_unbounded = false;
   double sum_generator_weight_processed = 0.0;
   unsigned long long events_processed = 0;
+  double min_cluster_energy = -1.0;
   unsigned long long events_written = 0;
   unsigned long long events_vertex_rejected = 0;
   unsigned long long events_invalid = 0;
@@ -136,6 +137,7 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   ok &= bind(tree, "sample_cross_section_pb", &value.cross_section_pb);
   ok &= bind(tree, "sample_window_min", &value.window_min);
   ok &= bind(tree, "sample_window_max", &value.window_max);
+  ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
   ok &= bind(tree, "sample_upper_unbounded", &value.upper_unbounded);
   ok &= bind(tree, "sum_generator_weight_processed", &value.sum_generator_weight_processed);
   ok &= bind(tree, "n_events_processed", &value.events_processed);
@@ -156,6 +158,7 @@ bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
   return value.schema_version == 3 && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
+      std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
       value.manifest_end > value.manifest_begin && value.input_file_count == value.manifest_end - value.manifest_begin &&
       same_double(value.cross_section_pb, sample.cross_section_pb) && same_double(value.window_min, sample.window_min) &&
       same_double(value.window_max, sample.window_max) && value.upper_unbounded == sample.upper_unbounded &&
@@ -169,7 +172,8 @@ bool compatible(const MapMetadata& value, const MapMetadata& reference)
       value.sample_name == reference.sample_name && value.analysis_release == reference.analysis_release &&
       value.model_sha256 == reference.model_sha256 && same_double(value.cross_section_pb, reference.cross_section_pb) &&
       same_double(value.window_min, reference.window_min) && same_double(value.window_max, reference.window_max) &&
-      value.upper_unbounded == reference.upper_unbounded;
+      value.upper_unbounded == reference.upper_unbounded &&
+      same_double(value.min_cluster_energy, reference.min_cluster_energy);
 }
 
 bool collect_maps(const std::string& pattern, const SampleDefinition& sample, bool require_complete, std::vector<MapMetadata>& maps)
@@ -439,7 +443,7 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
 
 int ReducePythiaRegionAAnchorTopology(
     const std::string family = "jet",
-    const std::string map_root = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection",
+    const std::string map_root = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1",
     const std::string output_base = "",
     const bool require_complete = true,
     const int n_bins = 200,
@@ -451,8 +455,12 @@ int ReducePythiaRegionAAnchorTopology(
     std::cerr << "Family must be jet or photonjet, with valid paths and binning" << std::endl;
     return 1;
   }
+  std::string normalized_map_root = map_root;
+  while (normalized_map_root.size() > 1U && normalized_map_root.back() == '/') normalized_map_root.pop_back();
+  const std::size_t map_configuration_begin = normalized_map_root.find_last_of('/');
+  const std::string map_configuration = normalized_map_root.substr(map_configuration_begin == std::string::npos ? 0U : map_configuration_begin + 1U);
   const std::string resolved_output_base = output_base.empty()
-      ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/" + family + "/region_a_pi0_anchor_topology"
+      ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/" + map_configuration + "/" + family + "/region_a_pi0_anchor_topology"
       : output_base;
   if (!make_output_directory(resolved_output_base)) return 2;
 
@@ -469,6 +477,7 @@ int ReducePythiaRegionAAnchorTopology(
   std::string family_analysis_release;
   std::string family_model_sha256;
 
+  double family_min_cluster_energy = -1.0;
   for (const SampleDefinition& sample : samples)
   {
     const std::string pattern = map_root + "/" + sample.name + "/map_*.root";
@@ -479,10 +488,12 @@ int ReducePythiaRegionAAnchorTopology(
     {
       family_analysis_release = maps.front().analysis_release;
       family_model_sha256 = maps.front().model_sha256;
+      family_min_cluster_energy = maps.front().min_cluster_energy;
     }
-    else if (maps.front().analysis_release != family_analysis_release || maps.front().model_sha256 != family_model_sha256)
+    else if (maps.front().analysis_release != family_analysis_release || maps.front().model_sha256 != family_model_sha256 ||
+        !same_double(maps.front().min_cluster_energy, family_min_cluster_energy))
     {
-      std::cerr << "Analysis release or BDT model differs across samples at " << sample.name << std::endl;
+      std::cerr << "Analysis release, BDT model, or minimum cluster energy differs across samples at " << sample.name << std::endl;
       return 3;
     }
     double sample_sumw = 0.0;
@@ -634,7 +645,10 @@ int ReducePythiaRegionAAnchorTopology(
   auto summary_fractions = make_fractions(spectra.weighted_pb, summary_category_indices, "h_region_a_summary_");
 
   SetsPhenixStyle();
-  const std::string family_label = family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples";
+  std::ostringstream family_label_stream;
+  family_label_stream << (family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples")
+                      << ", E_{cluster} > " << family_min_cluster_energy << " GeV";
+  const std::string family_label = family_label_stream.str();
   draw_spectrum(density, detailed_spectrum_indices, resolved_output_base + "_detailed.pdf", family_label, true);
   draw_spectrum(density, summary_spectrum_indices, resolved_output_base + ".pdf", family_label, false);
   draw_fraction_lines(detailed_fractions, detailed_category_indices, resolved_output_base + "_category_fractions_detailed.pdf", family_label, true);
@@ -657,7 +671,7 @@ int ReducePythiaRegionAAnchorTopology(
   int source_map_schema_version = 3;
   std::string selection_definition = "sample_stitching_valid_and_pass_and_region_a_and_pi0_anchor_valid";
   std::string prompt_definition = "sample_stitching_valid_and_pass_and_region_a_and_truth_prompt_cluster";
-  std::string topology_source = "stored_map_topology_evaluated_with_strict_cluster_energy_gt_0p1_GeV";
+  std::string topology_source = "stored_map_topology_evaluated_with_strict_min_cluster_energy_from_metadata";
   std::string weight_definition = "sample_cross_section_pb_times_generator_weight_divided_by_full_sample_sum_generator_weight_processed";
   std::string metadata_family = family;
   std::string metadata_map_root = map_root;
@@ -681,6 +695,7 @@ int ReducePythiaRegionAAnchorTopology(
   metadata.Branch("weight_definition", &weight_definition);
   metadata.Branch("sample_count", &sample_count);
   metadata.Branch("sample_names", &sample_names);
+  metadata.Branch("min_cluster_energy", &family_min_cluster_energy);
   metadata.Branch("sample_map_counts", &sample_map_counts);
   metadata.Branch("sample_events_written", &sample_events_written);
   metadata.Branch("sample_events_stitch_pass", &sample_events_stitch_pass);

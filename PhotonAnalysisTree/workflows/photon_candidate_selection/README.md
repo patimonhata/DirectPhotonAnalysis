@@ -31,7 +31,7 @@ The files do not need to be copied into the repository or current directory. `Fu
 A production map job processes all events in several DST segments and writes one file:
 
 ~~~text
-PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/<sample>/map_<chunk>.root
+PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>/map_<chunk>.root
 ~~~
 
 The current output schema is version 3. The four isolation branches `split_cluster_iso_raw_et`, `split_cluster_iso_corrected_et`, `split_cluster_iso_boundary`, and `split_cluster_noniso_boundary` are stored as `std::vector<double>`. Schema-2 files stored these branches as floats and must not be mixed with schema-3 files in one reduce input.
@@ -45,11 +45,12 @@ PhotonAnalysisTree/workflows/photon_candidate_selection/run_map.sh \
   0 0 10001 10 \
   PhotonAnalysisTree/input/jet5/segments.list \
   jet5 \
-  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/jet5 \
-  10
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p2/jet5 \
+  10 \
+  0.2
 ~~~
 
-The final `10` limits the test to ten events. Omit it, or use `0`, for all events in the selected DST range. `run_map.sh` writes to a temporary file, runs the ROOT validator, and only then atomically publishes `map_<chunk>.root`. It refuses to overwrite an existing output.
+The penultimate `10` limits the test to ten events, and the final `0.2` sets the strict minimum cluster energy to `E_cluster > 0.2 GeV`. `N_EVENTS` defaults to zero and `MIN_CLUSTER_ENERGY_GEV` defaults to 0.1. `run_map.sh` writes to a temporary file, verifies that its metadata contains the requested threshold, runs the ROOT validator, and only then atomically publishes `map_<chunk>.root`. It refuses to overwrite an existing output.
 
 All map production, including single-chunk tests, uses this manifest-based interface.
 
@@ -58,16 +59,16 @@ All map production, including single-chunk tests, uses this manifest-based inter
 `run_small_sample.sh` runs the production map code over the first contiguous part of one sample manifest and then runs the matching Jet- or PhotonJet-family reduce in partial-production mode. For example, this command processes the first 30 Jet12 segments in three maps of 10 segments each and makes the final plots:
 
 ~~~bash
-PhotonAnalysisTree/workflows/photon_candidate_selection/run_small_sample.sh jet12 30 10
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_small_sample.sh jet12 30 10 0.2
 ~~~
 
 Its interface is:
 
 ~~~text
-run_small_sample.sh SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [OUTPUT_ROOT] [N_EVENTS_PER_MAP]
+run_small_sample.sh SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP]
 ~~~
 
-The default output root is `PhotonAnalysisTree/output/qa/photon_candidate_selection/<sample>_<N>segments`. It contains `maps/<sample>/map_*.root` and the reduce products under `plots/`. Existing map files are never overwritten. `N_EVENTS_PER_MAP` defaults to zero, meaning every event in each selected map range.
+The default output root is `PhotonAnalysisTree/output/qa/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>_<N>segments`. It contains `maps/<sample>/map_*.root` and the reduce products under `plots/`. Existing map files are never overwritten. `MIN_CLUSTER_ENERGY_GEV` defaults to 0.1 and `N_EVENTS_PER_MAP` defaults to zero, meaning every event in each selected map range.
 
 This mode requires the selected manifest range to start at row zero and remain contiguous, matching the reducer's map-completeness checks. It uses only the selected sample and normalizes with only the maps present, so its products are for code, schema, and plot QA only—not a physics result. A handful of segments can be enough for a smoke test, but 30--100 segments is more likely to populate the Region-A topology plots.
 
@@ -89,7 +90,7 @@ Thus the future ABCD purity calculation can be performed entirely from these int
 
 - The signal HepMC collision vertex must satisfy `|z| < 60 cm`; missing or rejected vertices are not written.
 - `TOPOCLUSTER_ALLCALO` is reconstructed in the job with the requested EMCal+HCal topological-clustering configuration.
-- Only split clusters from `CLUSTERINFO_CEMC` with `E > 0.1 GeV` are stored.
+- Only split clusters from `CLUSTERINFO_CEMC` with `E > min_cluster_energy` are stored; the threshold is strict and configured per map production.
 - Shower shapes use the existing 7x7 calculator and a 70 MeV per-tower threshold. Tower patches, constituent towers, and the all-pairs table are not populated.
 - Raw isolation is `sum(TopoCluster ET, deltaR < 0.4) - candidate ET`.
 - Corrected simulation isolation is `1.2 * raw + 0.1 GeV`.
@@ -103,7 +104,7 @@ Meson partners are every other split cluster with `E > 0.5 GeV`, without a partn
 
 ## Detailed pi0 topology
 
-The map runs `Pi0AnchorTopologyEvaluator` with its Pythia defaults, `min_cluster_energy = 0.1 GeV` with a strict threshold, `|eta_anchor| < 0.7`, `|z_vertex| < 60 cm`, and missing-partner diagnostics enabled. It saves per-cluster truth contributors and prompt/pi0-anchor classifications, all pi0 candidate and daughter recovery diagnostics, and the flattened anchor table. The future reduce stage can reproduce the detailed `pi0_anchor_topology` classification without reopening the DST.
+The map runs `Pi0AnchorTopologyEvaluator` with its Pythia defaults, the same strict `min_cluster_energy` used for stored split clusters, `|eta_anchor| < 0.7`, `|z_vertex| < 60 cm`, and missing-partner diagnostics enabled. It saves per-cluster truth contributors and prompt/pi0-anchor classifications, all pi0 candidate and daughter recovery diagnostics, and the flattened anchor table. The reduce stage can reproduce the detailed `pi0_anchor_topology` classification without reopening the DST.
 
 ## Condor production
 
@@ -140,6 +141,7 @@ condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_pho
 ~~~
 
 No repository script submits jobs automatically.
+The submit files default to `min_cluster_energy = 0.1` and write below `photon_candidate_selection/cluster_e_gt_0p1/<sample>`. For another threshold, change both `min_cluster_energy` and the threshold component of `map_output_directory` before submission. Never mix thresholds in one sample directory.
 
 Each Condor job validates its output before publication. After a sample finishes, check that every expected map file exists:
 
@@ -151,6 +153,15 @@ Use a third argument of `true` to rerun the full ROOT validator on every file:
 
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/check_sample_map_outputs.sh jet5 10 true
+~~~
+
+For a non-default threshold, pass both its output directory and expected metadata value:
+
+~~~bash
+PhotonAnalysisTree/workflows/photon_candidate_selection/check_sample_map_outputs.sh \
+  jet5 10 true \
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p2/jet5 \
+  0.2
 ~~~
 
 ## Stitching and normalization
@@ -193,12 +204,12 @@ The cluster selections are:
 - pi0 anchor: `sample_stitching_valid && sample_stitching_pass && split_cluster_pass_region_a && split_cluster_pi0_anchor_valid`;
 - prompt reference: `sample_stitching_valid && sample_stitching_pass && split_cluster_pass_region_a && split_cluster_truth_prompt_cluster`.
 
-The stored topology classification uses the map-time strict `E_cluster > 0.1 GeV` threshold. The reduce does not reclassify topology. Its default binning matches the current `pi0_anchor_topology` production: 200 bins over `0 <= ET < 40 GeV`.
+The stored topology classification uses the map-time strict `E_cluster > min_cluster_energy` threshold. The reduce validates that all maps and samples use the same metadata value and does not reclassify topology. Its default binning matches the current `pi0_anchor_topology` production: 200 bins over `0 <= ET < 40 GeV`.
 
 Each family produces one ROOT file and six PDFs under
 
 ~~~text
-output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/<family>/
+output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_<threshold>/<family>/
 ~~~
 
 The PDFs are:

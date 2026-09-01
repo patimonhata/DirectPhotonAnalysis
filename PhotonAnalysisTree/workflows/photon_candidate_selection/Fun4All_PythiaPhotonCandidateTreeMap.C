@@ -7,6 +7,7 @@
 
 #include <TSystem.h>
 
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -39,10 +40,11 @@ int Fun4All_PythiaPhotonCandidateTreeMap(
     const std::string sample_name,
     const unsigned int map_chunk_id,
     const int n_events = 0,
+    const double min_cluster_energy = 0.1,
     const std::string model_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root")
 {
-  if (manifest_path.empty() || output_file.empty() || sample_name.empty() || model_file.empty() ||
-      manifest_begin < 0 || manifest_end <= manifest_begin || n_events < 0)
+  if (manifest_path.empty() || output_file.empty() || sample_name.empty() || model_file.empty() || manifest_begin < 0 ||
+      manifest_end <= manifest_begin || n_events < 0 || !std::isfinite(min_cluster_energy) || min_cluster_energy < 0.0)
   {
     std::cerr << "Fun4All_PythiaPhotonCandidateTreeMap - invalid argument" << std::endl;
     return EXIT_FAILURE;
@@ -145,10 +147,12 @@ int Fun4All_PythiaPhotonCandidateTreeMap(
   producer->set_signal_embedding_id(1);
   producer->set_truth_jet_node_name("AntiKt_Truth_r04");
   producer->set_verbosity(1);
+  producer->set_min_cluster_energy(min_cluster_energy);
   server->registerSubsystem(producer);
 
-  std::cout << "Fun4All_PythiaPhotonCandidateTreeMap - sample/range/files/output = "
-            << sample_name << "/[" << manifest_begin << ":" << manifest_end << "]/" << suffixes.size() << "/" << output_file << std::endl;
+  std::cout << "Fun4All_PythiaPhotonCandidateTreeMap - sample/range/files/min-cluster-E/output = "
+            << sample_name << "/[" << manifest_begin << ":" << manifest_end << "]/" << suffixes.size() << "/"
+            << min_cluster_energy << "/" << output_file << std::endl;
   const int run_status = server->run(n_events);
   const int end_status = server->End();
   delete server;

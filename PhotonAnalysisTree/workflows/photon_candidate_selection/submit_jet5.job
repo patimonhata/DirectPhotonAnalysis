@@ -14,14 +14,15 @@ total_files        = 10001
 files_per_job      = 10
 n_chunks           = 1001
 chunk_offset       = 0
+min_cluster_energy = 0.1
 input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/jet5/segments.list
-map_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/jet5
+map_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1/jet5
 log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection
 
 Output             = $(log_directory)/jet5/$(ProcId).out
 Error              = $(log_directory)/jet5/$(ProcId).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-jet5_$(ProcId).log
-Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(sample_name) $(map_output_directory)"
+Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(sample_name) $(map_output_directory) 0 $(min_cluster_energy)"
 
 # n_chunks = ceil(total_files / files_per_job) - chunk_offset.
 Queue $(n_chunks)

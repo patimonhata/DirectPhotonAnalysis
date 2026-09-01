@@ -3,7 +3,7 @@ set -euo pipefail
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module_dir=$(cd "$workflow_dir/../.." && pwd)
-usage="usage: workflows/photon_candidate_selection/run_map.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST SAMPLE_NAME OUTPUT_DIRECTORY [N_EVENTS]"
+usage="usage: workflows/photon_candidate_selection/run_map.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST SAMPLE_NAME OUTPUT_DIRECTORY [N_EVENTS] [MIN_CLUSTER_ENERGY_GEV]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
 total_files=${3:?$usage}
@@ -12,7 +12,7 @@ input_manifest=${5:?$usage}
 sample_name=${6:?$usage}
 output_directory=${7:?$usage}
 n_events=${8:-0}
-
+min_cluster_energy=${9:-0.1}
 for value in "$job_index" "$chunk_offset" "$total_files" "$files_per_job" "$n_events"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
     echo "Chunk, file counts, and N_EVENTS must be non-negative integers: $value" >&2
@@ -21,6 +21,10 @@ for value in "$job_index" "$chunk_offset" "$total_files" "$files_per_job" "$n_ev
 done
 if (( total_files == 0 || files_per_job == 0 )); then
   echo "TOTAL_FILES and FILES_PER_JOB must be positive" >&2
+  exit 2
+fi
+if ! [[ "$min_cluster_energy" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$ ]]; then
+  echo "MIN_CLUSTER_ENERGY_GEV must be a non-negative finite number: $min_cluster_energy" >&2
   exit 2
 fi
 case "$sample_name" in
@@ -72,9 +76,9 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
 set -u
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 root -l -b -q \
-  "$workflow_dir/Fun4All_PythiaPhotonCandidateTreeMap.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",\"${sample_name}\",${chunk_index},${n_events},\"${model_file}\")"
+  "$workflow_dir/Fun4All_PythiaPhotonCandidateTreeMap.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",\"${sample_name}\",${chunk_index},${n_events},${min_cluster_energy},\"${model_file}\")"
 root -l -b -q \
-  "$workflow_dir/check_pythia_photon_candidate_map.C(\"${temporary_output}\")"
+  "$workflow_dir/check_pythia_photon_candidate_map.C(\"${temporary_output}\",${min_cluster_energy})"
 
 mv -- "$temporary_output" "$final_output"
 temporary_output=

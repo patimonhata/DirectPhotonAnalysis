@@ -396,7 +396,8 @@ bool PythiaPhotonCandidateTree::update_input_provenance()
 int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
 {
   const bool manifest_valid = manifest_path_.empty() || (manifest_begin_ >= 0 && manifest_end_ > manifest_begin_ && primary_input_manager_);
-  if (output_file_name_.empty() || model_file_name_.empty() || signal_embedding_id_ <= 0 || !manifest_valid || !configure_sample())
+  if (output_file_name_.empty() || model_file_name_.empty() || signal_embedding_id_ <= 0 || !manifest_valid ||
+      !std::isfinite(min_cluster_energy_) || min_cluster_energy_ < 0.0 || !configure_sample())
   {
     std::cerr << "PythiaPhotonCandidateTree::Init - invalid output/model/sample configuration" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;

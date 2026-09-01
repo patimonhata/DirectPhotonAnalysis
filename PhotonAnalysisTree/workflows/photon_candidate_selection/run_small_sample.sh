@@ -3,10 +3,10 @@ set -euo pipefail
 
 usage()
 {
-  echo "Usage: $0 SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [OUTPUT_ROOT] [N_EVENTS_PER_MAP]" >&2
+  echo "Usage: $0 SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP]" >&2
 }
 
-if (( $# < 2 || $# > 5 )); then
+if (( $# < 2 || $# > 6 )); then
   usage
   exit 2
 fi
@@ -16,8 +16,9 @@ module_dir=$(cd "$workflow_dir/../.." && pwd)
 sample_name=$1
 segment_count=$2
 files_per_map=${3:-10}
-output_root=${4:-$module_dir/output/qa/photon_candidate_selection/${sample_name}_${segment_count}segments}
-n_events=${5:-0}
+min_cluster_energy=${4:-0.1}
+output_root=${5:-}
+n_events=${6:-0}
 
 for value in "$segment_count" "$files_per_map" "$n_events"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
@@ -28,6 +29,17 @@ done
 if (( segment_count == 0 || files_per_map == 0 )); then
   echo "N_SEGMENTS and FILES_PER_MAP must be positive" >&2
   exit 2
+fi
+if ! [[ "$min_cluster_energy" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$ ]]; then
+  echo "MIN_CLUSTER_ENERGY_GEV must be a non-negative finite number: $min_cluster_energy" >&2
+  exit 2
+fi
+printf -v canonical_threshold "%.12g" "$min_cluster_energy"
+threshold_tag=${canonical_threshold//./p}
+threshold_tag=${threshold_tag//+/}
+threshold_tag=${threshold_tag//-/m}
+if [[ -z "$output_root" ]]; then
+  output_root="$module_dir/output/qa/photon_candidate_selection/cluster_e_gt_${threshold_tag}/${sample_name}_${segment_count}segments"
 fi
 
 case "$sample_name" in
@@ -61,9 +73,9 @@ map_output="$map_root/$sample_name"
 output_base="$output_root/plots/region_a_pi0_anchor_topology"
 map_count=$(((segment_count + files_per_map - 1) / files_per_map))
 
-echo "Small-sample QA: sample=$sample_name segments=$segment_count maps=$map_count events_per_map=$n_events"
+echo "Small-sample QA: sample=$sample_name segments=$segment_count maps=$map_count events_per_map=$n_events min_cluster_energy=$min_cluster_energy"
 for ((job_index = 0; job_index < map_count; ++job_index)); do
-  "$workflow_dir/run_map.sh" "$job_index" 0 "$segment_count" "$files_per_map" "$input_manifest" "$sample_name" "$map_output" "$n_events"
+  "$workflow_dir/run_map.sh" "$job_index" 0 "$segment_count" "$files_per_map" "$input_manifest" "$sample_name" "$map_output" "$n_events" "$min_cluster_energy"
 done
 
 set +u

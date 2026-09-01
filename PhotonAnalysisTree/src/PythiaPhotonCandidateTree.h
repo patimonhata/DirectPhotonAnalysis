@@ -175,6 +175,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_manifest_path(const std::string& value) { manifest_path_ = value; }
   void set_manifest_range(long long begin, long long end) { manifest_begin_ = begin; manifest_end_ = end; }
   void set_suffix_range(const std::string& first, const std::string& last) { first_input_suffix_ = first; last_input_suffix_ = last; }
+  void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
   void set_map_chunk_id(unsigned int value) { map_chunk_id_ = value; }
   void set_signal_embedding_id(int value) { signal_embedding_id_ = value; }
   void set_truth_jet_node_name(const std::string& value) { truth_jet_node_name_ = value; }

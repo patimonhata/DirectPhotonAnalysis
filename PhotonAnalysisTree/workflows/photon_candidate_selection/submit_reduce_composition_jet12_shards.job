@@ -13,7 +13,7 @@ configuration      = cluster_e_gt_0p5
 # Supported selections: kinematic, preselection, preselection_tight, preselection_isolation,
 # region_a, region_a_tagging_veto, and final_photon (alias of region_a_tagging_veto).
 # selection          = region_a
-selection          = region_a_tagging_veto
+selection          = region_a
 require_complete   = true
 n_bins             = 200
 et_max             = 40.0

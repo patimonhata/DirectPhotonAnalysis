@@ -199,7 +199,7 @@ Run the compiled Jet-family reduce locally with:
 PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh \
   jet \
   PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1 \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/jet/region_a_pi0_anchor_topology \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/jet \
   true
 ~~~
 
@@ -209,7 +209,7 @@ Run the PhotonJet family independently by replacing `jet` with `photonjet` in bo
 PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh \
   photonjet \
   PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1 \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/photonjet/region_a_pi0_anchor_topology \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/photonjet \
   true
 ~~~
 
@@ -232,22 +232,27 @@ The cluster selections are:
 
 The stored topology classification uses the map-time strict `E_cluster > min_cluster_energy` threshold. The reduce validates that all maps and samples use the same topology threshold, fixed diagnostic floor, tagging threshold, and topology algorithm version, and does not reclassify topology. Its default binning matches the current `pi0_anchor_topology` production: 200 bins over `0 <= ET < 40 GeV`.
 
-Each family produces one ROOT file and six PDFs under
+Each family produces one selection-comparison ROOT file and one directory per selection under
 
 ~~~text
 output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_<threshold>/<family>/
+├── selection_comparison.root
+├── kinematic/region_a_pi0_anchor_topology*.pdf
+├── preselection/region_a_pi0_anchor_topology*.pdf
+├── preselection_tight/region_a_pi0_anchor_topology*.pdf
+├── preselection_isolation/region_a_pi0_anchor_topology*.pdf
+└── region_a_tagging_veto/region_a_pi0_anchor_topology*.pdf
 ~~~
 
-The PDFs are:
+The five selections are `kinematic`, `preselection` (`kinematic && pass_preselection`), `preselection_tight`,
+`preselection_isolation`, and `region_a_tagging_veto` (`region_a && !pi0_tag && !eta_tag`). Each selection directory
+contains the six spectrum/fraction PDFs listed below, with the selection label included in the annotations.
 
-- `region_a_pi0_anchor_topology.pdf`: summary differential-cross-section spectrum;
-- `region_a_pi0_anchor_topology_detailed.pdf`: detailed spectrum with missing subcategories;
-- `region_a_pi0_anchor_topology_category_fractions.pdf`: summary fraction lines;
-- `region_a_pi0_anchor_topology_category_fraction_stack.pdf`: summary stacked fractions;
-- `region_a_pi0_anchor_topology_category_fractions_detailed.pdf`: detailed fraction lines;
-- `region_a_pi0_anchor_topology_category_fraction_stack_detailed.pdf`: detailed stacked fractions.
-
-The ROOT file stores unweighted counts, cross-section-weighted spectra in pb, bin-width-normalized spectra in pb/GeV, category fractions, and compact reduce provenance. The topology categories are checked to partition the Region-A anchor denominator in every ET bin, including underflow and overflow.
+The ROOT file stores one directory per selection, each containing unweighted counts, cross-section-weighted spectra in pb,
+bin-width-normalized spectra in pb/GeV, and category fractions. The `selection_summary` tree stores per-sample raw selected
+cluster and selected anchor counts. Its metadata records the exact selection definitions and compact reduce provenance. The
+topology categories are checked to partition the selected Region-A anchor denominator in every ET bin, including underflow
+and overflow.
 
 ## Photon-candidate purity and background composition
 

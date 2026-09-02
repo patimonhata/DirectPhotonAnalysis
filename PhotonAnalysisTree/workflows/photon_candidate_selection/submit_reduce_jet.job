@@ -16,7 +16,7 @@ require_complete   = true
 n_bins             = 200
 et_max             = 40.0
 map_root            = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/$(configuration)
-output_base         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/$(configuration)/$(family)/region_a_pi0_anchor_topology
+output_base         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/$(configuration)/$(family)
 log_directory       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
 
 Output             = $(log_directory)/$(family)_$(configuration).out

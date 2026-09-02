@@ -1,6 +1,7 @@
 #include "../../macro/Utilities/sPhenixStyle.C"
 
 #include <TCanvas.h>
+#include <TDirectory.h>
 #include <TChain.h>
 #include <TFile.h>
 #include <TH1D.h>
@@ -26,6 +27,11 @@
 namespace
 {
 constexpr std::size_t kSpectrumCount = 14;
+constexpr std::size_t kSelectionCount = 5;
+constexpr std::array<const char*, kSelectionCount> kSelectionKeys = {
+    "kinematic", "preselection", "preselection_tight", "preselection_isolation", "region_a_tagging_veto"};
+constexpr std::array<const char*, kSelectionCount> kSelectionLabels = {
+    "Kinematic", "Pre-selection", "Pre-selection + TightBDT", "Pre-selection + Isolation", "Region A + Tagging veto"};
 constexpr std::array<const char*, kSpectrumCount> kKeys = {
     "prompt", "pi0_anchor", "separated", "merged", "single_contaminated", "missing",
     "missing_energy_threshold", "missing_displaced_partner", "missing_acceptance",
@@ -272,6 +278,32 @@ struct Spectra
   }
 };
 
+struct SelectionSpectra
+{
+  std::unique_ptr<Spectra> histograms;
+  std::vector<unsigned long long> sample_selected_clusters;
+  std::vector<unsigned long long> sample_selected_anchor_clusters;
+
+  SelectionSpectra(int n_bins, double et_max) : histograms(std::make_unique<Spectra>(n_bins, et_max)) {}
+};
+
+bool pass_selection(std::size_t selection, unsigned char pass_kinematics, unsigned char pass_preselection,
+                    unsigned char pass_tight, unsigned char pass_isolated, unsigned char pass_region_a,
+                    unsigned char pi0_tag, unsigned char eta_tag)
+{
+  const bool kinematic = pass_kinematics != 0U;
+  const bool preselection = kinematic && pass_preselection != 0U;
+  switch (selection)
+  {
+    case 0: return kinematic;
+    case 1: return preselection;
+    case 2: return preselection && pass_tight != 0U;
+    case 3: return preselection && pass_isolated != 0U;
+    case 4: return pass_region_a != 0U && pi0_tag == 0U && eta_tag == 0U;
+    default: return false;
+  }
+}
+
 bool valid_partition(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& histograms)
 {
   for (int bin = 0; bin <= histograms[0]->GetNbinsX() + 1; ++bin)
@@ -482,9 +514,11 @@ int ReducePythiaRegionAAnchorTopology(
   const std::string resolved_output_base = output_base.empty()
       ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/" + map_configuration + "/" + family + "/region_a_pi0_anchor_topology"
       : output_base;
-  if (!make_output_directory(resolved_output_base)) return 2;
+  if (gSystem->AccessPathName(resolved_output_base.c_str()) && gSystem->mkdir(resolved_output_base.c_str(), true) != 0) return 2;
 
-  Spectra spectra(n_bins, et_max);
+  std::array<std::unique_ptr<SelectionSpectra>, kSelectionCount> selections;
+  for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
+    selections[selection] = std::make_unique<SelectionSpectra>(n_bins, et_max);
   std::vector<std::string> sample_names;
   std::vector<unsigned long long> sample_map_counts;
   std::vector<unsigned long long> sample_events_written;
@@ -492,6 +526,8 @@ int ReducePythiaRegionAAnchorTopology(
   std::vector<unsigned long long> sample_region_a_clusters;
   std::vector<unsigned long long> sample_region_a_prompt_clusters;
   std::vector<unsigned long long> sample_region_a_anchor_clusters;
+  std::array<std::vector<unsigned long long>, kSelectionCount> sample_selected_clusters;
+  std::array<std::vector<unsigned long long>, kSelectionCount> sample_selected_anchor_clusters;
   std::vector<double> sample_cross_sections_pb;
   std::vector<double> sample_sum_generator_weights;
   std::string family_analysis_release;
@@ -539,6 +575,11 @@ int ReducePythiaRegionAAnchorTopology(
     unsigned long long region_a_clusters = 0;
     unsigned long long region_a_prompt_clusters = 0;
     unsigned long long region_a_anchor_clusters = 0;
+    for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
+    {
+      selections[selection]->sample_selected_clusters.push_back(0);
+      selections[selection]->sample_selected_anchor_clusters.push_back(0);
+    }
     for (const MapMetadata& map : maps)
     {
       TFile file(map.path.c_str(), "READ");
@@ -552,7 +593,13 @@ int ReducePythiaRegionAAnchorTopology(
       unsigned char stitching_pass = 0;
       double weight_numerator_pb = 0.0;
       std::vector<double>* cluster_et = nullptr;
+      std::vector<unsigned char>* pass_kinematics = nullptr;
+      std::vector<unsigned char>* pass_preselection = nullptr;
+      std::vector<unsigned char>* pass_tight = nullptr;
+      std::vector<unsigned char>* pass_isolated = nullptr;
       std::vector<unsigned char>* region_a = nullptr;
+      std::vector<unsigned char>* pi0_tag = nullptr;
+      std::vector<unsigned char>* eta_tag = nullptr;
       std::vector<unsigned char>* prompt = nullptr;
       std::vector<unsigned char>* anchor_valid = nullptr;
       std::vector<int>* topology = nullptr;
@@ -564,7 +611,13 @@ int ReducePythiaRegionAAnchorTopology(
       ok &= bind_active(tree, "sample_stitching_pass", &stitching_pass);
       ok &= bind_active(tree, "weight_numerator_pb", &weight_numerator_pb);
       ok &= bind_active(tree, "split_cluster_et", &cluster_et);
+      ok &= bind_active(tree, "split_cluster_pass_kinematics", &pass_kinematics);
+      ok &= bind_active(tree, "split_cluster_pass_preselection", &pass_preselection);
+      ok &= bind_active(tree, "split_cluster_pass_tight", &pass_tight);
+      ok &= bind_active(tree, "split_cluster_pass_isolated", &pass_isolated);
       ok &= bind_active(tree, "split_cluster_pass_region_a", &region_a);
+      ok &= bind_active(tree, "split_cluster_pi0_tag", &pi0_tag);
+      ok &= bind_active(tree, "split_cluster_eta_tag", &eta_tag);
       ok &= bind_active(tree, "split_cluster_truth_prompt_cluster", &prompt);
       ok &= bind_active(tree, "split_cluster_pi0_anchor_valid", &anchor_valid);
       ok &= bind_active(tree, "split_cluster_pi0_anchor_topology", &topology);
@@ -576,9 +629,13 @@ int ReducePythiaRegionAAnchorTopology(
       for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
       {
         tree->GetEntry(entry);
-        if (!cluster_et || !region_a || !prompt || !anchor_valid || !topology || !missing_category ||
-            cluster_et->size() != ncluster || region_a->size() != ncluster || prompt->size() != ncluster ||
-            anchor_valid->size() != ncluster || topology->size() != ncluster || missing_category->size() != ncluster)
+        if (!cluster_et || !pass_kinematics || !pass_preselection || !pass_tight || !pass_isolated || !region_a ||
+            !pi0_tag || !eta_tag || !prompt || !anchor_valid || !topology || !missing_category ||
+            cluster_et->size() != ncluster || pass_kinematics->size() != ncluster ||
+            pass_preselection->size() != ncluster || pass_tight->size() != ncluster ||
+            pass_isolated->size() != ncluster || region_a->size() != ncluster || pi0_tag->size() != ncluster ||
+            eta_tag->size() != ncluster || prompt->size() != ncluster || anchor_valid->size() != ncluster ||
+            topology->size() != ncluster || missing_category->size() != ncluster)
         {
           std::cerr << "Malformed cluster vectors in " << map.path << " entry " << entry << std::endl;
           return 6;
@@ -591,42 +648,49 @@ int ReducePythiaRegionAAnchorTopology(
         {
           const double et = (*cluster_et)[cluster];
           if (!std::isfinite(et)) return 6;
-          if (!(*region_a)[cluster]) continue;
-          ++region_a_clusters;
-          if ((*prompt)[cluster])
+          if ((*region_a)[cluster])
           {
-            spectra.fill(0, et, weight_pb);
-            ++region_a_prompt_clusters;
+            ++region_a_clusters;
+            if ((*prompt)[cluster]) ++region_a_prompt_clusters;
+            if ((*anchor_valid)[cluster]) ++region_a_anchor_clusters;
           }
-          if (!(*anchor_valid)[cluster]) continue;
-          spectra.fill(1, et, weight_pb);
-          ++region_a_anchor_clusters;
-          const int topology_value = (*topology)[cluster];
-          if (topology_value == 1) spectra.fill(2, et, weight_pb);
-          else if (topology_value == 2) spectra.fill(3, et, weight_pb);
-          else if (topology_value == 4) spectra.fill(4, et, weight_pb);
-          else if (topology_value == 0) spectra.fill(13, et, weight_pb);
-          else if (topology_value == 3)
+          for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
           {
-            spectra.fill(5, et, weight_pb);
-            const int missing_value = (*missing_category)[cluster];
-            if (missing_value == 1) spectra.fill(6, et, weight_pb);
-            else if (missing_value == 4) spectra.fill(7, et, weight_pb);
-            else if (missing_value == 2) spectra.fill(8, et, weight_pb);
-            else if (missing_value == 5) spectra.fill(9, et, weight_pb);
-            else if (missing_value == 6) spectra.fill(10, et, weight_pb);
-            else if (missing_value == 7) spectra.fill(11, et, weight_pb);
-            else if (missing_value == 3) spectra.fill(12, et, weight_pb);
+            if (!pass_selection(selection, (*pass_kinematics)[cluster], (*pass_preselection)[cluster], (*pass_tight)[cluster],
+                                (*pass_isolated)[cluster], (*region_a)[cluster], (*pi0_tag)[cluster], (*eta_tag)[cluster])) continue;
+            SelectionSpectra& selected = *selections[selection];
+            ++selected.sample_selected_clusters.back();
+            selected.histograms->fill(0, et, weight_pb);
+            if (!(*anchor_valid)[cluster]) continue;
+            ++selected.sample_selected_anchor_clusters.back();
+            selected.histograms->fill(1, et, weight_pb);
+            const int topology_value = (*topology)[cluster];
+            if (topology_value == 1) selected.histograms->fill(2, et, weight_pb);
+            else if (topology_value == 2) selected.histograms->fill(3, et, weight_pb);
+            else if (topology_value == 4) selected.histograms->fill(4, et, weight_pb);
+            else if (topology_value == 0) selected.histograms->fill(13, et, weight_pb);
+            else if (topology_value == 3)
+            {
+              selected.histograms->fill(5, et, weight_pb);
+              const int missing_value = (*missing_category)[cluster];
+              if (missing_value == 1) selected.histograms->fill(6, et, weight_pb);
+              else if (missing_value == 4) selected.histograms->fill(7, et, weight_pb);
+              else if (missing_value == 2) selected.histograms->fill(8, et, weight_pb);
+              else if (missing_value == 5) selected.histograms->fill(9, et, weight_pb);
+              else if (missing_value == 6) selected.histograms->fill(10, et, weight_pb);
+              else if (missing_value == 7) selected.histograms->fill(11, et, weight_pb);
+              else if (missing_value == 3) selected.histograms->fill(12, et, weight_pb);
+              else
+              {
+                std::cerr << "Invalid stored missing category in " << map.path << " entry " << entry << std::endl;
+                return 6;
+              }
+            }
             else
             {
-              std::cerr << "Invalid stored missing category in " << map.path << " entry " << entry << std::endl;
+              std::cerr << "Invalid stored topology in " << map.path << " entry " << entry << std::endl;
               return 6;
             }
-          }
-          else
-          {
-            std::cerr << "Invalid stored topology in " << map.path << " entry " << entry << std::endl;
-            return 6;
           }
         }
       }
@@ -639,6 +703,11 @@ int ReducePythiaRegionAAnchorTopology(
     sample_region_a_clusters.push_back(region_a_clusters);
     sample_region_a_prompt_clusters.push_back(region_a_prompt_clusters);
     sample_region_a_anchor_clusters.push_back(region_a_anchor_clusters);
+    for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
+    {
+      sample_selected_clusters[selection].push_back(selections[selection]->sample_selected_clusters.back());
+      sample_selected_anchor_clusters[selection].push_back(selections[selection]->sample_selected_anchor_clusters.back());
+    }
     sample_cross_sections_pb.push_back(sample.cross_section_pb);
     sample_sum_generator_weights.push_back(sample_sumw);
     std::cout << "Reduce sample/maps/events/stitch/regionA/prompt/anchor/sumw = " << sample.name << "/" << maps.size() << "/"
@@ -651,58 +720,74 @@ int ReducePythiaRegionAAnchorTopology(
     std::cerr << "No sample maps were reduced" << std::endl;
     return 3;
   }
-  if (!valid_partition(spectra.counts) || !valid_partition(spectra.weighted_pb))
+  for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
   {
-    std::cerr << "Topology partition failed" << std::endl;
-    return 7;
+    if (!valid_partition(selections[selection]->histograms->counts) || !valid_partition(selections[selection]->histograms->weighted_pb))
+    {
+      std::cerr << "Topology partition failed for selection " << kSelectionKeys[selection] << std::endl;
+      return 7;
+    }
   }
 
-  std::array<std::unique_ptr<TH1D>, kSpectrumCount> density;
-  for (std::size_t index = 0; index < kSpectrumCount; ++index)
-  {
-    density[index].reset(static_cast<TH1D*>(spectra.weighted_pb[index]->Clone((std::string("h_region_a_") + kKeys[index] + "_et_pb_per_gev").c_str())));
-    density[index]->SetDirectory(nullptr);
-    density[index]->Scale(1.0, "width");
-    density[index]->SetLineColor(kColors[index]);
-    density[index]->SetLineWidth(index < 2 ? 3 : 2);
-    style_axes(density[index].get(), "d#sigma/dE_{T} [pb/GeV]");
-    spectra.counts[index]->SetLineColor(kColors[index]);
-    spectra.weighted_pb[index]->SetLineColor(kColors[index]);
-  }
-  const std::vector<std::size_t> detailed_spectrum_indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
-  const std::vector<std::size_t> summary_spectrum_indices(kSummarySpectrum.begin(), kSummarySpectrum.end());
-  const std::vector<std::size_t> detailed_category_indices(kDetailedCategories.begin(), kDetailedCategories.end());
-  const std::vector<std::size_t> summary_category_indices(kSummaryCategories.begin(), kSummaryCategories.end());
-  auto detailed_fractions = make_fractions(spectra.weighted_pb, detailed_category_indices, "h_region_a_detailed_");
-  auto summary_fractions = make_fractions(spectra.weighted_pb, summary_category_indices, "h_region_a_summary_");
-
-  SetsPhenixStyle();
-  std::ostringstream family_label_stream;
-  family_label_stream << (family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples")
-                      << ", E_{cluster} > " << family_min_cluster_energy << " GeV";
-  const std::string family_label = family_label_stream.str();
-  draw_spectrum(density, detailed_spectrum_indices, resolved_output_base + "_detailed.pdf", family_label, true);
-  draw_spectrum(density, summary_spectrum_indices, resolved_output_base + ".pdf", family_label, false);
-  draw_fraction_lines(detailed_fractions, detailed_category_indices, resolved_output_base + "_category_fractions_detailed.pdf", family_label, true);
-  draw_fraction_lines(summary_fractions, summary_category_indices, resolved_output_base + "_category_fractions.pdf", family_label, false);
-  draw_fraction_stack(detailed_fractions, detailed_category_indices, resolved_output_base + "_category_fraction_stack_detailed.pdf", family_label, true);
-  draw_fraction_stack(summary_fractions, summary_category_indices, resolved_output_base + "_category_fraction_stack.pdf", family_label, false);
-
-  TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
+  TFile output((resolved_output_base + "/selection_comparison.root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;
-  for (std::size_t index = 0; index < kSpectrumCount; ++index)
+  const std::string family_label = family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples";
+  for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
   {
-    spectra.counts[index]->Write();
-    spectra.weighted_pb[index]->Write();
-    density[index]->Write();
+    Spectra& spectra = *selections[selection]->histograms;
+    const std::string selection_output_base = resolved_output_base + "/" + kSelectionKeys[selection] + "/region_a_pi0_anchor_topology";
+    if (!make_output_directory(selection_output_base)) return 8;
+    std::array<std::unique_ptr<TH1D>, kSpectrumCount> density;
+    for (std::size_t index = 0; index < kSpectrumCount; ++index)
+    {
+      density[index].reset(static_cast<TH1D*>(spectra.weighted_pb[index]->Clone((std::string("h_") + kSelectionKeys[selection] + "_" + kKeys[index] + "_et_pb_per_gev").c_str())));
+      density[index]->SetDirectory(nullptr);
+      density[index]->Scale(1.0, "width");
+      density[index]->SetLineColor(kColors[index]);
+      density[index]->SetLineWidth(index < 2 ? 3 : 2);
+      style_axes(density[index].get(), "d#sigma/dE_{T} [pb/GeV]");
+      spectra.counts[index]->SetLineColor(kColors[index]);
+      spectra.weighted_pb[index]->SetLineColor(kColors[index]);
+    }
+    const std::vector<std::size_t> detailed_spectrum_indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
+    const std::vector<std::size_t> summary_spectrum_indices(kSummarySpectrum.begin(), kSummarySpectrum.end());
+    const std::vector<std::size_t> detailed_category_indices(kDetailedCategories.begin(), kDetailedCategories.end());
+    const std::vector<std::size_t> summary_category_indices(kSummaryCategories.begin(), kSummaryCategories.end());
+    auto detailed_fractions = make_fractions(spectra.weighted_pb, detailed_category_indices, std::string("h_") + kSelectionKeys[selection] + "_detailed_");
+    auto summary_fractions = make_fractions(spectra.weighted_pb, summary_category_indices, std::string("h_") + kSelectionKeys[selection] + "_summary_");
+    const std::string selection_label = family_label + ", " + kSelectionLabels[selection] + ", E_{cluster} > " + std::to_string(family_min_cluster_energy) + " GeV";
+    draw_spectrum(density, detailed_spectrum_indices, selection_output_base + "_detailed.pdf", selection_label, true);
+    draw_spectrum(density, summary_spectrum_indices, selection_output_base + ".pdf", selection_label, false);
+    draw_fraction_lines(detailed_fractions, detailed_category_indices, selection_output_base + "_category_fractions_detailed.pdf", selection_label, true);
+    draw_fraction_lines(summary_fractions, summary_category_indices, selection_output_base + "_category_fractions.pdf", selection_label, false);
+    draw_fraction_stack(detailed_fractions, detailed_category_indices, selection_output_base + "_category_fraction_stack_detailed.pdf", selection_label, true);
+    draw_fraction_stack(summary_fractions, summary_category_indices, selection_output_base + "_category_fraction_stack.pdf", selection_label, false);
+
+    TDirectory* directory = output.mkdir(kSelectionKeys[selection]);
+    if (!directory) return 8;
+    directory->cd();
+    for (std::size_t index = 0; index < kSpectrumCount; ++index)
+    {
+      spectra.counts[index]->Write();
+      spectra.weighted_pb[index]->Write();
+      density[index]->Write();
+    }
+    for (auto& histogram : detailed_fractions) histogram->Write();
+    for (auto& histogram : summary_fractions) histogram->Write();
+    output.cd();
   }
-  for (auto& histogram : detailed_fractions) histogram->Write();
-  for (auto& histogram : summary_fractions) histogram->Write();
 
   int output_schema_version = 1;
   int source_map_schema_version = 4;
-  std::string selection_definition = "sample_stitching_valid_and_pass_and_region_a_and_pi0_anchor_valid";
-  std::string prompt_definition = "sample_stitching_valid_and_pass_and_region_a_and_truth_prompt_cluster";
+  std::vector<std::string> selection_keys(kSelectionKeys.begin(), kSelectionKeys.end());
+  std::vector<std::string> selection_labels(kSelectionLabels.begin(), kSelectionLabels.end());
+  std::vector<std::string> selection_definitions = {
+      "pass_kinematics",
+      "pass_kinematics_and_pass_preselection",
+      "pass_kinematics_and_pass_preselection_and_pass_tight",
+      "pass_kinematics_and_pass_preselection_and_pass_isolated",
+      "pass_region_a_and_not_pi0_tag_and_not_eta_tag"};
+  std::string prompt_definition = "selected_and_truth_prompt_cluster";
   std::string topology_source = "stored_map_topology_evaluated_with_strict_min_cluster_energy_from_metadata";
   std::string weight_definition = "sample_cross_section_pb_times_generator_weight_divided_by_full_sample_sum_generator_weight_processed";
   std::string metadata_family = family;
@@ -719,7 +804,9 @@ int ReducePythiaRegionAAnchorTopology(
   metadata.Branch("require_complete", &metadata_require_complete);
   metadata.Branch("n_bins", &metadata_n_bins);
   metadata.Branch("et_max", &metadata_et_max);
-  metadata.Branch("selection_definition", &selection_definition);
+  metadata.Branch("selection_keys", &selection_keys);
+  metadata.Branch("selection_labels", &selection_labels);
+  metadata.Branch("selection_definitions", &selection_definitions);
   metadata.Branch("prompt_definition", &prompt_definition);
   metadata.Branch("topology_source", &topology_source);
   metadata.Branch("analysis_release", &family_analysis_release);
@@ -741,9 +828,30 @@ int ReducePythiaRegionAAnchorTopology(
   metadata.Branch("sample_sum_generator_weights", &sample_sum_generator_weights);
   metadata.Fill();
   metadata.Write();
+
+  TTree selection_summary("selection_summary", "Per-selection reduce summary");
+  unsigned int selection_index = 0U;
+  std::string selection_key;
+  std::string selection_label;
+  std::vector<unsigned long long> selected_clusters;
+  std::vector<unsigned long long> selected_anchor_clusters;
+  selection_summary.Branch("selection_index", &selection_index);
+  selection_summary.Branch("selection_key", &selection_key);
+  selection_summary.Branch("selection_label", &selection_label);
+  selection_summary.Branch("sample_selected_clusters", &selected_clusters);
+  selection_summary.Branch("sample_selected_anchor_clusters", &selected_anchor_clusters);
+  for (selection_index = 0; selection_index < kSelectionCount; ++selection_index)
+  {
+    selection_key = kSelectionKeys[selection_index];
+    selection_label = kSelectionLabels[selection_index];
+    selected_clusters = sample_selected_clusters[selection_index];
+    selected_anchor_clusters = sample_selected_anchor_clusters[selection_index];
+    selection_summary.Fill();
+  }
+  selection_summary.Write();
   output.Close();
 
   std::cout << "ReducePythiaRegionAAnchorTopology - family/samples/anchor/output = " << family << "/" << sample_count << "/"
-            << spectra.counts[1]->GetEntries() << "/" << resolved_output_base << std::endl;
+            << selections[4]->histograms->counts[1]->GetEntries() << "/" << resolved_output_base << std::endl;
   return 0;
 }

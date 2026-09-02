@@ -239,4 +239,48 @@ The PDFs are:
 
 The ROOT file stores unweighted counts, cross-section-weighted spectra in pb, bin-width-normalized spectra in pb/GeV, category fractions, and compact reduce provenance. The topology categories are checked to partition the Region-A anchor denominator in every ET bin, including underflow and overflow.
 
+## Photon-candidate purity and background composition
+
+`ReducePythiaPhotonCandidateComposition.C` partitions every selected candidate into exactly one of prompt photon, pi0 topology, eta, or other. Every truth-origin requirement uses a strict contribution `> 0.5`; an exact contribution of `0.5` is therefore other. The detailed pi0 categories are separated, merged, single contaminated, missing, and other.
+
+Prompt uses the stored prompt flag plus the stored dominant-contributor fraction. Pi0 uses the stored anchor plus its same-parent main fraction and topology. Eta sums signal-embedding contributors identified either as a G4 eta or as a generator eta-decay photon. If more than one strict majority is ever found, the candidate is assigned to other and the reducer returns nonzero after writing the overlap count to metadata.
+
+Run the Region-A Jet-family composition with:
+
+~~~bash
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.sh \
+  jet \
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p5 \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a/jet/photon_candidate_composition \
+  region_a \
+  true
+~~~
+
+Use `final_photon` instead of `region_a` to use the stored Region-A selection after the pi0-or-eta tag veto:
+
+~~~bash
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.sh \
+  jet \
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p5 \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/final_photon/jet/photon_candidate_composition \
+  final_photon \
+  true
+~~~
+
+For a disconnect-safe full Jet-family production, first create the shared log directory and then submit the one-job reducer:
+
+~~~bash
+mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet.job
+~~~
+
+The submit file defaults to `configuration = cluster_e_gt_0p5`, `selection = region_a`, and `require_complete = true`. Change `selection` to `final_photon` for the tag-veto result. Submit the two selections separately because they write different output directories and log names.
+
+Each run writes:
+
+- `photon_candidate_composition.root`, containing unweighted and cross-section-weighted spectra, `h_photon_candidate_purity`, every category fraction, counts, normalization inputs, and classification QA metadata;
+- `photon_candidate_composition_category_fraction_stack.pdf`, whose categories partition the selected-candidate denominator in every cluster-ET bin.
+
+The reducer validates both the unweighted and weighted partition, including underflow and overflow. `overlap_cluster_count`, `half_boundary_cluster_count`, and `invalid_truth_cluster_count` are retained as QA counters. Production results require `REQUIRE_COMPLETE=true`; partial mode is only for development.
+
 ABCD purity extraction remains a separate future reduce stage.

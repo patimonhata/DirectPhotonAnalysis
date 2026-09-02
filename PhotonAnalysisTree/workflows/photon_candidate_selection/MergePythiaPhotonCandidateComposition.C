@@ -146,7 +146,7 @@ int MergePythiaPhotonCandidateComposition(
   using namespace candidate_composition;
   using namespace candidate_composition_merge;
   const std::vector<SampleDefinition> samples = sample_definitions(family);
-  if (samples.empty() || partial_root.empty() || output_base.empty() || (selection != "region_a" && selection != "final_photon")) return 1;
+  if (samples.empty() || partial_root.empty() || output_base.empty() || !find_selection(selection)) return 1;
   std::string normalized_partial_root = partial_root;
   while (normalized_partial_root.size() > 1U && normalized_partial_root.back() == '/') normalized_partial_root.pop_back();
   if (!make_output_directory(output_base)) return 2;

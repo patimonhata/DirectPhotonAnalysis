@@ -28,6 +28,30 @@ constexpr std::array<const char*, category_count> kLabels = {
 constexpr std::array<int, category_count> kColors = {
     kBlack, kRed + 1, kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2, kGray + 1, kOrange + 7, kGray + 2};
 
+struct SelectionDefinition
+{
+  const char* key;
+  const char* label;
+  std::array<const char*, 3> branches;
+  std::size_t branch_count;
+};
+
+constexpr std::array<SelectionDefinition, 7> kSelectionDefinitions = {{
+    {"kinematic", "Kinematic", {"split_cluster_pass_kinematics", nullptr, nullptr}, 1},
+    {"preselection", "Pre-selection", {"split_cluster_pass_kinematics", "split_cluster_pass_preselection", nullptr}, 2},
+    {"preselection_tight", "Pre-selection + TightBDT", {"split_cluster_pass_kinematics", "split_cluster_pass_preselection", "split_cluster_pass_tight"}, 3},
+    {"preselection_isolation", "Pre-selection + Isolation", {"split_cluster_pass_kinematics", "split_cluster_pass_preselection", "split_cluster_pass_isolated"}, 3},
+    {"region_a", "Region A: isolated and tight", {"split_cluster_pass_region_a", nullptr, nullptr}, 1},
+    {"region_a_tagging_veto", "Region A after #pi^{0}/#eta tag veto", {"split_cluster_pass_final_photon", nullptr, nullptr}, 1},
+    {"final_photon", "Region A after #pi^{0}/#eta tag veto", {"split_cluster_pass_final_photon", nullptr, nullptr}, 1},
+}};
+
+const SelectionDefinition* find_selection(const std::string& key)
+{
+  const auto found = std::find_if(kSelectionDefinitions.begin(), kSelectionDefinitions.end(), [&](const SelectionDefinition& definition) { return key == definition.key; });
+  return found == kSelectionDefinitions.end() ? nullptr : &*found;
+}
+
 struct Histograms
 {
   std::array<std::unique_ptr<TH1D>, category_count> counts;
@@ -190,7 +214,8 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
   label.SetTextSize(0.026);
   label.DrawLatex(0.06, 0.96, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(0.06, 0.91, (family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples"));
-  label.DrawLatex(0.06, 0.86, selection == "region_a" ? "Region A: isolated and tight" : "Region A after #pi^{0}/#eta tag veto");
+  const SelectionDefinition* selected_definition = find_selection(selection);
+  label.DrawLatex(0.06, 0.86, selected_definition ? selected_definition->label : selection.c_str());
   std::ostringstream threshold;
   threshold << "E_{cluster} > " << min_cluster_energy << " GeV; truth contribution > 50%";
   label.DrawLatex(0.06, 0.81, threshold.str().c_str());
@@ -212,6 +237,7 @@ int ReducePythiaPhotonCandidateComposition(
     const std::string sample_name = "")
 {
   using namespace candidate_composition;
+  const SelectionDefinition* selected_definition = find_selection(selection);
   const std::vector<SampleDefinition> family_samples = sample_definitions(family);
   std::vector<SampleDefinition> samples;
   if (sample_name.empty()) samples = family_samples;
@@ -220,7 +246,7 @@ int ReducePythiaPhotonCandidateComposition(
     const auto selected_sample = std::find_if(family_samples.begin(), family_samples.end(), [&](const SampleDefinition& sample) { return sample.name == sample_name; });
     if (selected_sample != family_samples.end()) samples.push_back(*selected_sample);
   }
-  if (samples.empty() || map_root.empty() || (selection != "region_a" && selection != "final_photon") ||
+  if (samples.empty() || map_root.empty() || !selected_definition ||
       n_bins <= 0 || !std::isfinite(et_max) || et_max <= 0.0) return 1;
   std::string normalized_map_root = map_root;
   while (normalized_map_root.size() > 1U && normalized_map_root.back() == '/') normalized_map_root.pop_back();
@@ -279,7 +305,7 @@ int ReducePythiaPhotonCandidateComposition(
       unsigned char weight_valid = 0, stitch_valid = 0, stitch_pass = 0;
       double weight_numerator = 0.0;
       std::vector<double>* et = nullptr;
-      std::vector<unsigned char>* selected = nullptr;
+      std::array<std::vector<unsigned char>*, 3> selection_flags = {};
       std::vector<unsigned char>* truth_valid = nullptr;
       std::vector<unsigned char>* prompt_flag = nullptr;
       std::vector<float>* dominant_fraction = nullptr;
@@ -300,7 +326,6 @@ int ReducePythiaPhotonCandidateComposition(
           bind_active(tree, "sample_stitching_pass", &stitch_pass) &&
           bind_active(tree, "weight_numerator_pb", &weight_numerator) &&
           bind_active(tree, "split_cluster_et", &et) &&
-          bind_active(tree, selection == "region_a" ? "split_cluster_pass_region_a" : "split_cluster_pass_final_photon", &selected) &&
           bind_active(tree, "split_cluster_truth_valid", &truth_valid) &&
           bind_active(tree, "split_cluster_truth_prompt_cluster", &prompt_flag) &&
           bind_active(tree, "split_cluster_truth_dominant_fraction", &dominant_fraction) &&
@@ -313,14 +338,19 @@ int ReducePythiaPhotonCandidateComposition(
           bind_active(tree, "split_cluster_truth_contributor_fraction", &fraction) &&
           bind_active(tree, "split_cluster_truth_contributor_photon_source", &source) &&
           bind_active(tree, "split_cluster_truth_contributor_classification_parent_pdg", &parent);
+      for (std::size_t index = 0; index < selected_definition->branch_count; ++index)
+        ok &= bind_active(tree, selected_definition->branches[index], &selection_flags[index]);
       if (!ok) return 5;
       tree->StopCacheLearningPhase();
 
       for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
       {
         tree->GetEntry(entry);
-        if (!et || !selected || !truth_valid || !prompt_flag || !dominant_fraction || !pi0_valid || !pi0_fraction || !topology ||
-            !offset || !g4_pdg || !embedding || !fraction || !source || !parent || et->size() != ncluster || selected->size() != ncluster ||
+        bool selection_flags_valid = true;
+        for (std::size_t index = 0; index < selected_definition->branch_count; ++index)
+          selection_flags_valid = selection_flags_valid && selection_flags[index] && selection_flags[index]->size() == ncluster;
+        if (!selection_flags_valid || !et || !truth_valid || !prompt_flag || !dominant_fraction || !pi0_valid || !pi0_fraction || !topology ||
+            !offset || !g4_pdg || !embedding || !fraction || !source || !parent || et->size() != ncluster ||
             truth_valid->size() != ncluster || prompt_flag->size() != ncluster || dominant_fraction->size() != ncluster ||
             pi0_valid->size() != ncluster || pi0_fraction->size() != ncluster || topology->size() != ncluster ||
             !valid_contributors(ncluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent)) return 6;
@@ -329,7 +359,10 @@ int ReducePythiaPhotonCandidateComposition(
         if (!std::isfinite(weight)) return 6;
         for (std::size_t cluster = 0; cluster < ncluster; ++cluster)
         {
-          if (!(*selected)[cluster]) continue;
+          bool passes_selection = true;
+          for (std::size_t index = 0; index < selected_definition->branch_count; ++index)
+            passes_selection = passes_selection && (*selection_flags[index])[cluster];
+          if (!passes_selection) continue;
           const double cluster_et = (*et)[cluster];
           const double eta_contribution = eta_fraction(cluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent);
           if (!std::isfinite(cluster_et) || !std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;

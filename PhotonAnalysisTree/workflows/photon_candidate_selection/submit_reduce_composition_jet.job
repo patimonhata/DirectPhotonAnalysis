@@ -26,7 +26,8 @@ Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-compositio
 
 Arguments          = "$(family) $(map_root) $(output_base) $(selection) $(require_complete) $(n_bins) $(et_max)"
 
-# Change selection to final_photon for Region A after the pi0-or-eta tag veto.
+# Supported: kinematic, preselection, preselection_tight, preselection_isolation, region_a,
+# region_a_tagging_veto, and final_photon (alias of region_a_tagging_veto).
 # PhotonJet must use a separate submit and output_base; do not mix sample families.
 # One reducer may write a given output_base at a time.
 Queue 1

@@ -271,16 +271,17 @@ PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.s
   true
 ~~~
 
-Use `final_photon` instead of `region_a` to use the stored Region-A selection after the pi0-or-eta tag veto:
+The supported selections use the same definitions as the topology comparison reduce:
 
-~~~bash
-PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.sh \
-  jet \
-  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p5 \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/final_photon/jet/photon_candidate_composition \
-  final_photon \
-  true
-~~~
+- `kinematic`: `split_cluster_pass_kinematics`;
+- `preselection`: `kinematic && pass_preselection`;
+- `preselection_tight`: `kinematic && pass_preselection && pass_tight`;
+- `preselection_isolation`: `kinematic && pass_preselection && pass_isolated`;
+- `region_a`: stored isolated-and-tight Region A;
+- `region_a_tagging_veto`: stored Region A after the pi0-or-eta tag veto;
+- `final_photon`: backward-compatible alias of `region_a_tagging_veto`.
+
+Use the selection key consistently in the output directory, reduce submit, and merge command.
 
 For a disconnect-safe full Jet-family production, create the shared log directory and submit one independent reduce job per sample:
 
@@ -307,14 +308,14 @@ The partial jobs do not create PDFs. After all seven jobs have exited successful
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge_composition.sh \
   jet \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a/jet/partial \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a/jet/photon_candidate_composition \
-  region_a
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a_tagging_veto/jet/partial \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a_tagging_veto/jet/photon_candidate_composition \
+  region_a_tagging_veto
 ~~~
 
 There is deliberately no automatic Condor dependency or DAG. The merge requires exactly one partial for every sample in the family and rejects missing files, unexpected sample metadata, incompatible analysis/configuration metadata, incompatible histogram axes, and invalid category partitions. It adds only count and weighted spectra, then recomputes every fraction and both stack PDFs from the merged weighted numerator and denominator.
 
-The sample submit defaults to `configuration = cluster_e_gt_0p5`, `selection = region_a`, and `require_complete = true`. Change `selection` to `final_photon` for the tag-veto result. Submit and merge the two selections separately because they use different partial and final directories and different log names.
+The sample submit defaults to `configuration = cluster_e_gt_0p5`, `selection = region_a_tagging_veto`, and `require_complete = true`. Edit `selection` for another result, and submit and merge each selection separately because each uses distinct partial, final, and log paths.
 
 Omitting the optional final `SAMPLE_NAME` argument from `run_reduce_composition.sh` retains the original all-sample behavior. The original one-job submit file also remains available:
 

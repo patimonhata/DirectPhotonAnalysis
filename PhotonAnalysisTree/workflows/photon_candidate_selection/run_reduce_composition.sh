@@ -34,10 +34,13 @@ if [[ -n "$sample_name" ]]; then
       ;;
   esac
 fi
-if [[ "$selection" != region_a && "$selection" != final_photon ]]; then
-  echo "SELECTION must be region_a or final_photon: $selection" >&2
-  exit 2
-fi
+case "$selection" in
+  kinematic|preselection|preselection_tight|preselection_isolation|region_a|region_a_tagging_veto|final_photon) ;;
+  *)
+    echo "Unsupported SELECTION: $selection" >&2
+    exit 2
+    ;;
+esac
 if [[ "$require_complete" != true && "$require_complete" != false ]]; then
   echo "REQUIRE_COMPLETE must be true or false: $require_complete" >&2
   exit 2

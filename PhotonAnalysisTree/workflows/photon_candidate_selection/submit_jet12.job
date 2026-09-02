@@ -11,18 +11,20 @@ job_lease_duration = 86400
 
 sample_name        = jet12
 total_files        = 100000
-files_per_job      = 10
-n_chunks           = 10000
+files_per_job      = 100
+n_chunks           = 1000
 chunk_offset       = 0
-min_cluster_energy = 0.1
+min_cluster_energy = 0.5
+tagging_partner_min_energy = $(min_cluster_energy)
 input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/jet12/segments.list
-map_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1/jet12
+# map_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p2/jet12
+map_output_directory = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/cluster_e_gt_0p5/jet12
 log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection
 
 Output             = $(log_directory)/jet12/$(ProcId).out
 Error              = $(log_directory)/jet12/$(ProcId).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-jet12_$(ProcId).log
-Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(sample_name) $(map_output_directory) 0 $(min_cluster_energy)"
+Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(sample_name) $(map_output_directory) 0 $(min_cluster_energy) $(tagging_partner_min_energy)"
 
 # n_chunks = ceil(total_files / files_per_job) - chunk_offset.
 Queue $(n_chunks)

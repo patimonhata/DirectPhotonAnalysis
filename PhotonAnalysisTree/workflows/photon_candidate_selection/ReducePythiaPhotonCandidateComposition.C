@@ -188,6 +188,9 @@ int ReducePythiaPhotonCandidateComposition(
   std::vector<double> sample_sum_generator_weights;
   std::string analysis_release, model_sha256;
   double min_cluster_energy = -1.0;
+  double partner_diagnostic_min_cluster_energy = -1.0;
+  double meson_partner_min_energy = -1.0;
+  int pi0_topology_algorithm_version = -1;
   unsigned long long selected_count = 0, prompt_count = 0, pi0_count = 0, eta_count = 0, other_count = 0;
   unsigned long long overlap_count = 0, half_boundary_count = 0, invalid_truth_count = 0;
 
@@ -201,9 +204,15 @@ int ReducePythiaPhotonCandidateComposition(
       analysis_release = maps.front().analysis_release;
       model_sha256 = maps.front().model_sha256;
       min_cluster_energy = maps.front().min_cluster_energy;
+      partner_diagnostic_min_cluster_energy = maps.front().partner_diagnostic_min_cluster_energy;
+      meson_partner_min_energy = maps.front().meson_partner_min_energy;
+      pi0_topology_algorithm_version = maps.front().pi0_topology_algorithm_version;
     }
     else if (analysis_release != maps.front().analysis_release || model_sha256 != maps.front().model_sha256 ||
-        !same_double(min_cluster_energy, maps.front().min_cluster_energy)) return 3;
+        !same_double(min_cluster_energy, maps.front().min_cluster_energy) ||
+        !same_double(partner_diagnostic_min_cluster_energy, maps.front().partner_diagnostic_min_cluster_energy) ||
+        !same_double(meson_partner_min_energy, maps.front().meson_partner_min_energy) ||
+        pi0_topology_algorithm_version != maps.front().pi0_topology_algorithm_version) return 3;
     double sample_sumw = 0.0;
     for (const auto& map : maps) sample_sumw += map.sum_generator_weight_processed;
     if (!std::isfinite(sample_sumw) || sample_sumw <= 0.0) return 4;
@@ -318,7 +327,7 @@ int ReducePythiaPhotonCandidateComposition(
     histograms.weighted[index]->Write();
     if (index > 0) fractions[index]->Write();
   }
-  int schema_version = 1, source_schema_version = 3, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 1, source_schema_version = 4, signal_embedding_id = kSignalEmbeddingId;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
   std::string eta_definition = "sum_signal_embedding_g4_eta_or_generator_eta_decay_photon_contributor_fraction";
@@ -339,6 +348,9 @@ int ReducePythiaPhotonCandidateComposition(
   metadata.Branch("n_bins", &metadata_n_bins);
   metadata.Branch("et_max", &metadata_et_max);
   metadata.Branch("min_cluster_energy", &min_cluster_energy);
+  metadata.Branch("partner_diagnostic_min_cluster_energy", &partner_diagnostic_min_cluster_energy);
+  metadata.Branch("meson_partner_min_energy", &meson_partner_min_energy);
+  metadata.Branch("pi0_topology_algorithm_version", &pi0_topology_algorithm_version);
   metadata.Branch("signal_embedding_id", &signal_embedding_id);
   metadata.Branch("majority_threshold", &majority_threshold);
   metadata.Branch("majority_comparison", &majority_comparison);

@@ -41,10 +41,13 @@ int Fun4All_PythiaPhotonCandidateTreeMap(
     const unsigned int map_chunk_id,
     const int n_events = 0,
     const double min_cluster_energy = 0.1,
-    const std::string model_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root")
+    const std::string model_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root",
+    const double tagging_partner_min_energy = -1.0)
 {
+  const double resolved_tagging_partner_min_energy = tagging_partner_min_energy < 0.0 ? min_cluster_energy : tagging_partner_min_energy;
   if (manifest_path.empty() || output_file.empty() || sample_name.empty() || model_file.empty() || manifest_begin < 0 ||
-      manifest_end <= manifest_begin || n_events < 0 || !std::isfinite(min_cluster_energy) || min_cluster_energy < 0.0)
+      manifest_end <= manifest_begin || n_events < 0 || !std::isfinite(min_cluster_energy) || min_cluster_energy < 0.0 ||
+      !std::isfinite(resolved_tagging_partner_min_energy) || resolved_tagging_partner_min_energy < 0.0)
   {
     std::cerr << "Fun4All_PythiaPhotonCandidateTreeMap - invalid argument" << std::endl;
     return EXIT_FAILURE;
@@ -148,11 +151,12 @@ int Fun4All_PythiaPhotonCandidateTreeMap(
   producer->set_truth_jet_node_name("AntiKt_Truth_r04");
   producer->set_verbosity(1);
   producer->set_min_cluster_energy(min_cluster_energy);
+  producer->set_meson_partner_min_energy(resolved_tagging_partner_min_energy);
   server->registerSubsystem(producer);
 
-  std::cout << "Fun4All_PythiaPhotonCandidateTreeMap - sample/range/files/min-cluster-E/output = "
+  std::cout << "Fun4All_PythiaPhotonCandidateTreeMap - sample/range/files/min-cluster-E/tagging-partner-min-E/output = "
             << sample_name << "/[" << manifest_begin << ":" << manifest_end << "]/" << suffixes.size() << "/"
-            << min_cluster_energy << "/" << output_file << std::endl;
+            << min_cluster_energy << "/" << resolved_tagging_partner_min_energy << "/" << output_file << std::endl;
   const int run_status = server->run(n_events);
   const int end_status = server->End();
   delete server;

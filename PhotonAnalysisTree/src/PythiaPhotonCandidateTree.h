@@ -72,6 +72,19 @@ struct PhotonCandidateSelectionBranches
   std::vector<int> pi0_anchor_missing_detail;
   std::vector<int> pi0_anchor_partner_photon_index;
   std::vector<float> pi0_anchor_partner_diagnostic_mass;
+  std::vector<int> pi0_anchor_partner_alignment;
+  std::vector<int> pi0_anchor_truth_partner_tag_status;
+  std::vector<int> pi0_anchor_tag_result;
+  std::vector<int> pi0_anchor_truth_partner_cluster_id;
+  std::vector<float> pi0_anchor_truth_partner_cluster_e;
+  std::vector<float> pi0_anchor_truth_partner_cluster_eta;
+  std::vector<float> pi0_anchor_truth_partner_cluster_phi;
+  std::vector<float> pi0_anchor_truth_partner_delta_r;
+  std::vector<float> pi0_anchor_truth_partner_direct_edep;
+  std::vector<float> pi0_anchor_truth_partner_reconstructed_e;
+  std::vector<float> pi0_anchor_truth_partner_recovery;
+  std::vector<float> pi0_anchor_truth_partner_mass;
+  std::vector<unsigned char> pi0_anchor_selected_tag_partner_matches_truth_partner;
 
   void clear();
   void create_branches(TTree* tree);
@@ -149,6 +162,17 @@ struct Pi0TopologyTreeBranches
   std::vector<int> anchor_partner_photon_index;
   std::vector<int> anchor_pre_cemc_photon_index;
   std::vector<float> anchor_partner_diagnostic_mass;
+  std::vector<int> anchor_partner_alignment;
+  std::vector<int> anchor_truth_partner_tag_status;
+  std::vector<int> anchor_truth_partner_cluster_id;
+  std::vector<float> anchor_truth_partner_cluster_e;
+  std::vector<float> anchor_truth_partner_cluster_eta;
+  std::vector<float> anchor_truth_partner_cluster_phi;
+  std::vector<float> anchor_truth_partner_delta_r;
+  std::vector<float> anchor_truth_partner_direct_edep;
+  std::vector<float> anchor_truth_partner_reconstructed_e;
+  std::vector<float> anchor_truth_partner_recovery;
+  std::vector<float> anchor_truth_partner_mass;
 
   void clear();
   void fill(const Pi0AnchorTopologyEventResult& result);
@@ -176,13 +200,14 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_manifest_range(long long begin, long long end) { manifest_begin_ = begin; manifest_end_ = end; }
   void set_suffix_range(const std::string& first, const std::string& last) { first_input_suffix_ = first; last_input_suffix_ = last; }
   void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
+  void set_meson_partner_min_energy(double value) { meson_partner_min_energy_ = value; }
   void set_map_chunk_id(unsigned int value) { map_chunk_id_ = value; }
   void set_signal_embedding_id(int value) { signal_embedding_id_ = value; }
   void set_truth_jet_node_name(const std::string& value) { truth_jet_node_name_ = value; }
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 3;
+  static constexpr int schema_version_ = 4;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);
@@ -234,6 +259,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   bool sample_upper_unbounded_ = false;
 
   double min_cluster_energy_ = 0.1;
+  double partner_diagnostic_min_cluster_energy_ = 0.1;
   double shower_shape_min_tower_energy_ = 0.070;
   double candidate_et_min_ = 5.0;
   double candidate_et_max_ = 35.0;
@@ -262,6 +288,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   TTree* metadata_tree_ = nullptr;
   bool metadata_filled_ = false;
   int metadata_schema_version_ = schema_version_;
+  int pi0_topology_algorithm_version_ = photon_tree::Pi0AnchorTopologyEvaluator::kAlgorithmVersion;
 
   unsigned long long n_events_processed_ = 0;
   unsigned long long n_events_written_ = 0;

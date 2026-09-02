@@ -126,6 +126,19 @@ void PhotonCandidateSelectionBranches::create_branches(TTree* tree)
   BRANCH(pi0_anchor_missing_detail);
   BRANCH(pi0_anchor_partner_photon_index);
   BRANCH(pi0_anchor_partner_diagnostic_mass);
+  BRANCH(pi0_anchor_partner_alignment);
+  BRANCH(pi0_anchor_truth_partner_tag_status);
+  BRANCH(pi0_anchor_tag_result);
+  BRANCH(pi0_anchor_truth_partner_cluster_id);
+  BRANCH(pi0_anchor_truth_partner_cluster_e);
+  BRANCH(pi0_anchor_truth_partner_cluster_eta);
+  BRANCH(pi0_anchor_truth_partner_cluster_phi);
+  BRANCH(pi0_anchor_truth_partner_delta_r);
+  BRANCH(pi0_anchor_truth_partner_direct_edep);
+  BRANCH(pi0_anchor_truth_partner_reconstructed_e);
+  BRANCH(pi0_anchor_truth_partner_recovery);
+  BRANCH(pi0_anchor_truth_partner_mass);
+  BRANCH(pi0_anchor_selected_tag_partner_matches_truth_partner);
 #undef BRANCH
 }
 
@@ -214,6 +227,17 @@ void Pi0TopologyTreeBranches::fill(const Pi0AnchorTopologyEventResult& result)
     anchor_partner_photon_index.push_back(anchor.partner_photon_index);
     anchor_pre_cemc_photon_index.push_back(anchor.pre_cemc_photon_index);
     anchor_partner_diagnostic_mass.push_back(anchor.partner_diagnostic_invariant_mass);
+    anchor_partner_alignment.push_back(static_cast<int>(anchor.partner_alignment));
+    anchor_truth_partner_tag_status.push_back(static_cast<int>(anchor.truth_partner_tag_status));
+    anchor_truth_partner_cluster_id.push_back(anchor.truth_partner_cluster_id);
+    anchor_truth_partner_cluster_e.push_back(anchor.truth_partner_cluster_energy);
+    anchor_truth_partner_cluster_eta.push_back(anchor.truth_partner_cluster_eta);
+    anchor_truth_partner_cluster_phi.push_back(anchor.truth_partner_cluster_phi);
+    anchor_truth_partner_delta_r.push_back(anchor.truth_partner_delta_r);
+    anchor_truth_partner_direct_edep.push_back(anchor.truth_partner_direct_edep);
+    anchor_truth_partner_reconstructed_e.push_back(anchor.truth_partner_reconstructed_photon_energy);
+    anchor_truth_partner_recovery.push_back(anchor.truth_partner_recovery);
+    anchor_truth_partner_mass.push_back(anchor.truth_partner_invariant_mass);
   }
 }
 
@@ -287,6 +311,17 @@ void Pi0TopologyTreeBranches::create_branches(TTree* tree)
   BRANCH(anchor_partner_photon_index);
   BRANCH(anchor_pre_cemc_photon_index);
   BRANCH(anchor_partner_diagnostic_mass);
+  BRANCH(anchor_partner_alignment);
+  BRANCH(anchor_truth_partner_tag_status);
+  BRANCH(anchor_truth_partner_cluster_id);
+  BRANCH(anchor_truth_partner_cluster_e);
+  BRANCH(anchor_truth_partner_cluster_eta);
+  BRANCH(anchor_truth_partner_cluster_phi);
+  BRANCH(anchor_truth_partner_delta_r);
+  BRANCH(anchor_truth_partner_direct_edep);
+  BRANCH(anchor_truth_partner_reconstructed_e);
+  BRANCH(anchor_truth_partner_recovery);
+  BRANCH(anchor_truth_partner_mass);
 #undef BRANCH
 }
 }
@@ -397,7 +432,8 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
 {
   const bool manifest_valid = manifest_path_.empty() || (manifest_begin_ >= 0 && manifest_end_ > manifest_begin_ && primary_input_manager_);
   if (output_file_name_.empty() || model_file_name_.empty() || signal_embedding_id_ <= 0 || !manifest_valid ||
-      !std::isfinite(min_cluster_energy_) || min_cluster_energy_ < 0.0 || !configure_sample())
+      !std::isfinite(min_cluster_energy_) || min_cluster_energy_ < 0.0 || !std::isfinite(meson_partner_min_energy_) ||
+      meson_partner_min_energy_ < 0.0 || !configure_sample())
   {
     std::cerr << "PythiaPhotonCandidateTree::Init - invalid output/model/sample configuration" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
@@ -428,6 +464,10 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.anchor_cluster_eta_max = candidate_abs_eta_max_;
   config.partner_cluster_eta_max = -1.0;
   config.min_cluster_energy = std::nextafter(min_cluster_energy_, std::numeric_limits<double>::infinity());
+  config.partner_diagnostic_min_cluster_energy = partner_diagnostic_min_cluster_energy_;
+  config.tagging_partner_min_cluster_energy = meson_partner_min_energy_;
+  config.tagging_pi0_mass_min = pi0_mass_min_;
+  config.tagging_pi0_mass_max = pi0_mass_max_;
   config.max_abs_vertex_z = max_abs_vertex_z_;
   config.enable_missing_diagnostics = true;
   config.verbosity = verbosity_;
@@ -662,6 +702,19 @@ void PythiaPhotonCandidateTree::fill_topology_cluster_links(const photon_tree::P
     selection_.pi0_anchor_missing_detail.push_back(anchor ? static_cast<int>(anchor->missing_detail) : -999);
     selection_.pi0_anchor_partner_photon_index.push_back(anchor ? anchor->partner_photon_index : -999);
     selection_.pi0_anchor_partner_diagnostic_mass.push_back(anchor ? anchor->partner_diagnostic_invariant_mass : invalid_float);
+    selection_.pi0_anchor_partner_alignment.push_back(anchor ? static_cast<int>(anchor->partner_alignment) : -999);
+    selection_.pi0_anchor_truth_partner_tag_status.push_back(anchor ? static_cast<int>(anchor->truth_partner_tag_status) : -999);
+    selection_.pi0_anchor_tag_result.push_back(static_cast<int>(photon_tree::Pi0AnchorTagResult::not_applicable));
+    selection_.pi0_anchor_truth_partner_cluster_id.push_back(anchor ? anchor->truth_partner_cluster_id : -999);
+    selection_.pi0_anchor_truth_partner_cluster_e.push_back(anchor ? anchor->truth_partner_cluster_energy : invalid_float);
+    selection_.pi0_anchor_truth_partner_cluster_eta.push_back(anchor ? anchor->truth_partner_cluster_eta : invalid_float);
+    selection_.pi0_anchor_truth_partner_cluster_phi.push_back(anchor ? anchor->truth_partner_cluster_phi : invalid_float);
+    selection_.pi0_anchor_truth_partner_delta_r.push_back(anchor ? anchor->truth_partner_delta_r : invalid_float);
+    selection_.pi0_anchor_truth_partner_direct_edep.push_back(anchor ? anchor->truth_partner_direct_edep : invalid_float);
+    selection_.pi0_anchor_truth_partner_reconstructed_e.push_back(anchor ? anchor->truth_partner_reconstructed_photon_energy : invalid_float);
+    selection_.pi0_anchor_truth_partner_recovery.push_back(anchor ? anchor->truth_partner_recovery : invalid_float);
+    selection_.pi0_anchor_truth_partner_mass.push_back(anchor ? anchor->truth_partner_invariant_mass : invalid_float);
+    selection_.pi0_anchor_selected_tag_partner_matches_truth_partner.push_back(0U);
   }
 }
 
@@ -776,6 +829,19 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
         eta_mass = mass;
         eta_partner = static_cast<int>(partner.cluster->get_id());
       }
+    }
+
+    if (selection_.pi0_anchor_valid[index])
+    {
+      const bool truth_partner_taggable = selection_.pi0_anchor_truth_partner_tag_status[index] ==
+          static_cast<int>(photon_tree::Pi0TruthPartnerTagStatus::taggable);
+      const photon_tree::Pi0AnchorTagResult tag_result = !pi0_tag
+          ? photon_tree::Pi0AnchorTagResult::survived
+          : (truth_partner_taggable ? photon_tree::Pi0AnchorTagResult::truth_pair_taggable_veto
+                                    : photon_tree::Pi0AnchorTagResult::combinatorial_only_veto);
+      selection_.pi0_anchor_tag_result[index] = static_cast<int>(tag_result);
+      selection_.pi0_anchor_selected_tag_partner_matches_truth_partner[index] = pi0_tag &&
+          pi0_partner == selection_.pi0_anchor_truth_partner_cluster_id[index] ? 1U : 0U;
     }
 
     const bool common_selection = kinematics && preselection;
@@ -923,6 +989,8 @@ void PythiaPhotonCandidateTree::create_output()
   metadata_tree_->Branch("topocluster_configuration", &topocluster_configuration_);
   metadata_tree_->Branch("isolation_definition", &isolation_definition_);
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);
+  metadata_tree_->Branch("partner_diagnostic_min_cluster_energy", &partner_diagnostic_min_cluster_energy_);
+  metadata_tree_->Branch("pi0_topology_algorithm_version", &pi0_topology_algorithm_version_);
   metadata_tree_->Branch("shower_shape_min_tower_energy", &shower_shape_min_tower_energy_);
   metadata_tree_->Branch("candidate_et_min", &candidate_et_min_);
   metadata_tree_->Branch("candidate_et_max", &candidate_et_max_);

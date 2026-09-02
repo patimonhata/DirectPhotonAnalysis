@@ -330,7 +330,21 @@ double diphoton_invariant_mass(const photon_tree::Pi0TopologyClusterRecord& anch
 {
   if (!(anchor.energy > 0.0) || !(partner.cluster_energy > 0.0)) return -1.0;
   const double delta_phi = std::atan2(std::sin(anchor.phi - partner.cluster_phi), std::cos(anchor.phi - partner.cluster_phi));
-  const double mass_squared = 2.0 * anchor.energy * partner.cluster_energy *
+  const double anchor_pt = anchor.energy / std::cosh(anchor.eta);
+  const double partner_pt = partner.cluster_energy / std::cosh(partner.cluster_eta);
+  const double mass_squared = 2.0 * anchor_pt * partner_pt *
+      (std::cosh(anchor.eta - partner.cluster_eta) - std::cos(delta_phi));
+  return mass_squared >= 0.0 && std::isfinite(mass_squared) ? std::sqrt(mass_squared) : -1.0;
+}
+
+double diphoton_invariant_mass(const photon_tree::Pi0TopologyClusterRecord& anchor,
+                               const photon_tree::Pi0TruthPartnerClusterRecord& partner)
+{
+  if (!(anchor.energy > 0.0) || !(partner.cluster_energy > 0.0)) return -1.0;
+  const double delta_phi = std::atan2(std::sin(anchor.phi - partner.cluster_phi), std::cos(anchor.phi - partner.cluster_phi));
+  const double anchor_pt = anchor.energy / std::cosh(anchor.eta);
+  const double partner_pt = partner.cluster_energy / std::cosh(partner.cluster_eta);
+  const double mass_squared = 2.0 * anchor_pt * partner_pt *
       (std::cosh(anchor.eta - partner.cluster_eta) - std::cos(delta_phi));
   return mass_squared >= 0.0 && std::isfinite(mass_squared) ? std::sqrt(mass_squared) : -1.0;
 }
@@ -396,6 +410,46 @@ const char* pi0_missing_category_name(Pi0MissingCategory value)
   case Pi0MissingCategory::no_cemc_deposit: return "no_cemc_deposit";
   case Pi0MissingCategory::unclustered_deposit: return "unclustered_deposit";
   case Pi0MissingCategory::match_incomplete: return "match_incomplete";
+  }
+  return "unknown";
+}
+
+const char* pi0_partner_alignment_name(Pi0PartnerAlignment value)
+{
+  switch (value)
+  {
+  case Pi0PartnerAlignment::not_applicable: return "not_applicable";
+  case Pi0PartnerAlignment::near: return "near";
+  case Pi0PartnerAlignment::displaced: return "displaced";
+  case Pi0PartnerAlignment::projection_invalid: return "projection_invalid";
+  case Pi0PartnerAlignment::cluster_unavailable: return "cluster_unavailable";
+  }
+  return "unknown";
+}
+
+const char* pi0_truth_partner_tag_status_name(Pi0TruthPartnerTagStatus value)
+{
+  switch (value)
+  {
+  case Pi0TruthPartnerTagStatus::not_applicable: return "not_applicable";
+  case Pi0TruthPartnerTagStatus::taggable: return "taggable";
+  case Pi0TruthPartnerTagStatus::cluster_unavailable: return "cluster_unavailable";
+  case Pi0TruthPartnerTagStatus::same_as_anchor: return "same_as_anchor";
+  case Pi0TruthPartnerTagStatus::below_energy_threshold: return "below_energy_threshold";
+  case Pi0TruthPartnerTagStatus::mass_outside_window: return "mass_outside_window";
+  case Pi0TruthPartnerTagStatus::invalid_mass: return "invalid_mass";
+  }
+  return "unknown";
+}
+
+const char* pi0_anchor_tag_result_name(Pi0AnchorTagResult value)
+{
+  switch (value)
+  {
+  case Pi0AnchorTagResult::not_applicable: return "not_applicable";
+  case Pi0AnchorTagResult::survived: return "survived";
+  case Pi0AnchorTagResult::truth_pair_taggable_veto: return "truth_pair_taggable_veto";
+  case Pi0AnchorTagResult::combinatorial_only_veto: return "combinatorial_only_veto";
   }
   return "unknown";
 }
@@ -672,8 +726,10 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
     if (record.energy < config_.min_cluster_energy)
     {
-      if (config_.enable_missing_diagnostics)
+      if (config_.enable_missing_diagnostics && record.energy > config_.partner_diagnostic_min_cluster_energy)
+      {
         below_threshold_clusters.push_back({cluster, record.cluster_id, record.energy, record.eta, record.phi});
+      }
       continue;
     }
     record.anchor_acceptance = std::abs(record.eta) < config_.anchor_cluster_eta_max;
@@ -820,6 +876,37 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     anchors_by_candidate[best_candidate].push_back(result.anchors.size() - 1U);
   }
 
+  const auto update_truth_partner = [&](Pi0TopologyCandidateRecord& candidate, std::size_t photon,
+                                        unsigned int cluster_id, double cluster_energy, double cluster_eta,
+                                        double cluster_phi, bool below_topology_threshold, const Pi0ClusterTruthMatch& match) {
+    if (!(cluster_energy > config_.partner_diagnostic_min_cluster_energy) || !match.usable || !(match.total_edep > 0.0F)) return;
+    const double direct_edep = match.gamma_edep[photon];
+    const double fraction = direct_edep / match.total_edep;
+    auto& partner = candidate.truth_partner_clusters[photon];
+    if (!(direct_edep > 0.0) || !(fraction > config_.min_energy_contribution_fraction) ||
+        (partner.found && !(direct_edep > partner.direct_edep))) return;
+    partner.found = true;
+    partner.below_topology_threshold = below_topology_threshold;
+    partner.cluster_id = cluster_id;
+    partner.cluster_energy = cluster_energy;
+    partner.cluster_eta = cluster_eta;
+    partner.cluster_phi = cluster_phi;
+    partner.direct_edep = direct_edep;
+    partner.reconstructed_photon_energy = cluster_energy * fraction;
+    partner.recovery = candidate.photon_energy[photon] > 0.0
+        ? partner.reconstructed_photon_energy / candidate.photon_energy[photon] : 0.0;
+    if (candidate.photon_projection_valid[photon])
+    {
+      const double delta_phi = std::atan2(std::sin(cluster_phi - candidate.photon_projection_phi[photon]),
+                                          std::cos(cluster_phi - candidate.photon_projection_phi[photon]));
+      partner.delta_r = std::hypot(cluster_eta - candidate.photon_projection_eta[photon], delta_phi);
+    }
+    else
+    {
+      partner.delta_r = -1.0;
+    }
+  };
+
   for (std::size_t candidate_index = 0;
        candidate_index < result.candidates.size(); ++candidate_index)
   {
@@ -851,6 +938,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       for (std::size_t photon = 0; photon < 2U; ++photon)
       {
         const double deposit = match.gamma_edep[photon];
+        const auto& cluster = result.clusters[cluster_index];
+        update_truth_partner(candidate, photon, cluster.cluster_id, cluster.energy, cluster.eta, cluster.phi, false, match);
         const double fraction = match.total_edep > 0.0F
             ? deposit / match.total_edep : 0.0;
         if (deposit > 0.0 &&
@@ -920,7 +1009,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     for (std::size_t candidate_index = 0; candidate_index < result.candidates.size(); ++candidate_index)
     {
       const auto& candidate = result.candidates[candidate_index];
-      if (!candidate.topology_evaluated || (candidate.recovered[0] && candidate.recovered[1])) continue;
+      if (!candidate.topology_evaluated) continue;
       diagnostic_candidate_indices.push_back(candidate_index);
       diagnostic_track_ids.push_back(candidate.photon_track_ids);
     }
@@ -952,7 +1041,10 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         }
         auto& candidate = result.candidates[diagnostic_candidate_indices[position]];
         for (std::size_t photon = 0; photon < 2U; ++photon)
+        {
+          update_truth_partner(candidate, photon, cluster.id, cluster.energy, cluster.eta, cluster.phi, true, match);
           update_diagnostic(candidate, photon, cluster.id, cluster.energy, cluster.eta, cluster.phi, true, match);
+        }
       }
     }
   }
@@ -998,6 +1090,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       {
         anchor.topology = Pi0AnchorTopology::separated;
         anchor.reason = Pi0AnchorReason::separated_distinct_recovered_clusters;
+        anchor.partner_photon_index = is_best0 ? 1 : 0;
       }
       else if ((is_best0 && !candidate.recovered[1]) ||
                (is_best1 && !candidate.recovered[0]))
@@ -1081,6 +1174,53 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         anchor.reason = anchor_is_unrecovered_best
             ? Pi0AnchorReason::other_best_cluster_below_recovery
             : Pi0AnchorReason::other_not_daughter_maximum;
+      }
+
+      if (anchor.partner_photon_index >= 0 && anchor.partner_photon_index < 2)
+      {
+        const std::size_t partner_index = static_cast<std::size_t>(anchor.partner_photon_index);
+        const auto& partner = candidate.truth_partner_clusters[partner_index];
+        if (!candidate.photon_projection_valid[partner_index])
+        {
+          anchor.partner_alignment = Pi0PartnerAlignment::projection_invalid;
+        }
+        else if (!partner.found)
+        {
+          anchor.partner_alignment = Pi0PartnerAlignment::cluster_unavailable;
+        }
+        else
+        {
+          anchor.partner_alignment = partner.delta_r > config_.missing_diagnostic_max_delta_r
+              ? Pi0PartnerAlignment::displaced : Pi0PartnerAlignment::near;
+        }
+
+        if (!partner.found)
+        {
+          anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::cluster_unavailable;
+        }
+        else
+        {
+          anchor.truth_partner_cluster_id = static_cast<int>(partner.cluster_id);
+          anchor.truth_partner_cluster_energy = partner.cluster_energy;
+          anchor.truth_partner_cluster_eta = partner.cluster_eta;
+          anchor.truth_partner_cluster_phi = partner.cluster_phi;
+          anchor.truth_partner_delta_r = partner.delta_r;
+          anchor.truth_partner_direct_edep = partner.direct_edep;
+          anchor.truth_partner_reconstructed_photon_energy = partner.reconstructed_photon_energy;
+          anchor.truth_partner_recovery = partner.recovery;
+          anchor.truth_partner_invariant_mass = diphoton_invariant_mass(result.clusters[anchor.cluster_index], partner);
+          if (partner.cluster_id == result.clusters[anchor.cluster_index].cluster_id)
+            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::same_as_anchor;
+          else if (!(partner.cluster_energy > config_.tagging_partner_min_cluster_energy))
+            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::below_energy_threshold;
+          else if (!(anchor.truth_partner_invariant_mass >= 0.0) || !std::isfinite(anchor.truth_partner_invariant_mass))
+            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::invalid_mass;
+          else if (!(anchor.truth_partner_invariant_mass > config_.tagging_pi0_mass_min &&
+                     anchor.truth_partner_invariant_mass < config_.tagging_pi0_mass_max))
+            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::mass_outside_window;
+          else
+            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::taggable;
+        }
       }
     }
   }

@@ -321,7 +321,8 @@ int CheckTopologyEventDump(const char* input_file)
     }
     else
     {
-      invalid_missing_detail = missing_category != 0 || missing_detail != 0 || partner_photon != -1;
+      invalid_missing_detail = missing_category != 0 || missing_detail != 0 ||
+          (topology == 1 ? (partner_photon < 0 || partner_photon > 1) : partner_photon != -1);
     }
     bool invalid_pre_cemc = false;
     const auto projection_it = candidate_projection.find({event, candidate_id});

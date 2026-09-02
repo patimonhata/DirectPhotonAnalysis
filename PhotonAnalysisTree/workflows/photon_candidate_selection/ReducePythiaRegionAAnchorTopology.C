@@ -99,6 +99,9 @@ struct MapMetadata
   double sum_generator_weight_processed = 0.0;
   unsigned long long events_processed = 0;
   double min_cluster_energy = -1.0;
+  double partner_diagnostic_min_cluster_energy = -1.0;
+  double meson_partner_min_energy = -1.0;
+  int pi0_topology_algorithm_version = -1;
   unsigned long long events_written = 0;
   unsigned long long events_vertex_rejected = 0;
   unsigned long long events_invalid = 0;
@@ -148,6 +151,9 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   ok &= bind(tree, "sample_window_min", &value.window_min);
   ok &= bind(tree, "sample_window_max", &value.window_max);
   ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
+  ok &= bind(tree, "partner_diagnostic_min_cluster_energy", &value.partner_diagnostic_min_cluster_energy);
+  ok &= bind(tree, "meson_partner_min_energy", &value.meson_partner_min_energy);
+  ok &= bind(tree, "pi0_topology_algorithm_version", &value.pi0_topology_algorithm_version);
   ok &= bind(tree, "sample_upper_unbounded", &value.upper_unbounded);
   ok &= bind(tree, "sum_generator_weight_processed", &value.sum_generator_weight_processed);
   ok &= bind(tree, "n_events_processed", &value.events_processed);
@@ -166,9 +172,11 @@ bool read_metadata(const std::string& path, MapMetadata& value)
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 3 && value.sample_name == sample.name && !value.input_manifest.empty() &&
+  return value.schema_version == 4 && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
+      std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.1) &&
+      std::isfinite(value.meson_partner_min_energy) && value.meson_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 8 &&
       value.manifest_end > value.manifest_begin && value.input_file_count == value.manifest_end - value.manifest_begin &&
       same_double(value.cross_section_pb, sample.cross_section_pb) && same_double(value.window_min, sample.window_min) &&
       same_double(value.window_max, sample.window_max) && value.upper_unbounded == sample.upper_unbounded &&
@@ -183,7 +191,9 @@ bool compatible(const MapMetadata& value, const MapMetadata& reference)
       value.model_sha256 == reference.model_sha256 && same_double(value.cross_section_pb, reference.cross_section_pb) &&
       same_double(value.window_min, reference.window_min) && same_double(value.window_max, reference.window_max) &&
       value.upper_unbounded == reference.upper_unbounded &&
-      same_double(value.min_cluster_energy, reference.min_cluster_energy);
+      same_double(value.min_cluster_energy, reference.min_cluster_energy) &&
+      same_double(value.partner_diagnostic_min_cluster_energy, reference.partner_diagnostic_min_cluster_energy) &&
+      same_double(value.meson_partner_min_energy, reference.meson_partner_min_energy) && value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version;
 }
 
 bool collect_maps(const std::string& pattern, const SampleDefinition& sample, bool require_complete, std::vector<MapMetadata>& maps)
@@ -488,6 +498,9 @@ int ReducePythiaRegionAAnchorTopology(
   std::string family_model_sha256;
 
   double family_min_cluster_energy = -1.0;
+  double family_partner_diagnostic_min_cluster_energy = -1.0;
+  double family_meson_partner_min_energy = -1.0;
+  int family_pi0_topology_algorithm_version = -1;
   for (const SampleDefinition& sample : samples)
   {
     const std::string pattern = map_root + "/" + sample.name + "/map_*.root";
@@ -499,11 +512,17 @@ int ReducePythiaRegionAAnchorTopology(
       family_analysis_release = maps.front().analysis_release;
       family_model_sha256 = maps.front().model_sha256;
       family_min_cluster_energy = maps.front().min_cluster_energy;
+      family_partner_diagnostic_min_cluster_energy = maps.front().partner_diagnostic_min_cluster_energy;
+      family_meson_partner_min_energy = maps.front().meson_partner_min_energy;
+      family_pi0_topology_algorithm_version = maps.front().pi0_topology_algorithm_version;
     }
     else if (maps.front().analysis_release != family_analysis_release || maps.front().model_sha256 != family_model_sha256 ||
-        !same_double(maps.front().min_cluster_energy, family_min_cluster_energy))
+        !same_double(maps.front().min_cluster_energy, family_min_cluster_energy) ||
+        !same_double(maps.front().partner_diagnostic_min_cluster_energy, family_partner_diagnostic_min_cluster_energy) ||
+        !same_double(maps.front().meson_partner_min_energy, family_meson_partner_min_energy) ||
+        maps.front().pi0_topology_algorithm_version != family_pi0_topology_algorithm_version)
     {
-      std::cerr << "Analysis release, BDT model, or minimum cluster energy differs across samples at " << sample.name << std::endl;
+      std::cerr << "Analysis release, BDT model, threshold configuration, or topology algorithm differs across samples at " << sample.name << std::endl;
       return 3;
     }
     double sample_sumw = 0.0;
@@ -681,7 +700,7 @@ int ReducePythiaRegionAAnchorTopology(
   for (auto& histogram : summary_fractions) histogram->Write();
 
   int output_schema_version = 1;
-  int source_map_schema_version = 3;
+  int source_map_schema_version = 4;
   std::string selection_definition = "sample_stitching_valid_and_pass_and_region_a_and_pi0_anchor_valid";
   std::string prompt_definition = "sample_stitching_valid_and_pass_and_region_a_and_truth_prompt_cluster";
   std::string topology_source = "stored_map_topology_evaluated_with_strict_min_cluster_energy_from_metadata";
@@ -709,6 +728,9 @@ int ReducePythiaRegionAAnchorTopology(
   metadata.Branch("sample_count", &sample_count);
   metadata.Branch("sample_names", &sample_names);
   metadata.Branch("min_cluster_energy", &family_min_cluster_energy);
+  metadata.Branch("partner_diagnostic_min_cluster_energy", &family_partner_diagnostic_min_cluster_energy);
+  metadata.Branch("meson_partner_min_energy", &family_meson_partner_min_energy);
+  metadata.Branch("pi0_topology_algorithm_version", &family_pi0_topology_algorithm_version);
   metadata.Branch("sample_map_counts", &sample_map_counts);
   metadata.Branch("sample_events_written", &sample_events_written);
   metadata.Branch("sample_events_stitch_pass", &sample_events_stitch_pass);

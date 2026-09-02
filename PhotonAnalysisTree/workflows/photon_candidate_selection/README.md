@@ -260,15 +260,19 @@ and overflow.
 
 Prompt uses the stored prompt flag plus the stored dominant-contributor fraction. Pi0 uses the stored anchor plus its same-parent main fraction and topology. Eta sums signal-embedding contributors identified either as a G4 eta or as a generator eta-decay photon. If more than one strict majority is ever found, the candidate is assigned to other and the reducer returns nonzero after writing the overlap count to metadata.
 
-Run the Region-A Jet-family composition with:
+Run one Region-A Jet5 partial manually with:
 
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.sh \
   jet \
   PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p5 \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a/jet/photon_candidate_composition \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a/jet/partial/jet5/shard_0/photon_candidate_composition \
   region_a \
-  true
+  true \
+  200 \
+  40.0 \
+  jet5 \
+  0
 ~~~
 
 The supported selections use the same definitions as the topology comparison reduce:
@@ -283,27 +287,30 @@ The supported selections use the same definitions as the topology comparison red
 
 Use the selection key consistently in the output directory, reduce submit, and merge command.
 
-For a disconnect-safe full Jet-family production, create the shared log directory and submit one independent reduce job per sample:
+For a disconnect-safe full Jet-family production, create the shared log directory and submit the six single-shard samples and the ten Jet12 shards:
 
 ~~~bash
 mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
 condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet_samples.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet12_shards.job
 ~~~
 
-To retry only a subset without rerunning completed samples, override `sample_names` on submission. For example:
+The first submit queues `jet3`, `jet5`, `jet8`, `jet20`, `jet30`, and `jet40` once each. The second queues Jet12 shards 0 through 9, for 16 ordinary Condor jobs total. To retry only a subset, override the corresponding list:
 
 ~~~bash
 condor_submit -append 'sample_names = jet3,jet5' \
   PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet_samples.job
+condor_submit -append 'shard_indices = 3,7' \
+  PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet12_shards.job
 ~~~
 
-This creates seven ordinary Condor jobs, one each for `jet3`, `jet5`, `jet8`, `jet12`, `jet20`, `jet30`, and `jet40`. The concurrency limit is four. Each job writes only
+Every partial has the same layout, including the one-shard samples:
 
 ~~~text
-partial/<sample>/photon_candidate_composition.root
+partial/<sample>/shard_<index>/photon_candidate_composition.root
 ~~~
 
-The partial jobs do not create PDFs. After all seven jobs have exited successfully, merge them manually:
+Jet12 map files are divided into ten contiguous, non-overlapping ranges. Every Jet12 shard uses the full-sample generator-weight sum for normalization, while reading events only from its own range. Partial files contain count and cross-section-weighted spectra plus required shard metadata; they do not contain fractions or PDFs. After all 16 jobs have exited successfully, merge them manually:
 
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge_composition.sh \
@@ -313,19 +320,11 @@ PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge_composition.sh
   region_a_tagging_veto
 ~~~
 
-There is deliberately no automatic Condor dependency or DAG. The merge requires exactly one partial for every sample in the family and rejects missing files, unexpected sample metadata, incompatible analysis/configuration metadata, incompatible histogram axes, and invalid category partitions. It adds only count and weighted spectra, then recomputes every fraction and both stack PDFs from the merged weighted numerator and denominator.
+There is deliberately no automatic Condor dependency or DAG. The merge requires shards 0-9 for Jet12 and shard 0 for every other sample, and rejects missing or duplicate coverage, invalid shard ranges, inconsistent full-sample normalization, unexpected sample metadata, incompatible analysis/configuration metadata, incompatible histogram axes, and invalid category partitions. It adds only count and weighted spectra, then recomputes every fraction and both stack PDFs from the merged weighted numerator and denominator.
 
 The sample submit defaults to `configuration = cluster_e_gt_0p5`, `selection = region_a_tagging_veto`, and `require_complete = true`. Edit `selection` for another result, and submit and merge each selection separately because each uses distinct partial, final, and log paths.
 
-Omitting the optional final `SAMPLE_NAME` argument from `run_reduce_composition.sh` retains the original all-sample behavior. The original one-job submit file also remains available:
-
-~~~bash
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet.job
-~~~
-
-Do not run the one-job and sample-split reducers with the same output paths.
-
-Each run writes:
+The merge writes:
 
 - `photon_candidate_composition.root`, containing unweighted and cross-section-weighted spectra, `h_photon_candidate_purity`, every category fraction, counts, normalization inputs, and classification QA metadata;
 - `photon_candidate_composition_category_fraction_stack.pdf`, whose summary categories partition the selected-candidate denominator in every cluster-ET bin;

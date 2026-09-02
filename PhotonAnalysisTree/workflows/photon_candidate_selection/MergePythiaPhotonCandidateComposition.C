@@ -37,6 +37,16 @@ struct Metadata
   unsigned long long invalid_truth_cluster_count = 0;
 };
 
+struct ShardMetadata
+{
+  std::string sample_name;
+  int shard_index = -1;
+  int shard_count = -1;
+  unsigned long long map_index_begin = 0;
+  unsigned long long map_index_end = 0;
+  unsigned long long total_map_count = 0;
+};
+
 bool read_metadata(TFile& file, Metadata& value)
 {
   auto* tree = file.Get<TTree>("metadata");
@@ -103,6 +113,19 @@ bool read_metadata(TFile& file, Metadata& value)
   return true;
 }
 
+bool read_shard_metadata(TFile& file, ShardMetadata& value)
+{
+  auto* tree = file.Get<TTree>("shard_metadata");
+  if (!tree || tree->GetEntries() != 1) return false;
+  std::string* sample_name = nullptr;
+  const bool ok = bind(tree, "sample_name", &sample_name) && bind(tree, "shard_index", &value.shard_index) &&
+      bind(tree, "shard_count", &value.shard_count) && bind(tree, "map_index_begin", &value.map_index_begin) &&
+      bind(tree, "map_index_end", &value.map_index_end) && bind(tree, "total_map_count", &value.total_map_count);
+  if (!ok || tree->GetEntry(0) <= 0 || !sample_name) return false;
+  value.sample_name = *sample_name;
+  return true;
+}
+
 bool compatible(const Metadata& value, const Metadata& reference)
 {
   return value.schema_version == reference.schema_version && value.source_map_schema_version == reference.source_map_schema_version &&
@@ -157,73 +180,102 @@ int MergePythiaPhotonCandidateComposition(
   bool have_reference = false;
   for (const SampleDefinition& sample : samples)
   {
-    const std::string path = normalized_partial_root + "/" + sample.name + "/photon_candidate_composition.root";
-    TFile file(path.c_str(), "READ");
-    Metadata metadata;
-    if (file.IsZombie() || !read_metadata(file, metadata))
+    const int shard_count = required_shard_count(sample.name);
+    unsigned long long next_map_index = 0, total_map_count = 0;
+    double sample_sumw = 0.0;
+    for (int shard_index = 0; shard_index < shard_count; ++shard_index)
     {
-      std::cerr << "Missing or invalid composition partial: " << path << std::endl;
-      return 3;
-    }
-    if (metadata.schema_version != 1 || metadata.source_map_schema_version != 4 || metadata.family != family ||
-        metadata.selection != selection || metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
-        metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U ||
-        metadata.selected_cluster_count != metadata.prompt_cluster_count + metadata.pi0_cluster_count +
-            metadata.eta_cluster_count + metadata.other_cluster_count)
-    {
-      std::cerr << "Unexpected partial metadata: " << path << std::endl;
-      return 3;
-    }
-    if (!have_reference)
-    {
-      combined = metadata;
-      combined.sample_names.clear();
-      combined.sample_map_counts.clear();
-      combined.sample_sum_generator_weights.clear();
-      combined.selected_cluster_count = 0;
-      combined.prompt_cluster_count = 0;
-      combined.pi0_cluster_count = 0;
-      combined.eta_cluster_count = 0;
-      combined.other_cluster_count = 0;
-      combined.overlap_cluster_count = 0;
-      combined.half_boundary_cluster_count = 0;
-      combined.invalid_truth_cluster_count = 0;
-      have_reference = true;
-    }
-    else if (!compatible(metadata, combined))
-    {
-      std::cerr << "Incompatible composition partial metadata: " << path << std::endl;
-      return 4;
-    }
+      const std::string path = normalized_partial_root + "/" + sample.name + "/shard_" + std::to_string(shard_index) + "/photon_candidate_composition.root";
+      TFile file(path.c_str(), "READ");
+      Metadata metadata;
+      ShardMetadata shard;
+      if (file.IsZombie() || !read_metadata(file, metadata) || !read_shard_metadata(file, shard))
+      {
+        std::cerr << "Missing or invalid composition partial: " << path << std::endl;
+        return 3;
+      }
+      if (metadata.schema_version != 2 || metadata.source_map_schema_version != 4 || metadata.family != family ||
+          metadata.selection != selection || metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
+          metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U ||
+          metadata.selected_cluster_count != metadata.prompt_cluster_count + metadata.pi0_cluster_count +
+              metadata.eta_cluster_count + metadata.other_cluster_count ||
+          shard.sample_name != sample.name || shard.shard_index != shard_index || shard.shard_count != shard_count ||
+          shard.total_map_count != metadata.sample_map_counts.front() || shard.total_map_count == 0 ||
+          shard.map_index_begin != shard.total_map_count * static_cast<unsigned long long>(shard_index) / static_cast<unsigned long long>(shard_count) ||
+          shard.map_index_end != shard.total_map_count * static_cast<unsigned long long>(shard_index + 1) / static_cast<unsigned long long>(shard_count) ||
+          shard.map_index_begin != next_map_index || shard.map_index_begin >= shard.map_index_end)
+      {
+        std::cerr << "Unexpected partial metadata: " << path << std::endl;
+        return 3;
+      }
+      if (!have_reference)
+      {
+        combined = metadata;
+        combined.sample_names.clear();
+        combined.sample_map_counts.clear();
+        combined.sample_sum_generator_weights.clear();
+        combined.selected_cluster_count = 0;
+        combined.prompt_cluster_count = 0;
+        combined.pi0_cluster_count = 0;
+        combined.eta_cluster_count = 0;
+        combined.other_cluster_count = 0;
+        combined.overlap_cluster_count = 0;
+        combined.half_boundary_cluster_count = 0;
+        combined.invalid_truth_cluster_count = 0;
+        have_reference = true;
+      }
+      else if (!compatible(metadata, combined))
+      {
+        std::cerr << "Incompatible composition partial metadata: " << path << std::endl;
+        return 4;
+      }
+      if (shard_index == 0)
+      {
+        total_map_count = shard.total_map_count;
+        sample_sumw = metadata.sample_sum_generator_weights.front();
+        if (!std::isfinite(sample_sumw) || sample_sumw <= 0.0)
+        {
+          std::cerr << "Invalid full-sample normalization metadata: " << path << std::endl;
+          return 4;
+        }
+      }
+      else if (shard.total_map_count != total_map_count || !same_double(metadata.sample_sum_generator_weights.front(), sample_sumw))
+      {
+        std::cerr << "Inconsistent shard normalization metadata: " << path << std::endl;
+        return 4;
+      }
 
-    for (std::size_t index = 0; index < category_count; ++index)
-    {
-      const std::string count_name = std::string("h_candidate_") + candidate_composition::kKeys[index] + "_et_count";
-      const std::string weighted_name = std::string("h_candidate_") + candidate_composition::kKeys[index] + "_et_pb";
-      TH1D* count = file.Get<TH1D>(count_name.c_str());
-      TH1D* weighted_pb = file.Get<TH1D>(weighted_name.c_str());
-      if (!valid_histogram(count, metadata) || !valid_histogram(weighted_pb, metadata))
+      for (std::size_t index = 0; index < category_count; ++index)
       {
-        std::cerr << "Missing or incompatible histogram in " << path << ": " << count_name << " / " << weighted_name << std::endl;
-        return 5;
+        const std::string count_name = std::string("h_candidate_") + candidate_composition::kKeys[index] + "_et_count";
+        const std::string weighted_name = std::string("h_candidate_") + candidate_composition::kKeys[index] + "_et_pb";
+        TH1D* count = file.Get<TH1D>(count_name.c_str());
+        TH1D* weighted_pb = file.Get<TH1D>(weighted_name.c_str());
+        if (!valid_histogram(count, metadata) || !valid_histogram(weighted_pb, metadata))
+        {
+          std::cerr << "Missing or incompatible histogram in " << path << ": " << count_name << " / " << weighted_name << std::endl;
+          return 5;
+        }
+        if (!counts[index])
+        {
+          counts[index].reset(static_cast<TH1D*>(count->Clone()));
+          weighted[index].reset(static_cast<TH1D*>(weighted_pb->Clone()));
+          counts[index]->SetDirectory(nullptr);
+          weighted[index]->SetDirectory(nullptr);
+        }
+        else if (!counts[index]->Add(count) || !weighted[index]->Add(weighted_pb))
+        {
+          std::cerr << "Could not add histograms from " << path << std::endl;
+          return 5;
+        }
       }
-      if (!counts[index])
-      {
-        counts[index].reset(static_cast<TH1D*>(count->Clone()));
-        weighted[index].reset(static_cast<TH1D*>(weighted_pb->Clone()));
-        counts[index]->SetDirectory(nullptr);
-        weighted[index]->SetDirectory(nullptr);
-      }
-      else if (!counts[index]->Add(count) || !weighted[index]->Add(weighted_pb))
-      {
-        std::cerr << "Could not add histograms from " << path << std::endl;
-        return 5;
-      }
+      add_counters(combined, metadata);
+      next_map_index = shard.map_index_end;
     }
-    combined.sample_names.push_back(metadata.sample_names.front());
-    combined.sample_map_counts.push_back(metadata.sample_map_counts.front());
-    combined.sample_sum_generator_weights.push_back(metadata.sample_sum_generator_weights.front());
-    add_counters(combined, metadata);
+    if (next_map_index != total_map_count) return 6;
+    combined.sample_names.push_back(sample.name);
+    combined.sample_map_counts.push_back(total_map_count);
+    combined.sample_sum_generator_weights.push_back(sample_sumw);
   }
 
   if (!have_reference || combined.selected_cluster_count != combined.prompt_cluster_count + combined.pi0_cluster_count +

@@ -19,15 +19,15 @@ n_bins             = 200
 et_max             = 40.0
 map_root            = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/$(configuration)
 partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/$(configuration)/$(selection)/$(family)/partial
-output_base         = $(partial_root)/$(sample_name)/shard_0/photon_candidate_composition
+output_base         = $(partial_root)/jet12/shard_$(shard_index)/photon_candidate_composition
 log_directory       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
 
-Output             = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_$(sample_name)_shard_0.out
-Error              = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_$(sample_name)_shard_0.err
-Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-composition-$(selection)-$(family)-$(configuration)-$(sample_name)-shard-0.log
+Output             = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_jet12_shard_$(shard_index).out
+Error              = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_jet12_shard_$(shard_index).err
+Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-composition-$(selection)-$(family)-$(configuration)-jet12-shard-$(shard_index).log
 
-Arguments          = "$(family) $(map_root) $(output_base) $(selection) $(require_complete) $(n_bins) $(et_max) $(sample_name) 0"
+Arguments          = "$(family) $(map_root) $(output_base) $(selection) $(require_complete) $(n_bins) $(et_max) jet12 $(shard_index)"
 
-# Override sample_names with condor_submit -append to retry a subset.
-sample_names = jet3,jet5,jet8,jet20,jet30,jet40
-Queue sample_name in $(sample_names)
+# Override shard_indices with condor_submit -append to retry a subset.
+shard_indices = 0,1,2,3,4,5,6,7,8,9
+Queue shard_index in $(shard_indices)

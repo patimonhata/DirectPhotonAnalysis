@@ -46,6 +46,11 @@ constexpr std::array<SelectionDefinition, 7> kSelectionDefinitions = {{
     {"final_photon", "Region A after #pi^{0}/#eta tag veto", {"split_cluster_pass_final_photon", nullptr, nullptr}, 1},
 }};
 
+int required_shard_count(const std::string& sample_name)
+{
+  return sample_name == "jet12" ? 10 : 1;
+}
+
 const SelectionDefinition* find_selection(const std::string& key)
 {
   const auto found = std::find_if(kSelectionDefinitions.begin(), kSelectionDefinitions.end(), [&](const SelectionDefinition& definition) { return key == definition.key; });
@@ -227,31 +232,27 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
 }
 
 int ReducePythiaPhotonCandidateComposition(
-    const std::string family = "jet",
-    const std::string map_root = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1",
-    const std::string output_base = "",
-    const std::string selection = "region_a",
-    const bool require_complete = true,
-    const int n_bins = 200,
-    const double et_max = 40.0,
-    const std::string sample_name = "")
+    const std::string family,
+    const std::string map_root,
+    const std::string output_base,
+    const std::string selection,
+    const bool require_complete,
+    const int n_bins,
+    const double et_max,
+    const std::string sample_name,
+    const int shard_index)
 {
   using namespace candidate_composition;
   const SelectionDefinition* selected_definition = find_selection(selection);
   const std::vector<SampleDefinition> family_samples = sample_definitions(family);
-  std::vector<SampleDefinition> samples;
-  if (sample_name.empty()) samples = family_samples;
-  else
-  {
-    const auto selected_sample = std::find_if(family_samples.begin(), family_samples.end(), [&](const SampleDefinition& sample) { return sample.name == sample_name; });
-    if (selected_sample != family_samples.end()) samples.push_back(*selected_sample);
-  }
-  if (samples.empty() || map_root.empty() || !selected_definition ||
+  const auto selected_sample = std::find_if(family_samples.begin(), family_samples.end(), [&](const SampleDefinition& sample) { return sample.name == sample_name; });
+  const int shard_count = required_shard_count(sample_name);
+  if (selected_sample == family_samples.end() || shard_index < 0 || shard_index >= shard_count || map_root.empty() || !selected_definition ||
       n_bins <= 0 || !std::isfinite(et_max) || et_max <= 0.0) return 1;
   std::string normalized_map_root = map_root;
   while (normalized_map_root.size() > 1U && normalized_map_root.back() == '/') normalized_map_root.pop_back();
   const std::string configuration = normalized_map_root.substr(normalized_map_root.find_last_of('/') + 1U);
-  const std::string default_output_suffix = sample_name.empty() ? "/photon_candidate_composition" : "/partial/" + sample_name + "/photon_candidate_composition";
+  const std::string default_output_suffix = "/partial/" + sample_name + "/shard_" + std::to_string(shard_index) + "/photon_candidate_composition";
   const std::string resolved_output_base = output_base.empty()
       ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/" +
             configuration + "/" + selection + "/" + family + default_output_suffix
@@ -270,151 +271,133 @@ int ReducePythiaPhotonCandidateComposition(
   unsigned long long selected_count = 0, prompt_count = 0, pi0_count = 0, eta_count = 0, other_count = 0;
   unsigned long long overlap_count = 0, half_boundary_count = 0, invalid_truth_count = 0;
 
-  for (const SampleDefinition& sample : samples)
+  const SampleDefinition& sample = *selected_sample;
+  unsigned long long shard_map_begin = 0, shard_map_end = 0, total_map_count = 0;
+  std::vector<MapMetadata> maps;
+  if (!collect_maps(map_root + "/" + sample.name + "/map_*.root", sample, require_complete, maps)) return 3;
+  if (maps.empty()) return 3;
+  analysis_release = maps.front().analysis_release;
+  model_sha256 = maps.front().model_sha256;
+  min_cluster_energy = maps.front().min_cluster_energy;
+  partner_diagnostic_min_cluster_energy = maps.front().partner_diagnostic_min_cluster_energy;
+  meson_partner_min_energy = maps.front().meson_partner_min_energy;
+  pi0_topology_algorithm_version = maps.front().pi0_topology_algorithm_version;
+  double sample_sumw = 0.0;
+  for (const auto& map : maps) sample_sumw += map.sum_generator_weight_processed;
+  if (!std::isfinite(sample_sumw) || sample_sumw <= 0.0) return 4;
+  total_map_count = maps.size();
+  shard_map_begin = total_map_count * static_cast<unsigned long long>(shard_index) / static_cast<unsigned long long>(shard_count);
+  shard_map_end = total_map_count * static_cast<unsigned long long>(shard_index + 1) / static_cast<unsigned long long>(shard_count);
+  if (shard_map_begin >= shard_map_end) return 4;
+  sample_names.push_back(sample.name);
+  sample_map_counts.push_back(maps.size());
+  sample_sum_generator_weights.push_back(sample_sumw);
+
+  for (unsigned long long map_index = shard_map_begin; map_index < shard_map_end; ++map_index)
   {
-    std::vector<MapMetadata> maps;
-    if (!collect_maps(map_root + "/" + sample.name + "/map_*.root", sample, require_complete, maps)) return 3;
-    if (maps.empty()) continue;
-    if (analysis_release.empty())
-    {
-      analysis_release = maps.front().analysis_release;
-      model_sha256 = maps.front().model_sha256;
-      min_cluster_energy = maps.front().min_cluster_energy;
-      partner_diagnostic_min_cluster_energy = maps.front().partner_diagnostic_min_cluster_energy;
-      meson_partner_min_energy = maps.front().meson_partner_min_energy;
-      pi0_topology_algorithm_version = maps.front().pi0_topology_algorithm_version;
-    }
-    else if (analysis_release != maps.front().analysis_release || model_sha256 != maps.front().model_sha256 ||
-        !same_double(min_cluster_energy, maps.front().min_cluster_energy) ||
-        !same_double(partner_diagnostic_min_cluster_energy, maps.front().partner_diagnostic_min_cluster_energy) ||
-        !same_double(meson_partner_min_energy, maps.front().meson_partner_min_energy) ||
-        pi0_topology_algorithm_version != maps.front().pi0_topology_algorithm_version) return 3;
-    double sample_sumw = 0.0;
-    for (const auto& map : maps) sample_sumw += map.sum_generator_weight_processed;
-    if (!std::isfinite(sample_sumw) || sample_sumw <= 0.0) return 4;
-    sample_names.push_back(sample.name);
-    sample_map_counts.push_back(maps.size());
-    sample_sum_generator_weights.push_back(sample_sumw);
+    const MapMetadata& map = maps[map_index];
+    TFile file(map.path.c_str(), "READ");
+    auto* tree = file.Get<TTree>("event_tree");
+    if (file.IsZombie() || !tree) return 5;
+    unsigned int ncluster = 0;
+    unsigned char weight_valid = 0, stitch_valid = 0, stitch_pass = 0;
+    double weight_numerator = 0.0;
+    std::vector<double>* et = nullptr;
+    std::array<std::vector<unsigned char>*, 3> selection_flags = {};
+    std::vector<unsigned char>* truth_valid = nullptr;
+    std::vector<unsigned char>* prompt_flag = nullptr;
+    std::vector<float>* dominant_fraction = nullptr;
+    std::vector<unsigned char>* pi0_valid = nullptr;
+    std::vector<float>* pi0_fraction = nullptr;
+    std::vector<int>* topology = nullptr;
+    std::vector<unsigned int>* offset = nullptr;
+    std::vector<int>* g4_pdg = nullptr;
+    std::vector<int>* embedding = nullptr;
+    std::vector<float>* fraction = nullptr;
+    std::vector<int>* source = nullptr;
+    std::vector<int>* parent = nullptr;
+    tree->SetBranchStatus("*", false);
+    tree->SetCacheSize(kEventTreeCacheSize);
+    bool ok = bind_active(tree, "split_ncluster", &ncluster) &&
+        bind_active(tree, "event_weight_valid", &weight_valid) &&
+        bind_active(tree, "sample_stitching_valid", &stitch_valid) &&
+        bind_active(tree, "sample_stitching_pass", &stitch_pass) &&
+        bind_active(tree, "weight_numerator_pb", &weight_numerator) &&
+        bind_active(tree, "split_cluster_et", &et) &&
+        bind_active(tree, "split_cluster_truth_valid", &truth_valid) &&
+        bind_active(tree, "split_cluster_truth_prompt_cluster", &prompt_flag) &&
+        bind_active(tree, "split_cluster_truth_dominant_fraction", &dominant_fraction) &&
+        bind_active(tree, "split_cluster_pi0_anchor_valid", &pi0_valid) &&
+        bind_active(tree, "split_cluster_pi0_anchor_main_fraction", &pi0_fraction) &&
+        bind_active(tree, "split_cluster_pi0_anchor_topology", &topology) &&
+        bind_active(tree, "split_cluster_truth_contributor_offset", &offset) &&
+        bind_active(tree, "split_cluster_truth_contributor_g4_pdg_id", &g4_pdg) &&
+        bind_active(tree, "split_cluster_truth_contributor_embedding_id", &embedding) &&
+        bind_active(tree, "split_cluster_truth_contributor_fraction", &fraction) &&
+        bind_active(tree, "split_cluster_truth_contributor_photon_source", &source) &&
+        bind_active(tree, "split_cluster_truth_contributor_classification_parent_pdg", &parent);
+    for (std::size_t index = 0; index < selected_definition->branch_count; ++index)
+      ok &= bind_active(tree, selected_definition->branches[index], &selection_flags[index]);
+    if (!ok) return 5;
+    tree->StopCacheLearningPhase();
 
-    for (const MapMetadata& map : maps)
+    for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
     {
-      TFile file(map.path.c_str(), "READ");
-      auto* tree = file.Get<TTree>("event_tree");
-      if (file.IsZombie() || !tree) return 5;
-      unsigned int ncluster = 0;
-      unsigned char weight_valid = 0, stitch_valid = 0, stitch_pass = 0;
-      double weight_numerator = 0.0;
-      std::vector<double>* et = nullptr;
-      std::array<std::vector<unsigned char>*, 3> selection_flags = {};
-      std::vector<unsigned char>* truth_valid = nullptr;
-      std::vector<unsigned char>* prompt_flag = nullptr;
-      std::vector<float>* dominant_fraction = nullptr;
-      std::vector<unsigned char>* pi0_valid = nullptr;
-      std::vector<float>* pi0_fraction = nullptr;
-      std::vector<int>* topology = nullptr;
-      std::vector<unsigned int>* offset = nullptr;
-      std::vector<int>* g4_pdg = nullptr;
-      std::vector<int>* embedding = nullptr;
-      std::vector<float>* fraction = nullptr;
-      std::vector<int>* source = nullptr;
-      std::vector<int>* parent = nullptr;
-      tree->SetBranchStatus("*", false);
-      tree->SetCacheSize(kEventTreeCacheSize);
-      bool ok = bind_active(tree, "split_ncluster", &ncluster) &&
-          bind_active(tree, "event_weight_valid", &weight_valid) &&
-          bind_active(tree, "sample_stitching_valid", &stitch_valid) &&
-          bind_active(tree, "sample_stitching_pass", &stitch_pass) &&
-          bind_active(tree, "weight_numerator_pb", &weight_numerator) &&
-          bind_active(tree, "split_cluster_et", &et) &&
-          bind_active(tree, "split_cluster_truth_valid", &truth_valid) &&
-          bind_active(tree, "split_cluster_truth_prompt_cluster", &prompt_flag) &&
-          bind_active(tree, "split_cluster_truth_dominant_fraction", &dominant_fraction) &&
-          bind_active(tree, "split_cluster_pi0_anchor_valid", &pi0_valid) &&
-          bind_active(tree, "split_cluster_pi0_anchor_main_fraction", &pi0_fraction) &&
-          bind_active(tree, "split_cluster_pi0_anchor_topology", &topology) &&
-          bind_active(tree, "split_cluster_truth_contributor_offset", &offset) &&
-          bind_active(tree, "split_cluster_truth_contributor_g4_pdg_id", &g4_pdg) &&
-          bind_active(tree, "split_cluster_truth_contributor_embedding_id", &embedding) &&
-          bind_active(tree, "split_cluster_truth_contributor_fraction", &fraction) &&
-          bind_active(tree, "split_cluster_truth_contributor_photon_source", &source) &&
-          bind_active(tree, "split_cluster_truth_contributor_classification_parent_pdg", &parent);
+      tree->GetEntry(entry);
+      bool selection_flags_valid = true;
       for (std::size_t index = 0; index < selected_definition->branch_count; ++index)
-        ok &= bind_active(tree, selected_definition->branches[index], &selection_flags[index]);
-      if (!ok) return 5;
-      tree->StopCacheLearningPhase();
-
-      for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
+        selection_flags_valid = selection_flags_valid && selection_flags[index] && selection_flags[index]->size() == ncluster;
+      if (!selection_flags_valid || !et || !truth_valid || !prompt_flag || !dominant_fraction || !pi0_valid || !pi0_fraction || !topology ||
+          !offset || !g4_pdg || !embedding || !fraction || !source || !parent || et->size() != ncluster ||
+          truth_valid->size() != ncluster || prompt_flag->size() != ncluster || dominant_fraction->size() != ncluster ||
+          pi0_valid->size() != ncluster || pi0_fraction->size() != ncluster || topology->size() != ncluster ||
+          !valid_contributors(ncluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent)) return 6;
+      if (!weight_valid || !stitch_valid || !stitch_pass) continue;
+      const double weight = weight_numerator / sample_sumw;
+      if (!std::isfinite(weight)) return 6;
+      for (std::size_t cluster = 0; cluster < ncluster; ++cluster)
       {
-        tree->GetEntry(entry);
-        bool selection_flags_valid = true;
+        bool passes_selection = true;
         for (std::size_t index = 0; index < selected_definition->branch_count; ++index)
-          selection_flags_valid = selection_flags_valid && selection_flags[index] && selection_flags[index]->size() == ncluster;
-        if (!selection_flags_valid || !et || !truth_valid || !prompt_flag || !dominant_fraction || !pi0_valid || !pi0_fraction || !topology ||
-            !offset || !g4_pdg || !embedding || !fraction || !source || !parent || et->size() != ncluster ||
-            truth_valid->size() != ncluster || prompt_flag->size() != ncluster || dominant_fraction->size() != ncluster ||
-            pi0_valid->size() != ncluster || pi0_fraction->size() != ncluster || topology->size() != ncluster ||
-            !valid_contributors(ncluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent)) return 6;
-        if (!weight_valid || !stitch_valid || !stitch_pass) continue;
-        const double weight = weight_numerator / sample_sumw;
-        if (!std::isfinite(weight)) return 6;
-        for (std::size_t cluster = 0; cluster < ncluster; ++cluster)
-        {
-          bool passes_selection = true;
-          for (std::size_t index = 0; index < selected_definition->branch_count; ++index)
-            passes_selection = passes_selection && (*selection_flags[index])[cluster];
-          if (!passes_selection) continue;
-          const double cluster_et = (*et)[cluster];
-          const double eta_contribution = eta_fraction(cluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent);
-          if (!std::isfinite(cluster_et) || !std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;
-          ++selected_count;
-          histograms.fill(denominator, cluster_et, weight);
-          if (!(*truth_valid)[cluster]) ++invalid_truth_count;
-          const bool is_prompt = (*prompt_flag)[cluster] && (*dominant_fraction)[cluster] > kMajorityThreshold;
-          const bool is_pi0 = (*pi0_valid)[cluster] && (*pi0_fraction)[cluster] > kMajorityThreshold;
-          const bool is_eta = eta_contribution > kMajorityThreshold;
-          const int majority_count = static_cast<int>(is_prompt) + static_cast<int>(is_pi0) + static_cast<int>(is_eta);
-          if (((*prompt_flag)[cluster] && (*dominant_fraction)[cluster] == kMajorityThreshold) ||
-              ((*pi0_valid)[cluster] && (*pi0_fraction)[cluster] == kMajorityThreshold) || eta_contribution == kMajorityThreshold) ++half_boundary_count;
-          std::size_t category = other;
-          if (majority_count > 1) ++overlap_count;
-          else if (is_prompt) category = prompt;
-          else if (is_pi0) category = pi0_category((*topology)[cluster]);
-          else if (is_eta) category = eta;
-          if (category == category_count) return 6;
-          histograms.fill(category, cluster_et, weight);
-          if (category == prompt) ++prompt_count;
-          else if (category >= pi0_separated && category <= pi0_other) ++pi0_count;
-          else if (category == eta) ++eta_count;
-          else ++other_count;
-        }
+          passes_selection = passes_selection && (*selection_flags[index])[cluster];
+        if (!passes_selection) continue;
+        const double cluster_et = (*et)[cluster];
+        const double eta_contribution = eta_fraction(cluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent);
+        if (!std::isfinite(cluster_et) || !std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;
+        ++selected_count;
+        histograms.fill(denominator, cluster_et, weight);
+        if (!(*truth_valid)[cluster]) ++invalid_truth_count;
+        const bool is_prompt = (*prompt_flag)[cluster] && (*dominant_fraction)[cluster] > kMajorityThreshold;
+        const bool is_pi0 = (*pi0_valid)[cluster] && (*pi0_fraction)[cluster] > kMajorityThreshold;
+        const bool is_eta = eta_contribution > kMajorityThreshold;
+        const int majority_count = static_cast<int>(is_prompt) + static_cast<int>(is_pi0) + static_cast<int>(is_eta);
+        if (((*prompt_flag)[cluster] && (*dominant_fraction)[cluster] == kMajorityThreshold) ||
+            ((*pi0_valid)[cluster] && (*pi0_fraction)[cluster] == kMajorityThreshold) || eta_contribution == kMajorityThreshold) ++half_boundary_count;
+        std::size_t category = other;
+        if (majority_count > 1) ++overlap_count;
+        else if (is_prompt) category = prompt;
+        else if (is_pi0) category = pi0_category((*topology)[cluster]);
+        else if (is_eta) category = eta;
+        if (category == category_count) return 6;
+        histograms.fill(category, cluster_et, weight);
+        if (category == prompt) ++prompt_count;
+        else if (category >= pi0_separated && category <= pi0_other) ++pi0_count;
+        else if (category == eta) ++eta_count;
+        else ++other_count;
       }
     }
   }
 
   if (sample_names.empty() || selected_count != prompt_count + pi0_count + eta_count + other_count ||
       !valid_partition(histograms.counts) || !valid_partition(histograms.weighted)) return 7;
-  std::array<std::unique_ptr<TH1D>, category_count> fractions;
-  for (std::size_t index = 1; index < category_count; ++index)
-  {
-    const std::string name = index == prompt ? "h_photon_candidate_purity"
-                                             : std::string("h_candidate_") + candidate_composition::kKeys[index] + "_fraction";
-    fractions[index] = fraction_histogram(*histograms.weighted[index], *histograms.weighted[denominator], name);
-  }
-  if (sample_name.empty())
-  {
-    draw_stack(fractions, resolved_output_base + "_category_fraction_stack.pdf", family, selection, min_cluster_energy, false);
-    draw_stack(fractions, resolved_output_base + "_category_fraction_stack_detailed.pdf", family, selection, min_cluster_energy, true);
-  }
-
   TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;
   for (std::size_t index = 0; index < category_count; ++index)
   {
     histograms.counts[index]->Write();
     histograms.weighted[index]->Write();
-    if (index > 0) fractions[index]->Write();
   }
-  int schema_version = 1, source_schema_version = 4, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 2, source_schema_version = 4, signal_embedding_id = kSignalEmbeddingId;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
   std::string eta_definition = "sum_signal_embedding_g4_eta_or_generator_eta_decay_photon_contributor_fraction";
@@ -459,11 +442,22 @@ int ReducePythiaPhotonCandidateComposition(
   metadata.Branch("invalid_truth_cluster_count", &invalid_truth_count);
   metadata.Fill();
   metadata.Write();
+  std::string shard_sample_name = sample_name;
+  int metadata_shard_index = shard_index, metadata_shard_count = shard_count;
+  TTree shard_metadata("shard_metadata", "Photon-candidate composition partial shard metadata");
+  shard_metadata.Branch("sample_name", &shard_sample_name);
+  shard_metadata.Branch("shard_index", &metadata_shard_index);
+  shard_metadata.Branch("shard_count", &metadata_shard_count);
+  shard_metadata.Branch("map_index_begin", &shard_map_begin);
+  shard_metadata.Branch("map_index_end", &shard_map_end);
+  shard_metadata.Branch("total_map_count", &total_map_count);
+  shard_metadata.Fill();
+  shard_metadata.Write();
   output.Close();
   std::cout << "ReducePythiaPhotonCandidateComposition - family/selection/selected/prompt/pi0/eta/other/overlap/half/output = "
             << family << "/" << selection << "/" << selected_count << "/" << prompt_count << "/" << pi0_count << "/" << eta_count << "/"
             << other_count << "/" << overlap_count << "/" << half_boundary_count << "/" << resolved_output_base;
-  if (!sample_name.empty()) std::cout << " (partial sample " << sample_name << ")";
+  std::cout << " (partial " << sample_name << " shard " << shard_index << "/" << shard_count << ", maps " << shard_map_begin << ":" << shard_map_end << ")";
   std::cout << std::endl;
   return overlap_count == 0ULL ? 0 : 9;
 }

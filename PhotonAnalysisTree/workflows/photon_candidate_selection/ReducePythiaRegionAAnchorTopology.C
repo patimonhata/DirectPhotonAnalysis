@@ -67,8 +67,8 @@ std::vector<SampleDefinition> sample_definitions(const std::string& family)
   if (family == "jet")
   {
     return {
-        {"jet3", 0.0, 5.0, 1.2147e9, false, 10001},
-        {"jet5", 5.0, 9.0, 1.3878e8, false, 10001},
+        {"jet3", 0.0, 5.0, 1.2147e9, false, 10000},
+        {"jet5", 5.0, 9.0, 1.3878e8, false, 10000},
         {"jet8", 9.0, 14.0, 1.3013e7, false, 10000},
         {"jet12", 14.0, 21.0, 1.4903e6, false, 100000},
         {"jet20", 21.0, 32.0, 6.2623e4, false, 10000},

@@ -208,18 +208,27 @@ int ReducePythiaPhotonCandidateComposition(
     const std::string selection = "region_a",
     const bool require_complete = true,
     const int n_bins = 200,
-    const double et_max = 40.0)
+    const double et_max = 40.0,
+    const std::string sample_name = "")
 {
   using namespace candidate_composition;
-  const std::vector<SampleDefinition> samples = sample_definitions(family);
+  const std::vector<SampleDefinition> family_samples = sample_definitions(family);
+  std::vector<SampleDefinition> samples;
+  if (sample_name.empty()) samples = family_samples;
+  else
+  {
+    const auto selected_sample = std::find_if(family_samples.begin(), family_samples.end(), [&](const SampleDefinition& sample) { return sample.name == sample_name; });
+    if (selected_sample != family_samples.end()) samples.push_back(*selected_sample);
+  }
   if (samples.empty() || map_root.empty() || (selection != "region_a" && selection != "final_photon") ||
       n_bins <= 0 || !std::isfinite(et_max) || et_max <= 0.0) return 1;
   std::string normalized_map_root = map_root;
   while (normalized_map_root.size() > 1U && normalized_map_root.back() == '/') normalized_map_root.pop_back();
   const std::string configuration = normalized_map_root.substr(normalized_map_root.find_last_of('/') + 1U);
+  const std::string default_output_suffix = sample_name.empty() ? "/photon_candidate_composition" : "/partial/" + sample_name + "/photon_candidate_composition";
   const std::string resolved_output_base = output_base.empty()
       ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/" +
-            configuration + "/" + selection + "/" + family + "/photon_candidate_composition"
+            configuration + "/" + selection + "/" + family + default_output_suffix
       : output_base;
   if (!make_output_directory(resolved_output_base)) return 2;
 
@@ -358,8 +367,11 @@ int ReducePythiaPhotonCandidateComposition(
                                              : std::string("h_candidate_") + candidate_composition::kKeys[index] + "_fraction";
     fractions[index] = fraction_histogram(*histograms.weighted[index], *histograms.weighted[denominator], name);
   }
-  draw_stack(fractions, resolved_output_base + "_category_fraction_stack.pdf", family, selection, min_cluster_energy, false);
-  draw_stack(fractions, resolved_output_base + "_category_fraction_stack_detailed.pdf", family, selection, min_cluster_energy, true);
+  if (sample_name.empty())
+  {
+    draw_stack(fractions, resolved_output_base + "_category_fraction_stack.pdf", family, selection, min_cluster_energy, false);
+    draw_stack(fractions, resolved_output_base + "_category_fraction_stack_detailed.pdf", family, selection, min_cluster_energy, true);
+  }
 
   TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;
@@ -417,6 +429,8 @@ int ReducePythiaPhotonCandidateComposition(
   output.Close();
   std::cout << "ReducePythiaPhotonCandidateComposition - family/selection/selected/prompt/pi0/eta/other/overlap/half/output = "
             << family << "/" << selection << "/" << selected_count << "/" << prompt_count << "/" << pi0_count << "/" << eta_count << "/"
-            << other_count << "/" << overlap_count << "/" << half_boundary_count << "/" << resolved_output_base << std::endl;
+            << other_count << "/" << overlap_count << "/" << half_boundary_count << "/" << resolved_output_base;
+  if (!sample_name.empty()) std::cout << " (partial sample " << sample_name << ")";
+  std::cout << std::endl;
   return overlap_count == 0ULL ? 0 : 9;
 }

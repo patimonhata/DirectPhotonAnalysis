@@ -3,10 +3,10 @@ set -euo pipefail
 
 usage()
 {
-  echo "Usage: $0 FAMILY MAP_ROOT OUTPUT_BASE SELECTION REQUIRE_COMPLETE [N_BINS] [ET_MAX_GEV]" >&2
+  echo "Usage: $0 FAMILY MAP_ROOT OUTPUT_BASE SELECTION REQUIRE_COMPLETE [N_BINS] [ET_MAX_GEV] [SAMPLE_NAME]" >&2
 }
 
-if (( $# < 5 || $# > 7 )); then
+if (( $# < 5 || $# > 8 )); then
   usage
   exit 2
 fi
@@ -19,10 +19,20 @@ selection=$4
 require_complete=$5
 n_bins=${6:-200}
 et_max=${7:-40.0}
+sample_name=${8:-}
 
 if [[ "$family" != jet && "$family" != photonjet ]]; then
   echo "FAMILY must be jet or photonjet: $family" >&2
   exit 2
+fi
+if [[ -n "$sample_name" ]]; then
+  case "$family:$sample_name" in
+    jet:jet3|jet:jet5|jet:jet8|jet:jet12|jet:jet20|jet:jet30|jet:jet40|photonjet:photonjet3|photonjet:photonjet5|photonjet:photonjet10|photonjet:photonjet20) ;;
+    *)
+      echo "SAMPLE_NAME does not belong to FAMILY: $family/$sample_name" >&2
+      exit 2
+      ;;
+  esac
 fi
 if [[ "$selection" != region_a && "$selection" != final_photon ]]; then
   echo "SELECTION must be region_a or final_photon: $selection" >&2
@@ -44,7 +54,7 @@ if [[ ! -d "$map_root" ]]; then
   echo "MAP_ROOT is not a directory: $map_root" >&2
   exit 2
 fi
-if [[ -z "$output_base" || "$map_root" == *\"* || "$map_root" == *\\* || "$output_base" == *\"* || "$output_base" == *\\* ]]; then
+if [[ -z "$output_base" || "$map_root" == *\"* || "$map_root" == *\\* || "$output_base" == *\"* || "$output_base" == *\\* || "$sample_name" == *\"* || "$sample_name" == *\\* ]]; then
   echo "MAP_ROOT and OUTPUT_BASE must be non-empty paths without quotes or backslashes" >&2
   exit 2
 fi
@@ -53,6 +63,6 @@ map_root=$(cd "$map_root" && pwd)
 set +u
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
 set -u
-root -l -b -q "$workflow_dir/ReducePythiaPhotonCandidateComposition.C+(\"$family\",\"$map_root\",\"$output_base\",\"$selection\",$require_complete,$n_bins,$et_max)"
+root -l -b -q "$workflow_dir/ReducePythiaPhotonCandidateComposition.C+(\"$family\",\"$map_root\",\"$output_base\",\"$selection\",$require_complete,$n_bins,$et_max,\"$sample_name\")"
 
 echo "Photon-candidate composition output base: $output_base"

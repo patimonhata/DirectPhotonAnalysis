@@ -1,0 +1,31 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+request_memory     = 4GB
+Priority           = 20
+job_lease_duration = 86400
+
+family             = jet
+configuration      = cluster_e_gt_0p5
+# selection          = region_a
+selection          = region_a_tagging_veto
+require_complete   = true
+n_bins             = 200
+et_max             = 40.0
+map_root            = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/$(configuration)
+partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/$(configuration)/$(selection)/$(family)/partial
+output_base         = $(partial_root)/$(sample_name)/photon_candidate_composition
+log_directory       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
+
+Output             = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_$(sample_name).out
+Error              = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_$(sample_name).err
+Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-composition-$(selection)-$(family)-$(configuration)-$(sample_name).log
+
+Arguments          = "$(family) $(map_root) $(output_base) $(selection) $(require_complete) $(n_bins) $(et_max) $(sample_name)"
+
+# Override sample_names with condor_submit -append to retry a subset.
+sample_names = jet3,jet5,jet8,jet12,jet20,jet30,jet40
+Queue sample_name in $(sample_names)

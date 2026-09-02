@@ -119,43 +119,84 @@ std::size_t pi0_category(int topology)
 }
 
 void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output,
-                const std::string& family, const std::string& selection, double min_cluster_energy)
+                const std::string& family, const std::string& selection, double min_cluster_energy, bool detailed)
 {
   SetsPhenixStyle();
-  TCanvas canvas("c_photon_candidate_composition", "", 1100, 900);
-  canvas.SetLeftMargin(0.13);
-  canvas.SetRightMargin(0.04);
-  canvas.SetBottomMargin(0.13);
-  canvas.SetTopMargin(0.08);
-  canvas.SetTicks(1, 1);
-  THStack stack("stack_photon_candidate_composition", "");
-  for (std::size_t index = 1; index < category_count; ++index)
+  const std::string detail = detailed ? "detailed" : "summary";
+  TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad");
+  THStack stack(("stack_" + detail + "_photon_candidate_composition").c_str(), "");
+  std::unique_ptr<TH1D> pi0_fraction;
+  if (detailed)
   {
-    fractions[index]->SetFillColor(kColors[index]);
-    fractions[index]->SetLineColor(kBlack);
-    stack.Add(fractions[index].get());
+    for (std::size_t index = 1; index < category_count; ++index)
+    {
+      fractions[index]->SetFillColor(kColors[index]);
+      fractions[index]->SetLineColor(kBlack);
+      stack.Add(fractions[index].get());
+    }
+  }
+  else
+  {
+    pi0_fraction.reset(static_cast<TH1D*>(fractions[pi0_separated]->Clone("h_candidate_pi0_fraction")));
+    pi0_fraction->Reset("ICES");
+    pi0_fraction->SetDirectory(nullptr);
+    for (std::size_t index = pi0_separated; index <= pi0_other; ++index) pi0_fraction->Add(fractions[index].get());
+    pi0_fraction->SetFillColor(kColors[pi0_separated]);
+    pi0_fraction->SetLineColor(kBlack);
+    for (std::size_t index : {prompt, eta, other})
+    {
+      fractions[index]->SetFillColor(kColors[index]);
+      fractions[index]->SetLineColor(kBlack);
+    }
+    stack.Add(fractions[prompt].get());
+    stack.Add(pi0_fraction.get());
+    stack.Add(fractions[eta].get());
+    stack.Add(fractions[other].get());
   }
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
   stack.Draw("HIST");
   stack.GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
   stack.GetYaxis()->SetTitle("Fraction of selected candidates");
-  TLegend legend(0.52, 0.55, 0.95, 0.90);
+  for (TAxis* axis : {stack.GetXaxis(), stack.GetYaxis()})
+  {
+    axis->SetLabelSize(0.05);
+    axis->SetTitleSize(0.05);
+    axis->CenterTitle();
+  }
+  stack.GetXaxis()->SetTitleOffset(1.4);
+  stack.GetYaxis()->SetTitleOffset(1.15);
+  canvas.cd();
+  TLegend legend(detailed ? 0.48 : 0.56, detailed ? 0.60 : 0.73, 0.95, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(0.025);
-  for (std::size_t index = 1; index < category_count; ++index) legend.AddEntry(fractions[index].get(), kLabels[index], "f");
+  legend.SetTextSize(detailed ? 0.018 : 0.024);
+  if (detailed)
+  {
+    for (std::size_t index = 1; index < category_count; ++index) legend.AddEntry(fractions[index].get(), kLabels[index], "f");
+  }
+  else
+  {
+    legend.AddEntry(fractions[prompt].get(), kLabels[prompt], "f");
+    legend.AddEntry(pi0_fraction.get(), "#pi^{0}", "f");
+    legend.AddEntry(fractions[eta].get(), kLabels[eta], "f");
+    legend.AddEntry(fractions[other].get(), kLabels[other], "f");
+  }
   legend.Draw();
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  label.SetTextSize(0.028);
-  label.DrawLatex(0.15, 0.92, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.15, 0.875, (family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples"));
-  label.DrawLatex(0.15, 0.83, selection == "region_a" ? "Region A: isolated and tight" : "Region A after #pi^{0}/#eta tag veto");
+  label.SetTextSize(0.026);
+  label.DrawLatex(0.06, 0.96, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(0.06, 0.91, (family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples"));
+  label.DrawLatex(0.06, 0.86, selection == "region_a" ? "Region A: isolated and tight" : "Region A after #pi^{0}/#eta tag veto");
   std::ostringstream threshold;
   threshold << "E_{cluster} > " << min_cluster_energy << " GeV; truth contribution > 50%";
-  label.DrawLatex(0.15, 0.785, threshold.str().c_str());
+  label.DrawLatex(0.06, 0.81, threshold.str().c_str());
+  plot_pad->cd();
+  plot_pad->RedrawAxis();
+  canvas.cd();
   canvas.SaveAs(output.c_str());
 }
 }
@@ -317,7 +358,8 @@ int ReducePythiaPhotonCandidateComposition(
                                              : std::string("h_candidate_") + candidate_composition::kKeys[index] + "_fraction";
     fractions[index] = fraction_histogram(*histograms.weighted[index], *histograms.weighted[denominator], name);
   }
-  draw_stack(fractions, resolved_output_base + "_category_fraction_stack.pdf", family, selection, min_cluster_energy);
+  draw_stack(fractions, resolved_output_base + "_category_fraction_stack.pdf", family, selection, min_cluster_energy, false);
+  draw_stack(fractions, resolved_output_base + "_category_fraction_stack_detailed.pdf", family, selection, min_cluster_energy, true);
 
   TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;

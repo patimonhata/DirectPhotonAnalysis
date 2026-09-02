@@ -1,6 +1,6 @@
 # Pythia photon-candidate selection
 
-This workflow is the map stage of the Pythia photon-candidate analysis. A map job reads a contiguous range of synchronized DST segments and writes one event-wise ROOT TTree containing split-cluster shower shapes, BDT and isolation selections, neutral-meson tags, and detailed pi0 truth topology.
+This workflow covers the map, reduce, and merge stages of the Pythia photon-candidate analysis. A map job reads a contiguous range of synchronized DST segments and writes one event-wise ROOT TTree containing split-cluster shower shapes, BDT and isolation selections, neutral-meson tags, and detailed pi0 truth topology.
 
 ## Build
 
@@ -56,10 +56,10 @@ All map production, including single-chunk tests, uses this manifest-based inter
 
 ## Small-sample end-to-end QA
 
-`run_small_sample.sh` runs the production map code over the first contiguous part of one sample manifest and then runs the matching Jet- or PhotonJet-family reduce in partial-production mode. For example, this command processes the first 30 Jet12 segments in three maps of 10 segments each and makes the final plots:
+`run_small_sample.sh` runs the production map code over the first contiguous part of one sample manifest and then runs the matching Jet- or PhotonJet-family reduce in partial-production mode. For example, this command processes the first 100 Jet12 segments in ten maps of 10 segments each and writes all ten integrated partials:
 
 ~~~bash
-PhotonAnalysisTree/workflows/photon_candidate_selection/run_small_sample.sh jet12 30 10 0.2
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_small_sample.sh jet12 100 10 0.2
 ~~~
 
 Its interface is:
@@ -68,9 +68,9 @@ Its interface is:
 run_small_sample.sh SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP] [TAGGING_PARTNER_MIN_ENERGY_GEV]
 ~~~
 
-The default output root is `PhotonAnalysisTree/output/qa/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>_<N>segments`. It contains `maps/<sample>/map_*.root` and the reduce products under `plots/`. Existing map files are never overwritten. `MIN_CLUSTER_ENERGY_GEV` defaults to 0.1, `TAGGING_PARTNER_MIN_ENERGY_GEV` defaults to the topology threshold, and `N_EVENTS_PER_MAP` defaults to zero, meaning every event in each selected map range.
+The default output root is `PhotonAnalysisTree/output/qa/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>_<N>segments`. It contains `maps/<sample>/map_*.root` and integrated partials under `reduce/<sample>/shard_<index>/`. Existing map files are never overwritten. `MIN_CLUSTER_ENERGY_GEV` defaults to 0.1, `TAGGING_PARTNER_MIN_ENERGY_GEV` defaults to the topology threshold, and `N_EVENTS_PER_MAP` defaults to zero, meaning every event in each selected map range.
 
-This mode requires the selected manifest range to start at row zero and remain contiguous, matching the reducer's map-completeness checks. It uses only the selected sample and normalizes with only the maps present, so its products are for code, schema, and plot QA only—not a physics result. A handful of segments can be enough for a smoke test, but 30--100 segments is more likely to populate the Region-A topology plots.
+This mode requires the selected manifest range to start at row zero and remain contiguous, matching the reducer's map-completeness checks. It uses only the selected sample and normalizes with only the maps present, so its products are for code, schema, and plot QA only—not a physics result. A non-Jet12 sample can use a handful of segments for a smoke test. Jet12 requires at least ten generated map files so every fixed shard is non-empty.
 
 ## Region A/B/C/D content
 
@@ -187,55 +187,110 @@ event_weight_pb = event.weight_numerator_pb / sumw_sample
 
 where `weight_numerator_pb = sample_cross_section_pb * generator_weight`. The denominator includes events rejected later by the vertex cut. Do not normalize map files independently. Cross sections and half-open stitching windows are stored in metadata; `jet40` has no upper bound.
 
-## Region-A pi0-anchor topology reduce
+## Unified reduce and merge
 
-`ReducePythiaRegionAAnchorTopology.C` reads the completed map production, validates every sample's schema, metadata compatibility, and contiguous manifest coverage, calculates the full-sample normalization above, and makes the Region-A topology plots without reopening DSTs. Jet and PhotonJet are separate families and are never mixed.
+`ReducePythiaPhotonCandidateSelection.C` is the only production reducer. One job reads one sample shard once and fills both analyses:
 
-The event loop disables every branch by default, activates only the 11 scalar/vector branches used by this reduce, and gives those branches a 64 MiB `TTreeCache` per open map file. Keep future event-branch bindings on the `bind_active` path so new inputs are both enabled and cached.
+- photon-candidate composition for the requested selection;
+- pi0-anchor topology for all five comparison selections.
 
-Run the compiled Jet-family reduce locally with:
+The supported composition selections are `kinematic`, `preselection`, `preselection_tight`, `preselection_isolation`, `region_a`, and `region_a_tagging_veto`. `final_photon` is an alias of `region_a_tagging_veto`. The topology comparison always includes `kinematic`, `preselection`, `preselection_tight`, `preselection_isolation`, and `region_a_tagging_veto`, independently of the requested composition selection.
+
+The composition categories partition every selected candidate into prompt photon, pi0 topology, eta, or other. The detailed pi0 categories are separated, merged, single contaminated, missing, and other. Truth-origin majorities use a strict contribution `> 0.5`; an exact contribution of `0.5` is other. An overlap is recorded in metadata and makes the reducer return code 9 after writing its output.
+
+The topology prompt reference requires both the selected flag and `split_cluster_truth_prompt_cluster`. The pi0 categories partition selected valid pi0 anchors. Weighted fraction errors are computed from the weighted numerator/denominator subset covariance; weighted fractions are never added directly.
+
+### Shards and partial files
+
+Every non-Jet12 sample has exactly one shard, index 0. Jet12 has exactly ten contiguous, non-overlapping shards, indices 0 through 9. A Jet12 shard reads only its map range but uses the full Jet12 generator-weight sum for cross-section normalization.
+
+Run one partial locally with the mandatory interface:
+
+~~~text
+run_reduce.sh FAMILY MAP_ROOT OUTPUT_BASE SELECTION REQUIRE_COMPLETE N_BINS ET_MAX_GEV SAMPLE_NAME SHARD_INDEX
+~~~
+
+For example:
 
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh \
   jet \
-  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1 \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/jet \
-  true
+  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p5 \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/cluster_e_gt_0p5/region_a/jet/partial/jet5/shard_0/photon_candidate_selection \
+  region_a true 200 40.0 jet5 0
 ~~~
 
-Run the PhotonJet family independently by replacing `jet` with `photonjet` in both the family argument and output path:
+Each partial is:
 
-~~~bash
-PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh \
-  photonjet \
-  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1 \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p1/photonjet \
-  true
+~~~text
+partial/<sample>/shard_<index>/photon_candidate_selection.root
+├── composition/
+├── anchor_topology/<selection>/
+├── metadata
+├── topology_summary
+└── shard_metadata
 ~~~
 
-Production mode requires every expected map from every sample in the selected family. The optional fourth argument `require_complete=false` is only for development with partial productions; its cross-section normalization uses only the maps present and is not a physics result.
+The partial contains only count and cross-section-weighted histograms plus validation metadata; final fractions and PDFs are created by merge.
 
-For a disconnect-safe batch run, submit the Jet and PhotonJet reducers as separate one-job Condor clusters:
+### Condor reduce
+
+For the Jet family, submit six one-shard samples and ten Jet12 shards as 16 ordinary Condor jobs:
 
 ~~~bash
 mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet.job
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_photonjet.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet_samples.job
+condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet12_shards.job
 ~~~
 
-The submit files default to `configuration = cluster_e_gt_0p1` and `require_complete = true`. Edit both values as needed before submission. Each output base must have at most one active reducer; the repository never submits these jobs automatically.
+The submit files default to `configuration = cluster_e_gt_0p5`, `selection = region_a`, `require_complete = true`, 200 bins, and 40 GeV. Edit the configuration and selection consistently in both submit files before submitting. They write distinct partial and log paths for every sample/shard.
 
-The cluster selections are:
+Retry only selected jobs with:
 
-- pi0 anchor: `sample_stitching_valid && sample_stitching_pass && split_cluster_pass_region_a && split_cluster_pi0_anchor_valid`;
-- prompt reference: `sample_stitching_valid && sample_stitching_pass && split_cluster_pass_region_a && split_cluster_truth_prompt_cluster`.
+~~~bash
+condor_submit -append 'sample_names = jet3,jet5' \
+  PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet_samples.job
+condor_submit -append 'shard_indices = 3,7' \
+  PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet12_shards.job
+~~~
 
-The stored topology classification uses the map-time strict `E_cluster > min_cluster_energy` threshold. The reduce validates that all maps and samples use the same topology threshold, fixed diagnostic floor, tagging threshold, and topology algorithm version, and does not reclassify topology. Its default binning matches the current `pi0_anchor_topology` production: 200 bins over `0 <= ET < 40 GeV`.
+There is no DAG or automatic dependency. Confirm that all 16 jobs exited successfully before merge.
 
-Each family produces one selection-comparison ROOT file and one directory per selection under
+### Merge
+
+`MergePythiaPhotonCandidateSelection.C` is the only merger. Its wrapper interface is:
 
 ~~~text
-output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_<threshold>/<family>/
+run_merge.sh FAMILY PARTIAL_ROOT COMPOSITION_OUTPUT_BASE TOPOLOGY_OUTPUT_BASE SELECTION
+~~~
+
+For example:
+
+~~~bash
+PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge.sh \
+  jet \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/cluster_e_gt_0p5/region_a/jet/partial \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a/jet/photon_candidate_composition \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p5/jet \
+  region_a
+~~~
+
+The merger requires shard 0 for each non-Jet12 sample and shards 0--9 for Jet12. It rejects missing or duplicate coverage, invalid shard ranges, inconsistent full-sample normalization, unexpected sample metadata, incompatible analysis/configuration metadata, incompatible axes, and invalid category partitions. It adds only counts and weighted spectra, then recomputes all fractions and errors.
+
+Composition output:
+
+~~~text
+photon_candidate_composition.root
+photon_candidate_composition_category_fraction_stack.pdf
+photon_candidate_composition_category_fraction_stack_detailed.pdf
+~~~
+
+The ROOT file includes unweighted and weighted spectra, photon purity, every category fraction, normalization inputs, and classification QA counters.
+
+Anchor-topology output:
+
+~~~text
+<TOPOLOGY_OUTPUT_BASE>/
 ├── selection_comparison.root
 ├── kinematic/region_a_pi0_anchor_topology*.pdf
 ├── preselection/region_a_pi0_anchor_topology*.pdf
@@ -244,92 +299,8 @@ output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_g
 └── region_a_tagging_veto/region_a_pi0_anchor_topology*.pdf
 ~~~
 
-The five selections are `kinematic`, `preselection` (`kinematic && pass_preselection`), `preselection_tight`,
-`preselection_isolation`, and `region_a_tagging_veto` (`region_a && !pi0_tag && !eta_tag`). Each selection directory
-contains the six spectrum/fraction PDFs listed below, with the selection label included in the annotations.
+The topology ROOT file stores counts, weighted spectra in pb, bin-width-normalized spectra in pb/GeV, fractions, metadata, and per-selection sample summaries.
 
-The ROOT file stores one directory per selection, each containing unweighted counts, cross-section-weighted spectra in pb,
-bin-width-normalized spectra in pb/GeV, and category fractions. The `selection_summary` tree stores per-sample raw selected
-cluster and selected anchor counts. Its metadata records the exact selection definitions and compact reduce provenance. The
-topology categories are checked to partition the selected Region-A anchor denominator in every ET bin, including underflow
-and overflow.
-
-## Photon-candidate purity and background composition
-
-`ReducePythiaPhotonCandidateComposition.C` partitions every selected candidate into exactly one of prompt photon, pi0 topology, eta, or other. Every truth-origin requirement uses a strict contribution `> 0.5`; an exact contribution of `0.5` is therefore other. The detailed pi0 categories are separated, merged, single contaminated, missing, and other.
-
-Prompt uses the stored prompt flag plus the stored dominant-contributor fraction. Pi0 uses the stored anchor plus its same-parent main fraction and topology. Eta sums signal-embedding contributors identified either as a G4 eta or as a generator eta-decay photon. If more than one strict majority is ever found, the candidate is assigned to other and the reducer returns nonzero after writing the overlap count to metadata.
-
-Run one Region-A Jet5 partial manually with:
-
-~~~bash
-PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.sh \
-  jet \
-  PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p5 \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a/jet/partial/jet5/shard_0/photon_candidate_composition \
-  region_a \
-  true \
-  200 \
-  40.0 \
-  jet5 \
-  0
-~~~
-
-The supported selections use the same definitions as the topology comparison reduce:
-
-- `kinematic`: `split_cluster_pass_kinematics`;
-- `preselection`: `kinematic && pass_preselection`;
-- `preselection_tight`: `kinematic && pass_preselection && pass_tight`;
-- `preselection_isolation`: `kinematic && pass_preselection && pass_isolated`;
-- `region_a`: stored isolated-and-tight Region A;
-- `region_a_tagging_veto`: stored Region A after the pi0-or-eta tag veto;
-- `final_photon`: backward-compatible alias of `region_a_tagging_veto`.
-
-Use the selection key consistently in the output directory, reduce submit, and merge command.
-
-For a disconnect-safe full Jet-family production, create the shared log directory and submit the six single-shard samples and the ten Jet12 shards:
-
-~~~bash
-mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet_samples.job
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet12_shards.job
-~~~
-
-The first submit queues `jet3`, `jet5`, `jet8`, `jet20`, `jet30`, and `jet40` once each. The second queues Jet12 shards 0 through 9, for 16 ordinary Condor jobs total. To retry only a subset, override the corresponding list:
-
-~~~bash
-condor_submit -append 'sample_names = jet3,jet5' \
-  PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet_samples.job
-condor_submit -append 'shard_indices = 3,7' \
-  PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_composition_jet12_shards.job
-~~~
-
-Every partial has the same layout, including the one-shard samples:
-
-~~~text
-partial/<sample>/shard_<index>/photon_candidate_composition.root
-~~~
-
-Jet12 map files are divided into ten contiguous, non-overlapping ranges. Every Jet12 shard uses the full-sample generator-weight sum for normalization, while reading events only from its own range. Partial files contain count and cross-section-weighted spectra plus required shard metadata; they do not contain fractions or PDFs. After all 16 jobs have exited successfully, merge them manually:
-
-~~~bash
-PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge_composition.sh \
-  jet \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a_tagging_veto/jet/partial \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/region_a_tagging_veto/jet/photon_candidate_composition \
-  region_a_tagging_veto
-~~~
-
-There is deliberately no automatic Condor dependency or DAG. The merge requires shards 0-9 for Jet12 and shard 0 for every other sample, and rejects missing or duplicate coverage, invalid shard ranges, inconsistent full-sample normalization, unexpected sample metadata, incompatible analysis/configuration metadata, incompatible histogram axes, and invalid category partitions. It adds only count and weighted spectra, then recomputes every fraction and both stack PDFs from the merged weighted numerator and denominator.
-
-The sample submit defaults to `configuration = cluster_e_gt_0p5`, `selection = region_a_tagging_veto`, and `require_complete = true`. Edit `selection` for another result, and submit and merge each selection separately because each uses distinct partial, final, and log paths.
-
-The merge writes:
-
-- `photon_candidate_composition.root`, containing unweighted and cross-section-weighted spectra, `h_photon_candidate_purity`, every category fraction, counts, normalization inputs, and classification QA metadata;
-- `photon_candidate_composition_category_fraction_stack.pdf`, whose summary categories partition the selected-candidate denominator in every cluster-ET bin;
-- `photon_candidate_composition_category_fraction_stack_detailed.pdf`, with the individual pi0 topology categories.
-
-The reducer validates both the unweighted and weighted partition, including underflow and overflow. `overlap_cluster_count`, `half_boundary_cluster_count`, and `invalid_truth_cluster_count` are retained as QA counters. Production results require `REQUIRE_COMPLETE=true`; partial mode is only for development.
+Production results require `REQUIRE_COMPLETE=true`. `false` is for incomplete QA productions only; normalization then uses only available maps and is not a physics result. Jet and PhotonJet families remain separate and are never mixed.
 
 ABCD purity extraction remains a separate future reduce stage.

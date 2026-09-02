@@ -1,6 +1,6 @@
 Universe           = vanilla
 Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection
-Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce_composition.sh
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh
 
 PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
 OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
@@ -12,19 +12,18 @@ family             = jet
 configuration      = cluster_e_gt_0p5
 # Supported selections: kinematic, preselection, preselection_tight, preselection_isolation,
 # region_a, region_a_tagging_veto, and final_photon (alias of region_a_tagging_veto).
-# selection          = region_a
 selection          = region_a
 require_complete   = true
 n_bins             = 200
 et_max             = 40.0
 map_root            = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/$(configuration)
-partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/$(configuration)/$(selection)/$(family)/partial
-output_base         = $(partial_root)/jet12/shard_$(shard_index)/photon_candidate_composition
+partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/$(configuration)/$(selection)/$(family)/partial
+output_base         = $(partial_root)/jet12/shard_$(shard_index)/photon_candidate_selection
 log_directory       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
 
-Output             = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_jet12_shard_$(shard_index).out
-Error              = $(log_directory)/composition_$(selection)_$(family)_$(configuration)_jet12_shard_$(shard_index).err
-Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-composition-$(selection)-$(family)-$(configuration)-jet12-shard-$(shard_index).log
+Output             = $(log_directory)/selection_$(selection)_$(family)_$(configuration)_jet12_shard_$(shard_index).out
+Error              = $(log_directory)/selection_$(selection)_$(family)_$(configuration)_jet12_shard_$(shard_index).err
+Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-selection-$(selection)-$(family)-$(configuration)-jet12-shard-$(shard_index).log
 
 Arguments          = "$(family) $(map_root) $(output_base) $(selection) $(require_complete) $(n_bins) $(et_max) jet12 $(shard_index)"
 

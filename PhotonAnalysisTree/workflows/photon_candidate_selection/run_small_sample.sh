@@ -75,7 +75,7 @@ mkdir -p -- "$output_root"
 output_root=$(cd "$output_root" && pwd)
 map_root="$output_root/maps"
 map_output="$map_root/$sample_name"
-output_base="$output_root/plots/region_a_pi0_anchor_topology"
+partial_root="$output_root/reduce/$sample_name"
 map_count=$(((segment_count + files_per_map - 1) / files_per_map))
 
 echo "Small-sample QA: sample=$sample_name segments=$segment_count maps=$map_count events_per_map=$n_events min_cluster_energy=$min_cluster_energy tagging_partner_min_energy=$tagging_partner_min_energy"
@@ -83,11 +83,16 @@ for ((job_index = 0; job_index < map_count; ++job_index)); do
   "$workflow_dir/run_map.sh" "$job_index" 0 "$segment_count" "$files_per_map" "$input_manifest" "$sample_name" "$map_output" "$n_events" "$min_cluster_energy" "$tagging_partner_min_energy"
 done
 
-set +u
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-set -u
-root -l -b -q \
-  "$workflow_dir/ReducePythiaRegionAAnchorTopology.C(\"$family\",\"$map_root\",\"$output_base\",false,200,40.0)"
+shard_count=1
+if [[ "$sample_name" == jet12 ]]; then shard_count=10; fi
+if (( map_count < shard_count )); then
+  echo "Jet12 QA requires at least 10 maps so every fixed shard is non-empty: maps=$map_count" >&2
+  exit 2
+fi
+for ((shard_index = 0; shard_index < shard_count; ++shard_index)); do
+  output_base="$partial_root/shard_${shard_index}/photon_candidate_selection"
+  "$workflow_dir/run_reduce.sh" "$family" "$map_root" "$output_base" region_a false 200 40.0 "$sample_name" "$shard_index"
+done
 
 echo "Small-sample QA maps: $map_output"
-echo "Small-sample QA plots: $output_root/plots"
+echo "Small-sample QA partials: $partial_root"

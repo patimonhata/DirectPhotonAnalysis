@@ -200,6 +200,12 @@ The composition categories partition every selected candidate into prompt photon
 
 The topology prompt reference requires both the selected flag and `split_cluster_truth_prompt_cluster`. The pi0 categories partition selected valid pi0 anchors. Weighted fraction errors are computed from the weighted numerator/denominator subset covariance; weighted fractions are never added directly.
 
+The merge also computes category-conditional survival fractions relative to the kinematic selection. In each cluster-ET bin, every curve is the weighted yield for one category after the current selection divided by the weighted yield for the same category after the kinematic selection. The composition summary contains all candidates, prompt photons, aggregated pi0-origin candidates, eta-origin candidates, and other-origin candidates; its detailed version resolves the pi0 topology. The anchor-topology summary contains all pi0-main anchors and the five topology categories; its detailed version resolves the missing category.
+
+These survival curves have independent category denominators and therefore are not stacked and do not sum to one. Their uncertainties use the same weighted subset-covariance calculation as the existing fractions. A zero-denominator bin is stored as zero in the ROOT histogram and omitted from the PDF graph. The merger validates the unweighted subset relation and the weighted sum-of-squared-weights subset relation for every selection, category, and bin.
+
+The partial schema remains version 4. The merged candidate-composition schema is version 5 and the merged anchor-topology schema is version 4. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
+
 ### Shards and partial files
 
 Every non-Jet12 sample has exactly one shard, index 0. Jet12 has exactly ten contiguous, non-overlapping shards, indices 0 through 9. A Jet12 shard reads only its map range but uses the full Jet12 generator-weight sum for cross-section normalization.
@@ -290,6 +296,8 @@ Composition output mirrors the topology selection layout:
 └── region_a_tagging_veto/photon_candidate_composition*.pdf
 ~~~
 
+Each selection directory includes summary and detailed `*_survival_fraction_relative_to_kinematic*.pdf` plots in addition to the existing category-fraction stacks.
+
 The ROOT file has one directory per selection and includes unweighted and weighted spectra, photon purity, every category fraction, normalization inputs, and classification QA counters.
 
 Anchor-topology output:
@@ -304,6 +312,8 @@ Anchor-topology output:
 ├── region_a/region_a_pi0_anchor_topology*.pdf
 └── region_a_tagging_veto/region_a_pi0_anchor_topology*.pdf
 ~~~
+
+Each selection directory includes summary and detailed `*_survival_fraction_relative_to_kinematic*.pdf` plots in addition to the existing spectra and category-fraction plots.
 
 The topology ROOT file stores counts, weighted spectra in pb, bin-width-normalized spectra in pb/GeV, fractions, metadata, and per-selection sample summaries.
 

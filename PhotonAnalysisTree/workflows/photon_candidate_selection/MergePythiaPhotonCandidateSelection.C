@@ -1,5 +1,7 @@
 #include "ReducePythiaPhotonCandidateSelection.C"
 
+#include <TGraphErrors.h>
+
 namespace candidate_composition_merge
 {
 struct Metadata
@@ -211,6 +213,112 @@ void add_metadata_counters(Metadata& total, const Metadata& value)
   total.region_a_prompt_clusters += value.region_a_prompt_clusters;
   total.region_a_anchor_clusters += value.region_a_anchor_clusters;
 }
+
+struct SurvivalCurve
+{
+  std::unique_ptr<TH1D> histogram;
+  std::unique_ptr<TGraphErrors> graph;
+  std::string label;
+};
+
+bool valid_subset(const TH1D& numerator_counts, const TH1D& denominator_counts,
+                  const TH1D& numerator_weighted, const TH1D& denominator_weighted)
+{
+  for (int bin = 0; bin <= numerator_counts.GetNbinsX() + 1; ++bin)
+  {
+    const double numerator_count = numerator_counts.GetBinContent(bin);
+    const double denominator_count = denominator_counts.GetBinContent(bin);
+    const double count_scale = std::max({1.0, std::abs(numerator_count), std::abs(denominator_count)});
+    const double numerator_w2 = std::pow(numerator_weighted.GetBinError(bin), 2);
+    const double denominator_w2 = std::pow(denominator_weighted.GetBinError(bin), 2);
+    const double w2_scale = std::max({1.0, numerator_w2, denominator_w2});
+    if (numerator_count < -1e-9 * count_scale || numerator_count > denominator_count + 1e-9 * count_scale ||
+        numerator_w2 > denominator_w2 + 1e-9 * w2_scale) return false;
+  }
+  return true;
+}
+
+std::unique_ptr<TH1D> sum_histograms(const std::vector<const TH1D*>& inputs, const std::string& name)
+{
+  if (inputs.empty()) return nullptr;
+  auto result = std::unique_ptr<TH1D>(static_cast<TH1D*>(inputs.front()->Clone(name.c_str())));
+  result->SetDirectory(nullptr);
+  result->Reset("ICES");
+  for (const TH1D* input : inputs)
+  {
+    if (!input || !result->Add(input)) return nullptr;
+  }
+  return result;
+}
+
+std::unique_ptr<SurvivalCurve> make_survival_curve(const TH1D& numerator, const TH1D& denominator,
+                                                   const std::string& name, const std::string& label,
+                                                   int color, int marker_style)
+{
+  auto curve = std::make_unique<SurvivalCurve>();
+  curve->histogram = candidate_composition::fraction_histogram(numerator, denominator, name);
+  curve->histogram->SetLineColor(color);
+  curve->histogram->SetMarkerColor(color);
+  curve->histogram->SetMarkerStyle(marker_style);
+  curve->histogram->SetMarkerSize(0.9);
+  curve->histogram->SetLineWidth(2);
+  style_axes(curve->histogram.get(), "Survival fraction relative to Kinematic");
+  curve->graph = std::make_unique<TGraphErrors>();
+  curve->graph->SetName((name + "_valid_bins").c_str());
+  curve->graph->SetLineColor(color);
+  curve->graph->SetMarkerColor(color);
+  curve->graph->SetMarkerStyle(marker_style);
+  curve->graph->SetMarkerSize(0.9);
+  curve->graph->SetLineWidth(2);
+  curve->label = label;
+  for (int bin = 1; bin <= denominator.GetNbinsX(); ++bin)
+  {
+    if (denominator.GetBinContent(bin) == 0.0) continue;
+    const double value = curve->histogram->GetBinContent(bin);
+    const double error = curve->histogram->GetBinError(bin);
+    if (!std::isfinite(value) || !std::isfinite(error)) continue;
+    const int point = curve->graph->GetN();
+    curve->graph->SetPoint(point, denominator.GetXaxis()->GetBinCenter(bin), value);
+    curve->graph->SetPointError(point, 0.0, error);
+  }
+  return curve;
+}
+
+void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const TH1D& axis_source,
+                          const std::string& output_path, const std::string& canvas_name,
+                          const std::string& family_label, const std::string& selection_label,
+                          const std::string& definition_label, bool detailed)
+{
+  TCanvas canvas(canvas_name.c_str(), "", kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad(canvas_name + "_pad");
+  auto frame = std::unique_ptr<TH1D>(static_cast<TH1D*>(axis_source.Clone((canvas_name + "_frame").c_str())));
+  frame->SetDirectory(nullptr);
+  frame->Reset("ICES");
+  frame->SetMinimum(0.0);
+  frame->SetMaximum(1.05);
+  style_axes(frame.get(), "Survival fraction relative to Kinematic");
+  frame->Draw("AXIS");
+  for (const SurvivalCurve* curve : curves) curve->graph->Draw("PE1 SAME");
+  canvas.cd();
+  TLegend legend(detailed ? 0.50 : 0.56, detailed ? 0.64 : 0.70, 0.97, 0.97);
+  legend.SetBorderSize(0);
+  legend.SetFillStyle(0);
+  legend.SetTextSize(detailed ? 0.014 : 0.022);
+  for (const SurvivalCurve* curve : curves) legend.AddEntry(curve->graph.get(), curve->label.c_str(), "lep");
+  legend.Draw();
+  TLatex label;
+  label.SetNDC();
+  label.SetTextAlign(13);
+  label.SetTextSize(0.026);
+  label.DrawLatex(0.06, 0.96, "#it{#bf{sPHENIX}} Internal");
+  label.DrawLatex(0.06, 0.91, family_label.c_str());
+  label.DrawLatex(0.06, 0.86, (selection_label + " relative to Kinematic").c_str());
+  label.DrawLatex(0.06, 0.81, definition_label.c_str());
+  plot_pad->cd();
+  plot_pad->RedrawAxis();
+  canvas.cd();
+  canvas.SaveAs(output_path.c_str());
+}
 }
 
 int MergePythiaPhotonCandidateSelection(
@@ -394,6 +502,16 @@ int MergePythiaPhotonCandidateSelection(
         !candidate_composition::valid_partition(composition_histograms[selection_index]->weighted) ||
         !topology_histograms[selection_index] || !::valid_partition(topology_histograms[selection_index]->counts) ||
         !::valid_partition(topology_histograms[selection_index]->weighted_pb)) return 6;
+    for (std::size_t index = 0; index < category_count; ++index)
+    {
+      if (!valid_subset(*composition_histograms[selection_index]->counts[index], *composition_histograms[0]->counts[index],
+                        *composition_histograms[selection_index]->weighted[index], *composition_histograms[0]->weighted[index])) return 6;
+    }
+    for (std::size_t index = 0; index < kSpectrumCount; ++index)
+    {
+      if (!valid_subset(*topology_histograms[selection_index]->counts[index], *topology_histograms[0]->counts[index],
+                        *topology_histograms[selection_index]->weighted_pb[index], *topology_histograms[0]->weighted_pb[index])) return 6;
+    }
   }
 
   TFile composition_output((composition_output_base + "/selection_comparison.root").c_str(), "RECREATE");
@@ -411,6 +529,42 @@ int MergePythiaPhotonCandidateSelection(
     if (!make_output_directory(selection_output_base)) return 7;
     draw_stack(fractions, selection_output_base + "_category_fraction_stack.pdf", family, kSelectionKeys[composition_selection], combined.min_cluster_energy, false);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack_detailed.pdf", family, kSelectionKeys[composition_selection], combined.min_cluster_energy, true);
+    std::array<std::unique_ptr<SurvivalCurve>, category_count> survival;
+    for (std::size_t index = 0; index < category_count; ++index)
+    {
+      const std::string key = index == denominator ? "all" : candidate_composition::kKeys[index];
+      const std::string label = index == denominator ? "All candidates" : candidate_composition::kLabels[index];
+      const int color = index == denominator ? kBlack : candidate_composition::kColors[index];
+      survival[index] = make_survival_curve(*histograms.weighted[index], *composition_histograms[0]->weighted[index],
+          "h_candidate_" + key + "_survival_fraction_relative_to_kinematic", label, color, 20 + static_cast<int>(index));
+    }
+    std::vector<const TH1D*> selected_pi0_inputs, kinematic_pi0_inputs;
+    for (std::size_t index = pi0_separated; index <= pi0_other; ++index)
+    {
+      selected_pi0_inputs.push_back(histograms.weighted[index].get());
+      kinematic_pi0_inputs.push_back(composition_histograms[0]->weighted[index].get());
+    }
+    auto selected_pi0 = sum_histograms(selected_pi0_inputs, "h_selected_pi0_for_survival");
+    auto kinematic_pi0 = sum_histograms(kinematic_pi0_inputs, "h_kinematic_pi0_for_survival");
+    if (!selected_pi0 || !kinematic_pi0) return 7;
+    auto pi0_survival = make_survival_curve(*selected_pi0, *kinematic_pi0,
+        "h_candidate_pi0_survival_fraction_relative_to_kinematic", "#pi^{0}", candidate_composition::kColors[pi0_separated], 22);
+    const std::vector<const SurvivalCurve*> summary_survival = {
+        survival[denominator].get(), survival[prompt].get(), pi0_survival.get(), survival[eta].get(), survival[other].get()};
+    const std::vector<const SurvivalCurve*> detailed_survival = {
+        survival[denominator].get(), survival[prompt].get(), survival[pi0_separated].get(), survival[pi0_merged].get(),
+        survival[pi0_single_contaminated].get(), survival[pi0_missing].get(), survival[pi0_other].get(), survival[eta].get(), survival[other].get()};
+    const std::string family_label = family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples";
+    std::ostringstream composition_definition;
+    composition_definition << "E_{cluster} > " << combined.min_cluster_energy << " GeV; truth contribution > 50%";
+    draw_survival_curves(summary_survival, *histograms.weighted[denominator],
+        selection_output_base + "_survival_fraction_relative_to_kinematic.pdf",
+        std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival", family_label,
+        kSelectionLabels[composition_selection], composition_definition.str(), false);
+    draw_survival_curves(detailed_survival, *histograms.weighted[denominator],
+        selection_output_base + "_survival_fraction_relative_to_kinematic_detailed.pdf",
+        std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_detailed", family_label,
+        kSelectionLabels[composition_selection], composition_definition.str(), true);
     TDirectory* directory = composition_output.mkdir(kSelectionKeys[composition_selection]);
     if (!directory) return 7;
     directory->cd();
@@ -419,14 +573,23 @@ int MergePythiaPhotonCandidateSelection(
       histograms.counts[index]->Write();
       histograms.weighted[index]->Write();
       if (index > 0) fractions[index]->Write();
+      survival[index]->histogram->Write();
     }
+    pi0_survival->histogram->Write();
     composition_output.cd();
   }
   std::vector<std::string> composition_selection_keys(kSelectionKeys.begin(), kSelectionKeys.end());
   std::vector<std::string> composition_selection_labels(kSelectionLabels.begin(), kSelectionLabels.end());
   std::vector<std::string> composition_selection_definitions(kSelectionDefinitions.begin(), kSelectionDefinitions.end());
+  int composition_schema_version = 5;
+  int composition_source_partial_schema_version = combined.schema_version;
+  std::string survival_fraction_denominator_selection = "kinematic";
+  std::string survival_fraction_definition = "weighted_selected_category_yield_divided_by_weighted_kinematic_category_yield_per_cluster_et_bin";
+  std::string survival_fraction_uncertainty = "weighted_subset_covariance";
+  std::string survival_fraction_zero_denominator = "stored_as_zero_and_not_drawn";
   TTree metadata("metadata", "Photon-candidate composition merge metadata");
-  metadata.Branch("schema_version", &combined.schema_version);
+  metadata.Branch("schema_version", &composition_schema_version);
+  metadata.Branch("source_partial_schema_version", &composition_source_partial_schema_version);
   metadata.Branch("source_map_schema_version", &combined.source_map_schema_version);
   metadata.Branch("family", &combined.family);
   metadata.Branch("map_root", &combined.map_root);
@@ -446,6 +609,10 @@ int MergePythiaPhotonCandidateSelection(
   metadata.Branch("eta_definition", &combined.eta_definition);
   metadata.Branch("other_definition", &combined.other_definition);
   metadata.Branch("weight_definition", &combined.weight_definition);
+  metadata.Branch("survival_fraction_denominator_selection", &survival_fraction_denominator_selection);
+  metadata.Branch("survival_fraction_definition", &survival_fraction_definition);
+  metadata.Branch("survival_fraction_uncertainty", &survival_fraction_uncertainty);
+  metadata.Branch("survival_fraction_zero_denominator", &survival_fraction_zero_denominator);
   metadata.Branch("analysis_release", &combined.analysis_release);
   metadata.Branch("model_sha256", &combined.model_sha256);
   metadata.Branch("sample_names", &combined.sample_names);
@@ -521,6 +688,29 @@ int MergePythiaPhotonCandidateSelection(
     draw_fraction_lines(summary_fractions, summary_category_indices, selection_output_base + "_category_fractions.pdf", selection_label, false);
     draw_fraction_stack(detailed_fractions, detailed_category_indices, selection_output_base + "_category_fraction_stack_detailed.pdf", selection_label, true);
     draw_fraction_stack(summary_fractions, summary_category_indices, selection_output_base + "_category_fraction_stack.pdf", selection_label, false);
+    std::array<std::unique_ptr<SurvivalCurve>, kSpectrumCount> topology_survival;
+    for (std::size_t index = 1; index < kSpectrumCount; ++index)
+    {
+      const int color = index == 1 ? kBlack : ::kColors[index];
+      const std::string label = index == 1 ? "All #pi^{0}-main anchors" : ::kLabels[index];
+      topology_survival[index] = make_survival_curve(*spectra.weighted_pb[index], *topology_histograms[0]->weighted_pb[index],
+          std::string("h_") + kSelectionKeys[topology_selection] + "_" + ::kKeys[index] + "_survival_fraction_relative_to_kinematic",
+          label, color, 19 + static_cast<int>(index));
+    }
+    std::vector<const SurvivalCurve*> topology_summary_survival = {topology_survival[1].get()};
+    for (std::size_t index : summary_category_indices) topology_summary_survival.push_back(topology_survival[index].get());
+    std::vector<const SurvivalCurve*> topology_detailed_survival = {topology_survival[1].get()};
+    for (std::size_t index : detailed_category_indices) topology_detailed_survival.push_back(topology_survival[index].get());
+    std::ostringstream topology_definition;
+    topology_definition << "E_{cluster} > " << combined.min_cluster_energy << " GeV; #pi^{0}-main anchors";
+    draw_survival_curves(topology_summary_survival, *spectra.weighted_pb[1],
+        selection_output_base + "_survival_fraction_relative_to_kinematic.pdf",
+        std::string("c_") + kSelectionKeys[topology_selection] + "_pi0_anchor_survival", family_label,
+        kSelectionLabels[topology_selection], topology_definition.str(), false);
+    draw_survival_curves(topology_detailed_survival, *spectra.weighted_pb[1],
+        selection_output_base + "_survival_fraction_relative_to_kinematic_detailed.pdf",
+        std::string("c_") + kSelectionKeys[topology_selection] + "_pi0_anchor_survival_detailed", family_label,
+        kSelectionLabels[topology_selection], topology_definition.str(), true);
 
     TDirectory* directory = topology_output.mkdir(kSelectionKeys[topology_selection]);
     if (!directory) return 7;
@@ -530,14 +720,16 @@ int MergePythiaPhotonCandidateSelection(
       spectra.counts[index]->Write();
       spectra.weighted_pb[index]->Write();
       density[index]->Write();
+      if (index > 0) topology_survival[index]->histogram->Write();
     }
     for (auto& histogram : detailed_fractions) histogram->Write();
     for (auto& histogram : summary_fractions) histogram->Write();
     topology_output.cd();
   }
 
-  int topology_schema_version = 3;
+  int topology_schema_version = 4;
   int topology_source_schema_version = combined.source_map_schema_version;
+  int topology_source_partial_schema_version = combined.schema_version;
   std::vector<std::string> topology_selection_keys(kSelectionKeys.begin(), kSelectionKeys.end());
   std::vector<std::string> topology_selection_labels(kSelectionLabels.begin(), kSelectionLabels.end());
   std::vector<std::string> topology_selection_definitions(kSelectionDefinitions.begin(), kSelectionDefinitions.end());
@@ -546,6 +738,7 @@ int MergePythiaPhotonCandidateSelection(
   unsigned int topology_sample_count = combined.sample_names.size();
   TTree topology_metadata("metadata", "Pi0-anchor topology merge metadata");
   topology_metadata.Branch("schema_version", &topology_schema_version);
+  topology_metadata.Branch("source_partial_schema_version", &topology_source_partial_schema_version);
   topology_metadata.Branch("source_map_schema_version", &topology_source_schema_version);
   topology_metadata.Branch("family", &combined.family);
   topology_metadata.Branch("map_root", &combined.map_root);
@@ -560,6 +753,10 @@ int MergePythiaPhotonCandidateSelection(
   topology_metadata.Branch("analysis_release", &combined.analysis_release);
   topology_metadata.Branch("model_sha256", &combined.model_sha256);
   topology_metadata.Branch("weight_definition", &combined.weight_definition);
+  topology_metadata.Branch("survival_fraction_denominator_selection", &survival_fraction_denominator_selection);
+  topology_metadata.Branch("survival_fraction_definition", &survival_fraction_definition);
+  topology_metadata.Branch("survival_fraction_uncertainty", &survival_fraction_uncertainty);
+  topology_metadata.Branch("survival_fraction_zero_denominator", &survival_fraction_zero_denominator);
   topology_metadata.Branch("sample_count", &topology_sample_count);
   topology_metadata.Branch("sample_names", &combined.sample_names);
   topology_metadata.Branch("min_cluster_energy", &combined.min_cluster_energy);

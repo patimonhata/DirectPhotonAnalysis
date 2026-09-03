@@ -35,7 +35,7 @@ partial_root=$(cd "$partial_root" && pwd)
 set +u
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
 set -u
-root -l -b -q "$workflow_dir/MergePythiaPhotonCandidateSelection.C+(\"$family\",\"$partial_root\",\"$composition_output_base\",\"$topology_output_base\")"
+root -l -b -q "$workflow_dir/MergePythiaPhotonCandidateSelection.C(\"$family\",\"$partial_root\",\"$composition_output_base\",\"$topology_output_base\")"
 
 echo "Merged composition output base: $composition_output_base"
 echo "Merged anchor-topology output base: $topology_output_base"

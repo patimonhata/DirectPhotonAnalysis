@@ -65,6 +65,6 @@ map_root=$(cd "$map_root" && pwd)
 set +u
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
 set -u
-root -l -b -q "$workflow_dir/ReducePythiaPhotonCandidateSelection.C+(\"$family\",\"$map_root\",\"$output_base\",$require_complete,$n_bins,$et_max,\"$sample_name\",$shard_index)"
+root -l -b -q "$workflow_dir/ReducePythiaPhotonCandidateSelection.C(\"$family\",\"$map_root\",\"$output_base\",$require_complete,$n_bins,$et_max,\"$sample_name\",$shard_index)"
 
 echo "Photon-candidate selection partial output base: $output_base"

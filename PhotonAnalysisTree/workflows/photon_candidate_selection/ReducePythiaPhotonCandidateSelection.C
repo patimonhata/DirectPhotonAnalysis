@@ -28,11 +28,14 @@
 namespace
 {
 constexpr std::size_t kSpectrumCount = 14;
-constexpr std::size_t kSelectionCount = 5;
+constexpr std::size_t kSelectionCount = 6;
 constexpr std::array<const char*, kSelectionCount> kSelectionKeys = {
-    "kinematic", "preselection", "preselection_tight", "preselection_isolation", "region_a_tagging_veto"};
+    "kinematic", "preselection", "preselection_tight", "preselection_isolation", "region_a", "region_a_tagging_veto"};
 constexpr std::array<const char*, kSelectionCount> kSelectionLabels = {
-    "Kinematic", "Pre-selection", "Pre-selection + TightBDT", "Pre-selection + Isolation", "Region A + Tagging veto"};
+    "Kinematic", "Pre-selection", "Pre-selection + TightBDT", "Pre-selection + Isolation", "Region A: isolated and tight", "Region A + Tagging veto"};
+constexpr std::array<const char*, kSelectionCount> kSelectionDefinitions = {
+    "pass_kinematics", "pass_kinematics_and_pass_preselection", "pass_kinematics_and_pass_preselection_and_pass_tight",
+    "pass_kinematics_and_pass_preselection_and_pass_isolated", "pass_region_a", "pass_region_a_and_not_pi0_tag_and_not_eta_tag"};
 constexpr std::array<const char*, kSpectrumCount> kKeys = {
     "prompt", "pi0_anchor", "separated", "merged", "single_contaminated", "missing",
     "missing_energy_threshold", "missing_displaced_partner", "missing_acceptance",
@@ -293,7 +296,8 @@ bool pass_selection(std::size_t selection, unsigned char pass_kinematics, unsign
     case 1: return preselection;
     case 2: return preselection && pass_tight != 0U;
     case 3: return preselection && pass_isolated != 0U;
-    case 4: return pass_region_a != 0U && pi0_tag == 0U && eta_tag == 0U;
+    case 4: return pass_region_a != 0U;
+    case 5: return pass_region_a != 0U && pi0_tag == 0U && eta_tag == 0U;
     default: return false;
   }
 }
@@ -526,43 +530,22 @@ constexpr std::array<const char*, category_count> kLabels = {
 constexpr std::array<int, category_count> kColors = {
     kBlack, kRed + 1, kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2, kGray + 1, kOrange + 7, kGray + 2};
 
-struct SelectionDefinition
-{
-  const char* key;
-  const char* label;
-};
-
-constexpr std::array<SelectionDefinition, 7> kSelectionDefinitions = {{
-    {"kinematic", "Kinematic"},
-    {"preselection", "Pre-selection"},
-    {"preselection_tight", "Pre-selection + TightBDT"},
-    {"preselection_isolation", "Pre-selection + Isolation"},
-    {"region_a", "Region A: isolated and tight"},
-    {"region_a_tagging_veto", "Region A after #pi^{0}/#eta tag veto"},
-    {"final_photon", "Region A after #pi^{0}/#eta tag veto"},
-}};
-
 int required_shard_count(const std::string& sample_name)
 {
   return sample_name == "jet12" ? 10 : 1;
 }
 
-const SelectionDefinition* find_selection(const std::string& key)
+struct Summary
 {
-  const auto found = std::find_if(kSelectionDefinitions.begin(), kSelectionDefinitions.end(), [&](const SelectionDefinition& definition) { return key == definition.key; });
-  return found == kSelectionDefinitions.end() ? nullptr : &*found;
-}
-
-bool passes_selection(const std::string& selection, unsigned char kinematic, unsigned char preselection, unsigned char tight,
-                      unsigned char isolated, unsigned char region_a, unsigned char final_photon)
-{
-  if (selection == "kinematic") return kinematic;
-  if (selection == "preselection") return kinematic && preselection;
-  if (selection == "preselection_tight") return kinematic && preselection && tight;
-  if (selection == "preselection_isolation") return kinematic && preselection && isolated;
-  if (selection == "region_a") return region_a;
-  return (selection == "region_a_tagging_veto" || selection == "final_photon") && final_photon;
-}
+  unsigned long long selected = 0;
+  unsigned long long prompt = 0;
+  unsigned long long pi0 = 0;
+  unsigned long long eta = 0;
+  unsigned long long other = 0;
+  unsigned long long overlap = 0;
+  unsigned long long half_boundary = 0;
+  unsigned long long invalid_truth = 0;
+};
 
 struct Histograms
 {
@@ -728,8 +711,9 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
   label.SetTextSize(0.026);
   label.DrawLatex(0.06, 0.96, "#it{#bf{sPHENIX}} Internal");
   label.DrawLatex(0.06, 0.91, (family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples"));
-  const SelectionDefinition* selected_definition = find_selection(selection);
-  label.DrawLatex(0.06, 0.86, selected_definition ? selected_definition->label : selection.c_str());
+  const auto found = std::find(kSelectionKeys.begin(), kSelectionKeys.end(), selection);
+  const std::size_t selection_index = static_cast<std::size_t>(std::distance(kSelectionKeys.begin(), found));
+  label.DrawLatex(0.06, 0.86, found == kSelectionKeys.end() ? selection.c_str() : kSelectionLabels[selection_index]);
   std::ostringstream threshold;
   threshold << "E_{cluster} > " << min_cluster_energy << " GeV; truth contribution > 50%";
   label.DrawLatex(0.06, 0.81, threshold.str().c_str());
@@ -744,7 +728,6 @@ int ReducePythiaPhotonCandidateSelection(
     const std::string family,
     const std::string map_root,
     const std::string output_base,
-    const std::string selection,
     const bool require_complete,
     const int n_bins,
     const double et_max,
@@ -752,11 +735,10 @@ int ReducePythiaPhotonCandidateSelection(
     const int shard_index)
 {
   using namespace candidate_composition;
-  const SelectionDefinition* selected_definition = find_selection(selection);
   const std::vector<SampleDefinition> family_samples = sample_definitions(family);
   const auto selected_sample = std::find_if(family_samples.begin(), family_samples.end(), [&](const SampleDefinition& sample) { return sample.name == sample_name; });
   const int shard_count = required_shard_count(sample_name);
-  if (selected_sample == family_samples.end() || shard_index < 0 || shard_index >= shard_count || map_root.empty() || !selected_definition ||
+  if (selected_sample == family_samples.end() || shard_index < 0 || shard_index >= shard_count || map_root.empty() ||
       n_bins <= 0 || !std::isfinite(et_max) || et_max <= 0.0) return 1;
   std::string normalized_map_root = map_root;
   while (normalized_map_root.size() > 1U && normalized_map_root.back() == '/') normalized_map_root.pop_back();
@@ -764,14 +746,17 @@ int ReducePythiaPhotonCandidateSelection(
   const std::string default_output_suffix = "/partial/" + sample_name + "/shard_" + std::to_string(shard_index) + "/photon_candidate_selection";
   const std::string resolved_output_base = output_base.empty()
       ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/" +
-            configuration + "/" + selection + "/" + family + default_output_suffix
+            configuration + "/" + family + default_output_suffix
       : output_base;
   if (!make_output_directory(resolved_output_base)) return 2;
 
-  Histograms histograms(n_bins, et_max);
+  std::array<std::unique_ptr<Histograms>, kSelectionCount> composition_histograms;
   std::array<std::unique_ptr<Spectra>, kSelectionCount> topology_histograms;
-  for (std::size_t topology_selection = 0; topology_selection < kSelectionCount; ++topology_selection)
-    topology_histograms[topology_selection] = std::make_unique<Spectra>(n_bins, et_max);
+  for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
+  {
+    composition_histograms[selection_index] = std::make_unique<Histograms>(n_bins, et_max);
+    topology_histograms[selection_index] = std::make_unique<Spectra>(n_bins, et_max);
+  }
   std::vector<std::string> sample_names;
   std::vector<unsigned long long> sample_map_counts;
   std::vector<double> sample_sum_generator_weights;
@@ -780,8 +765,7 @@ int ReducePythiaPhotonCandidateSelection(
   double partner_diagnostic_min_cluster_energy = -1.0;
   double meson_partner_min_energy = -1.0;
   int pi0_topology_algorithm_version = -1;
-  unsigned long long selected_count = 0, prompt_count = 0, pi0_count = 0, eta_count = 0, other_count = 0;
-  unsigned long long overlap_count = 0, half_boundary_count = 0, invalid_truth_count = 0;
+  std::array<Summary, kSelectionCount> composition_summaries;
   unsigned long long events_written = 0, expected_events_written = 0, events_stitch_pass = 0;
   unsigned long long region_a_clusters = 0, region_a_prompt_clusters = 0, region_a_anchor_clusters = 0;
   std::array<unsigned long long, kSelectionCount> topology_selected_clusters = {};
@@ -902,10 +886,13 @@ int ReducePythiaPhotonCandidateSelection(
           if ((*prompt_flag)[cluster]) ++region_a_prompt_clusters;
           if ((*pi0_valid)[cluster]) ++region_a_anchor_clusters;
         }
+        std::array<bool, kSelectionCount> selected_by = {};
+        for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
+          selected_by[selection_index] = pass_selection(selection_index, (*pass_kinematics)[cluster], (*pass_preselection)[cluster], (*pass_tight)[cluster],
+              (*pass_isolated)[cluster], (*pass_region_a)[cluster], (*pi0_tag)[cluster], (*eta_tag)[cluster]);
         for (std::size_t topology_selection = 0; topology_selection < kSelectionCount; ++topology_selection)
         {
-          if (!pass_selection(topology_selection, (*pass_kinematics)[cluster], (*pass_preselection)[cluster], (*pass_tight)[cluster],
-                              (*pass_isolated)[cluster], (*pass_region_a)[cluster], (*pi0_tag)[cluster], (*eta_tag)[cluster])) continue;
+          if (!selected_by[topology_selection]) continue;
           ++topology_selected_clusters[topology_selection];
           Spectra& spectra = *topology_histograms[topology_selection];
           if ((*prompt_flag)[cluster]) spectra.fill(0, cluster_et, weight);
@@ -932,49 +919,66 @@ int ReducePythiaPhotonCandidateSelection(
           }
           else return 6;
         }
-        const bool passes_composition = candidate_composition::passes_selection(
-            selection, (*pass_kinematics)[cluster], (*pass_preselection)[cluster], (*pass_tight)[cluster],
-            (*pass_isolated)[cluster], (*pass_region_a)[cluster], (*pass_final_photon)[cluster]);
-        if (!passes_composition) continue;
+        if (std::none_of(selected_by.begin(), selected_by.end(), [](bool selected) { return selected; })) continue;
         const double eta_contribution = eta_fraction(cluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent);
         if (!std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;
-        ++selected_count;
-        histograms.fill(denominator, cluster_et, weight);
-        if (!(*truth_valid)[cluster]) ++invalid_truth_count;
         const bool is_prompt = (*prompt_flag)[cluster] && (*dominant_fraction)[cluster] > kMajorityThreshold;
         const bool is_pi0 = (*pi0_valid)[cluster] && (*pi0_fraction)[cluster] > kMajorityThreshold;
         const bool is_eta = eta_contribution > kMajorityThreshold;
         const int majority_count = static_cast<int>(is_prompt) + static_cast<int>(is_pi0) + static_cast<int>(is_eta);
-        if (((*prompt_flag)[cluster] && (*dominant_fraction)[cluster] == kMajorityThreshold) ||
-            ((*pi0_valid)[cluster] && (*pi0_fraction)[cluster] == kMajorityThreshold) || eta_contribution == kMajorityThreshold) ++half_boundary_count;
+        const bool half_boundary = ((*prompt_flag)[cluster] && (*dominant_fraction)[cluster] == kMajorityThreshold) ||
+            ((*pi0_valid)[cluster] && (*pi0_fraction)[cluster] == kMajorityThreshold) || eta_contribution == kMajorityThreshold;
         std::size_t category = other;
-        if (majority_count > 1) ++overlap_count;
-        else if (is_prompt) category = prompt;
-        else if (is_pi0) category = pi0_category((*topology)[cluster]);
-        else if (is_eta) category = eta;
+        if (majority_count <= 1)
+        {
+          if (is_prompt) category = prompt;
+          else if (is_pi0) category = pi0_category((*topology)[cluster]);
+          else if (is_eta) category = eta;
+        }
         if (category == category_count) return 6;
-        histograms.fill(category, cluster_et, weight);
-        if (category == prompt) ++prompt_count;
-        else if (category >= pi0_separated && category <= pi0_other) ++pi0_count;
-        else if (category == eta) ++eta_count;
-        else ++other_count;
+        for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
+        {
+          if (!selected_by[selection_index]) continue;
+          Summary& summary = composition_summaries[selection_index];
+          Histograms& spectra = *composition_histograms[selection_index];
+          ++summary.selected;
+          spectra.fill(denominator, cluster_et, weight);
+          if (!(*truth_valid)[cluster]) ++summary.invalid_truth;
+          if (half_boundary) ++summary.half_boundary;
+          if (majority_count > 1) ++summary.overlap;
+          spectra.fill(category, cluster_et, weight);
+          if (category == prompt) ++summary.prompt;
+          else if (category >= pi0_separated && category <= pi0_other) ++summary.pi0;
+          else if (category == eta) ++summary.eta;
+          else ++summary.other;
+        }
       }
     }
   }
 
-  if (events_written != expected_events_written || sample_names.empty() || selected_count != prompt_count + pi0_count + eta_count + other_count ||
-      !valid_partition(histograms.counts) || !valid_partition(histograms.weighted)) return 7;
-  for (std::size_t topology_selection = 0; topology_selection < kSelectionCount; ++topology_selection)
-    if (!::valid_partition(topology_histograms[topology_selection]->counts) || !::valid_partition(topology_histograms[topology_selection]->weighted_pb)) return 7;
+  if (events_written != expected_events_written || sample_names.empty()) return 7;
+  for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
+  {
+    const Summary& summary = composition_summaries[selection_index];
+    if (summary.selected != summary.prompt + summary.pi0 + summary.eta + summary.other ||
+        !candidate_composition::valid_partition(composition_histograms[selection_index]->counts) ||
+        !candidate_composition::valid_partition(composition_histograms[selection_index]->weighted) ||
+        !::valid_partition(topology_histograms[selection_index]->counts) || !::valid_partition(topology_histograms[selection_index]->weighted_pb)) return 7;
+  }
   TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;
-  TDirectory* composition_directory = output.mkdir("composition");
-  if (!composition_directory) return 8;
-  composition_directory->cd();
-  for (std::size_t index = 0; index < category_count; ++index)
+  TDirectory* composition_root_directory = output.mkdir("composition");
+  if (!composition_root_directory) return 8;
+  for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
   {
-    histograms.counts[index]->Write();
-    histograms.weighted[index]->Write();
+    TDirectory* composition_directory = composition_root_directory->mkdir(kSelectionKeys[selection_index]);
+    if (!composition_directory) return 8;
+    composition_directory->cd();
+    for (std::size_t index = 0; index < category_count; ++index)
+    {
+      composition_histograms[selection_index]->counts[index]->Write();
+      composition_histograms[selection_index]->weighted[index]->Write();
+    }
   }
   output.cd();
   TDirectory* topology_root_directory = output.mkdir("anchor_topology");
@@ -991,14 +995,13 @@ int ReducePythiaPhotonCandidateSelection(
     }
   }
   output.cd();
-  int schema_version = 3, source_schema_version = 4, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 4, source_schema_version = 4, signal_embedding_id = kSignalEmbeddingId;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
   std::string eta_definition = "sum_signal_embedding_g4_eta_or_generator_eta_decay_photon_contributor_fraction";
   std::string other_definition = "no_unique_prompt_pi0_eta_strict_majority_including_exact_0p5";
   std::string weight_definition = "cross_section_pb_times_generator_weight_divided_by_full_sample_sum_generator_weight_processed";
   std::string metadata_family = family;
-  std::string metadata_selection = selection;
   bool metadata_require_complete = require_complete;
   int metadata_n_bins = n_bins;
   double metadata_et_max = et_max;
@@ -1007,7 +1010,6 @@ int ReducePythiaPhotonCandidateSelection(
   metadata.Branch("schema_version", &schema_version);
   metadata.Branch("source_map_schema_version", &source_schema_version);
   metadata.Branch("family", &metadata_family);
-  metadata.Branch("selection", &metadata_selection);
   metadata.Branch("map_root", &normalized_map_root);
   metadata.Branch("require_complete", &metadata_require_complete);
   metadata.Branch("n_bins", &metadata_n_bins);
@@ -1033,16 +1035,38 @@ int ReducePythiaPhotonCandidateSelection(
   metadata.Branch("region_a_clusters", &region_a_clusters);
   metadata.Branch("region_a_prompt_clusters", &region_a_prompt_clusters);
   metadata.Branch("region_a_anchor_clusters", &region_a_anchor_clusters);
-  metadata.Branch("selected_cluster_count", &selected_count);
-  metadata.Branch("prompt_cluster_count", &prompt_count);
-  metadata.Branch("pi0_cluster_count", &pi0_count);
-  metadata.Branch("eta_cluster_count", &eta_count);
-  metadata.Branch("other_cluster_count", &other_count);
-  metadata.Branch("overlap_cluster_count", &overlap_count);
-  metadata.Branch("half_boundary_cluster_count", &half_boundary_count);
-  metadata.Branch("invalid_truth_cluster_count", &invalid_truth_count);
   metadata.Fill();
   metadata.Write();
+  TTree composition_summary("composition_summary", "Per-selection candidate-composition partial summary");
+  unsigned int composition_selection_index = 0;
+  std::string composition_selection_key;
+  unsigned long long composition_selected = 0, composition_prompt = 0, composition_pi0 = 0, composition_eta = 0, composition_other = 0;
+  unsigned long long composition_overlap = 0, composition_half_boundary = 0, composition_invalid_truth = 0;
+  composition_summary.Branch("selection_index", &composition_selection_index);
+  composition_summary.Branch("selection_key", &composition_selection_key);
+  composition_summary.Branch("selected_clusters", &composition_selected);
+  composition_summary.Branch("prompt_clusters", &composition_prompt);
+  composition_summary.Branch("pi0_clusters", &composition_pi0);
+  composition_summary.Branch("eta_clusters", &composition_eta);
+  composition_summary.Branch("other_clusters", &composition_other);
+  composition_summary.Branch("overlap_clusters", &composition_overlap);
+  composition_summary.Branch("half_boundary_clusters", &composition_half_boundary);
+  composition_summary.Branch("invalid_truth_clusters", &composition_invalid_truth);
+  for (composition_selection_index = 0; composition_selection_index < kSelectionCount; ++composition_selection_index)
+  {
+    composition_selection_key = kSelectionKeys[composition_selection_index];
+    const Summary& summary = composition_summaries[composition_selection_index];
+    composition_selected = summary.selected;
+    composition_prompt = summary.prompt;
+    composition_pi0 = summary.pi0;
+    composition_eta = summary.eta;
+    composition_other = summary.other;
+    composition_overlap = summary.overlap;
+    composition_half_boundary = summary.half_boundary;
+    composition_invalid_truth = summary.invalid_truth;
+    composition_summary.Fill();
+  }
+  composition_summary.Write();
   TTree topology_summary("topology_summary", "Per-selection anchor-topology partial summary");
   unsigned int topology_selection_index = 0;
   std::string topology_selection_key;
@@ -1071,10 +1095,10 @@ int ReducePythiaPhotonCandidateSelection(
   shard_metadata.Fill();
   shard_metadata.Write();
   output.Close();
-  std::cout << "ReducePythiaPhotonCandidateSelection - family/selection/selected/prompt/pi0/eta/other/overlap/half/output = "
-            << family << "/" << selection << "/" << selected_count << "/" << prompt_count << "/" << pi0_count << "/" << eta_count << "/"
-            << other_count << "/" << overlap_count << "/" << half_boundary_count << "/" << resolved_output_base;
+  std::cout << "ReducePythiaPhotonCandidateSelection - family/sample/selections/output = "
+            << family << "/" << sample_name << "/" << kSelectionCount << "/" << resolved_output_base;
   std::cout << " (partial " << sample_name << " shard " << shard_index << "/" << shard_count << ", maps " << shard_map_begin << ":" << shard_map_end << ")";
   std::cout << std::endl;
-  return overlap_count == 0ULL ? 0 : 9;
+  const bool have_overlap = std::any_of(composition_summaries.begin(), composition_summaries.end(), [](const Summary& summary) { return summary.overlap != 0ULL; });
+  return have_overlap ? 9 : 0;
 }

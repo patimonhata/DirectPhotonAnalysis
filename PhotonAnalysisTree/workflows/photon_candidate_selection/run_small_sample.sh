@@ -91,7 +91,7 @@ if (( map_count < shard_count )); then
 fi
 for ((shard_index = 0; shard_index < shard_count; ++shard_index)); do
   output_base="$partial_root/shard_${shard_index}/photon_candidate_selection"
-  "$workflow_dir/run_reduce.sh" "$family" "$map_root" "$output_base" region_a false 200 40.0 "$sample_name" "$shard_index"
+  "$workflow_dir/run_reduce.sh" "$family" "$map_root" "$output_base" false 200 40.0 "$sample_name" "$shard_index"
 done
 
 echo "Small-sample QA maps: $map_output"

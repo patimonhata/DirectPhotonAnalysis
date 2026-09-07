@@ -30,6 +30,7 @@ int SummarizeTaggingPurityDiagnostic(const std::string input_file, const std::st
   TFile input(input_file.c_str(), "READ");
   auto* metadata = input.Get<TTree>("metadata");
   if (input.IsZombie() || !metadata || metadata->GetEntries() != 16 || output_prefix.empty()) return 1;
+  if (!photon_candidate_settings::validate_partials(*metadata, "selection_settings")) return 1;
   auto get = [&](const std::string& key, const std::string& suffix) {
     return input.Get<TH1D>(("flow/h_" + key + "_et_" + suffix).c_str());
   };

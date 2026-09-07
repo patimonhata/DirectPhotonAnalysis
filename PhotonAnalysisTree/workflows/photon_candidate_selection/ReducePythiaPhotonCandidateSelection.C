@@ -26,7 +26,7 @@
 
 namespace
 {
-constexpr std::size_t kSpectrumCount = 14;
+constexpr std::size_t kSpectrumCount = 13;
 constexpr std::size_t kSelectionCount = 6;
 constexpr std::array<const char*, kSelectionCount> kSelectionKeys = {
     "kinematic", "preselection", "preselection_tight", "preselection_isolation", "region_a", "region_a_tagging_veto"};
@@ -37,20 +37,27 @@ constexpr std::array<const char*, kSelectionCount> kSelectionDefinitions = {
     "pass_kinematics_and_pass_preselection_and_pass_isolated", "pass_region_a", "pass_region_a_and_not_pi0_tag_and_not_eta_tag"};
 constexpr std::array<const char*, kSpectrumCount> kKeys = {
     "prompt", "pi0_anchor", "separated", "merged", "single_contaminated", "missing",
-    "missing_energy_threshold", "missing_displaced_partner", "missing_acceptance",
-    "missing_no_cemc_deposit", "missing_unclustered_deposit", "missing_match_incomplete",
-    "missing_other", "other"};
-constexpr std::array<const char*, kSpectrumCount> kLabels = {
+    "missing_energy_band_taggable", "missing_energy_band_not_taggable", "missing_acceptance",
+    "missing_low_energy", "missing_unclustered_or_no_cemc_deposit", "missing_other", "other"};
+std::array<std::string, kSpectrumCount> kLabels = {
     "Prompt-#gamma cluster", "#pi^{0}-main anchor", "Separated", "Merged", "Single contaminated", "Missing (total)",
-    "Missing: energy threshold", "Missing: displaced partner cluster", "Missing: acceptance",
-    "Missing: no CEMC deposit", "Missing: unclustered deposit", "Missing: match incomplete",
-    "Missing: other", "Other"};
+    "Missing: energy band, mass inside", "Missing: energy band, mass outside", "Missing: acceptance",
+    "Missing: low energy", "Missing: unclustered or no CEMC deposit", "Missing: other", "Other"};
 constexpr std::array<int, kSpectrumCount> kColors = {
     kRed + 1, kBlue + 1, kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2,
-    kOrange + 7, kPink + 7, kViolet + 1, kYellow + 2, kSpring + 5, kBlue + 3, kGreen + 3, kGray + 2};
-constexpr std::array<std::size_t, 7> kSummarySpectrum = {0, 1, 2, 3, 4, 5, 13};
-constexpr std::array<std::size_t, 11> kDetailedCategories = {2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13};
-constexpr std::array<std::size_t, 5> kSummaryCategories = {2, 3, 4, 5, 13};
+    kOrange + 7, kPink + 7, kViolet + 1, kYellow + 2, kSpring + 5, kGreen + 3, kGray + 2};
+constexpr std::array<std::size_t, 7> kSummarySpectrum = {0, 1, 2, 3, 4, 5, 12};
+constexpr std::array<std::size_t, 10> kDetailedCategories = {2, 3, 4, 6, 7, 9, 10, 8, 11, 12};
+constexpr std::array<std::size_t, 5> kSummaryCategories = {2, 3, 4, 5, 12};
+void set_missing_labels(double low, double high)
+{
+  std::ostringstream band, lower;
+  band << low << " < E #leq " << high << " GeV";
+  lower << "Missing: E #leq " << low << " GeV";
+  kLabels[6] = "Missing: " + band.str() + ", mass inside";
+  kLabels[7] = "Missing: " + band.str() + ", mass outside";
+  kLabels[9] = lower.str();
+}
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
 constexpr double kSpectrumYMinimum = 1e-2;
@@ -111,7 +118,15 @@ struct MapMetadata
   unsigned long long events_processed = 0;
   double min_cluster_energy = -1.0;
   double partner_diagnostic_min_cluster_energy = -1.0;
-  double meson_partner_min_energy = -1.0;
+  double pi0_partner_min_energy = -1.0;
+  double eta_partner_min_energy = -1.0;
+  double pi0_mass_min = -1.0;
+  double pi0_mass_max = -1.0;
+  double eta_mass_min = -1.0;
+  double eta_mass_max = -1.0;
+  double missing_energy_min = -1.0;
+  double missing_energy_max = -1.0;
+  double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
   unsigned long long events_written = 0;
   unsigned long long events_vertex_rejected = 0;
@@ -163,7 +178,15 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   ok &= bind(tree, "sample_window_max", &value.window_max);
   ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
   ok &= bind(tree, "partner_diagnostic_min_cluster_energy", &value.partner_diagnostic_min_cluster_energy);
-  ok &= bind(tree, "meson_partner_min_energy", &value.meson_partner_min_energy);
+  ok &= bind(tree, "pi0_partner_min_energy", &value.pi0_partner_min_energy);
+  ok &= bind(tree, "eta_partner_min_energy", &value.eta_partner_min_energy);
+  ok &= bind(tree, "pi0_mass_min", &value.pi0_mass_min);
+  ok &= bind(tree, "pi0_mass_max", &value.pi0_mass_max);
+  ok &= bind(tree, "eta_mass_min", &value.eta_mass_min);
+  ok &= bind(tree, "eta_mass_max", &value.eta_mass_max);
+  ok &= bind(tree, "missing_energy_min", &value.missing_energy_min);
+  ok &= bind(tree, "missing_energy_max", &value.missing_energy_max);
+  ok &= bind(tree, "min_photon_energy_recovery", &value.min_photon_energy_recovery);
   ok &= bind(tree, "pi0_topology_algorithm_version", &value.pi0_topology_algorithm_version);
   ok &= bind(tree, "sample_upper_unbounded", &value.upper_unbounded);
   ok &= bind(tree, "sum_generator_weight_processed", &value.sum_generator_weight_processed);
@@ -183,11 +206,21 @@ bool read_metadata(const std::string& path, MapMetadata& value)
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 4 && value.sample_name == sample.name && !value.input_manifest.empty() &&
+  return value.schema_version == 5 && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
-      std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.1) &&
-      std::isfinite(value.meson_partner_min_energy) && value.meson_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 8 &&
+      std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.0) &&
+      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 9 &&
+      std::isfinite(value.eta_partner_min_energy) && value.eta_partner_min_energy >= 0.0 &&
+      std::isfinite(value.pi0_mass_min) && value.pi0_mass_min >= 0.0 &&
+      std::isfinite(value.pi0_mass_max) && value.pi0_mass_max >= 0.0 &&
+      std::isfinite(value.eta_mass_min) && value.eta_mass_min >= 0.0 &&
+      std::isfinite(value.eta_mass_max) && value.eta_mass_max >= 0.0 &&
+      std::isfinite(value.missing_energy_min) && value.missing_energy_min >= 0.0 &&
+      std::isfinite(value.missing_energy_max) && value.missing_energy_max >= 0.0 &&
+      std::isfinite(value.min_photon_energy_recovery) && value.min_photon_energy_recovery >= 0.0 &&
+      value.pi0_mass_min < value.pi0_mass_max && value.eta_mass_min < value.eta_mass_max &&
+      value.missing_energy_min < value.missing_energy_max && same_double(value.min_photon_energy_recovery, 0.5) &&
       value.manifest_end > value.manifest_begin && value.input_file_count == value.manifest_end - value.manifest_begin &&
       same_double(value.cross_section_pb, sample.cross_section_pb) && same_double(value.window_min, sample.window_min) &&
       same_double(value.window_max, sample.window_max) && value.upper_unbounded == sample.upper_unbounded &&
@@ -204,7 +237,15 @@ bool compatible(const MapMetadata& value, const MapMetadata& reference)
       value.upper_unbounded == reference.upper_unbounded &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&
       same_double(value.partner_diagnostic_min_cluster_energy, reference.partner_diagnostic_min_cluster_energy) &&
-      same_double(value.meson_partner_min_energy, reference.meson_partner_min_energy) && value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version;
+      same_double(value.pi0_partner_min_energy, reference.pi0_partner_min_energy) &&
+      same_double(value.eta_partner_min_energy, reference.eta_partner_min_energy) &&
+      same_double(value.pi0_mass_min, reference.pi0_mass_min) &&
+      same_double(value.pi0_mass_max, reference.pi0_mass_max) &&
+      same_double(value.eta_mass_min, reference.eta_mass_min) &&
+      same_double(value.eta_mass_max, reference.eta_mass_max) &&
+      same_double(value.missing_energy_min, reference.missing_energy_min) &&
+      same_double(value.missing_energy_max, reference.missing_energy_max) &&
+      same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) && value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version;
 }
 
 bool collect_maps(const std::string& pattern, const SampleDefinition& sample, bool require_complete, std::vector<MapMetadata>& maps)
@@ -308,9 +349,9 @@ bool valid_partition(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& hi
   for (int bin = 0; bin <= histograms[0]->GetNbinsX() + 1; ++bin)
   {
     double missing_sum = 0.0;
-    for (std::size_t index = 6; index <= 12; ++index) missing_sum += histograms[index]->GetBinContent(bin);
+    for (std::size_t index = 6; index <= 11; ++index) missing_sum += histograms[index]->GetBinContent(bin);
     const double category_sum = histograms[2]->GetBinContent(bin) + histograms[3]->GetBinContent(bin) +
-        histograms[4]->GetBinContent(bin) + histograms[5]->GetBinContent(bin) + histograms[13]->GetBinContent(bin);
+        histograms[4]->GetBinContent(bin) + histograms[5]->GetBinContent(bin) + histograms[12]->GetBinContent(bin);
     const double scale = std::max({1.0, std::abs(histograms[1]->GetBinContent(bin)), std::abs(category_sum), std::abs(missing_sum)});
     if (std::abs(histograms[5]->GetBinContent(bin) - missing_sum) > 1e-9 * scale ||
         std::abs(histograms[1]->GetBinContent(bin) - category_sum) > 1e-9 * scale) return false;
@@ -390,7 +431,7 @@ void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& dens
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(detailed ? 0.016 : 0.024);
-  for (std::size_t index : indices) legend.AddEntry(density[index].get(), kLabels[index], "l");
+  for (std::size_t index : indices) legend.AddEntry(density[index].get(), kLabels[index].c_str(), "l");
   legend.Draw();
   draw_annotations(family_label);
   plot_pad->cd();
@@ -447,7 +488,7 @@ void draw_fraction_lines(const std::vector<std::unique_ptr<TH1D>>& fractions, co
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(detailed ? 0.018 : 0.024);
-  for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]], "lep");
+  for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "lep");
   legend.Draw();
   draw_annotations(family_label);
   plot_pad->cd();
@@ -485,7 +526,7 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(detailed ? 0.018 : 0.024);
-  for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]], "f");
+  for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "f");
   legend.Draw();
   draw_annotations(family_label);
   plot_pad->cd();
@@ -756,7 +797,15 @@ int ReducePythiaPhotonCandidateSelection(
   std::string analysis_release, model_sha256;
   double min_cluster_energy = -1.0;
   double partner_diagnostic_min_cluster_energy = -1.0;
-  double meson_partner_min_energy = -1.0;
+  double pi0_partner_min_energy = -1.0;
+  double eta_partner_min_energy = -1.0;
+  double pi0_mass_min = -1.0;
+  double pi0_mass_max = -1.0;
+  double eta_mass_min = -1.0;
+  double eta_mass_max = -1.0;
+  double missing_energy_min = -1.0;
+  double missing_energy_max = -1.0;
+  double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
   std::array<Summary, kSelectionCount> composition_summaries;
   unsigned long long events_written = 0, expected_events_written = 0, events_stitch_pass = 0;
@@ -773,7 +822,16 @@ int ReducePythiaPhotonCandidateSelection(
   model_sha256 = maps.front().model_sha256;
   min_cluster_energy = maps.front().min_cluster_energy;
   partner_diagnostic_min_cluster_energy = maps.front().partner_diagnostic_min_cluster_energy;
-  meson_partner_min_energy = maps.front().meson_partner_min_energy;
+  pi0_partner_min_energy = maps.front().pi0_partner_min_energy;
+  eta_partner_min_energy = maps.front().eta_partner_min_energy;
+  pi0_mass_min = maps.front().pi0_mass_min;
+  pi0_mass_max = maps.front().pi0_mass_max;
+  eta_mass_min = maps.front().eta_mass_min;
+  eta_mass_max = maps.front().eta_mass_max;
+  missing_energy_min = maps.front().missing_energy_min;
+  missing_energy_max = maps.front().missing_energy_max;
+  min_photon_energy_recovery = maps.front().min_photon_energy_recovery;
+  set_missing_labels(missing_energy_min, missing_energy_max);
   pi0_topology_algorithm_version = maps.front().pi0_topology_algorithm_version;
   double sample_sumw = 0.0;
   for (const auto& map : maps) sample_sumw += map.sum_generator_weight_processed;
@@ -896,7 +954,7 @@ int ReducePythiaPhotonCandidateSelection(
           if (topology_value == 1) spectra.fill(2, cluster_et, weight);
           else if (topology_value == 2) spectra.fill(3, cluster_et, weight);
           else if (topology_value == 4) spectra.fill(4, cluster_et, weight);
-          else if (topology_value == 0) spectra.fill(13, cluster_et, weight);
+          else if (topology_value == 0) spectra.fill(12, cluster_et, weight);
           else if (topology_value == 3)
           {
             spectra.fill(5, cluster_et, weight);
@@ -906,8 +964,7 @@ int ReducePythiaPhotonCandidateSelection(
             else if (missing_value == 2) spectra.fill(8, cluster_et, weight);
             else if (missing_value == 5) spectra.fill(9, cluster_et, weight);
             else if (missing_value == 6) spectra.fill(10, cluster_et, weight);
-            else if (missing_value == 7) spectra.fill(11, cluster_et, weight);
-            else if (missing_value == 3) spectra.fill(12, cluster_et, weight);
+            else if (missing_value == 3) spectra.fill(11, cluster_et, weight);
             else return 6;
           }
           else return 6;
@@ -988,7 +1045,7 @@ int ReducePythiaPhotonCandidateSelection(
     }
   }
   output.cd();
-  int schema_version = 4, source_schema_version = 4, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 5, source_schema_version = 5, signal_embedding_id = kSignalEmbeddingId;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
   std::string eta_definition = "sum_signal_embedding_g4_eta_or_generator_eta_decay_photon_contributor_fraction";
@@ -1009,7 +1066,15 @@ int ReducePythiaPhotonCandidateSelection(
   metadata.Branch("et_max", &metadata_et_max);
   metadata.Branch("min_cluster_energy", &min_cluster_energy);
   metadata.Branch("partner_diagnostic_min_cluster_energy", &partner_diagnostic_min_cluster_energy);
-  metadata.Branch("meson_partner_min_energy", &meson_partner_min_energy);
+  metadata.Branch("pi0_partner_min_energy", &pi0_partner_min_energy);
+  metadata.Branch("eta_partner_min_energy", &eta_partner_min_energy);
+  metadata.Branch("pi0_mass_min", &pi0_mass_min);
+  metadata.Branch("pi0_mass_max", &pi0_mass_max);
+  metadata.Branch("eta_mass_min", &eta_mass_min);
+  metadata.Branch("eta_mass_max", &eta_mass_max);
+  metadata.Branch("missing_energy_min", &missing_energy_min);
+  metadata.Branch("missing_energy_max", &missing_energy_max);
+  metadata.Branch("min_photon_energy_recovery", &min_photon_energy_recovery);
   metadata.Branch("pi0_topology_algorithm_version", &pi0_topology_algorithm_version);
   metadata.Branch("signal_embedding_id", &signal_embedding_id);
   metadata.Branch("majority_threshold", &majority_threshold);

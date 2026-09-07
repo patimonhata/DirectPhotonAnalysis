@@ -106,6 +106,9 @@ int ReduceHybridThresholdDiagnostic(const std::string low_map_root, const std::s
   Input low_input, high_input;
   if (!inspect(*sample, low_root + "/" + sample_name + "/map_*.root", 0.2, require_complete, low_input) ||
       !inspect(*sample, high_root + "/" + sample_name + "/map_*.root", 0.5, require_complete, high_input)) return 2;
+  if (!photon_candidate_settings::same(low_input.selection_settings, high_input.selection_settings, 3) ||
+      !close(low_input.selection_settings[1], 0.2) || !close(low_input.selection_settings[2], 0.2) ||
+      !close(high_input.selection_settings[1], 0.5) || !close(high_input.selection_settings[2], 0.5)) return 2;
   if (low_input.map_count != high_input.map_count || !close(low_input.sumw, high_input.sumw) || low_input.release != high_input.release ||
       low_input.model != high_input.model) return 2;
 
@@ -255,6 +258,8 @@ int ReduceHybridThresholdDiagnostic(const std::string low_map_root, const std::s
   std::string metadata_sample = sample_name;
   TTree metadata("metadata", "Hybrid tagging-threshold diagnostic partial metadata");
   metadata.Branch("schema_version", &schema_version);
+  metadata.Branch("low_selection_settings", &low_input.selection_settings);
+  metadata.Branch("high_selection_settings", &high_input.selection_settings);
   metadata.Branch("source_map_schema_version", &source_schema);
   metadata.Branch("low_map_root", &low_root);
   metadata.Branch("high_map_root", &high_root);

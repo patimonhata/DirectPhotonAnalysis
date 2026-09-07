@@ -37,6 +37,8 @@ int SummarizeHybridThresholdDiagnostic(const std::string input_file, const std::
   TFile input(input_file.c_str(), "READ");
   auto* metadata = input.Get<TTree>("metadata");
   if (input.IsZombie() || !metadata || metadata->GetEntries() != 16 || output_prefix.empty()) return 1;
+  if (!photon_candidate_settings::validate_partials(*metadata, "low_selection_settings")) return 1;
+  if (!photon_candidate_settings::validate_partials(*metadata, "high_selection_settings")) return 1;
   auto get = [&](const std::string& wp, const std::string& key, const std::string& suffix) {
     return input.Get<TH1D>(("working_points/" + wp + "/h_" + wp + "_" + key + "_et_" + suffix).c_str());
   };

@@ -1,3 +1,4 @@
+#include "../photon_candidate_selection/PhotonCandidateSettings.h"
 #include "../../macro/Utilities/sPhenixStyle.C"
 
 #include <TCanvas.h>
@@ -25,12 +26,12 @@
 
 namespace
 {
-constexpr int kMapSchema = 4;
-constexpr int kTopologyVersion = 8;
+constexpr int kMapSchema = 5;
+constexpr int kTopologyVersion = 9;
 constexpr double kTopologyThreshold = 0.5;
-constexpr double kDiagnosticFloor = 0.1;
-constexpr double kPi0MassMin = 0.10;
-constexpr double kPi0MassMax = 0.20;
+constexpr double kDiagnosticFloor = 0.0;
+double kPi0MassMin = 0.10;
+double kPi0MassMax = 0.20;
 constexpr int kMassBins = 240;
 constexpr double kMassMax = 1.2;
 constexpr std::array<const char*, 6> kSelectionKeys = {
@@ -85,7 +86,7 @@ struct Input
 };
 
 bool inspect(const Sample& sample, const std::string& pattern, bool require_complete, Input& input,
-             std::string& common_release, std::string& common_model, double& common_tag_threshold)
+             std::string& common_release, std::string& common_model, double& common_tag_threshold, std::vector<double>& common_settings)
 {
   TChain tree("metadata");
   if (tree.Add(pattern.c_str()) <= 0) return false;
@@ -99,7 +100,7 @@ bool inspect(const Sample& sample, const std::string& pattern, bool require_comp
   const bool ok = bind_branch(tree, "schema_version", &schema) && bind_branch(tree, "sample_name", &sample_name) && bind_branch(tree, "analysis_release", &release) &&
       bind_branch(tree, "model_sha256", &model) && bind_branch(tree, "manifest_begin", &begin) && bind_branch(tree, "manifest_end", &end) && bind_branch(tree, "map_chunk_id", &chunk) &&
       bind_branch(tree, "sum_generator_weight_processed", &sumw) && bind_branch(tree, "min_cluster_energy", &topology_threshold) &&
-      bind_branch(tree, "partner_diagnostic_min_cluster_energy", &diagnostic_floor) && bind_branch(tree, "meson_partner_min_energy", &tag_threshold) &&
+      bind_branch(tree, "partner_diagnostic_min_cluster_energy", &diagnostic_floor) && bind_branch(tree, "pi0_partner_min_energy", &tag_threshold) &&
       bind_branch(tree, "pi0_mass_min", &mass_min) && bind_branch(tree, "pi0_mass_max", &mass_max) && bind_branch(tree, "pi0_topology_algorithm_version", &topology_version);
   if (!ok) return false;
   long long expected_begin = 0;
@@ -107,7 +108,13 @@ bool inspect(const Sample& sample, const std::string& pattern, bool require_comp
   {
     if (tree.GetEntry(entry) <= 0 || !sample_name || !release || !model || schema != kMapSchema || *sample_name != sample.name || begin != expected_begin ||
         end <= begin || chunk != static_cast<unsigned int>(entry) || !close(topology_threshold, kTopologyThreshold) || !close(diagnostic_floor, kDiagnosticFloor) ||
-        !close(mass_min, kPi0MassMin) || !close(mass_max, kPi0MassMax) || topology_version != kTopologyVersion || !std::isfinite(sumw)) return false;
+        topology_version != kTopologyVersion || !std::isfinite(sumw)) return false;
+    std::vector<double> settings;
+    if (!photon_candidate_settings::read(tree.GetFile()->GetName(), settings)) return false;
+    if (common_settings.empty()) common_settings = settings;
+    else if (!photon_candidate_settings::same(common_settings, settings)) return false;
+    kPi0MassMin = settings[3];
+    kPi0MassMax = settings[4];
     if (common_release.empty())
     {
       common_release = *release;
@@ -323,11 +330,12 @@ int PlotDisplacedPartnerMassDiagnostic(
 
   std::vector<Input> inputs;
   std::string release, model;
+  std::vector<double> common_settings;
   double production_tag_threshold = -1;
   for (const auto& definition : definitions)
   {
     Input input;
-    if (!inspect(definition, root + "/" + definition.name + "/map_*.root", require_complete, input, release, model, production_tag_threshold)) return 3;
+    if (!inspect(definition, root + "/" + definition.name + "/map_*.root", require_complete, input, release, model, production_tag_threshold, common_settings)) return 3;
     inputs.push_back(input);
   }
 
@@ -395,12 +403,11 @@ int PlotDisplacedPartnerMassDiagnostic(
       if (!std::isfinite(weight)) return 5;
       for (std::size_t cluster = 0; cluster < ncluster; ++cluster)
       {
-        if (!(*anchor_valid)[cluster] || (*topology)[cluster] != 3 || (*missing_category)[cluster] != 4 || (*alignment)[cluster] != 2 ||
+        if (!(*anchor_valid)[cluster] || (*topology)[cluster] != 3 || (*alignment)[cluster] != 2 ||
             (*tag_status)[cluster] != 4 || !((*partner_e)[cluster] > tagging_partner_min_energy)) continue;
         const int candidate = (*candidate_index)[cluster];
-        const double mass = (*diagnostic_mass)[cluster];
-        if (candidate < 0 || static_cast<std::size_t>(candidate) >= candidate_pt->size() || !std::isfinite(mass) || mass < 0 ||
-            !std::isfinite((*truth_mass)[cluster]) || std::abs(mass - (*truth_mass)[cluster]) > 1e-5) return 5;
+        const double mass = (*truth_mass)[cluster];
+        if (candidate < 0 || static_cast<std::size_t>(candidate) >= candidate_pt->size() || !std::isfinite(mass) || mass < 0) return 5;
         const std::array<bool, 6> pass = {true, (*kinematic)[cluster] != 0, (*kinematic)[cluster] && (*preselection)[cluster],
             (*kinematic)[cluster] && (*preselection)[cluster] && (*tight)[cluster],
             (*kinematic)[cluster] && (*preselection)[cluster] && (*isolated)[cluster], (*region_a)[cluster] != 0};
@@ -459,6 +466,7 @@ int PlotDisplacedPartnerMassDiagnostic(
   }
   TTree metadata("metadata", "Displaced-partner mass diagnostic metadata");
   metadata.Branch("schema_version", &schema_version);
+  metadata.Branch("selection_settings", &common_settings);
   metadata.Branch("source_map_schema_version", &source_schema);
   metadata.Branch("family", &metadata_family);
   metadata.Branch("sample_filter", &metadata_filter);

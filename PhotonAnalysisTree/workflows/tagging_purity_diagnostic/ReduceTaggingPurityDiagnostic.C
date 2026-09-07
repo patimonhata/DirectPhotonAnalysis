@@ -1,3 +1,4 @@
+#include "../photon_candidate_selection/PhotonCandidateSettings.h"
 #include <TChain.h>
 #include <TDirectory.h>
 #include <TFile.h>
@@ -16,9 +17,9 @@
 
 namespace
 {
-constexpr int kMapSchema = 4;
-constexpr int kTopologyVersion = 8;
-constexpr double kDiagnosticFloor = 0.1;
+constexpr int kMapSchema = 5;
+constexpr int kTopologyVersion = 9;
+constexpr double kDiagnosticFloor = 0.0;
 constexpr int kEtBins = 40;
 constexpr double kEtMax = 40.0;
 constexpr Long64_t kCacheSize = 64LL * 1024LL * 1024LL;
@@ -32,17 +33,16 @@ struct Sample
 const std::array<Sample, 7> kSamples = {{{"jet3", 10000}, {"jet5", 10000}, {"jet8", 10000}, {"jet12", 100000},
                                          {"jet20", 10000}, {"jet30", 10000}, {"jet40", 10000}}};
 
-constexpr std::array<const char*, 41> kFlowKeys = {
+constexpr std::array<const char*, 39> kFlowKeys = {
     "all_before", "all_pi0_only_veto", "all_eta_only_veto", "all_both_veto", "all_after",
     "prompt_before", "prompt_pi0_only_veto", "prompt_eta_only_veto", "prompt_both_veto", "prompt_after",
     "background_before", "background_pi0_only_veto", "background_eta_only_veto", "background_both_veto", "background_after",
     "truth_pi0_before", "truth_pi0_pi0_veto", "truth_pi0_after",
     "pi0_anchor_before", "pi0_anchor_pi0_veto", "pi0_anchor_truth_taggable_veto", "pi0_anchor_combinatorial_only_veto",
     "pi0_anchor_selected_truth_partner", "pi0_anchor_selected_other_partner", "pi0_anchor_displaced_selected_truth_partner", "pi0_anchor_after",
-    "missing_energy_threshold_before", "missing_energy_threshold_after", "missing_acceptance_before", "missing_acceptance_after",
-    "missing_other_before", "missing_other_after", "missing_displaced_partner_before", "missing_displaced_partner_after",
-    "missing_no_cemc_deposit_before", "missing_no_cemc_deposit_after", "missing_unclustered_deposit_before", "missing_unclustered_deposit_after",
-    "missing_match_incomplete_before", "missing_match_incomplete_after", "selected_partner_join_failed"};
+    "missing_energy_band_taggable_before", "missing_energy_band_taggable_after", "missing_acceptance_before", "missing_acceptance_after",
+    "missing_other_before", "missing_other_after", "missing_energy_band_not_taggable_before", "missing_energy_band_not_taggable_after",
+    "missing_low_energy_before", "missing_low_energy_after", "missing_unclustered_or_no_cemc_deposit_before", "missing_unclustered_or_no_cemc_deposit_after", "selected_partner_join_failed"};
 
 constexpr std::array<const char*, 4> kFeatureGroups = {
     "prompt_combinatorial", "truth_pi0_selected_truth_partner", "truth_pi0_selected_other_partner", "truth_pi0_combinatorial_only"};
@@ -71,6 +71,7 @@ struct Input
   double sumw = 0;
   std::string release;
   std::string model;
+  std::vector<double> selection_settings;
 };
 
 bool inspect(const Sample& sample, const std::string& pattern, double threshold, bool require_complete, Input& input)
@@ -90,7 +91,7 @@ bool inspect(const Sample& sample, const std::string& pattern, double threshold,
       tree.SetBranchAddress("map_chunk_id", &chunk) >= 0 && tree.SetBranchAddress("sum_generator_weight_processed", &sumw) >= 0 &&
       tree.SetBranchAddress("min_cluster_energy", &min_energy) >= 0 &&
       tree.SetBranchAddress("partner_diagnostic_min_cluster_energy", &diagnostic_floor) >= 0 &&
-      tree.SetBranchAddress("meson_partner_min_energy", &tag_energy) >= 0 &&
+      tree.SetBranchAddress("pi0_partner_min_energy", &tag_energy) >= 0 &&
       tree.SetBranchAddress("pi0_topology_algorithm_version", &topology_version) >= 0;
   if (!ok) return false;
   long long expected_begin = 0;
@@ -98,7 +99,11 @@ bool inspect(const Sample& sample, const std::string& pattern, double threshold,
   {
     if (tree.GetEntry(entry) <= 0 || !sample_name || !release || !model || schema != kMapSchema || *sample_name != sample.name ||
         begin != expected_begin || end <= begin || chunk != static_cast<unsigned int>(entry) || !close(min_energy, threshold) ||
-        !close(tag_energy, threshold) || !close(diagnostic_floor, kDiagnosticFloor) || topology_version != kTopologyVersion || !std::isfinite(sumw)) return false;
+        !close(diagnostic_floor, kDiagnosticFloor) || topology_version != kTopologyVersion || !std::isfinite(sumw)) return false;
+    std::vector<double> settings;
+    if (!photon_candidate_settings::read(tree.GetFile()->GetName(), settings)) return false;
+    if (entry == 0) input.selection_settings = settings;
+    else if (!photon_candidate_settings::same(input.selection_settings, settings)) return false;
     if (input.release.empty())
     {
       input.release = *release;
@@ -188,7 +193,7 @@ struct FeatureHistograms
 
 constexpr std::size_t missing_before_key(int category)
 {
-  return category == 1 ? 26 : category == 2 ? 28 : category == 3 ? 30 : category == 4 ? 32 : category == 5 ? 34 : category == 6 ? 36 : category == 7 ? 38 : kFlowKeys.size();
+  return category == 1 ? 26 : category == 2 ? 28 : category == 3 ? 30 : category == 4 ? 32 : category == 5 ? 34 : category == 6 ? 36 : kFlowKeys.size();
 }
 }
 
@@ -334,7 +339,7 @@ int ReduceTaggingPurityDiagnostic(const std::string map_root, const std::string 
       if (partner == by_id.end())
       {
         ++partner_joins_failed;
-        flow.fill(40, (*et)[cluster], weight);
+        flow.fill(38, (*et)[cluster], weight);
         continue;
       }
       const std::size_t j = partner->second;
@@ -377,6 +382,7 @@ int ReduceTaggingPurityDiagnostic(const std::string map_root, const std::string 
   std::string metadata_sample = sample_name, metadata_map_root = root;
   TTree metadata("metadata", "Tagging-purity diagnostic partial metadata");
   metadata.Branch("schema_version", &schema_version);
+  metadata.Branch("selection_settings", &input.selection_settings);
   metadata.Branch("source_map_schema_version", &source_schema);
   metadata.Branch("map_root", &metadata_map_root);
   metadata.Branch("sample_name", &metadata_sample);

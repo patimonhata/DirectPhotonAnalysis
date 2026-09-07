@@ -23,16 +23,26 @@ anchor_cluster_eta_max = 0.7
 # Non-positive means no software eta cut: search the full CEMC cluster container.
 partner_cluster_eta_max = -1.0
 min_cluster_energy = 0.2
+pi0_partner_min_energy = $(min_cluster_energy)
+pi0_mass_min = 0.10
+pi0_mass_max = 0.20
+missing_energy_min = 0.2
+missing_energy_max = 0.5
 dominant_fraction_min = 0.5
 anchor_pi0_fraction_min = 0.5
 min_energy_contribution_fraction = 0.0
 min_photon_energy_recovery = 0.2
 max_abs_vertex_z = 60.0
+cemc_acceptance_eta_max = 1.1
+min_direct_match_cluster_energy_coverage = 0.5
+missing_diagnostic_max_delta_r = 0.15
+enable_missing_diagnostics = true
+pre_cemc_interaction_radius = 90.0
 
 Output             = $(log_directory)/pythia_pi0_anchor_topology_$(ProcId).out
 Error              = $(log_directory)/pythia_pi0_anchor_topology_$(ProcId).err
 Log                = /tmp/ryotaro-PhotonAnalysisTree-pythia-pi0-anchor-topology_$(ProcId).log
-Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(partial_output_directory) $(n_bins) $(et_max) $(anchor_cluster_eta_max) $(partner_cluster_eta_max) $(min_cluster_energy) $(dominant_fraction_min) $(anchor_pi0_fraction_min) $(min_energy_contribution_fraction) $(min_photon_energy_recovery) $(max_abs_vertex_z)"
+Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(partial_output_directory) $(n_bins) $(et_max) $(anchor_cluster_eta_max) $(partner_cluster_eta_max) $(min_cluster_energy) $(dominant_fraction_min) $(anchor_pi0_fraction_min) $(min_energy_contribution_fraction) $(min_photon_energy_recovery) $(max_abs_vertex_z) $(cemc_acceptance_eta_max) $(min_direct_match_cluster_energy_coverage) $(missing_diagnostic_max_delta_r) $(enable_missing_diagnostics) $(pre_cemc_interaction_radius) $(pi0_partner_min_energy) $(pi0_mass_min) $(pi0_mass_max) $(missing_energy_min) $(missing_energy_max)"
 
 # Require n_chunks = ceil(total_files / files_per_job) - chunk_offset.
 Queue $(n_chunks)

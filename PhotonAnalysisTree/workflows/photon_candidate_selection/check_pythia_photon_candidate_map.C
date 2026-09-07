@@ -13,7 +13,14 @@ bool map_bind(TTree* tree, const char* name, T* address)
 }
 
 int check_pythia_photon_candidate_map(const char* path, const double expected_min_cluster_energy = 0.1,
-                                      const double expected_tagging_partner_min_energy = -1.0)
+                                      const double expected_tagging_partner_min_energy = -1.0,
+                                      const double expected_eta_partner_min_energy = -1.0,
+                                      const double expected_pi0_mass_min = 0.10,
+                                      const double expected_pi0_mass_max = 0.20,
+                                      const double expected_eta_mass_min = 0.45,
+                                      const double expected_eta_mass_max = 0.65,
+                                      const double expected_missing_energy_min = 0.2,
+                                      const double expected_missing_energy_max = 0.5)
 {
   const double resolved_expected_tagging_energy = expected_tagging_partner_min_energy < 0.0 ? expected_min_cluster_energy : expected_tagging_partner_min_energy;
   const int tree_status = check_pythia_photon_candidate_tree(path);
@@ -38,7 +45,15 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   unsigned long long n_clusters_region_a = 0ULL;
   double min_cluster_energy = -1.0;
   double partner_diagnostic_min_cluster_energy = -1.0;
-  double meson_partner_min_energy = -1.0;
+  double pi0_partner_min_energy = -1.0;
+  double eta_partner_min_energy = -1.0;
+  double pi0_mass_min = -1.0;
+  double pi0_mass_max = -1.0;
+  double eta_mass_min = -1.0;
+  double eta_mass_max = -1.0;
+  double missing_energy_min = -1.0;
+  double missing_energy_max = -1.0;
+  double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
   unsigned long long n_clusters_region_b = 0ULL;
   unsigned long long n_clusters_region_c = 0ULL;
@@ -57,7 +72,15 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   ok &= map_bind(metadata, "sample_name", &sample_name);
   ok &= map_bind(metadata, "min_cluster_energy", &min_cluster_energy);
   ok &= map_bind(metadata, "partner_diagnostic_min_cluster_energy", &partner_diagnostic_min_cluster_energy);
-  ok &= map_bind(metadata, "meson_partner_min_energy", &meson_partner_min_energy);
+  ok &= map_bind(metadata, "pi0_partner_min_energy", &pi0_partner_min_energy);
+  ok &= map_bind(metadata, "eta_partner_min_energy", &eta_partner_min_energy);
+  ok &= map_bind(metadata, "pi0_mass_min", &pi0_mass_min);
+  ok &= map_bind(metadata, "pi0_mass_max", &pi0_mass_max);
+  ok &= map_bind(metadata, "eta_mass_min", &eta_mass_min);
+  ok &= map_bind(metadata, "eta_mass_max", &eta_mass_max);
+  ok &= map_bind(metadata, "missing_energy_min", &missing_energy_min);
+  ok &= map_bind(metadata, "missing_energy_max", &missing_energy_max);
+  ok &= map_bind(metadata, "min_photon_energy_recovery", &min_photon_energy_recovery);
   ok &= map_bind(metadata, "pi0_topology_algorithm_version", &pi0_topology_algorithm_version);
   ok &= map_bind(metadata, "n_events_written", &n_events_written);
   ok &= map_bind(metadata, "n_clusters_region_a", &n_clusters_region_a);
@@ -65,14 +88,22 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   ok &= map_bind(metadata, "n_clusters_region_c", &n_clusters_region_c);
   ok &= map_bind(metadata, "n_clusters_region_d", &n_clusters_region_d);
   ok &= map_bind(metadata, "n_clusters_final_photon", &n_clusters_final_photon);
-  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 4 || !input_manifest || input_manifest->empty() ||
+  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 5 || !input_manifest || input_manifest->empty() ||
       manifest_begin < 0 || manifest_end <= manifest_begin || input_file_count != manifest_end - manifest_begin ||
       !first_input_suffix || first_input_suffix->empty() || !last_input_suffix || last_input_suffix->empty() ||
       !sample_name || sample_name->empty() || !std::isfinite(min_cluster_energy) || min_cluster_energy < 0.0 ||
       !std::isfinite(expected_min_cluster_energy) || std::abs(min_cluster_energy - expected_min_cluster_energy) > 1e-12 ||
-      !std::isfinite(partner_diagnostic_min_cluster_energy) || std::abs(partner_diagnostic_min_cluster_energy - 0.1) > 1e-12 ||
-      !std::isfinite(meson_partner_min_energy) || !std::isfinite(resolved_expected_tagging_energy) ||
-      std::abs(meson_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 8 ||
+      !std::isfinite(partner_diagnostic_min_cluster_energy) || std::abs(partner_diagnostic_min_cluster_energy - 0.0) > 1e-12 ||
+      !std::isfinite(pi0_partner_min_energy) || !std::isfinite(resolved_expected_tagging_energy) ||
+      std::abs(pi0_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 9 ||
+      !std::isfinite(eta_partner_min_energy) || std::abs(eta_partner_min_energy - (expected_eta_partner_min_energy < 0.0 ? resolved_expected_tagging_energy : expected_eta_partner_min_energy)) > 1e-12 ||
+      !std::isfinite(pi0_mass_min) || std::abs(pi0_mass_min - expected_pi0_mass_min) > 1e-12 ||
+      !std::isfinite(pi0_mass_max) || std::abs(pi0_mass_max - expected_pi0_mass_max) > 1e-12 ||
+      !std::isfinite(eta_mass_min) || std::abs(eta_mass_min - expected_eta_mass_min) > 1e-12 ||
+      !std::isfinite(eta_mass_max) || std::abs(eta_mass_max - expected_eta_mass_max) > 1e-12 ||
+      !std::isfinite(missing_energy_min) || std::abs(missing_energy_min - expected_missing_energy_min) > 1e-12 ||
+      !std::isfinite(missing_energy_max) || std::abs(missing_energy_max - expected_missing_energy_max) > 1e-12 ||
+      std::abs(min_photon_energy_recovery - 0.5) > 1e-12 ||
       n_events_written != static_cast<unsigned long long>(events->GetEntries()))
   {
     std::cerr << "Invalid photon-candidate map metadata" << std::endl;
@@ -143,6 +174,6 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
 
   std::cout << "check_pythia_photon_candidate_map - chunk/range/files/min-cluster-E/tagging-partner-min-E/A/B/C/D/final = "
             << map_chunk_id << "/[" << manifest_begin << ":" << manifest_end << "]/" << input_file_count << "/"
-            << min_cluster_energy << "/" << meson_partner_min_energy << "/" << total_a << "/" << total_b << "/" << total_c << "/" << total_d << "/" << total_final << std::endl;
+            << min_cluster_energy << "/" << pi0_partner_min_energy << "/" << total_a << "/" << total_b << "/" << total_c << "/" << total_d << "/" << total_final << std::endl;
   return 0;
 }

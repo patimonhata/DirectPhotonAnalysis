@@ -3,7 +3,7 @@ set -euo pipefail
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module_dir=$(cd "$workflow_dir/../.." && pwd)
-usage="usage: workflows/photon_candidate_selection/check_sample_map_outputs.sh SAMPLE_NAME [FILES_PER_JOB] [DEEP_VALIDATION] [OUTPUT_DIRECTORY] [MIN_CLUSTER_ENERGY_GEV] [TAGGING_PARTNER_MIN_ENERGY_GEV]"
+usage="usage: workflows/photon_candidate_selection/check_sample_map_outputs.sh SAMPLE_NAME [FILES_PER_JOB] [DEEP_VALIDATION] [OUTPUT_DIRECTORY] [MIN_CLUSTER_ENERGY_GEV] [PI0_PARTNER_MIN_ENERGY_GEV] [ETA_PARTNER_MIN_ENERGY_GEV] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]"
 sample_name=${1:?$usage}
 files_per_job=${2:-10}
 deep_validation=${3:-false}
@@ -11,6 +11,19 @@ output_directory=${4:-}
 
 min_cluster_energy=${5:-0.1}
 tagging_partner_min_energy=${6:-$min_cluster_energy}
+eta_partner_min_energy=${7:-$tagging_partner_min_energy}
+pi0_mass_min=${8:-0.10}
+pi0_mass_max=${9:-0.20}
+eta_mass_min=${10:-0.45}
+eta_mass_max=${11:-0.65}
+missing_energy_min=${12:-0.2}
+missing_energy_max=${13:-0.5}
+for value in "$eta_partner_min_energy" "$pi0_mass_min" "$pi0_mass_max" "$eta_mass_min" "$eta_mass_max" "$missing_energy_min" "$missing_energy_max"; do
+  if ! [[ "$value" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$ ]]; then
+    echo "Invalid numeric selection setting: $value" >&2
+    exit 2
+  fi
+done
 case "$sample_name" in
   photonjet3|photonjet5|photonjet10|photonjet20|jet3|jet5|jet8|jet12|jet20|jet30|jet40) ;;
   *)
@@ -63,7 +76,7 @@ for ((chunk = 0; chunk < expected_maps; ++chunk)); do
     ((missing += 1))
     continue
   fi
-  if [[ "$deep_validation" == true ]] && ! root -l -b -q "$workflow_dir/check_pythia_photon_candidate_map.C(\"$path\",${min_cluster_energy},${tagging_partner_min_energy})"; then
+  if [[ "$deep_validation" == true ]] && ! root -l -b -q "$workflow_dir/check_pythia_photon_candidate_map.C(\"$path\",${min_cluster_energy},${tagging_partner_min_energy},${eta_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${eta_mass_min},${eta_mass_max},${missing_energy_min},${missing_energy_max})"; then
     echo "INVALID $path"
     ((invalid += 1))
   fi

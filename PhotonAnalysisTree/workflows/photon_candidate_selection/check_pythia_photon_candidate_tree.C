@@ -32,6 +32,10 @@ int check_pythia_photon_candidate_tree(const char* path)
     return 1;
   }
 
+  double stored_min_cluster_energy = -1.0;
+  if (!bind(metadata, "min_cluster_energy", &stored_min_cluster_energy) || metadata->GetEntry(0) <= 0 ||
+      !std::isfinite(stored_min_cluster_energy) || stored_min_cluster_energy < 0.0) return 1;
+
   unsigned int ncluster = 0;
   double vertex_z = 0.0;
   std::vector<unsigned int>* cluster_id = nullptr;
@@ -180,7 +184,7 @@ int check_pythia_photon_candidate_tree(const char* path)
 
     for (std::size_t cluster = 0; event_ok && cluster < ncluster; ++cluster)
     {
-      event_ok &= (*cluster_e)[cluster] > 0.1;
+      event_ok &= (*cluster_e)[cluster] > stored_min_cluster_energy;
       event_ok &= close_enough((*iso_corrected)[cluster], 1.2 * (*iso_raw)[cluster] + 0.1);
       event_ok &= close_enough((*noniso_boundary)[cluster], (*iso_boundary)[cluster] + 0.8);
       event_ok &= static_cast<bool>((*isolated)[cluster]) == ((*iso_corrected)[cluster] < (*iso_boundary)[cluster]);

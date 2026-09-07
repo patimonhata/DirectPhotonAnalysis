@@ -62,12 +62,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       "h_pi0_anchor_merged_cluster_et_raw",
       "h_pi0_anchor_single_contaminated_cluster_et_raw",
       "h_pi0_anchor_missing_cluster_et_raw",
-      "h_pi0_anchor_missing_energy_threshold_cluster_et_raw",
-      "h_pi0_anchor_missing_displaced_partner_cluster_et_raw",
+      "h_pi0_anchor_missing_energy_band_taggable_cluster_et_raw",
+      "h_pi0_anchor_missing_energy_band_not_taggable_cluster_et_raw",
       "h_pi0_anchor_missing_acceptance_cluster_et_raw",
-      "h_pi0_anchor_missing_no_cemc_deposit_cluster_et_raw",
-      "h_pi0_anchor_missing_unclustered_deposit_cluster_et_raw",
-      "h_pi0_anchor_missing_match_incomplete_cluster_et_raw",
+      "h_pi0_anchor_missing_low_energy_cluster_et_raw",
+      "h_pi0_anchor_missing_unclustered_or_no_cemc_deposit_cluster_et_raw",
       "h_pi0_anchor_missing_other_cluster_et_raw",
       "h_pi0_anchor_other_cluster_et_raw", "metadata"};
   std::set<std::string> observed_keys;
@@ -104,6 +103,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   double cemc_acceptance_eta_max = 0.0;
   double pre_cemc_interaction_radius = 0.0;
   double min_cluster_energy = 0.0;
+  double pi0_partner_min_energy = -1.0;
+  double pi0_mass_min = -1.0;
+  double pi0_mass_max = -1.0;
+  double missing_energy_min = -1.0;
+  double missing_energy_max = -1.0;
   double dominant_fraction_min = 0.0;
   double anchor_pi0_fraction_min = 0.0;
   double min_energy_contribution_fraction = 0.0;
@@ -146,12 +150,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   unsigned long long merged_count = 0;
   unsigned long long single_contaminated_count = 0;
   unsigned long long missing_count = 0;
-  unsigned long long missing_energy_threshold_count = 0;
-  unsigned long long missing_displaced_partner_cluster_count = 0;
+  unsigned long long missing_energy_band_taggable_count = 0;
+  unsigned long long missing_energy_band_not_taggable_count = 0;
   unsigned long long missing_acceptance_count = 0;
-  unsigned long long missing_no_cemc_deposit_count = 0;
-  unsigned long long missing_unclustered_deposit_count = 0;
-  unsigned long long missing_match_incomplete_count = 0;
+  unsigned long long missing_low_energy_count = 0;
+  unsigned long long missing_unclustered_or_no_cemc_deposit_count = 0;
   unsigned long long missing_other_count = 0;
   unsigned long long other_count = 0;
 
@@ -182,6 +185,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   ok &= bind(metadata, "cemc_acceptance_eta_max", &cemc_acceptance_eta_max);
   ok &= bind(metadata, "pre_cemc_interaction_radius", &pre_cemc_interaction_radius);
   ok &= bind(metadata, "min_cluster_energy", &min_cluster_energy);
+  ok &= bind(metadata, "pi0_partner_min_energy", &pi0_partner_min_energy);
+  ok &= bind(metadata, "pi0_mass_min", &pi0_mass_min);
+  ok &= bind(metadata, "pi0_mass_max", &pi0_mass_max);
+  ok &= bind(metadata, "missing_energy_min", &missing_energy_min);
+  ok &= bind(metadata, "missing_energy_max", &missing_energy_max);
   ok &= bind(metadata, "dominant_fraction_min", &dominant_fraction_min);
   ok &= bind(metadata, "anchor_pi0_fraction_min",
              &anchor_pi0_fraction_min);
@@ -220,12 +228,11 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   ok &= bind(metadata, "merged_count", &merged_count);
   ok &= bind(metadata, "single_contaminated_count", &single_contaminated_count);
   ok &= bind(metadata, "missing_count", &missing_count);
-  ok &= bind(metadata, "missing_energy_threshold_count", &missing_energy_threshold_count);
-  ok &= bind(metadata, "missing_displaced_partner_cluster_count", &missing_displaced_partner_cluster_count);
+  ok &= bind(metadata, "missing_energy_band_taggable_count", &missing_energy_band_taggable_count);
+  ok &= bind(metadata, "missing_energy_band_not_taggable_count", &missing_energy_band_not_taggable_count);
   ok &= bind(metadata, "missing_acceptance_count", &missing_acceptance_count);
-  ok &= bind(metadata, "missing_no_cemc_deposit_count", &missing_no_cemc_deposit_count);
-  ok &= bind(metadata, "missing_unclustered_deposit_count", &missing_unclustered_deposit_count);
-  ok &= bind(metadata, "missing_match_incomplete_count", &missing_match_incomplete_count);
+  ok &= bind(metadata, "missing_low_energy_count", &missing_low_energy_count);
+  ok &= bind(metadata, "missing_unclustered_or_no_cemc_deposit_count", &missing_unclustered_or_no_cemc_deposit_count);
   ok &= bind(metadata, "missing_other_count", &missing_other_count);
   ok &= bind(metadata, "other_count", &other_count);
   if (!ok || metadata->GetEntry(0) <= 0)
@@ -234,7 +241,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   }
 
   const bool valid_metadata =
-      schema_version == 8 && manifest_path && !manifest_path->empty() &&
+      schema_version == 9 && manifest_path && !manifest_path->empty() &&
       manifest_begin >= 0 && manifest_end > manifest_begin &&
       first_suffix && !first_suffix->empty() &&
       last_suffix && !last_suffix->empty() &&
@@ -248,7 +255,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
           "signal_g4_primary_pi0_or_generator_pi0_with_exactly_two_g4_photons" &&
       partner_selection &&
       *partner_selection ==
-          "same_energy_cut_as_anchor_partner_eta_cut_configurable" &&
+          "independent_pi0_partner_energy_cut_partner_eta_cut_configurable" &&
       topology_definition &&
       *topology_definition ==
           "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters_with_single_contaminated_pre_cemc_split" &&
@@ -256,7 +263,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       *topology_priority ==
           "ambiguous_main_to_other_then_single_contaminated_then_merged_then_separated_then_missing_then_other" &&
       missing_category_priority &&
-      *missing_category_priority == "projection_then_acceptance_then_cemc_deposit_then_threshold_near_or_displaced_then_recovery_then_match_incomplete_then_unclustered_then_other" &&
+      *missing_category_priority == "projection_then_acceptance_then_truth_partner_energy_and_mass_then_unclustered_or_no_cemc_then_other" &&
       response_policy &&
       *response_policy == "not_used_for_classification" &&
       photon_recovery_policy &&
@@ -272,6 +279,12 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       std::isfinite(cemc_acceptance_eta_max) && cemc_acceptance_eta_max > 0.0 &&
       std::isfinite(pre_cemc_interaction_radius) && pre_cemc_interaction_radius > 0.0 &&
       std::isfinite(min_cluster_energy) && min_cluster_energy >= 0.0 &&
+      std::isfinite(pi0_partner_min_energy) && pi0_partner_min_energy >= 0.0 &&
+      std::isfinite(pi0_mass_min) && pi0_mass_min >= 0.0 &&
+      std::isfinite(pi0_mass_max) && pi0_mass_max >= 0.0 &&
+      std::isfinite(missing_energy_min) && missing_energy_min >= 0.0 &&
+      std::isfinite(missing_energy_max) && missing_energy_max >= 0.0 &&
+      pi0_mass_min < pi0_mass_max && missing_energy_min < missing_energy_max &&
       dominant_fraction_min >= 0.0 && dominant_fraction_min <= 1.0 &&
       anchor_pi0_fraction_min >= 0.0 &&
       anchor_pi0_fraction_min <= 1.0 &&
@@ -284,7 +297,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       min_direct_match_cluster_energy_coverage <= 1.0 &&
       std::isfinite(missing_diagnostic_max_delta_r) && missing_diagnostic_max_delta_r > 0.0 &&
       std::isfinite(max_abs_vertex_z) && max_abs_vertex_z > 0.0 &&
-      matcher_version > 0 && topology_version > 0 && bin_width_normalized == 0U &&
+      matcher_version > 0 && topology_version == 9 && bin_width_normalized == 0U &&
       events_processed > 0 &&
       events_written + events_invalid + events_vertex_rejected ==
           events_processed &&
@@ -292,10 +305,10 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       anchor_count == anchor_g4 + anchor_generator &&
       anchor_count ==
           separated_count + merged_count + single_contaminated_count + missing_count + other_count &&
-      missing_count == missing_energy_threshold_count + missing_displaced_partner_cluster_count + missing_acceptance_count +
-          missing_no_cemc_deposit_count + missing_unclustered_deposit_count + missing_match_incomplete_count + missing_other_count &&
-      (enable_missing_diagnostics || (missing_energy_threshold_count == 0 && missing_displaced_partner_cluster_count == 0 &&
-          missing_no_cemc_deposit_count == 0 && missing_unclustered_deposit_count == 0 && missing_match_incomplete_count == 0)) &&
+      missing_count == missing_energy_band_taggable_count + missing_energy_band_not_taggable_count + missing_acceptance_count +
+          missing_low_energy_count + missing_unclustered_or_no_cemc_deposit_count + missing_other_count &&
+      (enable_missing_diagnostics || (missing_energy_band_taggable_count == 0 && missing_energy_band_not_taggable_count == 0 &&
+          missing_low_energy_count == 0 && missing_unclustered_or_no_cemc_deposit_count == 0)) &&
       ambiguous_main <= other_count;
   if (!valid_metadata)
   {
@@ -305,26 +318,24 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
     return 4;
   }
 
-  const std::array<const char*, 14> names = {
+  const std::array<const char*, 13> names = {
       "h_prompt_cluster_et_raw", "h_pi0_anchor_cluster_et_raw",
       "h_pi0_anchor_separated_cluster_et_raw",
       "h_pi0_anchor_merged_cluster_et_raw",
       "h_pi0_anchor_single_contaminated_cluster_et_raw",
       "h_pi0_anchor_missing_cluster_et_raw",
-      "h_pi0_anchor_missing_energy_threshold_cluster_et_raw",
-      "h_pi0_anchor_missing_displaced_partner_cluster_et_raw",
+      "h_pi0_anchor_missing_energy_band_taggable_cluster_et_raw",
+      "h_pi0_anchor_missing_energy_band_not_taggable_cluster_et_raw",
       "h_pi0_anchor_missing_acceptance_cluster_et_raw",
-      "h_pi0_anchor_missing_no_cemc_deposit_cluster_et_raw",
-      "h_pi0_anchor_missing_unclustered_deposit_cluster_et_raw",
-      "h_pi0_anchor_missing_match_incomplete_cluster_et_raw",
+      "h_pi0_anchor_missing_low_energy_cluster_et_raw",
+      "h_pi0_anchor_missing_unclustered_or_no_cemc_deposit_cluster_et_raw",
       "h_pi0_anchor_missing_other_cluster_et_raw",
       "h_pi0_anchor_other_cluster_et_raw"};
-  const std::array<unsigned long long, 14> counts = {
+  const std::array<unsigned long long, 13> counts = {
       prompt_count, anchor_count, separated_count, merged_count, single_contaminated_count, missing_count,
-      missing_energy_threshold_count, missing_displaced_partner_cluster_count, missing_acceptance_count,
-      missing_no_cemc_deposit_count, missing_unclustered_deposit_count, missing_match_incomplete_count,
-      missing_other_count, other_count};
-  std::array<TH1D*, 14> histograms{};
+      missing_energy_band_taggable_count, missing_energy_band_not_taggable_count, missing_acceptance_count,
+      missing_low_energy_count, missing_unclustered_or_no_cemc_deposit_count, missing_other_count, other_count};
+  std::array<TH1D*, 13> histograms{};
   for (std::size_t index = 0; index < names.size(); ++index)
   {
     input.GetObject(names[index], histograms[index]);
@@ -338,9 +349,9 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
   for (int bin = 0; bin <= n_bins + 1; ++bin)
   {
     double missing_categories = 0.0;
-    for (std::size_t index = 6; index <= 12; ++index) missing_categories += histograms[index]->GetBinContent(bin);
+    for (std::size_t index = 6; index <= 11; ++index) missing_categories += histograms[index]->GetBinContent(bin);
     const double categories = histograms[2]->GetBinContent(bin) + histograms[3]->GetBinContent(bin) +
-        histograms[4]->GetBinContent(bin) + missing_categories + histograms[13]->GetBinContent(bin);
+        histograms[4]->GetBinContent(bin) + missing_categories + histograms[12]->GetBinContent(bin);
     if (std::abs(histograms[5]->GetBinContent(bin) - missing_categories) > 1e-9 ||
         std::abs(histograms[1]->GetBinContent(bin) - categories) > 1e-9)
     {
@@ -351,14 +362,14 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
 
   std::cout
       << "check_pythia_pi0_anchor_cluster_partial - range/events/vertex-rejected/anchor"
-      << "/separated/merged/single-contaminated/missing(energy/displaced/acceptance/no-CEMC/unclustered/match-incomplete/other)/other = ["
+      << "/separated/merged/single-contaminated/missing(band-in/band-out/acceptance/low-energy/unclustered-or-no-deposit/other)/other = ["
       << manifest_begin << ":" << manifest_end << "]/"
       << events_processed << "/" << events_vertex_rejected << "/"
       << anchor_count << "/"
       << separated_count << "/" << merged_count << "/" << single_contaminated_count << "/"
-      << missing_count << "(" << missing_energy_threshold_count << "/" << missing_displaced_partner_cluster_count << "/"
-      << missing_acceptance_count << "/" << missing_no_cemc_deposit_count << "/" << missing_unclustered_deposit_count << "/"
-      << missing_match_incomplete_count << "/" << missing_other_count << ")/"
+      << missing_count << "(" << missing_energy_band_taggable_count << "/" << missing_energy_band_not_taggable_count << "/"
+      << missing_acceptance_count << "/" << missing_low_energy_count << "/" << missing_unclustered_or_no_cemc_deposit_count << "/"
+      << missing_other_count << ")/"
       << other_count << std::endl;
   return 0;
 }

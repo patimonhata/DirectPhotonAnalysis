@@ -398,18 +398,169 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value)
   return "unknown";
 }
 
+void classify_pi0_anchor(const Pi0AnchorTopologyConfig& config, const Pi0TopologyCandidateRecord& candidate,
+                         const Pi0TopologyClusterRecord& anchor_cluster, Pi0TopologyAnchorRecord& anchor)
+{
+  if (anchor.ambiguous_main)
+  {
+    anchor.topology = Pi0AnchorTopology::other;
+    anchor.reason = Pi0AnchorReason::ambiguous_main_contributor;
+    return;
+  }
+  const bool is_best0 = candidate.recovered[0] &&
+      candidate.best_cluster[0] == anchor.cluster_index;
+  const bool is_best1 = candidate.recovered[1] &&
+      candidate.best_cluster[1] == anchor.cluster_index;
+  const auto partner_recovered = [&](std::size_t photon) {
+    const auto& partner = candidate.topology_partner_clusters[photon];
+    return partner.found && std::isfinite(candidate.photon_energy[photon]) && candidate.photon_energy[photon] > 0.0 &&
+        std::isfinite(partner.recovery) && partner.recovery >= config.min_photon_energy_recovery;
+  };
+  const auto partner_is_anchor = [&](std::size_t photon) {
+    return partner_recovered(photon) && candidate.topology_partner_clusters[photon].cluster_id == anchor_cluster.cluster_id;
+  };
+  if ((is_best0 && partner_is_anchor(1)) || (is_best1 && partner_is_anchor(0)))
+  {
+    const bool pre_cemc0 = candidate.photon_pre_cemc_interaction[0];
+    const bool pre_cemc1 = candidate.photon_pre_cemc_interaction[1];
+    if (pre_cemc0 != pre_cemc1)
+    {
+      anchor.topology = Pi0AnchorTopology::single_contaminated;
+      anchor.reason = Pi0AnchorReason::single_contaminated_pre_cemc_partner;
+      anchor.pre_cemc_photon_index = pre_cemc0 ? 0 : 1;
+    }
+    else
+    {
+      anchor.topology = Pi0AnchorTopology::merged;
+      anchor.reason = Pi0AnchorReason::merged_shared_recovered_cluster;
+    }
+  }
+  else if ((is_best0 && partner_recovered(1) && !partner_is_anchor(1)) ||
+           (is_best1 && partner_recovered(0) && !partner_is_anchor(0)))
+  {
+    anchor.topology = Pi0AnchorTopology::separated;
+    anchor.reason = Pi0AnchorReason::separated_distinct_recovered_clusters;
+    anchor.partner_photon_index = is_best0 && partner_recovered(1) && !partner_is_anchor(1) ? 1 : 0;
+  }
+  else if ((is_best0 && !partner_recovered(1)) || (is_best1 && !partner_recovered(0)))
+  {
+    anchor.topology = Pi0AnchorTopology::missing;
+    anchor.reason = Pi0AnchorReason::missing_unrecovered_partner;
+    anchor.partner_photon_index = is_best0 ? 1 : 0;
+    const std::size_t partner = static_cast<std::size_t>(anchor.partner_photon_index);
+    const auto& diagnostic = candidate.partner_diagnostics[partner];
+    const bool projection_valid = candidate.photon_projection_valid[partner];
+    const bool has_cemc_deposit = candidate.photon_cemc_edep[partner] > 0.0 ||
+        candidate.best_cluster[partner] != invalid_index || diagnostic.has_direct_deposit;
+    if (diagnostic.found && diagnostic.has_direct_deposit)
+    {
+      anchor.partner_diagnostic_invariant_mass =
+          diphoton_invariant_mass(anchor_cluster, diagnostic);
+    }
+    const auto& truth_partner = candidate.truth_partner_clusters[partner];
+    anchor.missing_category = Pi0MissingCategory::other;
+    if (!projection_valid)
+      anchor.missing_detail = Pi0MissingDetail::partner_projection_invalid;
+    else if (!candidate.photon_in_cemc_acceptance[partner])
+    {
+      anchor.missing_category = Pi0MissingCategory::acceptance;
+      anchor.missing_detail = Pi0MissingDetail::partner_outside_cemc_acceptance;
+    }
+    else if (!config.enable_missing_diagnostics)
+      anchor.missing_detail = Pi0MissingDetail::partner_diagnostics_disabled;
+    else if (truth_partner.found)
+    {
+      const double mass = diphoton_invariant_mass(anchor_cluster, truth_partner);
+      anchor.missing_detail = Pi0MissingDetail::partner_best_below_recovery;
+      if (truth_partner.cluster_id != anchor_cluster.cluster_id)
+      {
+        if (truth_partner.cluster_energy <= config.missing_energy_min)
+          anchor.missing_category = Pi0MissingCategory::low_energy;
+        else if (truth_partner.cluster_energy <= config.missing_energy_max && std::isfinite(mass) && mass >= 0.0)
+          anchor.missing_category = mass > config.tagging_pi0_mass_min && mass < config.tagging_pi0_mass_max
+              ? Pi0MissingCategory::energy_band_taggable : Pi0MissingCategory::energy_band_not_taggable;
+      }
+    }
+    else if (diagnostic.found && !diagnostic.match.usable)
+      anchor.missing_detail = Pi0MissingDetail::partner_direct_match_incomplete;
+    else
+    {
+      anchor.missing_category = Pi0MissingCategory::unclustered_or_no_cemc_deposit;
+      anchor.missing_detail = has_cemc_deposit ? Pi0MissingDetail::partner_unclustered_cemc_deposit : Pi0MissingDetail::partner_no_cemc_deposit;
+    }
+  }
+  else
+  {
+    anchor.topology = Pi0AnchorTopology::other;
+    const bool anchor_is_unrecovered_best =
+        (!candidate.recovered[0] &&
+         candidate.best_cluster[0] == anchor.cluster_index) ||
+        (!candidate.recovered[1] &&
+         candidate.best_cluster[1] == anchor.cluster_index);
+    anchor.reason = anchor_is_unrecovered_best
+        ? Pi0AnchorReason::other_best_cluster_below_recovery
+        : Pi0AnchorReason::other_not_daughter_maximum;
+  }
+
+  if (anchor.partner_photon_index >= 0 && anchor.partner_photon_index < 2)
+  {
+    const std::size_t partner_index = static_cast<std::size_t>(anchor.partner_photon_index);
+    const auto& partner = candidate.truth_partner_clusters[partner_index];
+    if (!candidate.photon_projection_valid[partner_index])
+    {
+      anchor.partner_alignment = Pi0PartnerAlignment::projection_invalid;
+    }
+    else if (!partner.found)
+    {
+      anchor.partner_alignment = Pi0PartnerAlignment::cluster_unavailable;
+    }
+    else
+    {
+      anchor.partner_alignment = partner.delta_r > config.missing_diagnostic_max_delta_r
+          ? Pi0PartnerAlignment::displaced : Pi0PartnerAlignment::near;
+    }
+
+    if (!partner.found)
+    {
+      anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::cluster_unavailable;
+    }
+    else
+    {
+      anchor.truth_partner_cluster_id = static_cast<int>(partner.cluster_id);
+      anchor.truth_partner_cluster_energy = partner.cluster_energy;
+      anchor.truth_partner_cluster_eta = partner.cluster_eta;
+      anchor.truth_partner_cluster_phi = partner.cluster_phi;
+      anchor.truth_partner_delta_r = partner.delta_r;
+      anchor.truth_partner_direct_edep = partner.direct_edep;
+      anchor.truth_partner_reconstructed_photon_energy = partner.reconstructed_photon_energy;
+      anchor.truth_partner_recovery = partner.recovery;
+      anchor.truth_partner_invariant_mass = diphoton_invariant_mass(anchor_cluster, partner);
+      if (partner.cluster_id == anchor_cluster.cluster_id)
+        anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::same_as_anchor;
+      else if (!(partner.cluster_energy > config.tagging_partner_min_cluster_energy))
+        anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::below_energy_threshold;
+      else if (!(anchor.truth_partner_invariant_mass >= 0.0) || !std::isfinite(anchor.truth_partner_invariant_mass))
+        anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::invalid_mass;
+      else if (!(anchor.truth_partner_invariant_mass > config.tagging_pi0_mass_min &&
+                 anchor.truth_partner_invariant_mass < config.tagging_pi0_mass_max))
+        anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::mass_outside_window;
+      else
+        anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::taggable;
+    }
+  }
+}
+
 const char* pi0_missing_category_name(Pi0MissingCategory value)
 {
   switch (value)
   {
   case Pi0MissingCategory::not_missing: return "not_missing";
-  case Pi0MissingCategory::energy_threshold: return "energy_threshold";
+  case Pi0MissingCategory::energy_band_taggable: return "energy_band_taggable";
+  case Pi0MissingCategory::energy_band_not_taggable: return "energy_band_not_taggable";
+  case Pi0MissingCategory::low_energy: return "low_energy";
   case Pi0MissingCategory::acceptance: return "acceptance";
   case Pi0MissingCategory::other: return "other";
-  case Pi0MissingCategory::displaced_partner_cluster: return "displaced_partner_cluster";
-  case Pi0MissingCategory::no_cemc_deposit: return "no_cemc_deposit";
-  case Pi0MissingCategory::unclustered_deposit: return "unclustered_deposit";
-  case Pi0MissingCategory::match_incomplete: return "match_incomplete";
+  case Pi0MissingCategory::unclustered_or_no_cemc_deposit: return "unclustered_or_no_cemc_deposit";
   }
   return "unknown";
 }
@@ -477,6 +628,7 @@ const char* pi0_missing_detail_name(Pi0MissingDetail value)
 void Pi0AnchorTopologyEvaluator::configure(const Pi0AnchorTopologyConfig& config)
 {
   config_ = config;
+  if (config_.tagging_partner_min_cluster_energy < 0.0) config_.tagging_partner_min_cluster_energy = config_.min_cluster_energy;
   truth_matcher_.set_verbosity(config_.verbosity);
 }
 
@@ -726,7 +878,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
     if (record.energy < config_.min_cluster_energy)
     {
-      if (config_.enable_missing_diagnostics && record.energy > config_.partner_diagnostic_min_cluster_energy)
+      if (record.energy > 0.0)
       {
         below_threshold_clusters.push_back({cluster, record.cluster_id, record.energy, record.eta, record.phi});
       }
@@ -879,12 +1031,11 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
   const auto update_truth_partner = [&](Pi0TopologyCandidateRecord& candidate, std::size_t photon,
                                         unsigned int cluster_id, double cluster_energy, double cluster_eta,
                                         double cluster_phi, bool below_topology_threshold, const Pi0ClusterTruthMatch& match) {
-    if (!(cluster_energy > config_.partner_diagnostic_min_cluster_energy) || !match.usable || !(match.total_edep > 0.0F)) return;
+    if (!(cluster_energy > 0.0) || !match.usable || !(match.total_edep > 0.0F)) return;
     const double direct_edep = match.gamma_edep[photon];
     const double fraction = direct_edep / match.total_edep;
-    auto& partner = candidate.truth_partner_clusters[photon];
-    if (!(direct_edep > 0.0) || !(fraction > config_.min_energy_contribution_fraction) ||
-        (partner.found && !(direct_edep > partner.direct_edep))) return;
+    Pi0TruthPartnerClusterRecord partner;
+    if (!(direct_edep > 0.0) || !(fraction > config_.min_energy_contribution_fraction)) return;
     partner.found = true;
     partner.below_topology_threshold = below_topology_threshold;
     partner.cluster_id = cluster_id;
@@ -905,6 +1056,11 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     {
       partner.delta_r = -1.0;
     }
+    auto& truth_partner = candidate.truth_partner_clusters[photon];
+    if (!truth_partner.found || direct_edep > truth_partner.direct_edep) truth_partner = partner;
+    auto& topology_partner = candidate.topology_partner_clusters[photon];
+    if (cluster_energy > config_.tagging_partner_min_cluster_energy &&
+        (!topology_partner.found || direct_edep > topology_partner.direct_edep)) topology_partner = partner;
   };
 
   for (std::size_t candidate_index = 0;
@@ -969,7 +1125,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
                                      unsigned int cluster_id, double cluster_energy,
                                      double cluster_eta, double cluster_phi, bool below_threshold,
                                      const Pi0ClusterTruthMatch& match) {
-    if (candidate.recovered[photon]) return;
+    if (!config_.enable_missing_diagnostics) return;
     const double reference_eta = candidate.photon_projection_valid[photon]
         ? candidate.photon_projection_eta[photon] : candidate.photon_eta[photon];
     const double reference_phi = candidate.photon_projection_valid[photon]
@@ -1002,7 +1158,6 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         ? diagnostic.reconstructed_photon_energy / candidate.photon_energy[photon] : 0.0;
   };
 
-  if (config_.enable_missing_diagnostics)
   {
     std::vector<std::size_t> diagnostic_candidate_indices;
     std::vector<std::array<int, 2>> diagnostic_track_ids;
@@ -1057,171 +1212,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
          anchors_by_candidate[candidate_index])
     {
       auto& anchor = result.anchors[anchor_position];
-      if (anchor.ambiguous_main)
-      {
-        anchor.topology = Pi0AnchorTopology::other;
-        anchor.reason = Pi0AnchorReason::ambiguous_main_contributor;
-        continue;
-      }
-      const bool is_best0 = candidate.recovered[0] &&
-          candidate.best_cluster[0] == anchor.cluster_index;
-      const bool is_best1 = candidate.recovered[1] &&
-          candidate.best_cluster[1] == anchor.cluster_index;
-      if (is_best0 && is_best1)
-      {
-        const bool pre_cemc0 = candidate.photon_pre_cemc_interaction[0];
-        const bool pre_cemc1 = candidate.photon_pre_cemc_interaction[1];
-        if (pre_cemc0 != pre_cemc1)
-        {
-          anchor.topology = Pi0AnchorTopology::single_contaminated;
-          anchor.reason = Pi0AnchorReason::single_contaminated_pre_cemc_partner;
-          anchor.pre_cemc_photon_index = pre_cemc0 ? 0 : 1;
-        }
-        else
-        {
-          anchor.topology = Pi0AnchorTopology::merged;
-          anchor.reason = Pi0AnchorReason::merged_shared_recovered_cluster;
-        }
-      }
-      else if ((is_best0 && candidate.recovered[1] &&
-                candidate.best_cluster[1] != anchor.cluster_index) ||
-               (is_best1 && candidate.recovered[0] &&
-                candidate.best_cluster[0] != anchor.cluster_index))
-      {
-        anchor.topology = Pi0AnchorTopology::separated;
-        anchor.reason = Pi0AnchorReason::separated_distinct_recovered_clusters;
-        anchor.partner_photon_index = is_best0 ? 1 : 0;
-      }
-      else if ((is_best0 && !candidate.recovered[1]) ||
-               (is_best1 && !candidate.recovered[0]))
-      {
-        anchor.topology = Pi0AnchorTopology::missing;
-        anchor.reason = Pi0AnchorReason::missing_unrecovered_partner;
-        anchor.partner_photon_index = is_best0 ? 1 : 0;
-        const std::size_t partner = static_cast<std::size_t>(anchor.partner_photon_index);
-        const auto& diagnostic = candidate.partner_diagnostics[partner];
-        const bool projection_valid = candidate.photon_projection_valid[partner];
-        const bool has_cemc_deposit = candidate.photon_cemc_edep[partner] > 0.0 ||
-            candidate.best_cluster[partner] != invalid_index || diagnostic.has_direct_deposit;
-        if (diagnostic.found && diagnostic.has_direct_deposit)
-        {
-          anchor.partner_diagnostic_invariant_mass =
-              diphoton_invariant_mass(result.clusters[anchor.cluster_index], diagnostic);
-        }
-        if (!projection_valid)
-        {
-          anchor.missing_category = Pi0MissingCategory::other;
-          anchor.missing_detail = Pi0MissingDetail::partner_projection_invalid;
-        }
-        else if (!candidate.photon_in_cemc_acceptance[partner])
-        {
-          anchor.missing_category = Pi0MissingCategory::acceptance;
-          anchor.missing_detail = Pi0MissingDetail::partner_outside_cemc_acceptance;
-        }
-        else if (!config_.enable_missing_diagnostics)
-        {
-          anchor.missing_category = Pi0MissingCategory::other;
-          anchor.missing_detail = Pi0MissingDetail::partner_diagnostics_disabled;
-        }
-        else if (!has_cemc_deposit)
-        {
-          anchor.missing_category = Pi0MissingCategory::no_cemc_deposit;
-          anchor.missing_detail = Pi0MissingDetail::partner_no_cemc_deposit;
-        }
-        else if (diagnostic.found && diagnostic.below_energy_threshold && diagnostic.has_direct_deposit)
-        {
-          const bool displaced = diagnostic.delta_r > config_.missing_diagnostic_max_delta_r;
-          anchor.missing_category = displaced
-              ? Pi0MissingCategory::displaced_partner_cluster
-              : Pi0MissingCategory::energy_threshold;
-          if (displaced)
-          {
-            anchor.missing_detail = diagnostic.recovery >= config_.min_photon_energy_recovery
-                ? Pi0MissingDetail::partner_displaced_cluster_below_energy_threshold_recovered
-                : Pi0MissingDetail::partner_displaced_cluster_below_energy_threshold_below_recovery;
-          }
-          else
-          {
-            anchor.missing_detail = diagnostic.recovery >= config_.min_photon_energy_recovery
-                ? Pi0MissingDetail::partner_cluster_below_energy_threshold_recovered
-                : Pi0MissingDetail::partner_cluster_below_energy_threshold_below_recovery;
-          }
-        }
-        else if (candidate.best_cluster[partner] != invalid_index)
-        {
-          anchor.missing_category = Pi0MissingCategory::other;
-          anchor.missing_detail = Pi0MissingDetail::partner_best_below_recovery;
-        }
-        else if (diagnostic.found && !diagnostic.match.usable)
-        {
-          anchor.missing_category = Pi0MissingCategory::match_incomplete;
-          anchor.missing_detail = Pi0MissingDetail::partner_direct_match_incomplete;
-        }
-        else
-        {
-          anchor.missing_category = Pi0MissingCategory::unclustered_deposit;
-          anchor.missing_detail = Pi0MissingDetail::partner_unclustered_cemc_deposit;
-        }
-      }
-      else
-      {
-        anchor.topology = Pi0AnchorTopology::other;
-        const bool anchor_is_unrecovered_best =
-            (!candidate.recovered[0] &&
-             candidate.best_cluster[0] == anchor.cluster_index) ||
-            (!candidate.recovered[1] &&
-             candidate.best_cluster[1] == anchor.cluster_index);
-        anchor.reason = anchor_is_unrecovered_best
-            ? Pi0AnchorReason::other_best_cluster_below_recovery
-            : Pi0AnchorReason::other_not_daughter_maximum;
-      }
-
-      if (anchor.partner_photon_index >= 0 && anchor.partner_photon_index < 2)
-      {
-        const std::size_t partner_index = static_cast<std::size_t>(anchor.partner_photon_index);
-        const auto& partner = candidate.truth_partner_clusters[partner_index];
-        if (!candidate.photon_projection_valid[partner_index])
-        {
-          anchor.partner_alignment = Pi0PartnerAlignment::projection_invalid;
-        }
-        else if (!partner.found)
-        {
-          anchor.partner_alignment = Pi0PartnerAlignment::cluster_unavailable;
-        }
-        else
-        {
-          anchor.partner_alignment = partner.delta_r > config_.missing_diagnostic_max_delta_r
-              ? Pi0PartnerAlignment::displaced : Pi0PartnerAlignment::near;
-        }
-
-        if (!partner.found)
-        {
-          anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::cluster_unavailable;
-        }
-        else
-        {
-          anchor.truth_partner_cluster_id = static_cast<int>(partner.cluster_id);
-          anchor.truth_partner_cluster_energy = partner.cluster_energy;
-          anchor.truth_partner_cluster_eta = partner.cluster_eta;
-          anchor.truth_partner_cluster_phi = partner.cluster_phi;
-          anchor.truth_partner_delta_r = partner.delta_r;
-          anchor.truth_partner_direct_edep = partner.direct_edep;
-          anchor.truth_partner_reconstructed_photon_energy = partner.reconstructed_photon_energy;
-          anchor.truth_partner_recovery = partner.recovery;
-          anchor.truth_partner_invariant_mass = diphoton_invariant_mass(result.clusters[anchor.cluster_index], partner);
-          if (partner.cluster_id == result.clusters[anchor.cluster_index].cluster_id)
-            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::same_as_anchor;
-          else if (!(partner.cluster_energy > config_.tagging_partner_min_cluster_energy))
-            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::below_energy_threshold;
-          else if (!(anchor.truth_partner_invariant_mass >= 0.0) || !std::isfinite(anchor.truth_partner_invariant_mass))
-            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::invalid_mass;
-          else if (!(anchor.truth_partner_invariant_mass > config_.tagging_pi0_mass_min &&
-                     anchor.truth_partner_invariant_mass < config_.tagging_pi0_mass_max))
-            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::mass_outside_window;
-          else
-            anchor.truth_partner_tag_status = Pi0TruthPartnerTagStatus::taggable;
-        }
-      }
+      classify_pi0_anchor(config_, candidate, result.clusters[anchor.cluster_index], anchor);
     }
   }
 

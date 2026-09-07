@@ -1,6 +1,6 @@
 # Displaced-partner invariant-mass diagnostic
 
-This workflow reads schema-4 photon-candidate maps produced with the strict topology threshold `E_cluster > 0.5 GeV`. It selects the representative truth-associated pair classified as `Missing: displaced partner cluster`, requires the saved representative partner energy to be strictly above an emulated tagging threshold (0.2 GeV for this study), and plots its saved reconstructed invariant mass.
+This workflow reads schema-5 photon-candidate maps produced with the strict topology threshold `E_cluster > 0.5 GeV`. It selects the representative truth-associated pair with missing topology and displaced partner alignment, requires the saved representative partner energy to be strictly above an emulated tagging threshold (0.2 GeV for this study), and plots its saved reconstructed invariant mass.
 
 It does not recompute the full combinatorial pi0 veto: maps retain one representative diagnostic partner per truth photon, not every reconstructed split cluster below 0.5 GeV.
 
@@ -25,7 +25,7 @@ output_base=/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output
 ./run_merge.sh jet "$partial_root" "$output_base"
 ~~~
 
-Merge refuses incomplete, overlapping, or mismatched shards. It requires complete input maps, exact entry coverage, schema 4, topology threshold 0.5 GeV, production tagging threshold 0.5 GeV, diagnostic floor 0.1 GeV, emulated tagging threshold 0.2 GeV, a common release/model hash, and consistent per-sample normalization.
+Merge refuses incomplete, overlapping, or mismatched shards. It requires complete input maps, exact entry coverage, schema 5, topology threshold 0.5 GeV, production tagging threshold 0.5 GeV, diagnostic floor 0 GeV, emulated tagging threshold 0.2 GeV, a common release/model hash, and consistent per-sample normalization.
 
 To retry a subset, override `sample_names` or `shard_indices`, for example:
 
@@ -58,8 +58,10 @@ PhotonAnalysisTree/workflows/displaced_partner_mass_diagnostic/run.sh \
 
 ## Selection and output
 
-Selected pairs must have topology `missing` (3), missing category `displaced_partner_cluster` (4), alignment `displaced` (2), and production truth-pair tag status `below_energy_threshold` (4). The saved partner energy must satisfy `E_partner > 0.2 GeV`. The macro also requires the saved diagnostic-pair and representative-truth-pair masses to agree.
+Selected pairs must have topology `missing` (3), alignment `displaced` (2), and production truth-pair tag status `below_energy_threshold` (4). The saved partner energy must satisfy `E_partner > 0.2 GeV`. The mass comes from the representative truth pair. Selection is independent of the new missing energy/mass category.
 
 `displaced_partner_mass_diagnostic.root` stores raw and cross-section-weighted invariant-mass spectra, partner-energy spectra, mass versus anchor ET, mass versus truth-pi0 pT, all one-dimensional projections, metadata, and raw/weighted pi0-window fractions. Directories for inclusive, kinematic, preselection, preselection plus TightBDT, preselection plus isolation, and Region A selections are included. No production meson-tag veto is applied.
 
-PDFs show the inclusive weighted spectrum, weighted two-dimensional distributions, and raw-count unit-normalized projections. Red dashed lines mark the strict `0.10 < mass < 0.20 GeV` window. Anchor-ET bins are `0-5, 5-6, 6-8, 8-10, 10-15, 15-20, 20-35, 35-50, 50-100 GeV`; truth-pi0-pT bins are `0-3, 3-5, 5-6, 6-8, 8-10, 10-15, 15-20, 20-35, 35-50, 50-100 GeV`. The saved two-dimensional histograms allow arbitrary later rebinning.
+PDFs show the inclusive weighted spectrum, weighted two-dimensional distributions, and raw-count unit-normalized projections. Red dashed lines mark the production pi0 mass window read from map metadata (default `0.10 < mass < 0.20 GeV`). Anchor-ET bins are `0-5, 5-6, 6-8, 8-10, 10-15, 15-20, 20-35, 35-50, 50-100 GeV`; truth-pi0-pT bins are `0-3, 3-5, 5-6, 6-8, 8-10, 10-15, 15-20, 20-35, 35-50, 50-100 GeV`. The saved two-dimensional histograms allow arbitrary later rebinning.
+
+All map selection settings are retained in diagnostic metadata and checked for consistency. Recreate diagnostics from schema-5 maps; old missing-category codes are not interpreted as the new codes.

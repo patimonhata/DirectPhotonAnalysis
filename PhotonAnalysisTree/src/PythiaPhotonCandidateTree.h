@@ -200,14 +200,18 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_manifest_range(long long begin, long long end) { manifest_begin_ = begin; manifest_end_ = end; }
   void set_suffix_range(const std::string& first, const std::string& last) { first_input_suffix_ = first; last_input_suffix_ = last; }
   void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
-  void set_meson_partner_min_energy(double value) { meson_partner_min_energy_ = value; }
+  void set_pi0_partner_min_energy(double value) { pi0_partner_min_energy_ = value; }
+  void set_eta_partner_min_energy(double value) { eta_partner_min_energy_ = value; }
+  void set_pi0_mass_window(double low, double high) { pi0_mass_min_ = low; pi0_mass_max_ = high; }
+  void set_eta_mass_window(double low, double high) { eta_mass_min_ = low; eta_mass_max_ = high; }
+  void set_missing_energy_range(double low, double high) { missing_energy_min_ = low; missing_energy_max_ = high; }
   void set_map_chunk_id(unsigned int value) { map_chunk_id_ = value; }
   void set_signal_embedding_id(int value) { signal_embedding_id_ = value; }
   void set_truth_jet_node_name(const std::string& value) { truth_jet_node_name_ = value; }
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 4;
+  static constexpr int schema_version_ = 5;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);
@@ -259,7 +263,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   bool sample_upper_unbounded_ = false;
 
   double min_cluster_energy_ = 0.1;
-  double partner_diagnostic_min_cluster_energy_ = 0.1;
+  double partner_diagnostic_min_cluster_energy_ = 0.0;
   double shower_shape_min_tower_energy_ = 0.070;
   double candidate_et_min_ = 5.0;
   double candidate_et_max_ = 35.0;
@@ -270,7 +274,11 @@ class PythiaPhotonCandidateTree : public SubsysReco
   double isolation_scale_ = 1.2;
   double isolation_offset_ = 0.1;
   double nonisolation_gap_ = 0.8;
-  double meson_partner_min_energy_ = 0.5;
+  double pi0_partner_min_energy_ = 0.5;
+  double eta_partner_min_energy_ = 0.5;
+  double missing_energy_min_ = 0.2;
+  double missing_energy_max_ = 0.5;
+  double min_photon_energy_recovery_ = 0.5;
   double pi0_mass_min_ = 0.10;
   double pi0_mass_max_ = 0.20;
   double eta_mass_min_ = 0.45;

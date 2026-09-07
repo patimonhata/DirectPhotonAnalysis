@@ -2,20 +2,7 @@
 
 This workflow starts from every selected central SPLIT CEMC cluster for which a
 selected pi0 is the grouped main truth contributor. Each anchor cluster is
-filled exactly once into separated, merged, single-contaminated,
-missing(energy-threshold), missing(acceptance), missing(other), or other, so
-that
-
-    N_pi0-main anchor = N_separated + N_merged + N_single-contaminated
-                       + N_missing-energy-threshold + N_missing-acceptance
-                       + N_missing-other + N_other
-
-holds both globally and in every cluster-ET bin, including underflow and
-overflow. An aggregate missing spectrum is also retained and satisfies
-
-    N_missing = N_missing-energy-threshold + N_missing-acceptance + N_missing-other
-
-in every bin.
+filled exactly once into separated, merged, single-contaminated, missing, or other. Missing is partitioned into six exclusive categories: energy band with mass inside/outside the pi0 window, low energy, unclustered or no CEMC deposit, acceptance, and other. Their sum equals total missing in every ET bin, including underflow and overflow.
 
 ## Event selection
 
@@ -47,16 +34,12 @@ Selected pi0s are either transported G4-primary pi0 decays or generator pi0
 decays represented by exactly two G4-primary photons. Detector-secondary pi0s and Dalitz decays are excluded. No truth-eta
 selection is applied to the parent pi0 or either daughter photon.
 
-The anchor requires |eta_cluster| < 0.7. Partner lookup uses the same
-configurable cluster-energy cut as the anchor, but its eta cut is disabled by
-default (partner_cluster_eta_max <= 0), so every cluster in the CEMC cluster
-container can be considered. The default shared energy cut is
-E_cluster >= 0.2 GeV.
+The anchor requires |eta_cluster| < 0.7 and the configured anchor energy cut. Partner lookup uses its independent strict `E > pi0_partner_min_energy` cut (defaulting to the anchor threshold) and no eta cut by default. Diagnostic partner lookup searches all valid positive-energy clusters.
 
 ## Energy-deposit topology
 
 For each direct pi0 daughter photon, the matcher finds the cluster with maximum
-absolute daughter energy deposit among clusters passing the shared cluster
+absolute daughter energy deposit among clusters passing the respective anchor or partner
 selection. A daughter photon is considered recovered only when its
 maximum-deposit cluster satisfies the calibrated-energy estimate
 
@@ -88,40 +71,13 @@ For one anchor cluster:
   the other daughter has no cluster passing the photon-energy recovery cut.
   Missing is split with the following exclusive priority:
 
-  1. invalid projection -> missing-other;
-  2. acceptance: the valid partner projection satisfies
-     |eta_projection| >= cemc_acceptance_eta_max (default 1.1);
-  3. no-CEMC-deposit: no G4 hit energy in CEMC can be traced to the partner
-     photon or its descendants;
-  4. energy-threshold or displaced-partner-cluster: the global maximum
-     direct-deposit partner-derived cluster is below min_cluster_energy, split
-     by whether delta-R to the projection is at most
-     missing_diagnostic_max_delta_r (default 0.15);
-  5. missing-other when an above-threshold maximum-deposit cluster exists but
-     fails the unchanged photon-energy recovery requirement;
-  6. match-incomplete when a local candidate cluster cannot be matched with
-     sufficient cluster-member energy coverage;
-  7. unclustered-deposit when partner-descendant CEMC energy exists but no
-     usable direct-deposit cluster is found;
-  8. missing-other for remaining or diagnostics-disabled cases;
+  1. invalid projection -> other;
+  2. outside CEMC acceptance -> acceptance;
+  3. usable representative truth partner -> classify its full cluster energy: `E <= L` is low energy; `L < E <= U` is split by pi0 mass window only; `E > U`, invalid pair mass, or the same cluster as anchor -> other;
+  4. unresolved matching -> other;
+  5. otherwise -> unclustered or no CEMC deposit.
 
-- other: the anchor is the maximum-deposit cluster of neither daughter, its
-  main-contributor assignment is tied, or no preceding definition applies.
-
-The acceptance test is based on the projected partner photon, not on parent or
-daughter truth eta. The boundary is exclusive: exactly
-|eta_projection| = cemc_acceptance_eta_max is outside. Below-threshold direct
-matching searches globally and only then uses delta-R to distinguish near from
-displaced partner clusters; unusable match candidates remain local so unrelated
-noise does not create match-incomplete classifications.
-
-The anchor-spectrum workflow enables low-threshold missing diagnostics by
-default. Set enable_missing_diagnostics=false to avoid the additional CEMC-hit
-scan and low-threshold matching cost; then diagnostic-dependent missing cases
-fall into missing-other unless acceptance applies. Partial metadata records the
-acceptance boundary, pre-CEMC interaction radius, direct-match energy-coverage
-threshold, diagnostic delta-R, diagnostic enable flag, and topology algorithm
-version so incompatible productions cannot be combined.
+`L=0.2`, `U=0.5 GeV`, and pi0 window `0.10 < mass < 0.20 GeV` are configurable. The representative partner maximizes direct daughter deposit independently of the production energy threshold. Displacement and match-incomplete are no longer histogram categories. Diagnostics-disabled cases fall into other unless acceptance applies; partner topology matching still runs.
 
 If one pi0 produces extra pi0-main fragment clusters, only daughter
 maximum-deposit clusters can be merged, separated, or missing; the extra
@@ -142,7 +98,7 @@ file/job counts, and parameters before submitting manually:
 
 No repository script submits jobs automatically. Each job writes
 transactionally and validates its partial before publication. This change uses
-partial schema 8; do not mix it with earlier partial schemas. Point the next
+partial schema 9; do not mix it with earlier partial schemas. Point the next
 production at a new, empty output directory. run_partial.sh
 accepts optional CEMC_ACCEPTANCE_ETA_MAX,
 MIN_DIRECT_MATCH_CLUSTER_ENERGY_COVERAGE, MISSING_DIAGNOSTIC_MAX_DELTA_R, and
@@ -160,11 +116,11 @@ to the anchor spectrum. It produces two spectrum PDFs:
 - `output_base.pdf`: summary spectrum with the prompt-photon reference, all
   anchors, and the five exclusive topology categories;
 - `output_base_detailed.pdf`: detailed spectrum retaining the total missing
-  spectrum and its seven exclusive subcategories.
+  spectrum and its six exclusive subcategories.
 
 The summary category plots use five exclusive categories:
 separated, merged, single contaminated, missing, and other. The detailed plots
-retain the seven exclusive missing subcategories. Four category PDFs are
+retain the six exclusive missing subcategories. Four category PDFs are
 produced:
 
 - `output_base_category_fractions.pdf`: summary line plot;
@@ -172,5 +128,7 @@ produced:
 - `output_base_category_fractions_detailed.pdf`: detailed line plot;
 - `output_base_category_fraction_stack_detailed.pdf`: detailed stacked plot.
 
-The final ROOT schema is 9 and stores both detailed and summary fraction
+The final ROOT schema is 10 and stores both detailed and summary fraction
 histograms. Plot annotations and legends are placed outside the histogram frame.
+
+The optional tail after `PRE_CEMC_INTERACTION_RADIUS` in `run_partial.sh` is `PI0_PARTNER_MIN_ENERGY PI0_MASS_MIN PI0_MASS_MAX MISSING_ENERGY_MIN MISSING_ENERGY_MAX`. These values are exposed in `submit.job`, saved in partial metadata, and checked before finalization. This version retains photon-energy recovery >= 50%; its removal is a separate commit.

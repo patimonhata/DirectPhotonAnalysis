@@ -66,13 +66,12 @@ enum class Pi0MissingDetail : int
 enum class Pi0MissingCategory : int
 {
   not_missing = 0,
-  energy_threshold = 1,
+  energy_band_taggable = 1,
   acceptance = 2,
   other = 3,
-  displaced_partner_cluster = 4,
-  no_cemc_deposit = 5,
-  unclustered_deposit = 6,
-  match_incomplete = 7
+  energy_band_not_taggable = 4,
+  low_energy = 5,
+  unclustered_or_no_cemc_deposit = 6
 };
 
 enum class Pi0PartnerAlignment : int
@@ -133,8 +132,11 @@ struct Pi0AnchorTopologyConfig
   double min_photon_energy_recovery = 0.5;
   double min_direct_match_cluster_energy_coverage = 0.5;
   double missing_diagnostic_max_delta_r = 0.15;
-  double partner_diagnostic_min_cluster_energy = 0.1;
-  double tagging_partner_min_cluster_energy = 0.5;
+  double partner_diagnostic_min_cluster_energy = 0.0;
+  // Negative selects the anchor threshold when configuring the evaluator.
+  double tagging_partner_min_cluster_energy = -1.0;
+  double missing_energy_min = 0.2;
+  double missing_energy_max = 0.5;
   double tagging_pi0_mass_min = 0.10;
   double tagging_pi0_mass_max = 0.20;
   // A non-positive value disables the event-level collision-z cut.
@@ -214,6 +216,7 @@ struct Pi0TopologyCandidateRecord
   std::vector<Pi0ClusterTruthMatch> cluster_matches;
   std::array<Pi0PartnerDiagnosticRecord, 2> partner_diagnostics;
   std::array<Pi0TruthPartnerClusterRecord, 2> truth_partner_clusters;
+  std::array<Pi0TruthPartnerClusterRecord, 2> topology_partner_clusters;
 };
 
 struct Pi0TopologyAnchorRecord
@@ -259,6 +262,10 @@ struct Pi0AnchorTopologyEventResult
   unsigned long long energy_match_invalid_count = 0;
 };
 
+// Classify a prepared anchor after the event's direct-deposit matching has completed.
+void classify_pi0_anchor(const Pi0AnchorTopologyConfig& config, const Pi0TopologyCandidateRecord& candidate,
+                         const Pi0TopologyClusterRecord& anchor_cluster, Pi0TopologyAnchorRecord& anchor);
+
 const char* pi0_missing_detail_name(Pi0MissingDetail value);
 const char* pi0_missing_category_name(Pi0MissingCategory value);
 const char* pi0_pathway_name(Pi0Pathway value);
@@ -271,7 +278,7 @@ const char* pi0_anchor_tag_result_name(Pi0AnchorTagResult value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 8;
+  static constexpr int kAlgorithmVersion = 9;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

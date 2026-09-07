@@ -15,7 +15,15 @@ struct Metadata
   double et_max = -1.0;
   double min_cluster_energy = -1.0;
   double partner_diagnostic_min_cluster_energy = -1.0;
-  double meson_partner_min_energy = -1.0;
+  double pi0_partner_min_energy = -1.0;
+  double eta_partner_min_energy = -1.0;
+  double pi0_mass_min = -1.0;
+  double pi0_mass_max = -1.0;
+  double eta_mass_min = -1.0;
+  double eta_mass_max = -1.0;
+  double missing_energy_min = -1.0;
+  double missing_energy_max = -1.0;
+  double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
   int signal_embedding_id = -1;
   double majority_threshold = -1.0;
@@ -82,7 +90,15 @@ bool read_metadata(TFile& file, Metadata& value)
   ok &= bind(tree, "et_max", &value.et_max);
   ok &= bind(tree, "min_cluster_energy", &value.min_cluster_energy);
   ok &= bind(tree, "partner_diagnostic_min_cluster_energy", &value.partner_diagnostic_min_cluster_energy);
-  ok &= bind(tree, "meson_partner_min_energy", &value.meson_partner_min_energy);
+  ok &= bind(tree, "pi0_partner_min_energy", &value.pi0_partner_min_energy);
+  ok &= bind(tree, "eta_partner_min_energy", &value.eta_partner_min_energy);
+  ok &= bind(tree, "pi0_mass_min", &value.pi0_mass_min);
+  ok &= bind(tree, "pi0_mass_max", &value.pi0_mass_max);
+  ok &= bind(tree, "eta_mass_min", &value.eta_mass_min);
+  ok &= bind(tree, "eta_mass_max", &value.eta_mass_max);
+  ok &= bind(tree, "missing_energy_min", &value.missing_energy_min);
+  ok &= bind(tree, "missing_energy_max", &value.missing_energy_max);
+  ok &= bind(tree, "min_photon_energy_recovery", &value.min_photon_energy_recovery);
   ok &= bind(tree, "pi0_topology_algorithm_version", &value.pi0_topology_algorithm_version);
   ok &= bind(tree, "signal_embedding_id", &value.signal_embedding_id);
   ok &= bind(tree, "majority_threshold", &value.majority_threshold);
@@ -179,7 +195,15 @@ bool compatible(const Metadata& value, const Metadata& reference)
       value.require_complete == reference.require_complete && value.n_bins == reference.n_bins && same_double(value.et_max, reference.et_max) &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&
       same_double(value.partner_diagnostic_min_cluster_energy, reference.partner_diagnostic_min_cluster_energy) &&
-      same_double(value.meson_partner_min_energy, reference.meson_partner_min_energy) &&
+      same_double(value.pi0_partner_min_energy, reference.pi0_partner_min_energy) &&
+      same_double(value.eta_partner_min_energy, reference.eta_partner_min_energy) &&
+      same_double(value.pi0_mass_min, reference.pi0_mass_min) &&
+      same_double(value.pi0_mass_max, reference.pi0_mass_max) &&
+      same_double(value.eta_mass_min, reference.eta_mass_min) &&
+      same_double(value.eta_mass_max, reference.eta_mass_max) &&
+      same_double(value.missing_energy_min, reference.missing_energy_min) &&
+      same_double(value.missing_energy_max, reference.missing_energy_max) &&
+      same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) &&
       value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version &&
       value.signal_embedding_id == reference.signal_embedding_id && same_double(value.majority_threshold, reference.majority_threshold) &&
       value.majority_comparison == reference.majority_comparison && value.eta_definition == reference.eta_definition &&
@@ -365,7 +389,7 @@ int MergePythiaPhotonCandidateSelection(
         std::cerr << "Missing or invalid composition partial: " << path << std::endl;
         return 3;
       }
-      if (metadata.schema_version != 4 || metadata.source_map_schema_version != 4 || metadata.family != family ||
+      if (metadata.schema_version != 5 || metadata.source_map_schema_version != 5 || metadata.family != family ||
           metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
           metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U || !same_double(metadata.sample_cross_section_pb, sample.cross_section_pb) ||
           metadata.events_stitch_pass > metadata.events_written || metadata.region_a_prompt_clusters > metadata.region_a_clusters ||
@@ -382,6 +406,7 @@ int MergePythiaPhotonCandidateSelection(
       if (!have_reference)
       {
         combined = metadata;
+        set_missing_labels(combined.missing_energy_min, combined.missing_energy_max);
         combined.sample_names.clear();
         combined.sample_map_counts.clear();
         combined.sample_sum_generator_weights.clear();
@@ -581,7 +606,7 @@ int MergePythiaPhotonCandidateSelection(
   std::vector<std::string> composition_selection_keys(kSelectionKeys.begin(), kSelectionKeys.end());
   std::vector<std::string> composition_selection_labels(kSelectionLabels.begin(), kSelectionLabels.end());
   std::vector<std::string> composition_selection_definitions(kSelectionDefinitions.begin(), kSelectionDefinitions.end());
-  int composition_schema_version = 5;
+  int composition_schema_version = 6;
   int composition_source_partial_schema_version = combined.schema_version;
   std::string survival_fraction_denominator_selection = "kinematic";
   std::string survival_fraction_definition = "weighted_selected_category_yield_divided_by_weighted_kinematic_category_yield_per_cluster_et_bin";
@@ -601,7 +626,15 @@ int MergePythiaPhotonCandidateSelection(
   metadata.Branch("selection_definitions", &composition_selection_definitions);
   metadata.Branch("min_cluster_energy", &combined.min_cluster_energy);
   metadata.Branch("partner_diagnostic_min_cluster_energy", &combined.partner_diagnostic_min_cluster_energy);
-  metadata.Branch("meson_partner_min_energy", &combined.meson_partner_min_energy);
+  metadata.Branch("pi0_partner_min_energy", &combined.pi0_partner_min_energy);
+  metadata.Branch("eta_partner_min_energy", &combined.eta_partner_min_energy);
+  metadata.Branch("pi0_mass_min", &combined.pi0_mass_min);
+  metadata.Branch("pi0_mass_max", &combined.pi0_mass_max);
+  metadata.Branch("eta_mass_min", &combined.eta_mass_min);
+  metadata.Branch("eta_mass_max", &combined.eta_mass_max);
+  metadata.Branch("missing_energy_min", &combined.missing_energy_min);
+  metadata.Branch("missing_energy_max", &combined.missing_energy_max);
+  metadata.Branch("min_photon_energy_recovery", &combined.min_photon_energy_recovery);
   metadata.Branch("pi0_topology_algorithm_version", &combined.pi0_topology_algorithm_version);
   metadata.Branch("signal_embedding_id", &combined.signal_embedding_id);
   metadata.Branch("majority_threshold", &combined.majority_threshold);
@@ -728,7 +761,7 @@ int MergePythiaPhotonCandidateSelection(
     topology_output.cd();
   }
 
-  int topology_schema_version = 4;
+  int topology_schema_version = 5;
   int topology_source_schema_version = combined.source_map_schema_version;
   int topology_source_partial_schema_version = combined.schema_version;
   std::vector<std::string> topology_selection_keys(kSelectionKeys.begin(), kSelectionKeys.end());
@@ -762,7 +795,15 @@ int MergePythiaPhotonCandidateSelection(
   topology_metadata.Branch("sample_names", &combined.sample_names);
   topology_metadata.Branch("min_cluster_energy", &combined.min_cluster_energy);
   topology_metadata.Branch("partner_diagnostic_min_cluster_energy", &combined.partner_diagnostic_min_cluster_energy);
-  topology_metadata.Branch("meson_partner_min_energy", &combined.meson_partner_min_energy);
+  topology_metadata.Branch("pi0_partner_min_energy", &combined.pi0_partner_min_energy);
+  topology_metadata.Branch("eta_partner_min_energy", &combined.eta_partner_min_energy);
+  topology_metadata.Branch("pi0_mass_min", &combined.pi0_mass_min);
+  topology_metadata.Branch("pi0_mass_max", &combined.pi0_mass_max);
+  topology_metadata.Branch("eta_mass_min", &combined.eta_mass_min);
+  topology_metadata.Branch("eta_mass_max", &combined.eta_mass_max);
+  topology_metadata.Branch("missing_energy_min", &combined.missing_energy_min);
+  topology_metadata.Branch("missing_energy_max", &combined.missing_energy_max);
+  topology_metadata.Branch("min_photon_energy_recovery", &combined.min_photon_energy_recovery);
   topology_metadata.Branch("pi0_topology_algorithm_version", &combined.pi0_topology_algorithm_version);
   topology_metadata.Branch("sample_map_counts", &combined.sample_map_counts);
   topology_metadata.Branch("sample_events_written", &sample_events_written);

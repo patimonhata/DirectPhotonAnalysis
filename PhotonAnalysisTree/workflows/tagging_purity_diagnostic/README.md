@@ -1,6 +1,6 @@
 # Tagging-purity diagnostic
 
-This workflow reads the existing schema-4 photon-candidate map trees. It does not alter the production selection.
+This workflow reads the existing schema-5 photon-candidate map trees. It does not alter the production selection.
 
 For every Region-A anchor and 1 GeV ET bin it records raw and cross-section-weighted counts before tagging, pi0-only vetoes, eta-only vetoes, overlaps, and final survivors. The same flow is split into prompt and background anchors. Truth-pi0 anchors are further split by truth-pair taggability, combinatorial-only veto, selected-partner truth matching, displaced selected truth partners, and missing category.
 
@@ -65,3 +65,5 @@ root -l -b -q \
 ~~~
 
 This scan is integrated over anchor ET and evaluates one binned variable at a time among already selected partners; it is not a replacement for
+
+Current inputs use photon-candidate map schema 5 / topology algorithm 9. The six missing categories follow photon_candidate_selection; energy-band taggability uses only the production pi0 mass window. Map settings are retained in diagnostic metadata, checked within each reduce, and compared across merged partials. The hybrid study still explicitly compares common pi0/eta thresholds 0.2 and 0.5 GeV and requires matching mass windows and diagnostic settings. Regenerate older diagnostic products before using these reducers.

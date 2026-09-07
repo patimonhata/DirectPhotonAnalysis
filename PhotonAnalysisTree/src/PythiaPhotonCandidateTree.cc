@@ -432,8 +432,11 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
 {
   const bool manifest_valid = manifest_path_.empty() || (manifest_begin_ >= 0 && manifest_end_ > manifest_begin_ && primary_input_manager_);
   if (output_file_name_.empty() || model_file_name_.empty() || signal_embedding_id_ <= 0 || !manifest_valid ||
-      !std::isfinite(min_cluster_energy_) || min_cluster_energy_ < 0.0 || !std::isfinite(meson_partner_min_energy_) ||
-      meson_partner_min_energy_ < 0.0 || !configure_sample())
+      !std::isfinite(min_cluster_energy_) || min_cluster_energy_ < 0.0 || !std::isfinite(pi0_partner_min_energy_) ||
+      pi0_partner_min_energy_ < 0.0 || !std::isfinite(eta_partner_min_energy_) || eta_partner_min_energy_ < 0.0 ||
+      !std::isfinite(pi0_mass_min_) || !std::isfinite(pi0_mass_max_) || pi0_mass_min_ < 0.0 || pi0_mass_min_ >= pi0_mass_max_ ||
+      !std::isfinite(eta_mass_min_) || !std::isfinite(eta_mass_max_) || eta_mass_min_ < 0.0 || eta_mass_min_ >= eta_mass_max_ ||
+      !std::isfinite(missing_energy_min_) || !std::isfinite(missing_energy_max_) || missing_energy_min_ < 0.0 || missing_energy_min_ >= missing_energy_max_ || !configure_sample())
   {
     std::cerr << "PythiaPhotonCandidateTree::Init - invalid output/model/sample configuration" << std::endl;
     return Fun4AllReturnCodes::ABORTRUN;
@@ -465,7 +468,10 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.partner_cluster_eta_max = -1.0;
   config.min_cluster_energy = std::nextafter(min_cluster_energy_, std::numeric_limits<double>::infinity());
   config.partner_diagnostic_min_cluster_energy = partner_diagnostic_min_cluster_energy_;
-  config.tagging_partner_min_cluster_energy = meson_partner_min_energy_;
+  config.tagging_partner_min_cluster_energy = pi0_partner_min_energy_;
+  config.missing_energy_min = missing_energy_min_;
+  config.missing_energy_max = missing_energy_max_;
+  config.min_photon_energy_recovery = min_photon_energy_recovery_;
   config.tagging_pi0_mass_min = pi0_mass_min_;
   config.tagging_pi0_mass_max = pi0_mass_max_;
   config.max_abs_vertex_z = max_abs_vertex_z_;
@@ -810,19 +816,19 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
     double eta_distance = std::numeric_limits<double>::infinity();
     for (const auto& partner : all_split)
     {
-      if (partner.cluster->get_id() == data.cluster_id[index] || !(partner.energy > meson_partner_min_energy_))
+      if (partner.cluster->get_id() == data.cluster_id[index])
       {
         continue;
       }
       const double mass = diphoton_mass(data.cluster_e[index], eta, phi, partner.energy, partner.eta, partner.phi);
-      if (mass > pi0_mass_min_ && mass < pi0_mass_max_ && std::abs(mass - 0.134977) < pi0_distance)
+      if (partner.energy > pi0_partner_min_energy_ && mass > pi0_mass_min_ && mass < pi0_mass_max_ && std::abs(mass - 0.134977) < pi0_distance)
       {
         pi0_tag = true;
         pi0_distance = std::abs(mass - 0.134977);
         pi0_mass = mass;
         pi0_partner = static_cast<int>(partner.cluster->get_id());
       }
-      if (mass > eta_mass_min_ && mass < eta_mass_max_ && std::abs(mass - 0.547862) < eta_distance)
+      if (partner.energy > eta_partner_min_energy_ && mass > eta_mass_min_ && mass < eta_mass_max_ && std::abs(mass - 0.547862) < eta_distance)
       {
         eta_tag = true;
         eta_distance = std::abs(mass - 0.547862);
@@ -1000,7 +1006,11 @@ void PythiaPhotonCandidateTree::create_output()
   metadata_tree_->Branch("isolation_scale", &isolation_scale_);
   metadata_tree_->Branch("isolation_offset", &isolation_offset_);
   metadata_tree_->Branch("nonisolation_gap", &nonisolation_gap_);
-  metadata_tree_->Branch("meson_partner_min_energy", &meson_partner_min_energy_);
+  metadata_tree_->Branch("pi0_partner_min_energy", &pi0_partner_min_energy_);
+  metadata_tree_->Branch("eta_partner_min_energy", &eta_partner_min_energy_);
+  metadata_tree_->Branch("missing_energy_min", &missing_energy_min_);
+  metadata_tree_->Branch("missing_energy_max", &missing_energy_max_);
+  metadata_tree_->Branch("min_photon_energy_recovery", &min_photon_energy_recovery_);
   metadata_tree_->Branch("pi0_mass_min", &pi0_mass_min_);
   metadata_tree_->Branch("pi0_mass_max", &pi0_mass_max_);
   metadata_tree_->Branch("eta_mass_min", &eta_mass_min_);

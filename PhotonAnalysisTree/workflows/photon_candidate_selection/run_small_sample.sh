@@ -3,10 +3,10 @@ set -euo pipefail
 
 usage()
 {
-  echo "Usage: $0 SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP] [TAGGING_PARTNER_MIN_ENERGY_GEV]" >&2
+  echo "Usage: $0 SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP] [PI0_PARTNER_MIN_ENERGY_GEV] [ETA_PARTNER_MIN_ENERGY_GEV] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]" >&2
 }
 
-if (( $# < 2 || $# > 7 )); then
+if (( $# < 2 || $# > 14 )); then
   usage
   exit 2
 fi
@@ -20,6 +20,13 @@ min_cluster_energy=${4:-0.1}
 output_root=${5:-}
 n_events=${6:-0}
 tagging_partner_min_energy=${7:-$min_cluster_energy}
+eta_partner_min_energy=${8:-$tagging_partner_min_energy}
+pi0_mass_min=${9:-0.10}
+pi0_mass_max=${10:-0.20}
+eta_mass_min=${11:-0.45}
+eta_mass_max=${12:-0.65}
+missing_energy_min=${13:-0.2}
+missing_energy_max=${14:-0.5}
 
 for value in "$segment_count" "$files_per_map" "$n_events"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
@@ -80,7 +87,7 @@ map_count=$(((segment_count + files_per_map - 1) / files_per_map))
 
 echo "Small-sample QA: sample=$sample_name segments=$segment_count maps=$map_count events_per_map=$n_events min_cluster_energy=$min_cluster_energy tagging_partner_min_energy=$tagging_partner_min_energy"
 for ((job_index = 0; job_index < map_count; ++job_index)); do
-  "$workflow_dir/run_map.sh" "$job_index" 0 "$segment_count" "$files_per_map" "$input_manifest" "$sample_name" "$map_output" "$n_events" "$min_cluster_energy" "$tagging_partner_min_energy"
+  "$workflow_dir/run_map.sh" "$job_index" 0 "$segment_count" "$files_per_map" "$input_manifest" "$sample_name" "$map_output" "$n_events" "$min_cluster_energy" "$tagging_partner_min_energy" "$eta_partner_min_energy" "$pi0_mass_min" "$pi0_mass_max" "$eta_mass_min" "$eta_mass_max" "$missing_energy_min" "$missing_energy_max"
 done
 
 shard_count=1

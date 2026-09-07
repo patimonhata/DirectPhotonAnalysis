@@ -34,7 +34,7 @@ A production map job processes all events in several DST segments and writes one
 PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>/map_<chunk>.root
 ~~~
 
-The current output schema is version 4. In addition to the schema-3 double-precision isolation branches, schema 4 stores independent pi0-partner alignment, truth-pair taggability, and observed veto-result axes. Schema versions must not be mixed in one reduce input.
+The current map schema is 5 and the topology algorithm version is 9. This version retains the 50% photon-energy recovery requirement. Older maps and partials must be regenerated; they cannot be mixed with this production. All partner thresholds, mass windows, missing-energy boundaries, and the recovery requirement are stored and checked in map/reduce/merge metadata.
 
 The default Condor configuration uses 10 DST segments per ROOT file. This is deliberately configurable through `files_per_job`; after measuring the first jobs, change both `files_per_job` and `n_chunks = ceil(total_files / files_per_job)` together if a different file size is preferable.
 
@@ -50,7 +50,7 @@ PhotonAnalysisTree/workflows/photon_candidate_selection/run_map.sh \
   0.2
 ~~~
 
-The penultimate `10` limits the test to ten events, and the final `0.2` sets the strict topology threshold to `E_cluster > 0.2 GeV`. An optional tenth argument sets the strict tagging-partner threshold; when omitted it equals the topology threshold. `N_EVENTS` defaults to zero and the topology threshold defaults to 0.1 GeV. `run_map.sh` writes to a temporary file, verifies both thresholds and the fixed 0.1 GeV diagnostic floor in metadata, runs the ROOT validator, and only then atomically publishes `map_<chunk>.root`. It refuses to overwrite an existing output.
+The penultimate `10` limits the test to ten events, and the final `0.2` sets the strict stored-cluster/anchor threshold `E_cluster > 0.2 GeV`. Optional trailing arguments are listed below. `N_EVENTS` defaults to zero and the stored-cluster threshold defaults to 0.1 GeV. Outputs are validated and published atomically; existing maps are never overwritten.
 
 All map production, including single-chunk tests, uses this manifest-based interface.
 
@@ -65,10 +65,10 @@ PhotonAnalysisTree/workflows/photon_candidate_selection/run_small_sample.sh jet1
 Its interface is:
 
 ~~~text
-run_small_sample.sh SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP] [TAGGING_PARTNER_MIN_ENERGY_GEV]
+run_small_sample.sh SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP] [PI0_PARTNER_MIN_ENERGY_GEV] [ETA_PARTNER_MIN_ENERGY_GEV] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]
 ~~~
 
-The default output root is `PhotonAnalysisTree/output/qa/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>_<N>segments`. It contains `maps/<sample>/map_*.root` and integrated partials under `reduce/<sample>/shard_<index>/`. Existing map files are never overwritten. `MIN_CLUSTER_ENERGY_GEV` defaults to 0.1, `TAGGING_PARTNER_MIN_ENERGY_GEV` defaults to the topology threshold, and `N_EVENTS_PER_MAP` defaults to zero, meaning every event in each selected map range.
+The default output root is `PhotonAnalysisTree/output/qa/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>_<N>segments`. It contains `maps/<sample>/map_*.root` and integrated partials under `reduce/<sample>/shard_<index>/`. Existing map files are never overwritten. `MIN_CLUSTER_ENERGY_GEV` defaults to 0.1, the pi0 threshold defaults to the stored-cluster threshold and the eta threshold defaults to the pi0 threshold, and `N_EVENTS_PER_MAP` defaults to zero, meaning every event in each selected map range.
 
 This mode requires the selected manifest range to start at row zero and remain contiguous, matching the reducer's map-completeness checks. It uses only the selected sample and normalizes with only the maps present, so its products are for code, schema, and plot QA only—not a physics result. A non-Jet12 sample can use a handful of segments for a smoke test. Jet12 requires at least ten generated map files so every fixed shard is non-empty.
 
@@ -100,21 +100,46 @@ Thus the future ABCD purity calculation can be performed entirely from these int
 - Tight means `score > 0.8156 - 0.00156 ET`.
 - Non-tight is strictly `0.7333 - 0.01333 ET < score < 0.6844 + 0.00156 ET`.
 
-Meson tagging considers every other stored split cluster with `E > tagging_partner_min_energy`, without a partner eta cut. This tagging threshold is configured per production and defaults to the topology threshold in the wrappers. The stored best partner is the tagged pair closest to the nominal meson mass. The definition of `split_cluster_pass_final_photon` remains `region_a && !pi0_tag && !eta_tag`.
+Meson tagging considers every other valid reconstructed split cluster in `CLUSTERINFO_CEMC`, without a partner eta cut. Pi0 and eta each require their own strict `E > threshold` and `mass_min < mass < mass_max`. Any qualifying pair sets the tag; among multiple pairs, the saved veto partner is the pair closest to the nominal meson mass. Truth matching is not used in this veto. `split_cluster_pass_final_photon` remains `region_a && !pi0_tag && !eta_tag`.
 
-## Detailed pi0 topology
+## Partner and missing definitions
 
-The map runs `Pi0AnchorTopologyEvaluator` with its Pythia defaults, the same strict `min_cluster_energy` used for stored split clusters, `|eta_anchor| < 0.7`, `|z_vertex| < 60 cm`, and missing-partner diagnostics enabled. It saves per-cluster truth contributors and prompt/pi0-anchor classifications, all pi0 candidate and daughter recovery diagnostics, and the flattened anchor table. The reduce stage can reproduce the detailed `pi0_anchor_topology` classification without reopening the DST.
+The anchor selection keeps `min_cluster_energy`. Independently, topology partner lookup uses the strict pi0 tagging threshold. Each lookup selects the cluster with the largest absolute direct daughter deposit within its own eligible pool. The calibrated photon energy estimate remains `cluster_energy * daughter_deposit / total_deposit`, and recovery requires its ratio to truth photon energy to be at least 0.5. Thus changing the pi0 partner threshold can change separated/merged/single-contaminated/missing/other totals. The saved candidate daughter `best_cluster`/`recovered` fields describe the anchor pool; the anchor topology additionally evaluates the independent partner pool.
 
-The topology axis remains `separated/merged/single_contaminated/missing/other` and is intentionally evaluated with the production topology threshold. Independently, the truth partner is the cluster above the fixed strict diagnostic floor `E > 0.1 GeV` with the largest absolute direct energy deposit from the partner photon. `pi0_anchor_partner_alignment` records `near` or `displaced` using the existing projection criterion `deltaR > 0.15`, with explicit invalid/unavailable states.
+For missing diagnostics, all valid positive-energy clusters are searched, including those at or below 0.1 GeV. The representative truth partner maximizes direct daughter deposit among usable truth matches, independently of the tagging threshold. Its full reconstructed cluster energy (not the truth-photon energy or the attributed fraction) determines the missing energy category. The reconstruction's own clustering thresholds remain unchanged.
 
-`pi0_anchor_truth_partner_tag_status` records whether that representative truth pair is taggable at the production tagging threshold and pi0 mass window. `pi0_anchor_tag_result` then separates a surviving anchor, a veto where the truth pair itself was taggable, and a combinatorial-only veto where some reconstructed pair tagged the anchor although the representative truth pair was not taggable. `pi0_anchor_selected_tag_partner_matches_truth_partner` additionally records whether the selected pi0-tag partner cluster is the representative truth partner. These axes are diagnostic only and do not change topology or `final_photon`.
+The six exclusive missing categories are:
 
-The integer encodings are:
+| Code | Key | Definition |
+|---|---|---|
+| 1 | `energy_band_taggable` | `L < E <= U`, representative pair inside pi0 mass window |
+| 4 | `energy_band_not_taggable` | `L < E <= U`, finite representative pair mass outside pi0 window |
+| 5 | `low_energy` | `E <= L` |
+| 6 | `unclustered_or_no_cemc_deposit` | No associated cluster found, or no CEMC deposit |
+| 2 | `acceptance` | Partner projection outside CEMC acceptance |
+| 3 | `other` | Remaining cases, including unresolved matching, invalid mass, same cluster as anchor, and `E > U` |
 
-- `partner_alignment`: 0 not applicable, 1 near, 2 displaced, 3 projection invalid, 4 cluster unavailable;
-- `truth_partner_tag_status`: 0 not applicable, 1 taggable, 2 cluster unavailable, 3 same as anchor, 4 below tagging threshold, 5 mass outside window, 6 invalid mass;
+`L=0.2` and `U=0.5 GeV` by default. The mass-only taggability in this table asks whether lowering the partner energy threshold could tag the pair; it does not impose the production tagging threshold. Invalid projection goes to other; acceptance takes priority over energy classification. Incomplete matching is not labelled unclustered when it prevents identifying a partner. Displacement no longer defines a missing category. Legacy detailed reason codes remain diagnostic information, not additional histogram categories.
+
+The independent diagnostic axes remain:
+
+- `partner_alignment`: 0 not applicable, 1 near, 2 displaced (`deltaR > 0.15`), 3 projection invalid, 4 cluster unavailable;
+- `truth_partner_tag_status`: 0 not applicable, 1 taggable, 2 unavailable, 3 same as anchor, 4 below the production pi0 tagging threshold, 5 mass outside pi0 window, 6 invalid mass;
 - `tag_result`: 0 not applicable, 1 survived, 2 truth pair taggable veto, 3 combinatorial-only veto.
+
+These axes use the deposit-selected truth partner, which need not be the reconstructed partner selected by the actual veto.
+
+## Configurable parameters
+
+Map submit files define `pi0_partner_min_energy`, `eta_partner_min_energy`, `pi0_mass_min`, `pi0_mass_max`, `eta_mass_min`, `eta_mass_max`, `missing_energy_min`, and `missing_energy_max` (GeV). Initial pi0/eta thresholds preserve each submit file's old common threshold; the mass windows default to 0.10/0.20 and 0.45/0.65. Missing boundaries default to 0.2/0.5. Bounds must be finite, non-negative, and ordered.
+
+The optional tail of `run_map.sh` after `MIN_CLUSTER_ENERGY_GEV` is:
+
+```text
+PI0_PARTNER_MIN_ENERGY_GEV ETA_PARTNER_MIN_ENERGY_GEV PI0_MASS_MIN PI0_MASS_MAX ETA_MASS_MIN ETA_MASS_MAX MISSING_ENERGY_MIN MISSING_ENERGY_MAX
+```
+
+`run_small_sample.sh` and `check_sample_map_outputs.sh` accept the same tail after their stored-cluster threshold / existing pi0 threshold position. Omitted pi0 energy defaults to the stored-cluster threshold, omitted eta energy to pi0, and omitted windows/bounds to the values above. All settings are preserved in ROOT metadata and compared when reducing and merging. Use a separate output directory for every configuration.
 
 ## Condor production
 
@@ -151,7 +176,7 @@ condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_pho
 ~~~
 
 No repository script submits jobs automatically.
-Each submit file defines `min_cluster_energy` and `tagging_partner_min_energy`; the latter defaults to the former but can be changed independently per production. The wrapper likewise defaults an omitted tenth argument to the topology threshold. The fixed partner diagnostic floor is always 0.1 GeV. Change the threshold component of `map_output_directory` consistently and never mix topology/tagging configurations in one sample directory.
+Each submit file defines the stored-cluster/anchor threshold and the independent parameters listed above. The diagnostic floor metadata is fixed to 0 GeV, meaning all positive-energy reconstructed clusters are searched. Choose a new output directory for this schema and never mix configurations in one sample directory.
 
 Each Condor job validates its output before publication. After a sample finishes, check that every expected map file exists:
 
@@ -322,3 +347,9 @@ The topology ROOT file stores counts, weighted spectra in pb, bin-width-normaliz
 Production results require `REQUIRE_COMPLETE=true`. `false` is for incomplete QA productions only; normalization then uses only available maps and is not a physics result. Jet and PhotonJet families remain separate and are never mixed.
 
 ABCD purity extraction remains a separate future reduce stage.
+
+## Regression checks
+
+After sourcing ana.565 and building, run `PhotonAnalysisTree/tests/run_candidate_selection_tests.sh`. The tests cover missing energy and mass boundaries, acceptance and incomplete matching, recovery at 50%, merged/separated/single-contaminated topology, and rejection of mismatched map/partial settings. `python PhotonAnalysisTree/tests/check_candidate_veto.py MAP.root` independently recomputes veto flags and best partners for QA maps whose pi0 and eta thresholds are at least the stored-cluster threshold.
+
+On the first 200 Jet5 events, the previous implementation took 24.08 s wall / 22.32 s user and this version took 25.43 s wall / 23.48 s user (one run each, including ROOT startup and I/O). Both used stored-cluster threshold 0.2 GeV and tagging threshold 0.5 GeV. This is a small-sample estimate for the entire change, not an isolated diagnostic-floor benchmark. The new map processed 200 events, wrote 133, rejected 67 vertices, and had no invalid events. Map validation and six-selection reduce passed. A separate 20-event map verified unequal pi0/eta thresholds 0.5/0.7 GeV.

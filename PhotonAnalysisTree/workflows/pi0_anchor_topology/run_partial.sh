@@ -25,6 +25,11 @@ min_direct_match_cluster_energy_coverage=${18:-0.5}
 missing_diagnostic_max_delta_r=${19:-0.15}
 enable_missing_diagnostics=${20:-true}
 pre_cemc_interaction_radius=${21:-90.0}
+pi0_partner_min_energy=${22:-$min_cluster_energy}
+pi0_mass_min=${23:-0.10}
+pi0_mass_max=${24:-0.20}
+missing_energy_min=${25:-0.2}
+missing_energy_max=${26:-0.5}
 
 for value in "$job_index" "$chunk_offset" "$total_files" "$files_per_job" "$n_bins"; do
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
@@ -73,7 +78,7 @@ trap cleanup EXIT
 
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
-root -l -b -q   "$workflow_dir/Fun4All_PythiaPi0AnchorClusterSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${anchor_cluster_eta_max},${partner_cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${anchor_pi0_fraction_min},${min_energy_contribution_fraction},${min_photon_energy_recovery},${max_abs_vertex_z},${cemc_acceptance_eta_max},${min_direct_match_cluster_energy_coverage},${missing_diagnostic_max_delta_r},${enable_missing_diagnostics},${pre_cemc_interaction_radius})"
+root -l -b -q   "$workflow_dir/Fun4All_PythiaPi0AnchorClusterSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${anchor_cluster_eta_max},${partner_cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${anchor_pi0_fraction_min},${min_energy_contribution_fraction},${min_photon_energy_recovery},${max_abs_vertex_z},${cemc_acceptance_eta_max},${min_direct_match_cluster_energy_coverage},${missing_diagnostic_max_delta_r},${enable_missing_diagnostics},${pre_cemc_interaction_radius},${pi0_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${missing_energy_min},${missing_energy_max})"
 root -l -b -q   "$workflow_dir/check_pythia_pi0_anchor_cluster_partial.C(\"${temporary_output}\")"
 
 mv -- "$temporary_output" "$final_output"

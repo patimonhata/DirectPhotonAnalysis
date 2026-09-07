@@ -315,6 +315,8 @@ Anchor-topology output:
 
 Each selection directory includes summary and detailed `*_survival_fraction_relative_to_kinematic*.pdf` plots in addition to the existing spectra and category-fraction plots.
 
+The weighted anchor-topology spectra use the same logarithmic y-axis range, from `1e-2` to `5e6 pb/GeV`, for every selection so their absolute changes can be compared directly.
+
 The topology ROOT file stores counts, weighted spectra in pb, bin-width-normalized spectra in pb/GeV, fractions, metadata, and per-selection sample summaries.
 
 Production results require `REQUIRE_COMPLETE=true`. `false` is for incomplete QA productions only; normalization then uses only available maps and is not a physics result. Jet and PhotonJet families remain separate and are never mixed.

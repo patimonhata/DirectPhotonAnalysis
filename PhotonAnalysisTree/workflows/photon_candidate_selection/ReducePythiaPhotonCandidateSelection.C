@@ -17,7 +17,6 @@
 #include <array>
 #include <cmath>
 #include <iostream>
-#include <limits>
 #include <numeric>
 #include <memory>
 #include <set>
@@ -54,6 +53,8 @@ constexpr std::array<std::size_t, 11> kDetailedCategories = {2, 3, 4, 6, 7, 8, 9
 constexpr std::array<std::size_t, 5> kSummaryCategories = {2, 3, 4, 5, 13};
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
+constexpr double kSpectrumYMinimum = 1e-2;
+constexpr double kSpectrumYMaximum = 5e6;
 constexpr Long64_t kEventTreeCacheSize = 64LL * 1024LL * 1024LL;
 
 struct SampleDefinition
@@ -361,23 +362,18 @@ void draw_annotations(const std::string& family_label)
   label.SetTextAlign(13);
   label.SetTextSize(0.026);
   label.DrawLatex(0.06, 0.96, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.06, 0.91, family_label.c_str());
-  label.DrawLatex(0.06, 0.86, "5 < E_{T} < 35 GeV, |#eta| < 0.7");
-  label.DrawLatex(0.06, 0.81, "|z_{vtx}^{truth}| < 60 cm");
-}
-
-double smallest_positive(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& histograms, const std::vector<std::size_t>& indices)
-{
-  double result = std::numeric_limits<double>::infinity();
-  for (std::size_t index : indices)
+  double y = 0.91;
+  std::size_t begin = 0;
+  while (begin <= family_label.size())
   {
-    for (int bin = 1; bin <= histograms[index]->GetNbinsX(); ++bin)
-    {
-      const double value = histograms[index]->GetBinContent(bin);
-      if (value > 0.0) result = std::min(result, value);
-    }
+    const std::size_t end = family_label.find('\n', begin);
+    label.DrawLatex(0.06, y, family_label.substr(begin, end == std::string::npos ? end : end - begin).c_str());
+    y -= 0.05;
+    if (end == std::string::npos) break;
+    begin = end + 1U;
   }
-  return std::isfinite(result) ? result : 0.0;
+  label.DrawLatex(0.06, y, "5 < E_{T} < 35 GeV, |#eta| < 0.7");
+  label.DrawLatex(0.06, y - 0.05, "|z_{vtx}^{truth}| < 60 cm");
 }
 
 void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& density, const std::vector<std::size_t>& indices,
@@ -385,11 +381,8 @@ void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& dens
 {
   TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum").c_str(), "", kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum_pad", true);
-  double maximum = 0.0;
-  for (std::size_t index : indices) maximum = std::max(maximum, density[index]->GetMaximum());
-  const double minimum = smallest_positive(density, indices);
-  density[indices.front()]->SetMinimum(minimum > 0.0 ? 0.5 * minimum : 1e-12);
-  density[indices.front()]->SetMaximum(maximum > 0.0 ? 2.0 * maximum : 1.0);
+  density[indices.front()]->SetMinimum(kSpectrumYMinimum);
+  density[indices.front()]->SetMaximum(kSpectrumYMaximum);
   density[indices.front()]->Draw("HIST");
   for (std::size_t position = 1; position < indices.size(); ++position) density[indices[position]]->Draw("HIST SAME");
   canvas.cd();

@@ -681,7 +681,8 @@ int MergePythiaPhotonCandidateSelection(
     const std::vector<std::size_t> summary_category_indices(kSummaryCategories.begin(), kSummaryCategories.end());
     auto detailed_fractions = make_fractions(spectra.weighted_pb, detailed_category_indices, std::string("h_") + kSelectionKeys[topology_selection] + "_detailed_");
     auto summary_fractions = make_fractions(spectra.weighted_pb, summary_category_indices, std::string("h_") + kSelectionKeys[topology_selection] + "_summary_");
-    const std::string selection_label = family_label + ", " + kSelectionLabels[topology_selection] + ", E_{cluster} > " + std::to_string(combined.min_cluster_energy) + " GeV";
+    const std::string selection_label = family_label + ", " + kSelectionLabels[topology_selection] +
+        "\nE_{cluster} > " + std::to_string(combined.min_cluster_energy) + " GeV";
     draw_spectrum(density, detailed_spectrum_indices, selection_output_base + "_detailed.pdf", selection_label, true);
     draw_spectrum(density, summary_spectrum_indices, selection_output_base + ".pdf", selection_label, false);
     draw_fraction_lines(detailed_fractions, detailed_category_indices, selection_output_base + "_category_fractions_detailed.pdf", selection_label, true);

@@ -9,7 +9,7 @@ Priority           = 20
 job_lease_duration = 86400
 
 family             = jet
-configuration      = cluster_e_gt_0p5
+configuration      = ClusterE0p2_Pi0Partner0p2
 require_complete   = true
 n_bins             = 40
 et_max             = 40.0

@@ -126,7 +126,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   std::string topology_definition_ = "anchor_membership_in_recovered_direct_daughter_maximum_deposit_clusters_with_single_contaminated_pre_cemc_split";
   std::string topology_priority_ = "ambiguous_main_to_other_then_single_contaminated_then_merged_then_separated_then_missing_then_other";
   std::string response_policy_ = "not_used_for_classification";
-  std::string photon_recovery_policy_ = "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold";
+  std::string photon_recovery_policy_ = "optional_cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold_zero_disables";
   std::string vertex_selection_ = "signal_hepmc_collision_vertex_abs_z_lt_max";
   long long manifest_begin_ = -1;
   long long manifest_end_ = -1;
@@ -147,7 +147,7 @@ class PythiaPi0AnchorClusterSpectrum : public SubsysReco
   double dominant_fraction_min_ = 0.5;
   double anchor_pi0_fraction_min_ = 0.5;
   double min_energy_contribution_fraction_ = 0.0;
-  double min_photon_energy_recovery_ = 0.5;
+  double min_photon_energy_recovery_ = 0.0;
   double min_direct_match_cluster_energy_coverage_ = 0.5;
   double missing_diagnostic_max_delta_r_ = 0.15;
   bool enable_missing_diagnostics_ = true;

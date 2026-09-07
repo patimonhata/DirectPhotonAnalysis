@@ -18,7 +18,7 @@
 namespace
 {
 constexpr int kMapSchema = 5;
-constexpr int kTopologyVersion = 9;
+constexpr int kTopologyVersion = 10;
 constexpr double kDiagnosticFloor = 0.0;
 constexpr int kEtBins = 40;
 constexpr double kEtMax = 40.0;

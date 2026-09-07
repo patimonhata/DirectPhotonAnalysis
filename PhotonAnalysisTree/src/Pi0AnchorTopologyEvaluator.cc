@@ -413,8 +413,9 @@ void classify_pi0_anchor(const Pi0AnchorTopologyConfig& config, const Pi0Topolog
       candidate.best_cluster[1] == anchor.cluster_index;
   const auto partner_recovered = [&](std::size_t photon) {
     const auto& partner = candidate.topology_partner_clusters[photon];
-    return partner.found && std::isfinite(candidate.photon_energy[photon]) && candidate.photon_energy[photon] > 0.0 &&
-        std::isfinite(partner.recovery) && partner.recovery >= config.min_photon_energy_recovery;
+    return partner.found && (config.min_photon_energy_recovery <= 0.0 ||
+        (std::isfinite(candidate.photon_energy[photon]) && candidate.photon_energy[photon] > 0.0 &&
+         std::isfinite(partner.recovery) && partner.recovery >= config.min_photon_energy_recovery));
   };
   const auto partner_is_anchor = [&](std::size_t photon) {
     return partner_recovered(photon) && candidate.topology_partner_clusters[photon].cluster_id == anchor_cluster.cluster_id;
@@ -1110,13 +1111,11 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
     for (std::size_t photon = 0; photon < 2U; ++photon)
     {
-      candidate.recovered[photon] =
-          candidate.best_cluster[photon] != invalid_index &&
-          std::isfinite(candidate.photon_energy[photon]) &&
-          std::isfinite(candidate.reconstructed_photon_energy[photon]) &&
-          candidate.photon_energy[photon] > 0.0 &&
-          candidate.reconstructed_photon_energy[photon] /
-              candidate.photon_energy[photon] >= config_.min_photon_energy_recovery;
+      candidate.recovered[photon] = candidate.best_cluster[photon] != invalid_index &&
+          (config_.min_photon_energy_recovery <= 0.0 ||
+           (std::isfinite(candidate.photon_energy[photon]) && std::isfinite(candidate.reconstructed_photon_energy[photon]) &&
+            candidate.photon_energy[photon] > 0.0 &&
+            candidate.reconstructed_photon_energy[photon] / candidate.photon_energy[photon] >= config_.min_photon_energy_recovery));
     }
 
   }

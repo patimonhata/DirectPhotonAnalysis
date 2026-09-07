@@ -40,14 +40,13 @@ The anchor requires |eta_cluster| < 0.7 and the configured anchor energy cut. Pa
 
 For each direct pi0 daughter photon, the matcher finds the cluster with maximum
 absolute daughter energy deposit among clusters passing the respective anchor or partner
-selection. A daughter photon is considered recovered only when its
-maximum-deposit cluster satisfies the calibrated-energy estimate
+selection. The calibrated-energy estimate is retained for diagnostics:
 
     Erec_gamma = Ecluster * (Edep_gamma / Edep_total)
 
     Erec_gamma / Etruth_gamma >= min_photon_energy_recovery
 
-with default threshold 0.5. The optional cluster-composition requirement
+The default recovery threshold is now zero, which disables the ratio requirement entirely. A positive value can still be passed for comparison productions. The optional cluster-composition requirement
 
     Edep_gamma / Edep_cluster > min_energy_contribution_fraction
 
@@ -68,7 +67,7 @@ For one anchor cluster:
 - separated: it is the recovered maximum-deposit cluster of one daughter and
   the other daughter has a distinct recovered maximum-deposit partner cluster;
 - missing: it is the recovered maximum-deposit cluster of one daughter and
-  the other daughter has no cluster passing the photon-energy recovery cut.
+  the other daughter has no usable cluster passing the partner energy cut (and any explicitly enabled recovery cut).
   Missing is split with the following exclusive priority:
 
   1. invalid projection -> other;
@@ -131,4 +130,4 @@ produced:
 The final ROOT schema is 10 and stores both detailed and summary fraction
 histograms. Plot annotations and legends are placed outside the histogram frame.
 
-The optional tail after `PRE_CEMC_INTERACTION_RADIUS` in `run_partial.sh` is `PI0_PARTNER_MIN_ENERGY PI0_MASS_MIN PI0_MASS_MAX MISSING_ENERGY_MIN MISSING_ENERGY_MAX`. These values are exposed in `submit.job`, saved in partial metadata, and checked before finalization. This version retains photon-energy recovery >= 50%; its removal is a separate commit.
+The optional tail after `PRE_CEMC_INTERACTION_RADIUS` in `run_partial.sh` is `PI0_PARTNER_MIN_ENERGY PI0_MASS_MIN PI0_MASS_MAX MISSING_ENERGY_MIN MISSING_ENERGY_MAX`. These values are exposed in `submit.job`, saved in partial metadata, and checked before finalization. Topology algorithm 10 disables photon-energy recovery by default. Commit b7eb4d6 retains the previous configurable recovery behavior. A positive recovery threshold remains available for explicit comparison runs; zero bypasses the fraction check entirely.

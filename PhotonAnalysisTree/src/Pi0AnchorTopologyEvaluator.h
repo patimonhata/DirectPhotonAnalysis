@@ -129,7 +129,8 @@ struct Pi0AnchorTopologyConfig
   double dominant_fraction_min = 0.5;
   double anchor_pi0_fraction_min = 0.5;
   double min_energy_contribution_fraction = 0.0;
-  double min_photon_energy_recovery = 0.5;
+  // Zero disables the recovery-fraction requirement; positive values support comparison productions.
+  double min_photon_energy_recovery = 0.0;
   double min_direct_match_cluster_energy_coverage = 0.5;
   double missing_diagnostic_max_delta_r = 0.15;
   double partner_diagnostic_min_cluster_energy = 0.0;
@@ -278,7 +279,7 @@ const char* pi0_anchor_tag_result_name(Pi0AnchorTagResult value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 9;
+  static constexpr int kAlgorithmVersion = 10;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

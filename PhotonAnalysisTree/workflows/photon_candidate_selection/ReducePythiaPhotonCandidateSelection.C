@@ -210,7 +210,7 @@ bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
       std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.0) &&
-      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 9 &&
+      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 10 &&
       std::isfinite(value.eta_partner_min_energy) && value.eta_partner_min_energy >= 0.0 &&
       std::isfinite(value.pi0_mass_min) && value.pi0_mass_min >= 0.0 &&
       std::isfinite(value.pi0_mass_max) && value.pi0_mass_max >= 0.0 &&
@@ -220,7 +220,7 @@ bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
       std::isfinite(value.missing_energy_max) && value.missing_energy_max >= 0.0 &&
       std::isfinite(value.min_photon_energy_recovery) && value.min_photon_energy_recovery >= 0.0 &&
       value.pi0_mass_min < value.pi0_mass_max && value.eta_mass_min < value.eta_mass_max &&
-      value.missing_energy_min < value.missing_energy_max && same_double(value.min_photon_energy_recovery, 0.5) &&
+      value.missing_energy_min < value.missing_energy_max && same_double(value.min_photon_energy_recovery, 0.0) &&
       value.manifest_end > value.manifest_begin && value.input_file_count == value.manifest_end - value.manifest_begin &&
       same_double(value.cross_section_pb, sample.cross_section_pb) && same_double(value.window_min, sample.window_min) &&
       same_double(value.window_max, sample.window_max) && value.upper_unbounded == sample.upper_unbounded &&

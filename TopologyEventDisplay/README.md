@@ -154,44 +154,16 @@ is stored as `pre_cemc_photon_index`.
 
 Only `missing` is subdivided by `missing_category_name`:
 
-- `acceptance`: the unrecovered partner photon has a valid projection to the
-  CEMC radius with `abs(eta_projection) >= cemc_acceptance_eta_max` (1.1 by
-  default).
-- `no_cemc_deposit`: no CEMC G4 hit energy can be traced to the partner photon
-  or any of its descendants.
-- `energy_threshold`: the maximum direct-deposit partner-derived cluster is
-  below `min_cluster_energy` and lies within `missing_diagnostic_max_delta_r`
-  of the partner projection.
-- `displaced_partner_cluster`: the same kind of below-threshold partner-derived
-  cluster exists, but lies farther from the projection.
-- `unclustered_deposit`: partner-descendant CEMC energy exists, but no usable
-  direct-deposit cluster is found.
-- `match_incomplete`: a geometrically local cluster exists, but its direct
-  truth match is not usable because too little cluster-member energy could be
-  traced.
-- `other`: invalid projection, an above-threshold best cluster below the photon
-  recovery cut, disabled missing diagnostics, or another remaining case.
+- `energy_band_taggable`: full representative partner-cluster energy `0.2 < E <= 0.5 GeV` and pair mass inside the pi0 window;
+- `energy_band_not_taggable`: the same energy band and a finite mass outside the pi0 window;
+- `low_energy`: partner-cluster energy `E <= 0.2 GeV`;
+- `unclustered_or_no_cemc_deposit`: no associated cluster, or no CEMC deposit;
+- `acceptance`: valid partner projection outside CEMC acceptance;
+- `other`: invalid projection, unresolved matching, same-as-anchor cluster, energy above the band, invalid mass, or disabled diagnostics.
 
-The exclusive priority is invalid projection, acceptance, CEMC-deposit
-presence, near/displaced below-threshold cluster, photon recovery, incomplete
-local matching, unclustered deposit, then other. A recovered partner therefore
-remains separated or merged even if its truth projection is outside the
-fiducial boundary.
+These follow shared topology algorithm 10. Diagnostic matching searches all valid positive-energy clusters and selects the maximum direct daughter-deposit cluster. Invalid projection and acceptance take priority over energy classification. Displacement is diagnostic information rather than a missing category. Missing details retain finer reasons; `write_detail=false` still controls only the large geometry/truth tables.
 
-Below-threshold clusters are direct-matched globally. The maximum partner
-truth-deposit cluster is retained first, then its distance to the photon
-projection decides `energy_threshold` versus `displaced_partner_cluster`.
-Unusable candidates remain restricted to `missing_diagnostic_max_delta_r`
-(0.15 by default), preventing unrelated detector noise from producing
-`match_incomplete`. The dump also records the total partner-descendant CEMC
-truth deposit and the anchor-plus-diagnostic-cluster invariant mass. The photon
-recovery condition is unchanged.
-
-`missing_detail_name` retains whether a below-threshold cluster passes the
-existing recovery requirement, as well as the finer recovery, projection,
-matching, no-deposit, unclustered-deposit, and diagnostics-disabled causes.
-These diagnostics are recorded even with `write_detail=false`; that flag still
-controls the large geometry/truth tables.
+The default photon-energy recovery threshold is zero (disabled), following photon_candidate_selection. Positive values remain available for explicit comparison runs. The recovery estimate and direct truth-match quality requirement remain recorded and unchanged. The event-display workflow has no meson veto; its topology partner energy cut defaults to the configured anchor energy threshold.
 
 ## Intermediate ROOT schema
 

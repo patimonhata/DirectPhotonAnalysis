@@ -43,7 +43,7 @@ int Fun4All_PythiaPi0AnchorClusterSpectra(
     const double dominant_fraction_min = 0.5,
     const double anchor_pi0_fraction_min = 0.5,
     const double min_energy_contribution_fraction = 0.0,
-    const double min_photon_energy_recovery = 0.5,
+    const double min_photon_energy_recovery = 0.0,
     const double max_abs_vertex_z = 60.0,
     const double cemc_acceptance_eta_max = 1.1,
     const double min_direct_match_cluster_energy_coverage = 0.5,

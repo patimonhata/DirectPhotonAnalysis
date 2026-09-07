@@ -34,7 +34,7 @@ A production map job processes all events in several DST segments and writes one
 PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>/map_<chunk>.root
 ~~~
 
-The current map schema is 5 and the topology algorithm version is 9. This version retains the 50% photon-energy recovery requirement. Older maps and partials must be regenerated; they cannot be mixed with this production. All partner thresholds, mass windows, missing-energy boundaries, and the recovery requirement are stored and checked in map/reduce/merge metadata.
+The current map schema is 5 and the topology algorithm version is 10. This version disables the photon-energy recovery requirement (`min_photon_energy_recovery = 0`). The direct-deposit matching quality and dominance conditions remain unchanged. Older maps and partials must be regenerated; they cannot be mixed with this production. All partner thresholds, mass windows, missing-energy boundaries, and the recovery requirement are stored and checked in map/reduce/merge metadata.
 
 The default Condor configuration uses 10 DST segments per ROOT file. This is deliberately configurable through `files_per_job`; after measuring the first jobs, change both `files_per_job` and `n_chunks = ceil(total_files / files_per_job)` together if a different file size is preferable.
 
@@ -104,7 +104,7 @@ Meson tagging considers every other valid reconstructed split cluster in `CLUSTE
 
 ## Partner and missing definitions
 
-The anchor selection keeps `min_cluster_energy`. Independently, topology partner lookup uses the strict pi0 tagging threshold. Each lookup selects the cluster with the largest absolute direct daughter deposit within its own eligible pool. The calibrated photon energy estimate remains `cluster_energy * daughter_deposit / total_deposit`, and recovery requires its ratio to truth photon energy to be at least 0.5. Thus changing the pi0 partner threshold can change separated/merged/single-contaminated/missing/other totals. The saved candidate daughter `best_cluster`/`recovered` fields describe the anchor pool; the anchor topology additionally evaluates the independent partner pool.
+The anchor selection keeps `min_cluster_energy`. Independently, topology partner lookup uses the strict pi0 tagging threshold. Each lookup selects the cluster with the largest absolute direct daughter deposit within its own eligible pool. A usable deposit-selected cluster in the respective energy pool is sufficient for recovery; no minimum recovered-energy fraction is required. The calibrated photon energy estimate `cluster_energy * daughter_deposit / total_deposit` and its recovery ratio remain stored as diagnostics. Thus changing the pi0 partner threshold can change separated/merged/single-contaminated/missing/other totals. The saved candidate daughter `best_cluster`/`recovered` fields describe the anchor pool; the anchor topology additionally evaluates the independent partner pool.
 
 For missing diagnostics, all valid positive-energy clusters are searched, including those at or below 0.1 GeV. The representative truth partner maximizes direct daughter deposit among usable truth matches, independently of the tagging threshold. Its full reconstructed cluster energy (not the truth-photon energy or the attributed fraction) determines the missing energy category. The reconstruction's own clustering thresholds remain unchanged.
 
@@ -229,7 +229,7 @@ The merge also computes category-conditional survival fractions relative to the 
 
 These survival curves have independent category denominators and therefore are not stacked and do not sum to one. Their uncertainties use the same weighted subset-covariance calculation as the existing fractions. A zero-denominator bin is stored as zero in the ROOT histogram and omitted from the PDF graph. The merger validates the unweighted subset relation and the weighted sum-of-squared-weights subset relation for every selection, category, and bin.
 
-The partial schema remains version 4. The merged candidate-composition schema is version 5 and the merged anchor-topology schema is version 4. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
+The partial schema is version 5. The merged candidate-composition schema is version 6 and the merged anchor-topology schema is version 5. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
 
 ### Shards and partial files
 
@@ -350,6 +350,12 @@ ABCD purity extraction remains a separate future reduce stage.
 
 ## Regression checks
 
-After sourcing ana.565 and building, run `PhotonAnalysisTree/tests/run_candidate_selection_tests.sh`. The tests cover missing energy and mass boundaries, acceptance and incomplete matching, recovery at 50%, merged/separated/single-contaminated topology, and rejection of mismatched map/partial settings. `python PhotonAnalysisTree/tests/check_candidate_veto.py MAP.root` independently recomputes veto flags and best partners for QA maps whose pi0 and eta thresholds are at least the stored-cluster threshold.
+After sourcing ana.565 and building, run `PhotonAnalysisTree/tests/run_candidate_selection_tests.sh`. The tests cover missing energy and mass boundaries, acceptance and incomplete matching, recovery enabled at 50% and disabled, merged/separated/single-contaminated topology, and rejection of mismatched map/partial settings. `python PhotonAnalysisTree/tests/check_candidate_veto.py MAP.root` independently recomputes veto flags and best partners for QA maps whose pi0 and eta thresholds are at least the stored-cluster threshold.
 
-On the first 200 Jet5 events, the previous implementation took 24.08 s wall / 22.32 s user and this version took 25.43 s wall / 23.48 s user (one run each, including ROOT startup and I/O). Both used stored-cluster threshold 0.2 GeV and tagging threshold 0.5 GeV. This is a small-sample estimate for the entire change, not an isolated diagnostic-floor benchmark. The new map processed 200 events, wrote 133, rejected 67 vertices, and had no invalid events. Map validation and six-selection reduce passed. A separate 20-event map verified unequal pi0/eta thresholds 0.5/0.7 GeV.
+On the first 200 Jet5 events, the previous implementation took 24.08 s wall / 22.32 s user and the recovery-preserving commit `b7eb4d6` took 25.43 s wall / 23.48 s user (one run each, including ROOT startup and I/O). Both used stored-cluster threshold 0.2 GeV and tagging threshold 0.5 GeV. This is a small-sample estimate for the entire change, not an isolated diagnostic-floor benchmark. The new map processed 200 events, wrote 133, rejected 67 vertices, and had no invalid events. Map validation and six-selection reduce passed. A separate 20-event map verified unequal pi0/eta thresholds 0.5/0.7 GeV.
+
+## Recovery comparison checkpoints
+
+Commit `b7eb4d6` contains the configurable partner cuts and new missing categories while preserving the 50% recovery requirement in photon_candidate_selection. The subsequent commit disables that requirement and records topology algorithm 10, so the two productions cannot be mixed. To inspect the first version, use `git switch --detach b7eb4d6`; return to the current version with `git switch codex/photon-selection-partner-settings`. Rebuild the library for the chosen revision.
+
+On the identical 200-event Jet5 input, removing recovery changed 15 of 436 anchor topologies. All 22 compared reconstructed kinematics, tag/veto, partner-selection, and selection-flag branches were identical across the 133 written events. The independent veto check passed all 4666 decisions (1974 tags). `compare_recovery_maps.py BEFORE.root AFTER.root` reproduces this comparison. The direct-deposit match-coverage cut of 50% and the pi0-main contributor requirement are distinct cuts and remain enabled.

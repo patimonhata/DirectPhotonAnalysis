@@ -10,6 +10,8 @@ using namespace photon_tree;
 int main()
 {
   Pi0AnchorTopologyConfig config;
+  assert(config.min_photon_energy_recovery == 0.0);
+  config.min_photon_energy_recovery = 0.5;
   config.enable_missing_diagnostics = true;
   config.tagging_partner_min_cluster_energy = 0.5;
   Pi0TopologyClusterRecord cluster;
@@ -97,6 +99,15 @@ int main()
   assert(classify().topology == Pi0AnchorTopology::separated);
   partner.recovery = std::nextafter(0.5, 0.0);
   assert(classify().topology == Pi0AnchorTopology::missing);
+  config.min_photon_energy_recovery = 0.0;
+  assert(classify().topology == Pi0AnchorTopology::separated);
+  partner.recovery = 0.0;
+  assert(classify().topology == Pi0AnchorTopology::separated);
+  partner.recovery = std::numeric_limits<double>::quiet_NaN();
+  assert(classify().topology == Pi0AnchorTopology::separated);
+  partner.found = false;
+  assert(classify().topology == Pi0AnchorTopology::missing);
+  partner.found = true;
   partner.recovery = 0.5;
   partner.cluster_id = cluster.cluster_id;
   assert(classify().topology == Pi0AnchorTopology::merged);

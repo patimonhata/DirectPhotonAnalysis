@@ -21,7 +21,7 @@ inline bool read(const std::string& path, std::vector<double>& values)
     if (!tree->GetBranch(names[i]) || tree->SetBranchAddress(names[i], &values[i]) < 0) return false;
   if (tree->GetEntry(0) <= 0) return false;
   return std::all_of(values.begin(), values.end(), [](double v) { return std::isfinite(v) && v >= 0.0; }) &&
-      values[3] < values[4] && values[5] < values[6] && values[7] < values[8] && values[9] == 0.5 && values[10] == 0.0;
+      values[3] < values[4] && values[5] < values[6] && values[7] < values[8] && values[9] == 0.0 && values[10] == 0.0;
 }
 inline bool same(const std::vector<double>& a, const std::vector<double>& b, std::size_t begin = 0)
 {
@@ -41,7 +41,7 @@ inline bool validate_partials(TTree& tree, const char* branch)
   bool ok = tree.GetEntries() > 0;
   for (Long64_t entry = 0; ok && entry < tree.GetEntries(); ++entry)
   {
-    ok = tree.GetEntry(entry) > 0 && settings && source_schema == 5 && topology_version == 9;
+    ok = tree.GetEntry(entry) > 0 && settings && source_schema == 5 && topology_version == 10;
     if (!ok) break;
     if (entry == 0) reference = *settings;
     ok = same(reference, *settings);

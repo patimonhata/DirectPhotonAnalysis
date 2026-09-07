@@ -268,7 +268,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       *response_policy == "not_used_for_classification" &&
       photon_recovery_policy &&
       *photon_recovery_policy ==
-          "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
+          "optional_cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold_zero_disables" &&
       vertex_selection &&
       *vertex_selection == "signal_hepmc_collision_vertex_abs_z_lt_max" &&
       signal_embedding_id > 0 && n_bins > 0 &&
@@ -297,7 +297,7 @@ int check_pythia_pi0_anchor_cluster_partial(const std::string input_file)
       min_direct_match_cluster_energy_coverage <= 1.0 &&
       std::isfinite(missing_diagnostic_max_delta_r) && missing_diagnostic_max_delta_r > 0.0 &&
       std::isfinite(max_abs_vertex_z) && max_abs_vertex_z > 0.0 &&
-      matcher_version > 0 && topology_version == 9 && bin_width_normalized == 0U &&
+      matcher_version > 0 && topology_version == 10 && bin_width_normalized == 0U &&
       events_processed > 0 &&
       events_written + events_invalid + events_vertex_rejected ==
           events_processed &&

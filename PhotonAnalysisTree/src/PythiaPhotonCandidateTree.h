@@ -278,7 +278,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   double eta_partner_min_energy_ = 0.5;
   double missing_energy_min_ = 0.2;
   double missing_energy_max_ = 0.5;
-  double min_photon_energy_recovery_ = 0.5;
+  double min_photon_energy_recovery_ = 0.0;
   double pi0_mass_min_ = 0.10;
   double pi0_mass_max_ = 0.20;
   double eta_mass_min_ = 0.45;

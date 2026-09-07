@@ -273,7 +273,7 @@ bool valid_metadata(const PartialMetadata& value) {
       value.topology_priority == "ambiguous_main_to_other_then_single_contaminated_then_merged_then_separated_then_missing_then_other" &&
       value.missing_category_priority == "projection_then_acceptance_then_truth_partner_energy_and_mass_then_unclustered_or_no_cemc_then_other" &&
       value.response_policy == "not_used_for_classification" &&
-      value.photon_recovery_policy == "cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold" &&
+      value.photon_recovery_policy == "optional_cluster_energy_times_gamma_deposit_fraction_over_truth_energy_threshold_zero_disables" &&
       value.vertex_selection == "signal_hepmc_collision_vertex_abs_z_lt_max" &&
       value.signal_embedding_id > 0 && value.n_bins > 0 &&
       value.et_max > 0.0 &&
@@ -301,7 +301,7 @@ bool valid_metadata(const PartialMetadata& value) {
       value.min_direct_match_cluster_energy_coverage <= 1.0 &&
       std::isfinite(value.missing_diagnostic_max_delta_r) && value.missing_diagnostic_max_delta_r > 0.0 &&
       std::isfinite(value.max_abs_vertex_z) && value.max_abs_vertex_z > 0.0 &&
-      value.matcher_version > 0 && value.topology_version == 9 &&
+      value.matcher_version > 0 && value.topology_version == 10 &&
       value.bin_width_normalized == 0U &&
       value.events_processed > 0 &&
       value.events_written + value.events_invalid +

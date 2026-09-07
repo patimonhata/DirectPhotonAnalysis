@@ -1,0 +1,27 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/tagging_purity_diagnostic
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/tagging_purity_diagnostic/run_hybrid_reduce.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+request_memory     = 2GB
+Priority           = 20
+job_lease_duration = 86400
+
+low_map_root       = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/cluster_e_gt_0p2
+high_map_root      = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/cluster_e_gt_0p5
+output_file        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/hybrid_reduce/jet/partial/$(sample)/shard_0/hybrid_threshold_diagnostic.root
+log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_purity_diagnostic/hybrid_reduce
+Output             = $(log_directory)/$(sample)_shard_0.out
+Error              = $(log_directory)/$(sample)_shard_0.err
+Log                = /tmp/ryotaro-hybrid-threshold-$(sample)-shard-0.log
+Arguments          = "$(low_map_root) $(high_map_root) $(output_file) $(sample) 0 1 true 0"
+
+Queue sample from (
+  jet3
+  jet5
+  jet8
+  jet20
+  jet30
+  jet40
+)

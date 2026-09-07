@@ -1,0 +1,32 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/tagging_purity_diagnostic
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/tagging_purity_diagnostic/run_reduce.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+request_memory     = 2GB
+Priority           = 20
+job_lease_duration = 86400
+
+map_root           = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/$(configuration)
+output_file        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/reduce/$(configuration)/jet/partial/$(sample)/shard_0/tagging_purity_diagnostic.root
+log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_purity_diagnostic/reduce
+Output             = $(log_directory)/$(configuration)_$(sample)_shard_0.out
+Error              = $(log_directory)/$(configuration)_$(sample)_shard_0.err
+Log                = /tmp/ryotaro-tagging-purity-$(configuration)-$(sample)-shard-0.log
+Arguments          = "$(map_root) $(output_file) $(threshold) $(sample) 0 1 true 0"
+
+Queue configuration, threshold, sample from (
+  cluster_e_gt_0p2 0.2 jet3
+  cluster_e_gt_0p2 0.2 jet5
+  cluster_e_gt_0p2 0.2 jet8
+  cluster_e_gt_0p2 0.2 jet20
+  cluster_e_gt_0p2 0.2 jet30
+  cluster_e_gt_0p2 0.2 jet40
+  cluster_e_gt_0p5 0.5 jet3
+  cluster_e_gt_0p5 0.5 jet5
+  cluster_e_gt_0p5 0.5 jet8
+  cluster_e_gt_0p5 0.5 jet20
+  cluster_e_gt_0p5 0.5 jet30
+  cluster_e_gt_0p5 0.5 jet40
+)

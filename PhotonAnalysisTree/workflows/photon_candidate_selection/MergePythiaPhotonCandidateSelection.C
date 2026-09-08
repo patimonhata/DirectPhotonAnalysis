@@ -708,7 +708,8 @@ int MergePythiaPhotonCandidateSelection(
       spectra.counts[index]->SetLineColor(::kColors[index]);
       spectra.weighted_pb[index]->SetLineColor(::kColors[index]);
     }
-    const std::vector<std::size_t> detailed_spectrum_indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
+    std::vector<std::size_t> detailed_spectrum_indices(kSpectrumCount);
+    std::iota(detailed_spectrum_indices.begin(), detailed_spectrum_indices.end(), std::size_t{0});
     const std::vector<std::size_t> summary_spectrum_indices(kSummarySpectrum.begin(), kSummarySpectrum.end());
     const std::vector<std::size_t> detailed_category_indices(kDetailedCategories.begin(), kDetailedCategories.end());
     const std::vector<std::size_t> summary_category_indices(kSummaryCategories.begin(), kSummaryCategories.end());

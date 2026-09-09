@@ -323,6 +323,8 @@ Both plot families share one output base and the same selection directories:
 
 Each selection contains five composition PDFs (summary, detailed and superdetailed category-fraction stacks, plus summary and detailed survival fractions) and eight topology PDFs. The superdetailed composition stack splits pi0 missing into the six diagnostic categories, normalized to all selected candidates. The six additional fraction histograms are saved in `candidate_composition.root`.
 
+Each selection also contains `workinprogress/region_a_candidate_truth_origin.pdf`. This isolated plot compares the weighted prompt-photon-, pi0-, eta-, and other-candidate spectra after that selection; the five pi0 topology subclasses are summed into one pi0 curve.
+
 Existing schema-5 partials can be reused. Before reusing their topology missing breakdown, the merger checks that missing counts, weighted yields and errors agree with composition in every bin, including underflow and overflow. A mismatch stops the merge rather than displaying a breakdown from a different population.
 
 Both plot families use the same caption layout: collaboration label, sample family, truth vertex cut, candidate kinematics, selection, stored/anchor cluster threshold, and separate pi0/eta tagging energy thresholds and mass windows. Values come from validated production metadata; energies are shown to two decimal places. “Candidate cluster” does not imply an event-leading selection. “Stored/anchor clusters” describes `min_cluster_energy`: lower-energy clusters can still participate in tagging or truth-partner diagnostics, so a global “ignored” label would be inaccurate.

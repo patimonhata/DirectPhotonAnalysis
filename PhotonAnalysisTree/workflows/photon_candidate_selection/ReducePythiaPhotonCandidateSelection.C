@@ -385,7 +385,7 @@ std::unique_ptr<TPad> make_plot_pad(const std::string& name, bool log_y = false)
 void style_axes(TH1* histogram, const char* y_title)
 {
   histogram->SetStats(false);
-  histogram->GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
+  histogram->GetXaxis()->SetTitle("Candidate Cluster E_{T} [GeV]");
   histogram->GetYaxis()->SetTitle(y_title);
   for (TAxis* axis : {histogram->GetXaxis(), histogram->GetYaxis()})
   {
@@ -416,8 +416,7 @@ std::vector<std::string> caption_lines(const PlotCaption& value)
   const auto number = [](double x) { std::ostringstream out; out << std::fixed << std::setprecision(2) << x; return out.str(); };
   return {
       "#it{#bf{sPHENIX}} Internal",
-      value.family == "jet" ? "Pythia 8 p+p Jet samples" : "Pythia 8 p+p PhotonJet samples",
-      "|z_{vertex}^{truth}| < 60 cm",
+      value.family == "jet" ? "Pythia 8 p+p Jet samples, |z_{vertex}^{truth}| < 60 cm" : "Pythia 8 p+p PhotonJet samples, |z_{vertex}^{truth}| < 60 cm",
       "Candidate cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7",
       value.selection,
       "Stored/anchor clusters: E > " + number(value.min_cluster_energy) + " GeV",
@@ -433,7 +432,7 @@ void draw_annotations()
   const auto lines = caption_lines(plot_caption);
   for (std::size_t i = 0; i < lines.size(); ++i)
   {
-    label.SetTextSize(i == 0 ? 0.028 : (i >= 6 ? 0.019 : 0.021));
+    label.SetTextSize(i == 0 ? 0.034 : 0.024);
     label.DrawLatex(0.055, 0.965 - 0.041 * i, lines[i].c_str());
   }
 }
@@ -451,7 +450,7 @@ void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& dens
   TLegend legend(0.57, detailed ? 0.62 : 0.68, 0.98, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(detailed ? 0.016 : 0.024);
+  legend.SetTextSize(detailed ? 0.016 : 0.028);
   for (std::size_t index : indices) legend.AddEntry(density[index].get(), kLabels[index].c_str(), "l");
   legend.Draw();
   draw_annotations();
@@ -508,7 +507,7 @@ void draw_fraction_lines(const std::vector<std::unique_ptr<TH1D>>& fractions, co
   TLegend legend(0.57, detailed ? 0.62 : 0.73, 0.98, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(detailed ? 0.018 : 0.024);
+  legend.SetTextSize(detailed ? 0.018 : 0.028);
   for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "lep");
   legend.Draw();
   draw_annotations();
@@ -534,7 +533,7 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
   stack.Draw("HIST");
-  stack.GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
+  stack.GetXaxis()->SetTitle("Candidate Cluster E_{T} [GeV]");
   stack.GetYaxis()->SetTitle("Fraction");
   stack.GetXaxis()->SetLabelSize(0.05);
   stack.GetYaxis()->SetLabelSize(0.05);
@@ -546,7 +545,7 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
   TLegend legend(0.57, detailed ? 0.62 : 0.73, 0.98, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(detailed ? 0.018 : 0.024);
+  legend.SetTextSize(detailed ? 0.018 : 0.028);
   for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "f");
   legend.Draw();
   draw_annotations();
@@ -710,7 +709,7 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
   stack.Draw("HIST");
-  stack.GetXaxis()->SetTitle("Cluster E_{T} [GeV]");
+  stack.GetXaxis()->SetTitle("Candidate Cluster E_{T} [GeV]");
   stack.GetYaxis()->SetTitle("Fraction of selected candidates");
   for (TAxis* axis : {stack.GetXaxis(), stack.GetYaxis()})
   {
@@ -721,12 +720,26 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   stack.GetXaxis()->SetTitleOffset(1.4);
   stack.GetYaxis()->SetTitleOffset(1.15);
   canvas.cd();
-  TLegend legend(0.57, detail == "summary" ? 0.77 : 0.635, 0.99, 0.97);
-  legend.SetBorderSize(0);
-  legend.SetFillStyle(0);
-  legend.SetTextSize(detail == "superdetailed" ? 0.014 : (detail == "detailed" ? 0.018 : 0.024));
-  for (std::size_t i = 0; i < components.size(); ++i) legend.AddEntry(components[i], labels[i].c_str(), "f");
-  legend.Draw();
+  std::vector<std::unique_ptr<TLegend>> legends;
+  if (detail == "detailed")
+  {
+    legends.push_back(std::make_unique<TLegend>(0.50, 0.75, 0.73, 0.97));
+    legends.push_back(std::make_unique<TLegend>(0.71, 0.64, 0.99, 0.97));
+    for (std::size_t i : {std::size_t{0}, std::size_t{6}, std::size_t{7}}) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+    for (std::size_t i = 1; i <= 5; ++i) legends[1]->AddEntry(components[i], labels[i].c_str(), "f");
+  }
+  else
+  {
+    legends.push_back(std::make_unique<TLegend>(0.57, detail == "summary" ? 0.75 : 0.635, 0.99, 0.97));
+    for (std::size_t i = 0; i < components.size(); ++i) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+  }
+  for (auto& legend : legends)
+  {
+    legend->SetBorderSize(0);
+    legend->SetFillStyle(0);
+    legend->SetTextSize(detail == "superdetailed" ? 0.014 : (detail == "detailed" ? 0.022 : 0.028));
+    legend->Draw();
+  }
   draw_annotations();
   plot_pad->cd();
   plot_pad->RedrawAxis();

@@ -65,6 +65,61 @@ struct ShardMetadata
   unsigned long long total_map_count = 0;
 };
 
+constexpr std::size_t kCandidateOriginCount = 4;
+constexpr std::array<const char*, kCandidateOriginCount> kCandidateOriginKeys = {"prompt", "pi0", "eta", "other"};
+constexpr std::array<const char*, kCandidateOriginCount> kCandidateOriginLabels = {
+    "Prompt-#gamma clusters", "#pi^{0}-derived clusters", "#eta-derived clusters", "Other selected candidates"};
+constexpr std::array<int, kCandidateOriginCount> kCandidateOriginColors = {
+    candidate_composition::kColors[candidate_composition::prompt], candidate_composition::kColors[candidate_composition::pi0_separated],
+    candidate_composition::kColors[candidate_composition::eta], candidate_composition::kColors[candidate_composition::other]};
+
+std::array<std::unique_ptr<TH1D>, kCandidateOriginCount> make_candidate_origin_density(
+    const candidate_composition::Histograms& histograms, const std::string& prefix)
+{
+  using namespace candidate_composition;
+  std::array<std::unique_ptr<TH1D>, kCandidateOriginCount> density;
+  const std::array<std::size_t, kCandidateOriginCount> source_indices = {prompt, pi0_separated, eta, other};
+  for (std::size_t index = 0; index < kCandidateOriginCount; ++index)
+  {
+    density[index].reset(static_cast<TH1D*>(histograms.weighted[source_indices[index]]->Clone((prefix + kCandidateOriginKeys[index] + "_et_pb_per_gev").c_str())));
+    density[index]->SetDirectory(nullptr);
+  }
+  density[1]->Reset("ICES");
+  for (std::size_t index = pi0_separated; index <= pi0_other; ++index) density[1]->Add(histograms.weighted[index].get());
+  for (std::size_t index = 0; index < kCandidateOriginCount; ++index)
+  {
+    density[index]->Scale(1.0, "width");
+    density[index]->SetLineColor(kCandidateOriginColors[index]);
+    density[index]->SetLineWidth(3);
+    style_axes(density[index].get(), "Weighted Counts [a.u.]");
+  }
+  return density;
+}
+
+void draw_candidate_origin_spectrum(const std::array<std::unique_ptr<TH1D>, kCandidateOriginCount>& density,
+                                    const std::string& output_path, const std::string& selection_key)
+{
+  SetsPhenixStyle();
+  TCanvas canvas(("c_" + selection_key + "_candidate_origin_spectrum").c_str(), "", kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad(selection_key + "_candidate_origin_spectrum_pad", true);
+  density.front()->SetMinimum(kSpectrumYMinimum);
+  density.front()->SetMaximum(kSpectrumYMaximum);
+  density.front()->Draw("HIST");
+  for (std::size_t index = 1; index < kCandidateOriginCount; ++index) density[index]->Draw("HIST SAME");
+  canvas.cd();
+  TLegend legend(0.57, 0.73, 0.98, 0.97);
+  legend.SetBorderSize(0);
+  legend.SetFillStyle(0);
+  legend.SetTextSize(0.030);
+  for (std::size_t index = 0; index < kCandidateOriginCount; ++index) legend.AddEntry(density[index].get(), kCandidateOriginLabels[index], "l");
+  legend.Draw();
+  draw_annotations();
+  plot_pad->cd();
+  plot_pad->RedrawAxis();
+  canvas.cd();
+  canvas.SaveAs(output_path.c_str());
+}
+
 bool read_metadata(TFile& file, Metadata& value)
 {
   auto* tree = file.Get<TTree>("metadata");
@@ -309,7 +364,7 @@ std::unique_ptr<SurvivalCurve> make_survival_curve(const TH1D& numerator, const 
 }
 
 void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const TH1D& axis_source,
-                          const std::string& output_path, const std::string& canvas_name, bool detailed)
+                          const std::string& output_path, const std::string& canvas_name, bool detailed, bool split_candidate_categories = false)
 {
   TCanvas canvas(canvas_name.c_str(), "", kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(canvas_name + "_pad");
@@ -322,12 +377,27 @@ void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const
   frame->Draw("AXIS");
   for (const SurvivalCurve* curve : curves) curve->graph->Draw("PE1 SAME");
   canvas.cd();
-  TLegend legend(0.57, detailed ? 0.64 : 0.70, 0.97, 0.97);
-  legend.SetBorderSize(0);
-  legend.SetFillStyle(0);
-  legend.SetTextSize(detailed ? 0.014 : 0.022);
-  for (const SurvivalCurve* curve : curves) legend.AddEntry(curve->graph.get(), curve->label.c_str(), "lep");
-  legend.Draw();
+  std::vector<std::unique_ptr<TLegend>> legends;
+  if (split_candidate_categories)
+  {
+    legends.push_back(std::make_unique<TLegend>(0.48, 0.70, 0.71, 0.97));
+    legends.push_back(std::make_unique<TLegend>(0.69, 0.64, 0.99, 0.97));
+    for (std::size_t i : {std::size_t{0}, std::size_t{1}, curves.size() - 2, curves.size() - 1})
+      legends[0]->AddEntry(curves[i]->graph.get(), curves[i]->label.c_str(), "lep");
+    for (std::size_t i = 2; i + 2 < curves.size(); ++i) legends[1]->AddEntry(curves[i]->graph.get(), curves[i]->label.c_str(), "lep");
+  }
+  else
+  {
+    legends.push_back(std::make_unique<TLegend>(0.55, detailed ? 0.64 : 0.70, 0.97, 0.97));
+    for (const SurvivalCurve* curve : curves) legends[0]->AddEntry(curve->graph.get(), curve->label.c_str(), "lep");
+  }
+  for (auto& legend : legends)
+  {
+    legend->SetBorderSize(0);
+    legend->SetFillStyle(0);
+    legend->SetTextSize(split_candidate_categories ? 0.021 : (detailed ? 0.016 : 0.027));
+    legend->Draw();
+  }
   draw_annotations();
   plot_pad->cd();
   plot_pad->RedrawAxis();
@@ -545,6 +615,10 @@ int MergePythiaPhotonCandidateSelection(
     }
     const std::string selection_output_base = output_base + "/" + kSelectionKeys[composition_selection] + "/photon_candidate_composition";
     if (!make_output_directory(selection_output_base)) return 7;
+    const std::string work_in_progress_output = output_base + "/" + kSelectionKeys[composition_selection] + "/workinprogress/region_a_candidate_truth_origin.pdf";
+    if (!make_output_directory(work_in_progress_output)) return 7;
+    auto origin_density = make_candidate_origin_density(histograms, std::string("h_") + kSelectionKeys[composition_selection] + "_candidate_origin_");
+    draw_candidate_origin_spectrum(origin_density, work_in_progress_output, kSelectionKeys[composition_selection]);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack.pdf", false);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack_detailed.pdf", true);
     auto missing_fractions = composition_missing_fractions(histograms, *topology_histograms[composition_selection]);
@@ -584,7 +658,7 @@ int MergePythiaPhotonCandidateSelection(
         std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival", false);
     draw_survival_curves(detailed_survival, *histograms.weighted[denominator],
         selection_output_base + "_survival_fraction_relative_to_kinematic_detailed.pdf",
-        std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_detailed", true);
+        std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_detailed", true, true);
     TDirectory* directory = composition_output.mkdir(kSelectionKeys[composition_selection]);
     if (!directory) return 7;
     directory->cd();
@@ -700,7 +774,7 @@ int MergePythiaPhotonCandidateSelection(
       density[index]->Scale(1.0, "width");
       density[index]->SetLineColor(::kColors[index]);
       density[index]->SetLineWidth(index < 2 ? 3 : 2);
-      style_axes(density[index].get(), "d#sigma/dE_{T} [pb/GeV]");
+      style_axes(density[index].get(), "Weighted Counts [a.u.]");
       spectra.counts[index]->SetLineColor(::kColors[index]);
       spectra.weighted_pb[index]->SetLineColor(::kColors[index]);
     }

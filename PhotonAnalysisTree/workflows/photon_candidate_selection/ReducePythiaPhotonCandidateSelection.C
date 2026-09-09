@@ -61,7 +61,7 @@ void set_missing_labels(double low, double high)
 }
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
-constexpr double kWorkInProgressEtMaximum = 45.0;
+constexpr double kWorkInProgressEtMaximum = 40.0;
 constexpr double kWorkInProgressPadHeight = 0.76;
 constexpr double kSpectrumYMinimum = 1e-2;
 constexpr double kSpectrumYMaximum = 5e6;
@@ -433,11 +433,13 @@ std::vector<std::string> caption_lines(const PlotCaption& value, bool work_in_pr
   const std::string eta_tagging = "#eta tagging: E_{partner} > " + number(value.eta_partner_min_energy) + "; " + number(value.eta_mass_min) + " < m < " + number(value.eta_mass_max) + " GeV";
   if (work_in_progress)
   {
+    const std::string candidate = value.selection == kSelectionLabels.front()
+        ? "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7"
+        : "Candidate Cluster: after " + value.selection + " cut";
     return {
         "#it{#bf{sPHENIX}} Internal",
         sample + ", |z_{vertex}^{truth}| < 60 cm",
-        "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7",
-        "after " + value.selection + " cut",
+        candidate,
         pi0_tagging,
         eta_tagging};
   }
@@ -460,8 +462,10 @@ void draw_annotations(bool work_in_progress = false)
   const auto lines = caption_lines(plot_caption, work_in_progress);
   for (std::size_t i = 0; i < lines.size(); ++i)
   {
-    label.SetTextSize(i == 0 ? 0.034 : 0.024);
-    label.DrawLatex(0.055, (work_in_progress ? 0.975 : 0.965) - 0.041 * i, lines[i].c_str());
+    const double text_size = work_in_progress ? (i == 0 ? 0.040 : 0.030) : (i == 0 ? 0.034 : 0.024);
+    const double line_spacing = work_in_progress ? 0.046 : 0.041;
+    label.SetTextSize(text_size);
+    label.DrawLatex(0.055, (work_in_progress ? 0.975 : 0.965) - line_spacing * i, lines[i].c_str());
   }
 }
 
@@ -607,7 +611,7 @@ constexpr int kSignalEmbeddingId = 1;
 constexpr std::array<const char*, category_count> kKeys = {
     "denominator", "prompt", "pi0_separated", "pi0_merged", "pi0_single_contaminated", "pi0_missing", "pi0_other", "eta", "other"};
 constexpr std::array<const char*, category_count> kLabels = {
-    "Selected candidates", "Prompt #gamma", "#pi^{0}: separated", "#pi^{0}: merged", "#pi^{0}: single contaminated",
+    "Selected candidates", "Prompt-#gamma", "#pi^{0}: separated", "#pi^{0}: merged", "#pi^{0}: single contaminated",
     "#pi^{0}: missing", "#pi^{0}: other", "#eta", "Other"};
 constexpr std::array<int, category_count> kColors = {
     kBlack, kRed + 1, kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2, kGray + 1, kOrange + 7, kGray + 2};
@@ -726,7 +730,7 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
                                  bool work_in_progress = false)
 {
   SetsPhenixStyle();
-  const int canvas_width = work_in_progress && detail == "detailed" ? 1300 : kCanvasWidth;
+  const int canvas_width = work_in_progress && detail == "detailed" ? 1600 : kCanvasWidth;
   TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", canvas_width, kCanvasHeight);
   auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad", false, work_in_progress ? kWorkInProgressPadHeight : 0.62);
   THStack stack(("stack_" + detail + "_photon_candidate_composition").c_str(), "");

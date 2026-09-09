@@ -11,8 +11,9 @@ void test_candidate_plot_content(const std::string preview = "")
   assert(lines[4] == "Stored/anchor clusters: E > 0.20 GeV");
   assert(lines[5].find("0.50") != std::string::npos && lines[6].find("0.70") != std::string::npos);
   const auto work_in_progress_lines = caption_lines(plot_caption, true);
-  assert(work_in_progress_lines.size() == 5);
-  assert(work_in_progress_lines[2] == "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7, after Region A + Tagging veto");
+  assert(work_in_progress_lines.size() == 6);
+  assert(work_in_progress_lines[2] == "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7");
+  assert(work_in_progress_lines[3] == "after Region A + Tagging veto cut");
   assert(std::none_of(work_in_progress_lines.begin(), work_in_progress_lines.end(), [](const std::string& line) { return line.find("Stored/anchor") != std::string::npos; }));
   Histograms composition(2, 10.0);
   Spectra topology(2, 10.0);

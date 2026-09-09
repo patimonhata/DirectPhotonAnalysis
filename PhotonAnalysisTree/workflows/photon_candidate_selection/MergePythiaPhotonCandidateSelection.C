@@ -642,6 +642,7 @@ int MergePythiaPhotonCandidateSelection(
     draw_stack(fractions, selection_output_base + "_category_fraction_stack.pdf", false);
     draw_stack(fractions, work_in_progress_base + "/photon_candidate_composition_category_fraction_stack.pdf", false, true);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack_detailed.pdf", true);
+    draw_stack(fractions, work_in_progress_base + "/photon_candidate_composition_category_fraction_stack_detailed.pdf", true, true);
     auto missing_fractions = composition_missing_fractions(histograms, *topology_histograms[composition_selection]);
     if (missing_fractions.size() != kMissingSpectrumIndices.size())
     {

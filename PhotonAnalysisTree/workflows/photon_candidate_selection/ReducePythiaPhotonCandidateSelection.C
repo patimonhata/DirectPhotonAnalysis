@@ -436,7 +436,8 @@ std::vector<std::string> caption_lines(const PlotCaption& value, bool work_in_pr
     return {
         "#it{#bf{sPHENIX}} Internal",
         sample + ", |z_{vertex}^{truth}| < 60 cm",
-        "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7, after " + value.selection,
+        "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7",
+        "after " + value.selection + " cut",
         pi0_tagging,
         eta_tagging};
   }
@@ -725,7 +726,8 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
                                  bool work_in_progress = false)
 {
   SetsPhenixStyle();
-  TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", kCanvasWidth, kCanvasHeight);
+  const int canvas_width = work_in_progress && detail == "detailed" ? 1300 : kCanvasWidth;
+  TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", canvas_width, kCanvasHeight);
   auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad", false, work_in_progress ? kWorkInProgressPadHeight : 0.62);
   THStack stack(("stack_" + detail + "_photon_candidate_composition").c_str(), "");
   for (std::size_t i = 0; i < components.size(); ++i)
@@ -761,8 +763,22 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   if (work_in_progress)
   {
     canvas.cd();
-    legends.push_back(std::make_unique<TLegend>(0.68, 0.76, 0.98, 0.98));
-    for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+    if (detail == "detailed")
+    {
+      legends.push_back(std::make_unique<TLegend>(0.42, 0.82, 0.64, 0.98));
+      legends.push_back(std::make_unique<TLegend>(0.64, 0.74, 0.99, 0.99));
+      for (std::size_t i : {std::size_t{7}, std::size_t{6}, std::size_t{0}}) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+      for (std::size_t i = 6; i-- > 1;)
+      {
+        const char* label = i == 3 ? "#pi^{0}: contaminated" : labels[i].c_str();
+        legends[1]->AddEntry(components[i], label, "f");
+      }
+    }
+    else
+    {
+      legends.push_back(std::make_unique<TLegend>(0.68, 0.76, 0.98, 0.98));
+      for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+    }
   }
   else if (detail == "detailed")
   {

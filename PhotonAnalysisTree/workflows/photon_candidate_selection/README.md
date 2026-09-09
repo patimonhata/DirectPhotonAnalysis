@@ -229,7 +229,7 @@ The merge also computes category-conditional survival fractions relative to the 
 
 These survival curves have independent category denominators and therefore are not stacked and do not sum to one. Their uncertainties use the same weighted subset-covariance calculation as the existing fractions. A zero-denominator bin is stored as zero in the ROOT histogram and omitted from the PDF graph. The merger validates the unweighted subset relation and the weighted sum-of-squared-weights subset relation for every selection, category, and bin.
 
-The partial schema is version 5. The merged candidate-composition schema is version 6 and the merged anchor-topology schema is version 5. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
+The partial schema is version 5. The merged candidate-composition schema is version 7 and the merged anchor-topology schema is version 5. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
 
 ### Shards and partial files
 
@@ -293,7 +293,7 @@ There is no DAG or automatic dependency. Confirm that all 16 jobs exited success
 `MergePythiaPhotonCandidateSelection.C` is the only merger. Its wrapper interface is:
 
 ~~~text
-run_merge.sh FAMILY PARTIAL_ROOT COMPOSITION_OUTPUT_BASE TOPOLOGY_OUTPUT_BASE
+run_merge.sh FAMILY PARTIAL_ROOT OUTPUT_BASE
 ~~~
 
 For example:
@@ -301,44 +301,33 @@ For example:
 ~~~bash
 PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge.sh \
   jet \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/cluster_e_gt_0p5/jet/partial \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/candidate_composition/cluster_e_gt_0p5/jet \
-  PhotonAnalysisTree/output/plots/photon_candidate_selection/region_a_pi0_anchor_topology/cluster_e_gt_0p5/jet
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/ClusterE0p2_Pi0Partner0p2/jet/partial \
+  PhotonAnalysisTree/output/plots/photon_candidate_selection/ClusterE0p2_Pi0Partner0p2/jet
 ~~~
 
 The merger requires shard 0 for each non-Jet12 sample and shards 0--9 for Jet12. It rejects missing or duplicate coverage, invalid shard ranges, inconsistent full-sample normalization, unexpected sample metadata, incompatible analysis/configuration metadata, incompatible axes, and invalid category partitions. It adds only counts and weighted spectra, then recomputes all fractions and errors.
 
-Composition output mirrors the topology selection layout:
+Both plot families share one output base and the same selection directories:
 
 ~~~text
-<COMPOSITION_OUTPUT_BASE>/
-├── selection_comparison.root
-├── kinematic/photon_candidate_composition*.pdf
-├── preselection/photon_candidate_composition*.pdf
-├── preselection_tight/photon_candidate_composition*.pdf
-├── preselection_isolation/photon_candidate_composition*.pdf
-├── region_a/photon_candidate_composition*.pdf
-└── region_a_tagging_veto/photon_candidate_composition*.pdf
+<OUTPUT_BASE>/
+├── candidate_composition.root
+├── pi0_anchor_topology.root
+├── kinematic/*.pdf
+├── preselection/*.pdf
+├── preselection_tight/*.pdf
+├── preselection_isolation/*.pdf
+├── region_a/*.pdf
+└── region_a_tagging_veto/*.pdf
 ~~~
 
-Each selection directory includes summary and detailed `*_survival_fraction_relative_to_kinematic*.pdf` plots in addition to the existing category-fraction stacks.
+Each selection contains five composition PDFs (summary, detailed and superdetailed category-fraction stacks, plus summary and detailed survival fractions) and eight topology PDFs. The superdetailed composition stack splits pi0 missing into the six diagnostic categories, normalized to all selected candidates. The six additional fraction histograms are saved in `candidate_composition.root`.
 
-The ROOT file has one directory per selection and includes unweighted and weighted spectra, photon purity, every category fraction, normalization inputs, and classification QA counters.
+Existing schema-5 partials can be reused. Before reusing their topology missing breakdown, the merger checks that missing counts, weighted yields and errors agree with composition in every bin, including underflow and overflow. A mismatch stops the merge rather than displaying a breakdown from a different population.
 
-Anchor-topology output:
+Both plot families use the same caption layout: collaboration label, sample family, truth vertex cut, candidate kinematics, selection, stored/anchor cluster threshold, and separate pi0/eta tagging energy thresholds and mass windows. Values come from validated production metadata; energies are shown to two decimal places. “Candidate cluster” does not imply an event-leading selection. “Stored/anchor clusters” describes `min_cluster_energy`: lower-energy clusters can still participate in tagging or truth-partner diagnostics, so a global “ignored” label would be inaccurate.
 
-~~~text
-<TOPOLOGY_OUTPUT_BASE>/
-├── selection_comparison.root
-├── kinematic/region_a_pi0_anchor_topology*.pdf
-├── preselection/region_a_pi0_anchor_topology*.pdf
-├── preselection_tight/region_a_pi0_anchor_topology*.pdf
-├── preselection_isolation/region_a_pi0_anchor_topology*.pdf
-├── region_a/region_a_pi0_anchor_topology*.pdf
-└── region_a_tagging_veto/region_a_pi0_anchor_topology*.pdf
-~~~
-
-Each selection directory includes summary and detailed `*_survival_fraction_relative_to_kinematic*.pdf` plots in addition to the existing spectra and category-fraction plots.
+Each ROOT file has one directory per selection. The composition file includes unweighted and weighted spectra, photon purity, category fractions, normalization inputs, and classification QA counters. Both families include summary and detailed `*_survival_fraction_relative_to_kinematic*.pdf` plots.
 
 The weighted anchor-topology spectra use the same logarithmic y-axis range, from `1e-2` to `5e6 pb/GeV`, for every selection so their absolute changes can be compared directly.
 

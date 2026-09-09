@@ -10,6 +10,7 @@ g++ -std=c++17 -I"$module_dir/src" $(root-config --cflags) "$module_dir/tests/te
   -L"$build_dir" -lPhotonAnalysisTree -o "$test_dir/classification"
 "$test_dir/classification"
 root -l -b -q "$module_dir/tests/test_candidate_metadata.C"
+root -l -b -q "$module_dir/tests/test_candidate_plot_content.C"
 for script in "$module_dir/workflows/photon_candidate_selection/"*.sh "$module_dir/workflows/pi0_anchor_topology/"*.sh; do
   bash -n "$script"
 done

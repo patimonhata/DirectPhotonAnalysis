@@ -17,6 +17,7 @@
 #include <array>
 #include <cmath>
 #include <iostream>
+#include <iomanip>
 #include <numeric>
 #include <memory>
 #include <set>
@@ -396,29 +397,49 @@ void style_axes(TH1* histogram, const char* y_title)
   histogram->GetYaxis()->SetTitleOffset(1.15);
 }
 
-void draw_annotations(const std::string& family_label)
+struct PlotCaption
+{
+  std::string family;
+  std::string selection;
+  double min_cluster_energy = 0.0;
+  double pi0_partner_min_energy = 0.0;
+  double eta_partner_min_energy = 0.0;
+  double pi0_mass_min = 0.0;
+  double pi0_mass_max = 0.0;
+  double eta_mass_min = 0.0;
+  double eta_mass_max = 0.0;
+};
+PlotCaption plot_caption;
+
+std::vector<std::string> caption_lines(const PlotCaption& value)
+{
+  const auto number = [](double x) { std::ostringstream out; out << std::fixed << std::setprecision(2) << x; return out.str(); };
+  return {
+      "#it{#bf{sPHENIX}} Internal",
+      value.family == "jet" ? "Pythia 8 p+p Jet samples" : "Pythia 8 p+p PhotonJet samples",
+      "|z_{vertex}^{truth}| < 60 cm",
+      "Candidate cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7",
+      value.selection,
+      "Stored/anchor clusters: E > " + number(value.min_cluster_energy) + " GeV",
+      "#pi^{0} tagging: E_{partner} > " + number(value.pi0_partner_min_energy) + "; " + number(value.pi0_mass_min) + " < m < " + number(value.pi0_mass_max) + " GeV",
+      "#eta tagging: E_{partner} > " + number(value.eta_partner_min_energy) + "; " + number(value.eta_mass_min) + " < m < " + number(value.eta_mass_max) + " GeV"};
+}
+
+void draw_annotations()
 {
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  label.SetTextSize(0.026);
-  label.DrawLatex(0.06, 0.96, "#it{#bf{sPHENIX}} Internal");
-  double y = 0.91;
-  std::size_t begin = 0;
-  while (begin <= family_label.size())
+  const auto lines = caption_lines(plot_caption);
+  for (std::size_t i = 0; i < lines.size(); ++i)
   {
-    const std::size_t end = family_label.find('\n', begin);
-    label.DrawLatex(0.06, y, family_label.substr(begin, end == std::string::npos ? end : end - begin).c_str());
-    y -= 0.05;
-    if (end == std::string::npos) break;
-    begin = end + 1U;
+    label.SetTextSize(i == 0 ? 0.028 : (i >= 6 ? 0.019 : 0.021));
+    label.DrawLatex(0.055, 0.965 - 0.041 * i, lines[i].c_str());
   }
-  label.DrawLatex(0.06, y, "5 < E_{T} < 35 GeV, |#eta| < 0.7");
-  label.DrawLatex(0.06, y - 0.05, "|z_{vtx}^{truth}| < 60 cm");
 }
 
 void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& density, const std::vector<std::size_t>& indices,
-                   const std::string& output_path, const std::string& family_label, bool detailed)
+                   const std::string& output_path, bool detailed)
 {
   TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum").c_str(), "", kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum_pad", true);
@@ -427,13 +448,13 @@ void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& dens
   density[indices.front()]->Draw("HIST");
   for (std::size_t position = 1; position < indices.size(); ++position) density[indices[position]]->Draw("HIST SAME");
   canvas.cd();
-  TLegend legend(detailed ? 0.48 : 0.56, detailed ? 0.62 : 0.68, 0.95, 0.97);
+  TLegend legend(0.57, detailed ? 0.62 : 0.68, 0.98, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(detailed ? 0.016 : 0.024);
   for (std::size_t index : indices) legend.AddEntry(density[index].get(), kLabels[index].c_str(), "l");
   legend.Draw();
-  draw_annotations(family_label);
+  draw_annotations();
   plot_pad->cd();
   plot_pad->RedrawAxis();
   canvas.cd();
@@ -475,7 +496,7 @@ std::vector<std::unique_ptr<TH1D>> make_fractions(const std::array<std::unique_p
 }
 
 void draw_fraction_lines(const std::vector<std::unique_ptr<TH1D>>& fractions, const std::vector<std::size_t>& indices,
-                         const std::string& output_path, const std::string& family_label, bool detailed)
+                         const std::string& output_path, bool detailed)
 {
   TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction").c_str(), "", kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_pad");
@@ -484,13 +505,13 @@ void draw_fraction_lines(const std::vector<std::unique_ptr<TH1D>>& fractions, co
   fractions.front()->Draw("E1");
   for (std::size_t index = 1; index < fractions.size(); ++index) fractions[index]->Draw("E1 SAME");
   canvas.cd();
-  TLegend legend(detailed ? 0.48 : 0.56, detailed ? 0.62 : 0.73, 0.95, 0.97);
+  TLegend legend(0.57, detailed ? 0.62 : 0.73, 0.98, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(detailed ? 0.018 : 0.024);
   for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "lep");
   legend.Draw();
-  draw_annotations(family_label);
+  draw_annotations();
   plot_pad->cd();
   plot_pad->RedrawAxis();
   canvas.cd();
@@ -498,7 +519,7 @@ void draw_fraction_lines(const std::vector<std::unique_ptr<TH1D>>& fractions, co
 }
 
 void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const std::vector<std::size_t>& indices,
-                         const std::string& output_path, const std::string& family_label, bool detailed)
+                         const std::string& output_path, bool detailed)
 {
   TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack").c_str(), "", kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack_pad");
@@ -522,13 +543,13 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
   stack.GetXaxis()->CenterTitle();
   stack.GetYaxis()->CenterTitle();
   canvas.cd();
-  TLegend legend(detailed ? 0.48 : 0.56, detailed ? 0.62 : 0.73, 0.95, 0.97);
+  TLegend legend(0.57, detailed ? 0.62 : 0.73, 0.98, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(detailed ? 0.018 : 0.024);
   for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "f");
   legend.Draw();
-  draw_annotations(family_label);
+  draw_annotations();
   plot_pad->cd();
   plot_pad->RedrawAxis();
   canvas.cd();
@@ -673,41 +694,18 @@ std::size_t pi0_category(int topology)
   return topology == 0 ? pi0_other : category_count;
 }
 
-void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output,
-                const std::string& family, const std::string& selection, double min_cluster_energy, bool detailed)
+void draw_composition_components(const std::vector<TH1D*>& components, const std::vector<std::string>& labels,
+                                 const std::vector<int>& colors, const std::string& output, const std::string& detail)
 {
   SetsPhenixStyle();
-  const std::string detail = detailed ? "detailed" : "summary";
   TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad");
   THStack stack(("stack_" + detail + "_photon_candidate_composition").c_str(), "");
-  std::unique_ptr<TH1D> pi0_fraction;
-  if (detailed)
+  for (std::size_t i = 0; i < components.size(); ++i)
   {
-    for (std::size_t index = 1; index < category_count; ++index)
-    {
-      fractions[index]->SetFillColor(kColors[index]);
-      fractions[index]->SetLineColor(kBlack);
-      stack.Add(fractions[index].get());
-    }
-  }
-  else
-  {
-    pi0_fraction.reset(static_cast<TH1D*>(fractions[pi0_separated]->Clone("h_candidate_pi0_fraction")));
-    pi0_fraction->Reset("ICES");
-    pi0_fraction->SetDirectory(nullptr);
-    for (std::size_t index = pi0_separated; index <= pi0_other; ++index) pi0_fraction->Add(fractions[index].get());
-    pi0_fraction->SetFillColor(kColors[pi0_separated]);
-    pi0_fraction->SetLineColor(kBlack);
-    for (std::size_t index : {prompt, eta, other})
-    {
-      fractions[index]->SetFillColor(kColors[index]);
-      fractions[index]->SetLineColor(kBlack);
-    }
-    stack.Add(fractions[prompt].get());
-    stack.Add(pi0_fraction.get());
-    stack.Add(fractions[eta].get());
-    stack.Add(fractions[other].get());
+    components[i]->SetFillColor(colors[i]);
+    components[i]->SetLineColor(kBlack);
+    stack.Add(components[i]);
   }
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
@@ -723,39 +721,87 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
   stack.GetXaxis()->SetTitleOffset(1.4);
   stack.GetYaxis()->SetTitleOffset(1.15);
   canvas.cd();
-  TLegend legend(detailed ? 0.48 : 0.56, detailed ? 0.60 : 0.73, 0.95, 0.97);
+  TLegend legend(0.57, detail == "summary" ? 0.77 : 0.635, 0.99, 0.97);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(detailed ? 0.018 : 0.024);
-  if (detailed)
-  {
-    for (std::size_t index = 1; index < category_count; ++index) legend.AddEntry(fractions[index].get(), kLabels[index], "f");
-  }
-  else
-  {
-    legend.AddEntry(fractions[prompt].get(), kLabels[prompt], "f");
-    legend.AddEntry(pi0_fraction.get(), "#pi^{0}", "f");
-    legend.AddEntry(fractions[eta].get(), kLabels[eta], "f");
-    legend.AddEntry(fractions[other].get(), kLabels[other], "f");
-  }
+  legend.SetTextSize(detail == "superdetailed" ? 0.014 : (detail == "detailed" ? 0.018 : 0.024));
+  for (std::size_t i = 0; i < components.size(); ++i) legend.AddEntry(components[i], labels[i].c_str(), "f");
   legend.Draw();
-  TLatex label;
-  label.SetNDC();
-  label.SetTextAlign(13);
-  label.SetTextSize(0.026);
-  label.DrawLatex(0.06, 0.96, "#it{#bf{sPHENIX}} Internal");
-  label.DrawLatex(0.06, 0.91, (family == "jet" ? "Pythia8 p+p Jet samples" : "Pythia8 p+p PhotonJet samples"));
-  const auto found = std::find(kSelectionKeys.begin(), kSelectionKeys.end(), selection);
-  const std::size_t selection_index = static_cast<std::size_t>(std::distance(kSelectionKeys.begin(), found));
-  label.DrawLatex(0.06, 0.86, found == kSelectionKeys.end() ? selection.c_str() : kSelectionLabels[selection_index]);
-  std::ostringstream threshold;
-  threshold << "E_{cluster} > " << min_cluster_energy << " GeV; truth contribution > 50%";
-  label.DrawLatex(0.06, 0.81, threshold.str().c_str());
+  draw_annotations();
   plot_pad->cd();
   plot_pad->RedrawAxis();
   canvas.cd();
   canvas.SaveAs(output.c_str());
 }
+
+void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output, bool detailed)
+{
+  std::vector<TH1D*> components;
+  std::vector<std::string> labels;
+  std::vector<int> colors;
+  const auto add = [&](std::size_t i) { components.push_back(fractions[i].get()); labels.emplace_back(kLabels[i]); colors.push_back(kColors[i]); };
+  std::unique_ptr<TH1D> pi0_fraction;
+  if (detailed)
+  {
+    for (std::size_t i = 1; i < category_count; ++i) add(i);
+  }
+  else
+  {
+    pi0_fraction.reset(static_cast<TH1D*>(fractions[pi0_separated]->Clone("h_candidate_pi0_fraction")));
+    pi0_fraction->Reset("ICES");
+    pi0_fraction->SetDirectory(nullptr);
+    for (std::size_t i = pi0_separated; i <= pi0_other; ++i) pi0_fraction->Add(fractions[i].get());
+    add(prompt);
+    components.push_back(pi0_fraction.get()); labels.emplace_back("#pi^{0}"); colors.push_back(kColors[pi0_separated]);
+    add(eta);
+    add(other);
+  }
+  draw_composition_components(components, labels, colors, output, detailed ? "detailed" : "summary");
+}
+
+constexpr std::array<std::size_t, 6> kMissingSpectrumIndices = {6, 7, 9, 10, 8, 11};
+
+std::vector<std::unique_ptr<TH1D>> composition_missing_fractions(const Histograms& composition, const Spectra& topology)
+{
+  // Topology includes half-boundary/overlap anchors excluded from composition. Reuse its split only when the populations agree.
+  for (int bin = 0; bin <= composition.counts[pi0_missing]->GetNbinsX() + 1; ++bin)
+  {
+    if (!same_double(composition.counts[pi0_missing]->GetBinContent(bin), topology.counts[5]->GetBinContent(bin)) ||
+        !same_double(composition.weighted[pi0_missing]->GetBinContent(bin), topology.weighted_pb[5]->GetBinContent(bin)) ||
+        !same_double(composition.weighted[pi0_missing]->GetBinError(bin), topology.weighted_pb[5]->GetBinError(bin))) return {};
+  }
+  std::vector<std::unique_ptr<TH1D>> result;
+  for (std::size_t index : kMissingSpectrumIndices)
+    result.push_back(fraction_histogram(*topology.weighted_pb[index], *composition.weighted[denominator], std::string("h_candidate_pi0_") + ::kKeys[index] + "_fraction"));
+  return result;
+}
+
+void draw_superdetailed_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions,
+                              const std::vector<std::unique_ptr<TH1D>>& missing, const std::string& output)
+{
+  std::vector<TH1D*> components;
+  std::vector<std::string> labels;
+  std::vector<int> colors;
+  for (std::size_t i = 1; i < category_count; ++i)
+  {
+    if (i == pi0_missing)
+    {
+      for (std::size_t j = 0; j < missing.size(); ++j)
+      {
+        const std::size_t index = kMissingSpectrumIndices[j];
+        components.push_back(missing[j].get());
+        labels.push_back("#pi^{0}: " + ::kLabels[index]);
+        colors.push_back(::kColors[index]);
+      }
+    }
+    else
+    {
+      components.push_back(fractions[i].get()); labels.emplace_back(kLabels[i]); colors.push_back(kColors[i]);
+    }
+  }
+  draw_composition_components(components, labels, colors, output, "superdetailed");
+}
+
 }
 
 int ReducePythiaPhotonCandidateSelection(

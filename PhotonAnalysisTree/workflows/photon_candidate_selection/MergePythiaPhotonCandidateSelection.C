@@ -90,7 +90,6 @@ std::array<std::unique_ptr<TH1D>, kCandidateOriginCount> make_candidate_origin_d
   {
     density[index]->Scale(1.0, "width");
     density[index]->SetLineColor(kCandidateOriginColors[index]);
-    density[index]->SetLineWidth(3);
     style_axes(density[index].get(), "Weighted Counts [a.u.]");
   }
   return density;
@@ -104,12 +103,13 @@ void draw_candidate_origin_spectrum(const std::array<std::unique_ptr<TH1D>, kCan
   auto plot_pad = make_plot_pad(selection_key + "_candidate_origin_spectrum_pad", true, kWorkInProgressPadHeight);
   auto frame = make_work_in_progress_frame(*density.front(), "h_" + selection_key + "_candidate_origin_frame", "Weighted Counts [a.u.]",
                                            kSpectrumYMinimum, kSpectrumYMaximum);
+  scale_axes_to_canvas(frame.get(), kWorkInProgressPadHeight);
+  frame->GetYaxis()->SetTitleOffset(1.0);
   frame->Draw("AXIS");
   for (const auto& histogram : density) histogram->Draw("HIST SAME");
-  TLegend legend(0.52, 0.58, 0.94, 0.94);
-  legend.SetBorderSize(0);
+  TLegend legend(0.42, 0.58, 0.94, 0.94);
+  scale_legend_to_canvas(legend, kWorkInProgressPadHeight);
   legend.SetFillStyle(0);
-  // legend.SetTextSize(0.030);
   for (std::size_t index = 0; index < kCandidateOriginCount; ++index) legend.AddEntry(density[index].get(), kCandidateOriginLabels[index], "l");
   legend.Draw();
   plot_pad->RedrawAxis();
@@ -330,23 +330,17 @@ std::unique_ptr<TH1D> sum_histograms(const std::vector<const TH1D*>& inputs, con
 
 std::unique_ptr<SurvivalCurve> make_survival_curve(const TH1D& numerator, const TH1D& denominator,
                                                    const std::string& name, const std::string& label,
-                                                   int color, int marker_style)
+                                                   int color)
 {
   auto curve = std::make_unique<SurvivalCurve>();
   curve->histogram = candidate_composition::fraction_histogram(numerator, denominator, name);
   curve->histogram->SetLineColor(color);
   curve->histogram->SetMarkerColor(color);
-  curve->histogram->SetMarkerStyle(marker_style);
-  curve->histogram->SetMarkerSize(0.9);
-  curve->histogram->SetLineWidth(2);
-  style_axes(curve->histogram.get(), "Survival fraction relative to Kinematic");
+  style_axes(curve->histogram.get(), "#splitline{Survival fraction}{relative to Kinematic}");
   curve->graph = std::make_unique<TGraphErrors>();
   curve->graph->SetName((name + "_valid_bins").c_str());
   curve->graph->SetLineColor(color);
   curve->graph->SetMarkerColor(color);
-  curve->graph->SetMarkerStyle(marker_style);
-  curve->graph->SetMarkerSize(0.9);
-  curve->graph->SetLineWidth(2);
   curve->label = label;
   for (int bin = 1; bin <= denominator.GetNbinsX(); ++bin)
   {
@@ -367,11 +361,12 @@ void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const
 {
   SetsPhenixStyle();
   TCanvas canvas(canvas_name.c_str(), "", kCanvasWidth, kCanvasHeight);
-  auto plot_pad = make_plot_pad(canvas_name + "_pad", false, work_in_progress ? kWorkInProgressPadHeight : 0.62);
+  const double plot_height = work_in_progress ? kWorkInProgressPadHeight : kPlotPadHeight;
+  auto plot_pad = make_plot_pad(canvas_name + "_pad", false, plot_height);
   std::unique_ptr<TH1D> frame;
   if (work_in_progress)
   {
-    frame = make_work_in_progress_frame(axis_source, canvas_name + "_frame", "Survival fraction relative to Kinematic", 0.0, 1.05);
+    frame = make_work_in_progress_frame(axis_source, canvas_name + "_frame", "#splitline{Survival fraction}{relative to Kinematic}", 0.0, 1.05);
   }
   else
   {
@@ -380,8 +375,10 @@ void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const
     frame->Reset("ICES");
     frame->SetMinimum(0.0);
     frame->SetMaximum(1.05);
-    style_axes(frame.get(), "Survival fraction relative to Kinematic");
+    style_axes(frame.get(), "#splitline{Survival fraction}{relative to Kinematic}");
   }
+  scale_axes_to_canvas(frame.get(), plot_height);
+  frame->GetYaxis()->SetTitleOffset(1.0);
   frame->Draw("AXIS");
   for (const SurvivalCurve* curve : curves) curve->graph->Draw("PE1 SAME");
   std::vector<std::unique_ptr<TLegend>> legends;
@@ -407,9 +404,8 @@ void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const
   }
   for (auto& legend : legends)
   {
-    legend->SetBorderSize(0);
+    if (work_in_progress) scale_legend_to_canvas(*legend, plot_height);
     legend->SetFillStyle(0);
-    // legend->SetTextSize(work_in_progress ? 0.030 : (split_candidate_categories ? 0.021 : (detailed ? 0.016 : 0.027)));
     legend->Draw();
   }
   if (work_in_progress) plot_pad->RedrawAxis();
@@ -657,7 +653,7 @@ int MergePythiaPhotonCandidateSelection(
       const std::string label = index == denominator ? "All candidates" : candidate_composition::kLabels[index];
       const int color = index == denominator ? kBlack : candidate_composition::kColors[index];
       survival[index] = make_survival_curve(*histograms.weighted[index], *composition_histograms[0]->weighted[index],
-          "h_candidate_" + key + "_survival_fraction_relative_to_kinematic", label, color, 20 + static_cast<int>(index));
+          "h_candidate_" + key + "_survival_fraction_relative_to_kinematic", label, color);
     }
     std::vector<const TH1D*> selected_pi0_inputs, kinematic_pi0_inputs;
     for (std::size_t index = pi0_separated; index <= pi0_other; ++index)
@@ -669,7 +665,7 @@ int MergePythiaPhotonCandidateSelection(
     auto kinematic_pi0 = sum_histograms(kinematic_pi0_inputs, "h_kinematic_pi0_for_survival");
     if (!selected_pi0 || !kinematic_pi0) return 7;
     auto pi0_survival = make_survival_curve(*selected_pi0, *kinematic_pi0,
-        "h_candidate_pi0_survival_fraction_relative_to_kinematic", "#pi^{0}", candidate_composition::kColors[pi0_separated], 22);
+        "h_candidate_pi0_survival_fraction_relative_to_kinematic", "#pi^{0}", candidate_composition::kColors[pi0_separated]);
     const std::vector<const SurvivalCurve*> summary_survival = {
         survival[prompt].get(), pi0_survival.get(), survival[eta].get(), survival[other].get()};
     const std::vector<const SurvivalCurve*> detailed_survival = {
@@ -798,7 +794,6 @@ int MergePythiaPhotonCandidateSelection(
       density[index]->SetDirectory(nullptr);
       density[index]->Scale(1.0, "width");
       density[index]->SetLineColor(::kColors[index]);
-      density[index]->SetLineWidth(index < 2 ? 3 : 2);
       style_axes(density[index].get(), "Weighted Counts [a.u.]");
       spectra.counts[index]->SetLineColor(::kColors[index]);
       spectra.weighted_pb[index]->SetLineColor(::kColors[index]);
@@ -823,7 +818,7 @@ int MergePythiaPhotonCandidateSelection(
       const std::string label = index == 1 ? "All #pi^{0}-main anchors" : ::kLabels[index];
       topology_survival[index] = make_survival_curve(*spectra.weighted_pb[index], *topology_histograms[0]->weighted_pb[index],
           std::string("h_") + kSelectionKeys[topology_selection] + "_" + ::kKeys[index] + "_survival_fraction_relative_to_kinematic",
-          label, color, 19 + static_cast<int>(index));
+          label, color);
     }
     std::vector<const SurvivalCurve*> topology_summary_survival = {topology_survival[1].get()};
     for (std::size_t index : summary_category_indices) topology_summary_survival.push_back(topology_survival[index].get());

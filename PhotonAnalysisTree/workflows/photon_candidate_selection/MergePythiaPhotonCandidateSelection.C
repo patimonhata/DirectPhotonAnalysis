@@ -382,9 +382,9 @@ void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const
   {
     legends.push_back(std::make_unique<TLegend>(0.48, 0.70, 0.71, 0.97));
     legends.push_back(std::make_unique<TLegend>(0.69, 0.64, 0.99, 0.97));
-    for (std::size_t i : {std::size_t{0}, std::size_t{1}, curves.size() - 2, curves.size() - 1})
+    for (std::size_t i : {std::size_t{0}, curves.size() - 2, curves.size() - 1})
       legends[0]->AddEntry(curves[i]->graph.get(), curves[i]->label.c_str(), "lep");
-    for (std::size_t i = 2; i + 2 < curves.size(); ++i) legends[1]->AddEntry(curves[i]->graph.get(), curves[i]->label.c_str(), "lep");
+    for (std::size_t i = 1; i + 2 < curves.size(); ++i) legends[1]->AddEntry(curves[i]->graph.get(), curves[i]->label.c_str(), "lep");
   }
   else
   {
@@ -615,11 +615,13 @@ int MergePythiaPhotonCandidateSelection(
     }
     const std::string selection_output_base = output_base + "/" + kSelectionKeys[composition_selection] + "/photon_candidate_composition";
     if (!make_output_directory(selection_output_base)) return 7;
-    const std::string work_in_progress_output = output_base + "/" + kSelectionKeys[composition_selection] + "/workinprogress/region_a_candidate_truth_origin.pdf";
+    const std::string work_in_progress_base = output_base + "/" + kSelectionKeys[composition_selection] + "/workinprogress";
+    const std::string work_in_progress_output = work_in_progress_base + "/region_a_candidate_truth_origin.pdf";
     if (!make_output_directory(work_in_progress_output)) return 7;
     auto origin_density = make_candidate_origin_density(histograms, std::string("h_") + kSelectionKeys[composition_selection] + "_candidate_origin_");
     draw_candidate_origin_spectrum(origin_density, work_in_progress_output, kSelectionKeys[composition_selection]);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack.pdf", false);
+    draw_stack(fractions, work_in_progress_base + "/photon_candidate_composition_category_fraction_stack.pdf", false);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack_detailed.pdf", true);
     auto missing_fractions = composition_missing_fractions(histograms, *topology_histograms[composition_selection]);
     if (missing_fractions.size() != kMissingSpectrumIndices.size())
@@ -649,9 +651,9 @@ int MergePythiaPhotonCandidateSelection(
     auto pi0_survival = make_survival_curve(*selected_pi0, *kinematic_pi0,
         "h_candidate_pi0_survival_fraction_relative_to_kinematic", "#pi^{0}", candidate_composition::kColors[pi0_separated], 22);
     const std::vector<const SurvivalCurve*> summary_survival = {
-        survival[denominator].get(), survival[prompt].get(), pi0_survival.get(), survival[eta].get(), survival[other].get()};
+        survival[prompt].get(), pi0_survival.get(), survival[eta].get(), survival[other].get()};
     const std::vector<const SurvivalCurve*> detailed_survival = {
-        survival[denominator].get(), survival[prompt].get(), survival[pi0_separated].get(), survival[pi0_merged].get(),
+        survival[prompt].get(), survival[pi0_separated].get(), survival[pi0_merged].get(),
         survival[pi0_single_contaminated].get(), survival[pi0_missing].get(), survival[pi0_other].get(), survival[eta].get(), survival[other].get()};
     draw_survival_curves(summary_survival, *histograms.weighted[denominator],
         selection_output_base + "_survival_fraction_relative_to_kinematic.pdf",
@@ -659,6 +661,9 @@ int MergePythiaPhotonCandidateSelection(
     draw_survival_curves(detailed_survival, *histograms.weighted[denominator],
         selection_output_base + "_survival_fraction_relative_to_kinematic_detailed.pdf",
         std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_detailed", true, true);
+    draw_survival_curves(summary_survival, *histograms.weighted[denominator],
+        work_in_progress_base + "/photon_candidate_composition_survival_fraction_relative_to_kinematic.pdf",
+        std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_workinprogress", false);
     TDirectory* directory = composition_output.mkdir(kSelectionKeys[composition_selection]);
     if (!directory) return 7;
     directory->cd();

@@ -61,6 +61,8 @@ void set_missing_labels(double low, double high)
 }
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 900;
+constexpr double kWorkInProgressEtMaximum = 45.0;
+constexpr double kWorkInProgressPadHeight = 0.76;
 constexpr double kSpectrumYMinimum = 1e-2;
 constexpr double kSpectrumYMaximum = 5e6;
 constexpr Long64_t kEventTreeCacheSize = 64LL * 1024LL * 1024LL;
@@ -368,9 +370,9 @@ bool make_output_directory(const std::string& output_base)
   return directory.empty() || !gSystem->AccessPathName(directory.c_str()) || gSystem->mkdir(directory.c_str(), true) == 0;
 }
 
-std::unique_ptr<TPad> make_plot_pad(const std::string& name, bool log_y = false)
+std::unique_ptr<TPad> make_plot_pad(const std::string& name, bool log_y = false, double height = 0.62)
 {
-  auto pad = std::make_unique<TPad>(name.c_str(), "", 0.0, 0.0, 1.0, 0.62);
+  auto pad = std::make_unique<TPad>(name.c_str(), "", 0.0, 0.0, 1.0, height);
   pad->SetLeftMargin(0.13);
   pad->SetRightMargin(0.04);
   pad->SetBottomMargin(0.16);
@@ -397,6 +399,18 @@ void style_axes(TH1* histogram, const char* y_title)
   histogram->GetYaxis()->SetTitleOffset(1.15);
 }
 
+std::unique_ptr<TH1D> make_work_in_progress_frame(const TH1D& source, const std::string& name, const char* y_title, double minimum, double maximum)
+{
+  auto frame = std::unique_ptr<TH1D>(static_cast<TH1D*>(source.Clone(name.c_str())));
+  frame->SetDirectory(nullptr);
+  frame->Reset("ICES");
+  frame->SetBins(source.GetNbinsX(), 0.0, kWorkInProgressEtMaximum);
+  frame->SetMinimum(minimum);
+  frame->SetMaximum(maximum);
+  style_axes(frame.get(), y_title);
+  return frame;
+}
+
 struct PlotCaption
 {
   std::string family;
@@ -411,29 +425,42 @@ struct PlotCaption
 };
 PlotCaption plot_caption;
 
-std::vector<std::string> caption_lines(const PlotCaption& value)
+std::vector<std::string> caption_lines(const PlotCaption& value, bool work_in_progress = false)
 {
   const auto number = [](double x) { std::ostringstream out; out << std::fixed << std::setprecision(2) << x; return out.str(); };
+  const std::string sample = value.family == "jet" ? "Pythia 8 p+p Jet samples" : "Pythia 8 p+p PhotonJet samples";
+  const std::string pi0_tagging = "#pi^{0} tagging: E_{partner} > " + number(value.pi0_partner_min_energy) + "; " + number(value.pi0_mass_min) + " < m < " + number(value.pi0_mass_max) + " GeV";
+  const std::string eta_tagging = "#eta tagging: E_{partner} > " + number(value.eta_partner_min_energy) + "; " + number(value.eta_mass_min) + " < m < " + number(value.eta_mass_max) + " GeV";
+  if (work_in_progress)
+  {
+    return {
+        "#it{#bf{sPHENIX}} Internal",
+        sample + ", |z_{vertex}^{truth}| < 60 cm",
+        "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7, after " + value.selection,
+        pi0_tagging,
+        eta_tagging};
+  }
   return {
       "#it{#bf{sPHENIX}} Internal",
-      value.family == "jet" ? "Pythia 8 p+p Jet samples, |z_{vertex}^{truth}| < 60 cm" : "Pythia 8 p+p PhotonJet samples, |z_{vertex}^{truth}| < 60 cm",
+      sample + ", |z_{vertex}^{truth}| < 60 cm",
       "Candidate cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7",
       value.selection,
       "Stored/anchor clusters: E > " + number(value.min_cluster_energy) + " GeV",
-      "#pi^{0} tagging: E_{partner} > " + number(value.pi0_partner_min_energy) + "; " + number(value.pi0_mass_min) + " < m < " + number(value.pi0_mass_max) + " GeV",
-      "#eta tagging: E_{partner} > " + number(value.eta_partner_min_energy) + "; " + number(value.eta_mass_min) + " < m < " + number(value.eta_mass_max) + " GeV"};
+      pi0_tagging,
+      eta_tagging};
 }
 
-void draw_annotations()
+void draw_annotations(bool work_in_progress = false)
 {
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
-  const auto lines = caption_lines(plot_caption);
+  label.SetTextColor(kBlack);
+  const auto lines = caption_lines(plot_caption, work_in_progress);
   for (std::size_t i = 0; i < lines.size(); ++i)
   {
     label.SetTextSize(i == 0 ? 0.034 : 0.024);
-    label.DrawLatex(0.055, 0.965 - 0.041 * i, lines[i].c_str());
+    label.DrawLatex(0.055, (work_in_progress ? 0.975 : 0.965) - 0.041 * i, lines[i].c_str());
   }
 }
 
@@ -694,11 +721,12 @@ std::size_t pi0_category(int topology)
 }
 
 void draw_composition_components(const std::vector<TH1D*>& components, const std::vector<std::string>& labels,
-                                 const std::vector<int>& colors, const std::string& output, const std::string& detail)
+                                 const std::vector<int>& colors, const std::string& output, const std::string& detail,
+                                 bool work_in_progress = false)
 {
   SetsPhenixStyle();
   TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", kCanvasWidth, kCanvasHeight);
-  auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad");
+  auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad", false, work_in_progress ? kWorkInProgressPadHeight : 0.62);
   THStack stack(("stack_" + detail + "_photon_candidate_composition").c_str(), "");
   for (std::size_t i = 0; i < components.size(); ++i)
   {
@@ -708,21 +736,37 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   }
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
-  stack.Draw("HIST");
-  stack.GetXaxis()->SetTitle("Candidate Cluster E_{T} [GeV]");
-  stack.GetYaxis()->SetTitle("Fraction of selected candidates");
-  for (TAxis* axis : {stack.GetXaxis(), stack.GetYaxis()})
+  std::unique_ptr<TH1D> frame;
+  if (work_in_progress)
   {
-    axis->SetLabelSize(0.05);
-    axis->SetTitleSize(0.05);
-    axis->CenterTitle();
+    frame = make_work_in_progress_frame(*components.front(), "h_workinprogress_candidate_composition_frame", "Fraction of selected candidates", 0.0, 1.05);
+    frame->Draw("AXIS");
+    stack.Draw("HIST SAME");
   }
-  stack.GetXaxis()->SetTitleOffset(1.4);
-  stack.GetYaxis()->SetTitleOffset(1.15);
-  canvas.cd();
-  std::vector<std::unique_ptr<TLegend>> legends;
-  if (detail == "detailed")
+  else
   {
+    stack.Draw("HIST");
+    stack.GetXaxis()->SetTitle("Candidate Cluster E_{T} [GeV]");
+    stack.GetYaxis()->SetTitle("Fraction of selected candidates");
+    for (TAxis* axis : {stack.GetXaxis(), stack.GetYaxis()})
+    {
+      axis->SetLabelSize(0.05);
+      axis->SetTitleSize(0.05);
+      axis->CenterTitle();
+    }
+    stack.GetXaxis()->SetTitleOffset(1.4);
+    stack.GetYaxis()->SetTitleOffset(1.15);
+  }
+  std::vector<std::unique_ptr<TLegend>> legends;
+  if (work_in_progress)
+  {
+    canvas.cd();
+    legends.push_back(std::make_unique<TLegend>(0.68, 0.76, 0.98, 0.98));
+    for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+  }
+  else if (detail == "detailed")
+  {
+    canvas.cd();
     legends.push_back(std::make_unique<TLegend>(0.50, 0.75, 0.73, 0.97));
     legends.push_back(std::make_unique<TLegend>(0.71, 0.64, 0.99, 0.97));
     for (std::size_t i : {std::size_t{0}, std::size_t{6}, std::size_t{7}}) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
@@ -730,6 +774,7 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   }
   else
   {
+    canvas.cd();
     legends.push_back(std::make_unique<TLegend>(0.57, detail == "summary" ? 0.75 : 0.635, 0.99, 0.97));
     for (std::size_t i = 0; i < components.size(); ++i) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
   }
@@ -737,17 +782,22 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   {
     legend->SetBorderSize(0);
     legend->SetFillStyle(0);
-    legend->SetTextSize(detail == "superdetailed" ? 0.014 : (detail == "detailed" ? 0.022 : 0.028));
+    // legend->SetTextSize(work_in_progress ? 0.032 : (detail == "superdetailed" ? 0.014 : (detail == "detailed" ? 0.022 : 0.028)));
     legend->Draw();
   }
-  draw_annotations();
-  plot_pad->cd();
-  plot_pad->RedrawAxis();
+  if (work_in_progress) plot_pad->RedrawAxis();
   canvas.cd();
+  draw_annotations(work_in_progress);
+  if (!work_in_progress)
+  {
+    plot_pad->cd();
+    plot_pad->RedrawAxis();
+    canvas.cd();
+  }
   canvas.SaveAs(output.c_str());
 }
 
-void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output, bool detailed)
+void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output, bool detailed, bool work_in_progress = false)
 {
   std::vector<TH1D*> components;
   std::vector<std::string> labels;
@@ -769,7 +819,7 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
     add(eta);
     add(other);
   }
-  draw_composition_components(components, labels, colors, output, detailed ? "detailed" : "summary");
+  draw_composition_components(components, labels, colors, output, detailed ? "detailed" : "summary", work_in_progress);
 }
 
 constexpr std::array<std::size_t, 6> kMissingSpectrumIndices = {6, 7, 9, 10, 8, 11};

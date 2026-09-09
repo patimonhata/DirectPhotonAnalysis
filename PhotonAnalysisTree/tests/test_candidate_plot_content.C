@@ -10,6 +10,10 @@ void test_candidate_plot_content(const std::string preview = "")
   assert(lines[3] == "Region A + Tagging veto");
   assert(lines[4] == "Stored/anchor clusters: E > 0.20 GeV");
   assert(lines[5].find("0.50") != std::string::npos && lines[6].find("0.70") != std::string::npos);
+  const auto work_in_progress_lines = caption_lines(plot_caption, true);
+  assert(work_in_progress_lines.size() == 5);
+  assert(work_in_progress_lines[2] == "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7, after Region A + Tagging veto");
+  assert(std::none_of(work_in_progress_lines.begin(), work_in_progress_lines.end(), [](const std::string& line) { return line.find("Stored/anchor") != std::string::npos; }));
   Histograms composition(2, 10.0);
   Spectra topology(2, 10.0);
   const std::array<int, category_count> counts = {0, 40, 15, 10, 5, 10, 5, 10, 5};
@@ -22,6 +26,9 @@ void test_candidate_plot_content(const std::string preview = "")
   assert(same_double(origin_density[3]->GetBinContent(2), 2.0));
   assert(std::string(origin_density[0]->GetXaxis()->GetTitle()) == "Candidate Cluster E_{T} [GeV]");
   assert(std::string(origin_density[0]->GetYaxis()->GetTitle()) == "Weighted Counts [a.u.]");
+  const auto work_in_progress_frame = make_work_in_progress_frame(*origin_density[0], "qa_work_in_progress_frame", "Weighted Counts [a.u.]", 0.0, 1.0);
+  assert(same_double(work_in_progress_frame->GetXaxis()->GetXmin(), 0.0));
+  assert(same_double(work_in_progress_frame->GetXaxis()->GetXmax(), 45.0));
   const std::array<int, 6> missing_counts = {1, 2, 3, 1, 1, 2};
   for (std::size_t i = 0; i < missing_counts.size(); ++i)
     for (int j = 0; j < missing_counts[i]; ++j) { topology.fill(5, 7.0, 2.0); topology.fill(kMissingSpectrumIndices[i], 7.0, 2.0); }

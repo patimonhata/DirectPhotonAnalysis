@@ -1,0 +1,27 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/tagging_mass_diagnostic
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/tagging_mass_diagnostic/run_reduce.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+request_memory     = 2GB
+Priority           = 20
+job_lease_duration = 86400
+
+family             = jet
+configuration      = ClusterE0p12_Pi0Partner0p5
+require_complete   = true
+map_root           = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/$(configuration)
+partial_root       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/reduce/$(configuration)/$(family)/partial
+output_base        = $(partial_root)/$(sample_name)/shard_0
+log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_mass_diagnostic/reduce
+
+Output             = $(log_directory)/$(family)_$(configuration)_$(sample_name)_shard_0.out
+Error              = $(log_directory)/$(family)_$(configuration)_$(sample_name)_shard_0.err
+Log                = /tmp/ryotaro-tagging-mass-$(family)-$(configuration)-$(sample_name)-shard-0.log
+
+Arguments          = "$(family) $(map_root) $(output_base) $(require_complete) $(sample_name) 0 1"
+
+# Override sample_names with condor_submit -append to retry a subset.
+sample_names = jet3,jet5,jet8,jet20,jet30,jet40
+Queue sample_name in $(sample_names)

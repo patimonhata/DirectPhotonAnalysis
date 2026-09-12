@@ -61,10 +61,9 @@ void set_missing_labels(double low, double high)
 }
 constexpr int kCanvasWidth = 1100;
 constexpr int kCanvasHeight = 1000;
-constexpr double kWorkInProgressEtMaximum = 40.0;
-constexpr double kPlotPadHeight = 0.55;
-constexpr double kWorkInProgressPadHeight = 0.68;
-constexpr double kWorkInProgressCompositionPlotWidth = 0.70;
+constexpr double kPlotEtMaximum = 40.0;
+constexpr double kPlotPadHeight = 0.68;
+constexpr double kCompositionPlotWidth = 0.70;
 constexpr double kSpectrumYMinimum = 1e-2;
 constexpr double kSpectrumYMaximum = 5e6;
 constexpr Long64_t kEventTreeCacheSize = 64LL * 1024LL * 1024LL;
@@ -410,12 +409,12 @@ void scale_legend_to_canvas(TLegend& legend, double pad_height)
   legend.SetTextSize(gStyle->GetLegendTextSize() / pad_height);
 }
 
-std::unique_ptr<TH1D> make_work_in_progress_frame(const TH1D& source, const std::string& name, const char* y_title, double minimum, double maximum)
+std::unique_ptr<TH1D> make_plot_frame(const TH1D& source, const std::string& name, const char* y_title, double minimum, double maximum)
 {
   auto frame = std::unique_ptr<TH1D>(static_cast<TH1D*>(source.Clone(name.c_str())));
   frame->SetDirectory(nullptr);
   frame->Reset("ICES");
-  frame->SetBins(source.GetNbinsX(), 0.0, kWorkInProgressEtMaximum);
+  frame->SetBins(source.GetNbinsX(), 0.0, kPlotEtMaximum);
   frame->SetMinimum(minimum);
   frame->SetMaximum(maximum);
   style_axes(frame.get(), y_title);
@@ -436,45 +435,34 @@ struct PlotCaption
 };
 PlotCaption plot_caption;
 
-std::vector<std::string> caption_lines(const PlotCaption& value, bool work_in_progress = false)
+std::vector<std::string> caption_lines(const PlotCaption& value)
 {
   const auto number = [](double x) { std::ostringstream out; out << std::fixed << std::setprecision(2) << x; return out.str(); };
   const std::string sample = value.family == "jet" ? "Pythia 8 p+p Jet samples" : "Pythia 8 p+p PhotonJet samples";
   const std::string pi0_tagging = "#pi^{0} tagging: E_{partner}>" + number(value.pi0_partner_min_energy) + " GeV; " + number(value.pi0_mass_min) + "< m <" + number(value.pi0_mass_max) + " GeV";
   const std::string eta_tagging = "#eta  tagging: E_{partner}>" + number(value.eta_partner_min_energy) + " GeV; " + number(value.eta_mass_min) + "< m <" + number(value.eta_mass_max) + " GeV";
-  if (work_in_progress)
-  {
-    const std::string candidate = value.selection == kSelectionLabels.front()
-        ? "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7"
-        : "Candidate Cluster: after " + value.selection;
-    return {
-        "#it{#bf{sPHENIX}} Internal",
-        sample + ", |z_{vertex}^{truth}| < 60 cm",
-        candidate,
-        pi0_tagging,
-        eta_tagging};
-  }
+  const std::string candidate = value.selection == kSelectionLabels.front()
+      ? "Candidate Cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7"
+      : "Candidate Cluster: after " + value.selection;
   return {
       "#it{#bf{sPHENIX}} Internal",
       sample + ", |z_{vertex}^{truth}| < 60 cm",
-      "Candidate cluster: 5 < E_{T} < 35 GeV, |#eta| < 0.7",
-      value.selection,
-      "Stored/anchor clusters: E > " + number(value.min_cluster_energy) + " GeV",
+      candidate,
       pi0_tagging,
       eta_tagging};
 }
 
-void draw_annotations(bool work_in_progress = false)
+void draw_annotations()
 {
   TLatex label;
   label.SetNDC();
   label.SetTextAlign(13);
   label.SetTextColor(kBlack);
-  const auto lines = caption_lines(plot_caption, work_in_progress);
+  const auto lines = caption_lines(plot_caption);
   constexpr double line_spacing = 0.06;
   for (std::size_t i = 0; i < lines.size(); ++i)
   {
-    const double y = (work_in_progress ? 0.975 : 0.965) - line_spacing * i - (i >= 2 ? 0.01 : 0.0);
+    const double y = 0.975 - line_spacing * i - (i >= 2 ? 0.01 : 0.0);
     label.DrawLatex(0.055, y, lines[i].c_str());
   }
 }
@@ -483,22 +471,24 @@ void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& dens
                    const std::string& output_path, bool detailed)
 {
   SetsPhenixStyle();
-  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum").c_str(), "", kCanvasWidth, kCanvasHeight);
-  auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum_pad", true);
+  const bool side_legend = detailed;
+  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum").c_str(), "", side_legend ? 1600 : kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum_pad", true, kPlotPadHeight,
+                                side_legend ? kCompositionPlotWidth : 1.0);
   scale_axes_to_canvas(density[indices.front()].get(), kPlotPadHeight);
   density[indices.front()]->SetMinimum(kSpectrumYMinimum);
   density[indices.front()]->SetMaximum(kSpectrumYMaximum);
   density[indices.front()]->Draw("HIST");
   for (std::size_t position = 1; position < indices.size(); ++position) density[indices[position]]->Draw("HIST SAME");
-  canvas.cd();
-  TLegend legend(0.57, detailed ? 0.62 : 0.68, 0.98, 0.97);
+  if (side_legend) canvas.cd();
+  TLegend legend(side_legend ? 0.72 : 0.52, side_legend ? 0.05 : 0.38, side_legend ? 0.99 : 0.98, side_legend ? 0.95 : 0.94);
+  if (!side_legend) scale_legend_to_canvas(legend, kPlotPadHeight);
   legend.SetFillStyle(0);
   for (std::size_t index : indices) legend.AddEntry(density[index].get(), kLabels[index].c_str(), "l");
   legend.Draw();
-  draw_annotations();
-  plot_pad->cd();
   plot_pad->RedrawAxis();
   canvas.cd();
+  draw_annotations();
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -537,22 +527,24 @@ void draw_fraction_lines(const std::vector<std::unique_ptr<TH1D>>& fractions, co
                          const std::string& output_path, bool detailed)
 {
   SetsPhenixStyle();
-  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction").c_str(), "", kCanvasWidth, kCanvasHeight);
-  auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_pad");
+  const bool side_legend = detailed;
+  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction").c_str(), "", side_legend ? 1600 : kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_pad", false, kPlotPadHeight,
+                                side_legend ? kCompositionPlotWidth : 1.0);
   scale_axes_to_canvas(fractions.front().get(), kPlotPadHeight);
   fractions.front()->SetMinimum(0.0);
   fractions.front()->SetMaximum(1.05);
   fractions.front()->Draw("E1");
   for (std::size_t index = 1; index < fractions.size(); ++index) fractions[index]->Draw("E1 SAME");
-  canvas.cd();
-  TLegend legend(0.57, detailed ? 0.62 : 0.73, 0.98, 0.97);
+  if (side_legend) canvas.cd();
+  TLegend legend(side_legend ? 0.72 : 0.52, side_legend ? 0.10 : 0.50, side_legend ? 0.99 : 0.98, side_legend ? 0.90 : 0.94);
+  if (!side_legend) scale_legend_to_canvas(legend, kPlotPadHeight);
   legend.SetFillStyle(0);
   for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "lep");
   legend.Draw();
-  draw_annotations();
-  plot_pad->cd();
   plot_pad->RedrawAxis();
   canvas.cd();
+  draw_annotations();
   canvas.SaveAs(output_path.c_str());
 }
 
@@ -560,8 +552,9 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
                          const std::string& output_path, bool detailed)
 {
   SetsPhenixStyle();
-  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack").c_str(), "", kCanvasWidth, kCanvasHeight);
-  auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack_pad");
+  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack").c_str(), "", 1600, kCanvasHeight);
+  auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack_pad", false, kPlotPadHeight,
+                                kCompositionPlotWidth);
   THStack stack(("stack_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction").c_str(), "");
   for (std::size_t index = 0; index < fractions.size(); ++index)
   {
@@ -578,14 +571,13 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
   stack.GetXaxis()->CenterTitle();
   stack.GetYaxis()->CenterTitle();
   canvas.cd();
-  TLegend legend(0.57, detailed ? 0.62 : 0.73, 0.98, 0.97);
+  TLegend legend(0.72, detailed ? 0.10 : 0.30, 0.99, detailed ? 0.90 : 0.70);
   legend.SetFillStyle(0);
-  for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "f");
+  for (std::size_t index = fractions.size(); index-- > 0;) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "f");
   legend.Draw();
-  draw_annotations();
-  plot_pad->cd();
   plot_pad->RedrawAxis();
   canvas.cd();
+  draw_annotations();
   canvas.SaveAs(output_path.c_str());
 }
 }
@@ -728,14 +720,12 @@ std::size_t pi0_category(int topology)
 }
 
 void draw_composition_components(const std::vector<TH1D*>& components, const std::vector<std::string>& labels,
-                                 const std::vector<int>& colors, const std::string& output, const std::string& detail,
-                                 bool work_in_progress = false)
+                                 const std::vector<int>& colors, const std::string& output, const std::string& detail)
 {
   SetsPhenixStyle();
-  const bool side_legend = work_in_progress;
-  const int canvas_width = side_legend ? 1600 : kCanvasWidth;
-  const double plot_height = work_in_progress ? kWorkInProgressPadHeight : kPlotPadHeight;
-  const double plot_width = side_legend ? kWorkInProgressCompositionPlotWidth : 1.0;
+  constexpr int canvas_width = 1600;
+  constexpr double plot_height = kPlotPadHeight;
+  constexpr double plot_width = kCompositionPlotWidth;
   TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", canvas_width, kCanvasHeight);
   auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad", false, plot_height, plot_width);
   THStack stack(("stack_" + detail + "_photon_candidate_composition").c_str(), "");
@@ -747,76 +737,43 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   }
   stack.SetMinimum(0.0);
   stack.SetMaximum(1.05);
-  std::unique_ptr<TH1D> frame;
-  if (work_in_progress)
-  {
-    frame = make_work_in_progress_frame(*components.front(), "h_workinprogress_candidate_composition_frame", "Fraction", 0.0, 1.05);
-    scale_axes_to_canvas(frame.get(), plot_height);
-    frame->Draw("AXIS");
-    stack.Draw("HIST SAME");
-  }
-  else
-  {
-    stack.Draw("HIST");
-    scale_axes_to_canvas(stack.GetXaxis(), stack.GetYaxis(), plot_height);
-    stack.GetXaxis()->SetTitle("Candidate Cluster E_{T} [GeV]");
-    stack.GetYaxis()->SetTitle("Fraction");
-    for (TAxis* axis : {stack.GetXaxis(), stack.GetYaxis()})
-    {
-      axis->CenterTitle();
-    }
-  }
+  auto frame = make_plot_frame(*components.front(), "h_candidate_composition_frame", "Fraction", 0.0, 1.05);
+  scale_axes_to_canvas(frame.get(), plot_height);
+  frame->Draw("AXIS");
+  stack.Draw("HIST SAME");
   std::vector<std::unique_ptr<TLegend>> legends;
-  if (work_in_progress)
+  canvas.cd();
+  if (detail == "superdetailed")
   {
-    canvas.cd();
-    if (detail == "detailed")
-    {
-      legends.push_back(std::make_unique<TLegend>(0.72, 0.20, 0.99, 0.80));
-      for (std::size_t i = components.size(); i-- > 0;)
-      {
-        const char* label = i == 3 ? "#pi^{0}: contaminated" : labels[i].c_str();
-        legends[0]->AddEntry(components[i], label, "f");
-      }
-    }
-    else
-    {
-      legends.push_back(std::make_unique<TLegend>(0.72, 0.32, 0.99, 0.68));
-      for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
-    }
+    legends.push_back(std::make_unique<TLegend>(0.72, 0.05, 0.99, 0.95));
+    for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
   }
   else if (detail == "detailed")
   {
-    canvas.cd();
-    legends.push_back(std::make_unique<TLegend>(0.50, 0.75, 0.73, 0.97));
-    legends.push_back(std::make_unique<TLegend>(0.71, 0.64, 0.99, 0.97));
-    for (std::size_t i : {std::size_t{0}, std::size_t{6}, std::size_t{7}}) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
-    for (std::size_t i = 1; i <= 5; ++i) legends[1]->AddEntry(components[i], labels[i].c_str(), "f");
+    legends.push_back(std::make_unique<TLegend>(0.72, 0.20, 0.99, 0.80));
+    for (std::size_t i = components.size(); i-- > 0;)
+    {
+      const char* label = i == 3 ? "#pi^{0}: contaminated" : labels[i].c_str();
+      legends[0]->AddEntry(components[i], label, "f");
+    }
   }
   else
   {
-    canvas.cd();
-    legends.push_back(std::make_unique<TLegend>(0.57, detail == "summary" ? 0.75 : 0.635, 0.99, 0.97));
-    for (std::size_t i = 0; i < components.size(); ++i) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+    legends.push_back(std::make_unique<TLegend>(0.72, 0.32, 0.99, 0.68));
+    for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
   }
   for (auto& legend : legends)
   {
     legend->SetFillStyle(0);
     legend->Draw();
   }
-  if (work_in_progress) plot_pad->RedrawAxis();
+  plot_pad->RedrawAxis();
   canvas.cd();
-  draw_annotations(work_in_progress);
-  if (!work_in_progress)
-  {
-    plot_pad->cd();
-    plot_pad->RedrawAxis();
-    canvas.cd();
-  }
+  draw_annotations();
   canvas.SaveAs(output.c_str());
 }
 
-void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output, bool detailed, bool work_in_progress = false)
+void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output, bool detailed)
 {
   SetsPhenixStyle();
   std::vector<TH1D*> components;
@@ -839,7 +796,7 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
     add(eta);
     add(other);
   }
-  draw_composition_components(components, labels, colors, output, detailed ? "detailed" : "summary", work_in_progress);
+  draw_composition_components(components, labels, colors, output, detailed ? "detailed" : "summary");
 }
 
 constexpr std::array<std::size_t, 6> kMissingSpectrumIndices = {6, 7, 9, 10, 8, 11};

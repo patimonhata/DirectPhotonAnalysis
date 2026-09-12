@@ -42,7 +42,10 @@ constexpr std::array<const char*, 6> kSelectionKeys = {
     "separated_truth_pair", "separated_truth_pair_below_threshold", "prompt_pi0_all_pairs", "prompt_pi0_window_pairs", "prompt_eta_all_pairs", "prompt_eta_window_pairs"};
 constexpr std::array<const char*, 6> kSelectionLabels = {
     "Separated truth pair", "Truth partner below tagging threshold", "Prompt: all #pi^{0} partners", "Prompt: #pi^{0} window pairs", "Prompt: all #eta partners", "Prompt: #eta window pairs"};
-constexpr std::array<double, 10> kAnchorEtEdges = {0, 5, 6, 8, 10, 15, 20, 35, 50, 100};
+// End bins retain candidates outside the five shape intervals within the displayed ET range.
+constexpr std::array<double, 8> kAnchorEtEdges = {0, 5, 6, 8, 10, 18, 30, 40};
+constexpr int kAnchorEtBins = kAnchorEtEdges.size() - 1;
+constexpr std::array<double, 6> kShapeEtEdges = {5, 6, 8, 10, 18, 30};
 constexpr std::array<int, 10> kColors = {kBlack, kBlue + 1, kRed + 1, kGreen + 2, kMagenta + 1,
                                          kOrange + 7, kCyan + 2, kViolet + 1, kAzure + 7, kPink + 7};
 
@@ -170,10 +173,10 @@ struct Histograms
   {
     mass_count = std::make_unique<TH1D>(("h_" + key + "_mass_count").c_str(), "", kMassBins, 0, kMassMax);
     mass_pb = std::make_unique<TH1D>(("h_" + key + "_mass_pb").c_str(), "", kMassBins, 0, kMassMax);
-    mass_vs_anchor_et_count = std::make_unique<TH2D>(("h_" + key + "_mass_vs_anchor_et_count").c_str(), "", 9, kAnchorEtEdges.data(), kMassBins, 0, kMassMax);
-    mass_vs_anchor_et_pb = std::make_unique<TH2D>(("h_" + key + "_mass_vs_anchor_et_pb").c_str(), "", 9, kAnchorEtEdges.data(), kMassBins, 0, kMassMax);
-    window_count = std::make_unique<TH2D>(("h_" + key + "_window_count").c_str(), "", 9, kAnchorEtEdges.data(), 2, -0.5, 1.5);
-    window_pb = std::make_unique<TH2D>(("h_" + key + "_window_pb").c_str(), "", 9, kAnchorEtEdges.data(), 2, -0.5, 1.5);
+    mass_vs_anchor_et_count = std::make_unique<TH2D>(("h_" + key + "_mass_vs_anchor_et_count").c_str(), "", kAnchorEtBins, kAnchorEtEdges.data(), kMassBins, 0, kMassMax);
+    mass_vs_anchor_et_pb = std::make_unique<TH2D>(("h_" + key + "_mass_vs_anchor_et_pb").c_str(), "", kAnchorEtBins, kAnchorEtEdges.data(), kMassBins, 0, kMassMax);
+    window_count = std::make_unique<TH2D>(("h_" + key + "_window_count").c_str(), "", kAnchorEtBins, kAnchorEtEdges.data(), 2, -0.5, 1.5);
+    window_pb = std::make_unique<TH2D>(("h_" + key + "_window_pb").c_str(), "", kAnchorEtBins, kAnchorEtEdges.data(), 2, -0.5, 1.5);
     for (auto* h : objects()) { h->SetDirectory(nullptr); h->Sumw2(); }
   }
   std::array<TH1*, 6> objects() const { return {mass_count.get(), mass_pb.get(), mass_vs_anchor_et_count.get(), mass_vs_anchor_et_pb.get(), window_count.get(), window_pb.get()}; }
@@ -204,7 +207,7 @@ struct Histograms
   void write()
   {
     for (auto* h : objects()) h->Write();
-    for (int bin = 1; bin <= 9; ++bin)
+    for (int bin = 1; bin <= kAnchorEtBins; ++bin)
     {
       for (auto* h : {mass_vs_anchor_et_count.get(), mass_vs_anchor_et_pb.get()})
       {
@@ -215,9 +218,9 @@ struct Histograms
     // Exact strict-window classification, independent of mass bin edges and overflow.
     for (auto* h : {window_count.get(), window_pb.get()})
     {
-      TH1D fraction((std::string(h->GetName()) + "_fraction").c_str(), "", 9, kAnchorEtEdges.data());
+      TH1D fraction((std::string(h->GetName()) + "_fraction").c_str(), "", kAnchorEtBins, kAnchorEtEdges.data());
       fraction.SetDirectory(nullptr);
-      for (int bin = 0; bin <= 10; ++bin)
+      for (int bin = 0; bin <= kAnchorEtBins + 1; ++bin)
       {
         const double no = h->GetBinContent(bin, 1), yes = h->GetBinContent(bin, 2), total = no + yes;
         if (total == 0) continue;
@@ -232,8 +235,8 @@ struct Histograms
 
 struct Flow
 {
-  TH2D count{"candidate_flow_count", "", 9, kAnchorEtEdges.data(), 8, -0.5, 7.5};
-  TH2D weighted{"candidate_flow_pb", "", 9, kAnchorEtEdges.data(), 8, -0.5, 7.5};
+  TH2D count{"candidate_flow_count", "", kAnchorEtBins, kAnchorEtEdges.data(), 8, -0.5, 7.5};
+  TH2D weighted{"candidate_flow_pb", "", kAnchorEtBins, kAnchorEtEdges.data(), 8, -0.5, 7.5};
   Flow()
   {
     const char* labels[] = {"separated", "truth_pair_valid", "truth_partner_below_threshold", "truth_pair_invalid", "prompt", "prompt_pi0_veto", "prompt_eta_veto", "prompt_any_veto"};
@@ -250,7 +253,7 @@ struct Flow
 
 struct Metadata
 {
-  int schema_version = 1, source_map_schema_version = 5, pi0_topology_algorithm_version = 11;
+  int schema_version = 2, source_map_schema_version = 5, pi0_topology_algorithm_version = 11;
   int shard_index = 0, shard_count = 1;
   Long64_t total_entries = 0, entry_begin = 0, entry_end = 0, max_events = 0;
   bool require_complete = true;
@@ -282,7 +285,7 @@ struct Metadata
         !bind_branch(*t, "selection_settings", &settings) || !bind_branch(*t, "region_settings", &region) || t->GetEntry(0) <= 0 || !f || !s || !r || !m || !settings || !region) return false;
     family = *f; sample = *s; release = *r; model = *m; selection_settings = *settings; region_settings = *region;
     t->ResetBranchAddresses();
-    return schema_version == 1 && source_map_schema_version == 5 && pi0_topology_algorithm_version == 11 && selection_settings.size() == 11 && region_settings.size() == 9 &&
+    return schema_version == 2 && source_map_schema_version == 5 && pi0_topology_algorithm_version == 11 && selection_settings.size() == 11 && region_settings.size() == 9 &&
         photon_candidate_settings::same(selection_settings, selection_settings) && selection_settings[1] >= selection_settings[0] && selection_settings[2] >= selection_settings[0] &&
         selection_settings[3] < selection_settings[4] && selection_settings[5] < selection_settings[6] && selection_settings[9] == 0 && selection_settings[10] == 0 && std::isfinite(sumw) && sumw > 0 && map_count > 0;
   }
@@ -368,17 +371,20 @@ template <std::size_t N>
 void draw_shapes(TH2D* source, const std::array<double, N>& edges, const std::string& path, const std::string& text)
 {
   TCanvas canvas(("c_shape_" + std::string(source->GetName())).c_str(), "", 1100, 850);
-  canvas.SetTopMargin(0.23);
+  canvas.SetTopMargin(0.27);
   canvas.SetRightMargin(0.30);
   TLegend legend(0.72, 0.30, 0.99, 0.76);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
   legend.SetTextSize(0.024);
+  legend.SetHeader("Candidate cluster E_{T}");
   std::vector<std::unique_ptr<TH1D>> shapes;
   double maximum = 0;
-  for (int bin = 1; bin <= source->GetNbinsX(); ++bin)
+  for (std::size_t bin = 1; bin < N; ++bin)
   {
-    auto shape = std::unique_ptr<TH1D>(source->ProjectionY(("shape_" + std::to_string(bin)).c_str(), bin, bin));
+    const int first = source->GetXaxis()->FindFixBin(edges[bin - 1]);
+    const int last = source->GetXaxis()->FindFixBin(std::nextafter(edges[bin], edges[bin - 1]));
+    auto shape = std::unique_ptr<TH1D>(source->ProjectionY(("shape_" + std::to_string(bin)).c_str(), first, last));
     const double entries = shape->Integral(0, shape->GetNbinsX() + 1);
     if (entries != 0) shape->Scale(1.0 / entries);
     else shape->Reset();
@@ -419,8 +425,8 @@ void plot_groups(const std::array<std::unique_ptr<Histograms>, 6>& groups, const
     caption << "; window " << kPi0MassMin << "-" << kPi0MassMax << " GeV";
     draw_mass(groups[i]->mass_pb.get(), directory + "/mass.pdf", caption.str());
     draw_2d(groups[i]->mass_vs_anchor_et_pb.get(), directory + "/mass_vs_candidate_et.pdf", "Candidate cluster E_{T} [GeV]", caption.str());
-    draw_shapes(groups[i]->mass_vs_anchor_et_count.get(), kAnchorEtEdges, directory + "/mass_by_candidate_et_raw_shape.pdf", caption.str());
-    draw_shapes(groups[i]->mass_vs_anchor_et_pb.get(), kAnchorEtEdges, directory + "/mass_by_candidate_et_weighted_shape.pdf", caption.str());
+    draw_shapes(groups[i]->mass_vs_anchor_et_count.get(), kShapeEtEdges, directory + "/mass_by_candidate_et_raw_shape.pdf", caption.str() + "\nRaw pairs: unit-normalized per candidate E_{T} bin, including mass overflow.");
+    draw_shapes(groups[i]->mass_vs_anchor_et_pb.get(), kShapeEtEdges, directory + "/mass_by_candidate_et_weighted_shape.pdf", caption.str() + "\nWeighted pairs: unit-normalized per candidate E_{T} bin, including mass overflow.");
   }
 }
 }

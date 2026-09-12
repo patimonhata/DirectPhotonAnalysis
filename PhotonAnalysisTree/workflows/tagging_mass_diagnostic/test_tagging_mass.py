@@ -93,11 +93,13 @@ with tempfile.TemporaryDirectory(prefix='tagging-mass-test-') as temporary:
     h = hist(serial, 'prompt_pi0_window_pairs/h_prompt_pi0_window_pairs_mass_pb')
     assert math.isclose(h.Integral(), 4.5)  # 3 partners * (2 - .5)
     flow = hist(serial, 'candidate_flow_count')
-    assert flow.Integral(0, 10, 5, 5) == 2 and flow.Integral(0, 10, 8, 8) == 2
-    assert flow.Integral(0, 10, 1, 1) == 2 and flow.Integral(0, 10, 4, 4) == 1
+    assert flow.Integral(0, flow.GetNbinsX() + 1, 5, 5) == 2 and flow.Integral(0, flow.GetNbinsX() + 1, 8, 8) == 2
+    assert flow.Integral(0, flow.GetNbinsX() + 1, 1, 1) == 2 and flow.Integral(0, flow.GetNbinsX() + 1, 4, 4) == 1
     assert len(list((base / 'merged').rglob('*.pdf'))) == 24
+    et_axis = flow.GetXaxis()
+    assert [et_axis.GetBinLowEdge(i) for i in range(1, et_axis.GetNbins() + 2)] == [0, 5, 6, 8, 10, 18, 30, 40]
     # Strict mass boundaries, no nominal-mass best-pair selection.
-    ROOT.gInterpreter.Declare('bool check_tagging_mass_boundaries() { tagging_mass::Histograms h("boundary"); h.fill(.1, 10, 1, .1, .2); h.fill(.2, 10, 1, .1, .2); h.fill(.15, 10, 1, .1, .2); return h.window_count->Integral(0, 10, 2, 2) == 1; }')
+    ROOT.gInterpreter.Declare('bool check_tagging_mass_boundaries() { tagging_mass::Histograms h("boundary"); h.fill(.1, 10, 1, .1, .2); h.fill(.2, 10, 1, .1, .2); h.fill(.15, 10, 1, .1, .2); return h.window_count->Integral(0, h.window_count->GetNbinsX() + 1, 2, 2) == 1; }')
     assert ROOT.check_tagging_mass_boundaries()
     # Refuse overwrite, incomplete coverage and mixed map settings.
     assert ROOT.ReduceTaggingMassDiagnostic(*args, str(base / 'serial/jet8/shard_0'), True, 'jet8', 0, 1, 0) != 0

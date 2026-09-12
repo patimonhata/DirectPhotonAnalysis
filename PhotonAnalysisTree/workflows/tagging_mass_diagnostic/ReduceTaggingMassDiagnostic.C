@@ -33,7 +33,7 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
   std::vector<double> *energy = nullptr, *et = nullptr, *eta = nullptr, *phi = nullptr;
   std::vector<unsigned char> *region_a = nullptr, *anchor_valid = nullptr, *prompt = nullptr, *pi0_tag = nullptr, *eta_tag = nullptr;
   std::vector<float> *fraction = nullptr, *main_fraction = nullptr, *truth_mass = nullptr, *partner_e = nullptr;
-  std::vector<int> *topology = nullptr, *partner_id = nullptr, *truth_status = nullptr;
+  std::vector<int> *topology = nullptr, *partner_id = nullptr, *missing_category = nullptr;
 #define B(name, var) if (!bind_active(tree, name, &var)) { std::cerr << "Missing/incompatible branch: " << name << std::endl; return 4; }
   B("event_weight_valid", weight_valid); B("sample_stitching_valid", stitch_valid); B("sample_stitching_pass", stitch_pass);
   B("weight_numerator_pb", weight_numerator); B("split_ncluster", ncluster); B("split_cluster_id", id);
@@ -42,12 +42,12 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
   B("split_cluster_pi0_anchor_main_fraction", main_fraction); B("split_cluster_pi0_anchor_topology", topology);
   B("split_cluster_pi0_anchor_truth_partner_mass", truth_mass); B("split_cluster_pi0_anchor_truth_partner_cluster_e", partner_e);
   B("split_cluster_pi0_anchor_truth_partner_cluster_id", partner_id);
-  B("split_cluster_pi0_anchor_truth_partner_tag_status", truth_status);
+  B("split_cluster_pi0_anchor_missing_category", missing_category);
   B("split_cluster_truth_prompt_cluster", prompt); B("split_cluster_truth_dominant_fraction", fraction);
   B("split_cluster_pi0_tag", pi0_tag); B("split_cluster_eta_tag", eta_tag);
 #undef B
   tree.StopCacheLearningPhase();
-  std::array<std::unique_ptr<Histograms>, 6> groups;
+  std::array<std::unique_ptr<Histograms>, kSelectionKeys.size()> groups;
   for (std::size_t i = 0; i < groups.size(); ++i) groups[i] = std::make_unique<Histograms>(kSelectionKeys[i]);
   Flow flow;
   for (Long64_t entry = metadata.entry_begin; entry < metadata.entry_end; ++entry)
@@ -55,7 +55,7 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
     if (tree.GetEntry(entry) <= 0) return 5;
 #define S(v) if (!v || v->size() != ncluster) return 5
     S(id); S(energy); S(et); S(eta); S(phi); S(region_a); S(anchor_valid); S(main_fraction); S(topology); S(truth_mass);
-    S(partner_e); S(partner_id); S(truth_status); S(prompt); S(fraction); S(pi0_tag); S(eta_tag);
+    S(partner_e); S(partner_id); S(missing_category); S(prompt); S(fraction); S(pi0_tag); S(eta_tag);
 #undef S
     if (!weight_valid || !stitch_valid || !stitch_pass) continue;
     const double weight = weight_numerator / input.sumw;
@@ -71,22 +71,20 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
       const bool truth_pi0 = (*anchor_valid)[i] && (*main_fraction)[i] > 0.5F;
       const bool truth_prompt = (*prompt)[i] && (*fraction)[i] > 0.5F;
       if (truth_pi0 && truth_prompt) { std::cerr << "Overlapping truth origins" << std::endl; return 5; }
-      if (truth_pi0 && (*topology)[i] == 1)
+      const bool separated = truth_pi0 && (*topology)[i] == 1;
+      // Use the saved L < E <= U categories directly, preserving the map's pre-rounding decision.
+      const bool missing_band = truth_pi0 && (*topology)[i] == 3 && ((*missing_category)[i] == 1 || (*missing_category)[i] == 4);
+      if (separated || missing_band)
       {
-        flow.fill(0, candidate_et, weight);
+        flow.fill(separated ? 0 : 1, candidate_et, weight);
         const double mass = (*truth_mass)[i], pe = (*partner_e)[i];
         if ((*partner_id)[i] < 0 || static_cast<unsigned int>((*partner_id)[i]) == (*id)[i] || !std::isfinite(mass) || mass < 0 || !std::isfinite(pe) || pe <= 0)
           flow.fill(3, candidate_et, weight);
         else
         {
-          flow.fill(1, candidate_et, weight);
-          groups[0]->fill(mass, candidate_et, weight, settings[3], settings[4]);
-          // Use the pre-rounding map decision, not the float-stored energy at the boundary.
-          if ((*truth_status)[i] == 4)
-          {
-            flow.fill(2, candidate_et, weight);
-            groups[1]->fill(mass, candidate_et, weight, settings[3], settings[4]);
-          }
+          flow.fill(2, candidate_et, weight);
+          groups[separated ? 0 : 1]->fill(mass, candidate_et, weight, settings[3], settings[4]);
+          groups[2]->fill(mass, candidate_et, weight, settings[3], settings[4]);
         }
       }
       if (!truth_prompt) continue;
@@ -101,11 +99,11 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
         {
           if (!((*energy)[j] > settings[1 + meson])) continue;
           const double low = settings[3 + 2 * meson], high = settings[4 + 2 * meson];
-          groups[2 + 2 * meson]->fill(mass, candidate_et, weight, low, high);
+          groups[3 + 2 * meson]->fill(mass, candidate_et, weight, low, high);
           if (mass > low && mass < high)
           {
             found[meson] = true;
-            groups[3 + 2 * meson]->fill(mass, candidate_et, weight, low, high);
+            groups[4 + 2 * meson]->fill(mass, candidate_et, weight, low, high);
           }
         }
       }

@@ -38,10 +38,10 @@ double kPi0MassMin = 0.10;
 double kPi0MassMax = 0.20;
 constexpr int kMassBins = 240;
 constexpr double kMassMax = 1.2;
-constexpr std::array<const char*, 6> kSelectionKeys = {
-    "separated_truth_pair", "separated_truth_pair_below_threshold", "prompt_pi0_all_pairs", "prompt_pi0_window_pairs", "prompt_eta_all_pairs", "prompt_eta_window_pairs"};
-constexpr std::array<const char*, 6> kSelectionLabels = {
-    "Separated truth pair", "Truth partner below tagging threshold", "Prompt: all #pi^{0} partners", "Prompt: #pi^{0} window pairs", "Prompt: all #eta partners", "Prompt: #eta window pairs"};
+constexpr std::array<const char*, 7> kSelectionKeys = {
+    "separated_truth_pair", "missing_energy_band_truth_pair", "separated_or_missing_energy_band_truth_pair", "prompt_pi0_all_pairs", "prompt_pi0_window_pairs", "prompt_eta_all_pairs", "prompt_eta_window_pairs"};
+constexpr std::array<const char*, 7> kSelectionLabels = {
+    "Separated truth pair", "Missing energy-band truth pair", "Separated or missing energy-band truth pair", "Prompt: all #pi^{0} partners", "Prompt: #pi^{0} window pairs", "Prompt: all #eta partners", "Prompt: #eta window pairs"};
 // End bins retain candidates outside the five shape intervals within the displayed ET range.
 constexpr std::array<double, 8> kAnchorEtEdges = {0, 5, 6, 8, 10, 18, 30, 40};
 constexpr int kAnchorEtBins = kAnchorEtEdges.size() - 1;
@@ -239,7 +239,7 @@ struct Flow
   TH2D weighted{"candidate_flow_pb", "", kAnchorEtBins, kAnchorEtEdges.data(), 8, -0.5, 7.5};
   Flow()
   {
-    const char* labels[] = {"separated", "truth_pair_valid", "truth_partner_below_threshold", "truth_pair_invalid", "prompt", "prompt_pi0_veto", "prompt_eta_veto", "prompt_any_veto"};
+    const char* labels[] = {"separated", "missing_energy_band", "truth_pair_valid", "truth_pair_invalid", "prompt", "prompt_pi0_veto", "prompt_eta_veto", "prompt_any_veto"};
     for (auto* h : {&count, &weighted})
     {
       h->SetDirectory(nullptr); h->Sumw2();
@@ -253,7 +253,7 @@ struct Flow
 
 struct Metadata
 {
-  int schema_version = 2, source_map_schema_version = 5, pi0_topology_algorithm_version = 11;
+  int schema_version = 4, source_map_schema_version = 5, pi0_topology_algorithm_version = 11;
   int shard_index = 0, shard_count = 1;
   Long64_t total_entries = 0, entry_begin = 0, entry_end = 0, max_events = 0;
   bool require_complete = true;
@@ -285,7 +285,7 @@ struct Metadata
         !bind_branch(*t, "selection_settings", &settings) || !bind_branch(*t, "region_settings", &region) || t->GetEntry(0) <= 0 || !f || !s || !r || !m || !settings || !region) return false;
     family = *f; sample = *s; release = *r; model = *m; selection_settings = *settings; region_settings = *region;
     t->ResetBranchAddresses();
-    return schema_version == 2 && source_map_schema_version == 5 && pi0_topology_algorithm_version == 11 && selection_settings.size() == 11 && region_settings.size() == 9 &&
+    return schema_version == 4 && source_map_schema_version == 5 && pi0_topology_algorithm_version == 11 && selection_settings.size() == 11 && region_settings.size() == 9 &&
         photon_candidate_settings::same(selection_settings, selection_settings) && selection_settings[1] >= selection_settings[0] && selection_settings[2] >= selection_settings[0] &&
         selection_settings[3] < selection_settings[4] && selection_settings[5] < selection_settings[6] && selection_settings[9] == 0 && selection_settings[10] == 0 && std::isfinite(sumw) && sumw > 0 && map_count > 0;
   }
@@ -407,21 +407,25 @@ void draw_shapes(TH2D* source, const std::array<double, N>& edges, const std::st
   label(text);
   canvas.SaveAs(path.c_str());
 }
-void plot_groups(const std::array<std::unique_ptr<Histograms>, 6>& groups, const Metadata& metadata, const std::string& output)
+void plot_groups(const std::array<std::unique_ptr<Histograms>, kSelectionKeys.size()>& groups, const Metadata& metadata, const std::string& output)
 {
   SetsPhenixStyle(); gStyle->SetOptStat(0);
   for (std::size_t i = 0; i < groups.size(); ++i)
   {
-    const bool eta = i >= 4;
+    const bool eta = i >= 5;
     kPi0MassMin = metadata.selection_settings[eta ? 5 : 3];
     kPi0MassMax = metadata.selection_settings[eta ? 6 : 4];
     const std::string directory = output + "/" + kSelectionKeys[i];
     gSystem->mkdir(directory.c_str(), true);
     std::ostringstream caption;
     caption << (metadata.family == "jet" ? "Pythia8 p+p Jet" : "Pythia8 p+p PhotonJet") << ", Region A before veto\n" << kSelectionLabels[i] << "\n";
-    if (i >= 2) caption << "E_{partner} > " << metadata.selection_settings[eta ? 2 : 1] << " GeV";
-    else if (i == 1) caption << "E_{representative} #leq " << metadata.selection_settings[1] << " GeV (subset)";
-    else caption << "No representative partner cut; topology partner E > " << metadata.selection_settings[1] << " GeV";
+    if (i >= 3) caption << "E_{partner} > " << metadata.selection_settings[eta ? 2 : 1] << " GeV";
+    else if (i == 0) caption << "Topology partner E > " << metadata.selection_settings[1] << " GeV";
+    else
+    {
+      caption << "Missing: " << metadata.selection_settings[7] << " < E_{representative} #leq " << metadata.selection_settings[8] << " GeV";
+      if (i == 2) caption << "; separated: E > " << metadata.selection_settings[1] << " GeV";
+    }
     caption << "; window " << kPi0MassMin << "-" << kPi0MassMax << " GeV";
     draw_mass(groups[i]->mass_pb.get(), directory + "/mass.pdf", caption.str());
     draw_2d(groups[i]->mass_vs_anchor_et_pb.get(), directory + "/mass_vs_candidate_et.pdf", "Candidate cluster E_{T} [GeV]", caption.str());

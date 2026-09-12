@@ -10,7 +10,7 @@ int MergeTaggingMassDiagnostic(const std::string family, const std::string parti
   if (definitions.empty()) return 1;
   const std::string output_path = output_base + "/tagging_mass_diagnostic.root";
   if (!gSystem->AccessPathName(output_path.c_str())) { std::cerr << "Output already exists: " << output_path << std::endl; return 2; }
-  std::array<std::unique_ptr<Histograms>, 6> groups;
+  std::array<std::unique_ptr<Histograms>, kSelectionKeys.size()> groups;
   for (std::size_t i = 0; i < groups.size(); ++i) groups[i] = std::make_unique<Histograms>(kSelectionKeys[i]);
   Flow flow;
   Metadata reference;
@@ -50,7 +50,7 @@ int MergeTaggingMassDiagnostic(const std::string family, const std::string parti
   }
   output.cd();
   TTree metadata("metadata", "Merged tagging mass diagnostic");
-  int schema_version = 2, source_schema = 5, topology_version = 11;
+  int schema_version = 4, source_schema = 5, topology_version = 11;
   auto settings = reference.selection_settings, region_settings = reference.region_settings;
   std::string metadata_family = family, metadata_filter = sample_filter, release = reference.release, model = reference.model;
   unsigned long long partial_count = sources.size();

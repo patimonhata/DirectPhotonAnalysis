@@ -170,7 +170,7 @@ bool read_metadata(TFile& file, Metadata& value)
   ok &= bind(tree, "region_a_clusters", &value.region_a_clusters);
   ok &= bind(tree, "region_a_prompt_clusters", &value.region_a_prompt_clusters);
   ok &= bind(tree, "region_a_anchor_clusters", &value.region_a_anchor_clusters);
-  if (!ok || tree->GetEntry(0) <= 0 || !family || !map_root || !majority_comparison || !eta_definition ||
+  if (!ok || tree->GetEntry(0) <= 0 || value.pi0_topology_algorithm_version != 11 || !family || !map_root || !majority_comparison || !eta_definition ||
       !other_definition || !weight_definition || !analysis_release || !model_sha256 || !sample_names || !sample_map_counts ||
       !sample_sum_generator_weights) return false;
   value.family = *family;

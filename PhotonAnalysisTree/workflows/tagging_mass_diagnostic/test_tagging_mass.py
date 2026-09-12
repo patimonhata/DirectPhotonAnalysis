@@ -20,7 +20,7 @@ def make_map(path, pi0_cut=0.15, wrong_veto=False):
         data = array.array(code, [value]); keep.append(data)
         tree.Branch(name, data, name + '/' + {'d': 'D', 'i': 'I', 'I': 'i', 'q': 'L', 'B': 'b'}[code])
         return data
-    for name, value in [('schema_version', 5), ('pi0_topology_algorithm_version', 10)]: scalar(metadata, name, value, 'i')
+    for name, value in [('schema_version', 5), ('pi0_topology_algorithm_version', 11)]: scalar(metadata, name, value, 'i')
     scalar(metadata, 'map_chunk_id', 0, 'I')
     scalar(metadata, 'manifest_begin', 0, 'q'); scalar(metadata, 'manifest_end', 10000, 'q')
     for name, value in {'sum_generator_weight_processed': 10., 'min_cluster_energy': .12, 'partner_diagnostic_min_cluster_energy': 0.,
@@ -40,7 +40,7 @@ def make_map(path, pi0_cut=0.15, wrong_veto=False):
     vectors = {}
     types = {'unsigned int': ['id'], 'double': ['e', 'et', 'eta', 'phi'], 'unsigned char': ['pass_region_a', 'pi0_anchor_valid', 'truth_prompt_cluster', 'pi0_tag', 'eta_tag'],
              'float': ['pi0_anchor_main_fraction', 'pi0_anchor_truth_partner_mass', 'pi0_anchor_truth_partner_cluster_e', 'truth_dominant_fraction'],
-             'int': ['pi0_anchor_topology', 'pi0_anchor_truth_partner_cluster_id']}
+             'int': ['pi0_anchor_topology', 'pi0_anchor_truth_partner_cluster_id', 'pi0_anchor_truth_partner_tag_status']}
     for typ, names in types.items():
         for name in names:
             v = ROOT.std.vector(typ)(); vectors[name] = v; tree.Branch('split_cluster_' + name, v)
@@ -56,7 +56,8 @@ def make_map(path, pi0_cut=0.15, wrong_veto=False):
             values = {'id': j + 1, 'e': energies[j], 'et': energies[j], 'eta': 0.,
                       'phi': 0. if j == 0 else math.acos(1 - target_masses[j] ** 2 / (20 * energies[j])),
                       'pass_region_a': j == 0, 'pi0_anchor_valid': not prompt, 'pi0_anchor_main_fraction': 1. if not prompt else 0.,
-                      'pi0_anchor_topology': 1 if not prompt else 0, 'pi0_anchor_truth_partner_mass': .08 if event == 2 else -1. if event == 4 else .135,
+                      'pi0_anchor_topology': 3 if event == 2 else 1 if not prompt else 0,
+                      'pi0_anchor_truth_partner_tag_status': 4 if event == 2 else 1, 'pi0_anchor_truth_partner_mass': .08 if event == 2 else -1. if event == 4 else .135,
                       'pi0_anchor_truth_partner_cluster_e': .1 if event == 2 else 1., 'pi0_anchor_truth_partner_cluster_id': 99,
                       'truth_prompt_cluster': prompt and j == 0, 'truth_dominant_fraction': 1.,
                       'pi0_tag': prompt and j == 0 and not wrong_veto, 'eta_tag': prompt and j == 0}
@@ -80,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix='tagging-mass-test-') as temporary:
     serial = base / 'serial/jet8/shard_0/tagging_mass_diagnostic.root'
     merged = base / 'merged/tagging_mass_diagnostic.root'
     groups = ['separated_truth_pair', 'separated_truth_pair_below_threshold', 'prompt_pi0_all_pairs', 'prompt_pi0_window_pairs', 'prompt_eta_all_pairs', 'prompt_eta_window_pairs']
-    expected = [2, 1, 8, 6, 6, 2]
+    expected = [1, 0, 8, 6, 6, 2]
     for group, count in zip(groups, expected):
         name = f'{group}/h_{group}_mass_count'
         h = hist(serial, name); assert h.Integral(0, h.GetNbinsX() + 1) == count, (group, h.Integral(), count)
@@ -93,7 +94,7 @@ with tempfile.TemporaryDirectory(prefix='tagging-mass-test-') as temporary:
     assert math.isclose(h.Integral(), 4.5)  # 3 partners * (2 - .5)
     flow = hist(serial, 'candidate_flow_count')
     assert flow.Integral(0, 10, 5, 5) == 2 and flow.Integral(0, 10, 8, 8) == 2
-    assert flow.Integral(0, 10, 1, 1) == 3 and flow.Integral(0, 10, 4, 4) == 1
+    assert flow.Integral(0, 10, 1, 1) == 2 and flow.Integral(0, 10, 4, 4) == 1
     assert len(list((base / 'merged').rglob('*.pdf'))) == 24
     # Strict mass boundaries, no nominal-mass best-pair selection.
     ROOT.gInterpreter.Declare('bool check_tagging_mass_boundaries() { tagging_mass::Histograms h("boundary"); h.fill(.1, 10, 1, .1, .2); h.fill(.2, 10, 1, .1, .2); h.fill(.15, 10, 1, .1, .2); return h.window_count->Integral(0, 10, 2, 2) == 1; }')

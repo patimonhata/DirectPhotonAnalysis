@@ -33,7 +33,7 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
   std::vector<double> *energy = nullptr, *et = nullptr, *eta = nullptr, *phi = nullptr;
   std::vector<unsigned char> *region_a = nullptr, *anchor_valid = nullptr, *prompt = nullptr, *pi0_tag = nullptr, *eta_tag = nullptr;
   std::vector<float> *fraction = nullptr, *main_fraction = nullptr, *truth_mass = nullptr, *partner_e = nullptr;
-  std::vector<int> *topology = nullptr, *partner_id = nullptr;
+  std::vector<int> *topology = nullptr, *partner_id = nullptr, *truth_status = nullptr;
 #define B(name, var) if (!bind_active(tree, name, &var)) { std::cerr << "Missing/incompatible branch: " << name << std::endl; return 4; }
   B("event_weight_valid", weight_valid); B("sample_stitching_valid", stitch_valid); B("sample_stitching_pass", stitch_pass);
   B("weight_numerator_pb", weight_numerator); B("split_ncluster", ncluster); B("split_cluster_id", id);
@@ -42,6 +42,7 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
   B("split_cluster_pi0_anchor_main_fraction", main_fraction); B("split_cluster_pi0_anchor_topology", topology);
   B("split_cluster_pi0_anchor_truth_partner_mass", truth_mass); B("split_cluster_pi0_anchor_truth_partner_cluster_e", partner_e);
   B("split_cluster_pi0_anchor_truth_partner_cluster_id", partner_id);
+  B("split_cluster_pi0_anchor_truth_partner_tag_status", truth_status);
   B("split_cluster_truth_prompt_cluster", prompt); B("split_cluster_truth_dominant_fraction", fraction);
   B("split_cluster_pi0_tag", pi0_tag); B("split_cluster_eta_tag", eta_tag);
 #undef B
@@ -54,7 +55,7 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
     if (tree.GetEntry(entry) <= 0) return 5;
 #define S(v) if (!v || v->size() != ncluster) return 5
     S(id); S(energy); S(et); S(eta); S(phi); S(region_a); S(anchor_valid); S(main_fraction); S(topology); S(truth_mass);
-    S(partner_e); S(partner_id); S(prompt); S(fraction); S(pi0_tag); S(eta_tag);
+    S(partner_e); S(partner_id); S(truth_status); S(prompt); S(fraction); S(pi0_tag); S(eta_tag);
 #undef S
     if (!weight_valid || !stitch_valid || !stitch_pass) continue;
     const double weight = weight_numerator / input.sumw;
@@ -80,7 +81,8 @@ int ReduceTaggingMassDiagnostic(const std::string family, const std::string map_
         {
           flow.fill(1, candidate_et, weight);
           groups[0]->fill(mass, candidate_et, weight, settings[3], settings[4]);
-          if (pe <= settings[1])
+          // Use the pre-rounding map decision, not the float-stored energy at the boundary.
+          if ((*truth_status)[i] == 4)
           {
             flow.fill(2, candidate_et, weight);
             groups[1]->fill(mass, candidate_et, weight, settings[3], settings[4]);

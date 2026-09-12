@@ -31,7 +31,7 @@
 namespace tagging_mass
 {
 constexpr int kMapSchema = 5;
-constexpr int kTopologyVersion = 10;
+constexpr int kTopologyVersion = 11;
 
 constexpr double kDiagnosticFloor = 0.0;
 double kPi0MassMin = 0.10;
@@ -250,7 +250,7 @@ struct Flow
 
 struct Metadata
 {
-  int schema_version = 1, source_map_schema_version = 5, pi0_topology_algorithm_version = 10;
+  int schema_version = 1, source_map_schema_version = 5, pi0_topology_algorithm_version = 11;
   int shard_index = 0, shard_count = 1;
   Long64_t total_entries = 0, entry_begin = 0, entry_end = 0, max_events = 0;
   bool require_complete = true;
@@ -282,7 +282,7 @@ struct Metadata
         !bind_branch(*t, "selection_settings", &settings) || !bind_branch(*t, "region_settings", &region) || t->GetEntry(0) <= 0 || !f || !s || !r || !m || !settings || !region) return false;
     family = *f; sample = *s; release = *r; model = *m; selection_settings = *settings; region_settings = *region;
     t->ResetBranchAddresses();
-    return schema_version == 1 && source_map_schema_version == 5 && pi0_topology_algorithm_version == 10 && selection_settings.size() == 11 && region_settings.size() == 9 &&
+    return schema_version == 1 && source_map_schema_version == 5 && pi0_topology_algorithm_version == 11 && selection_settings.size() == 11 && region_settings.size() == 9 &&
         photon_candidate_settings::same(selection_settings, selection_settings) && selection_settings[1] >= selection_settings[0] && selection_settings[2] >= selection_settings[0] &&
         selection_settings[3] < selection_settings[4] && selection_settings[5] < selection_settings[6] && selection_settings[9] == 0 && selection_settings[10] == 0 && std::isfinite(sumw) && sumw > 0 && map_count > 0;
   }

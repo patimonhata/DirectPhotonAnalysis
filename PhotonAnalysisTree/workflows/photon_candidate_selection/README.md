@@ -34,7 +34,7 @@ A production map job processes all events in several DST segments and writes one
 PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>/map_<chunk>.root
 ~~~
 
-The current map schema is 5 and the topology algorithm version is 10. This version disables the photon-energy recovery requirement (`min_photon_energy_recovery = 0`). The direct-deposit matching quality and dominance conditions remain unchanged. Older maps and partials must be regenerated; they cannot be mixed with this production. All partner thresholds, mass windows, missing-energy boundaries, and the recovery requirement are stored and checked in map/reduce/merge metadata.
+The current map schema is 5 and the topology algorithm version is 11. This version selects the maximum-deposit representative truth partner across all positive-energy usable matches before applying the strict pi0 partner threshold. The photon-energy recovery requirement remains disabled (`min_photon_energy_recovery = 0`). The direct-deposit matching quality and dominance conditions remain unchanged. Older maps and partials must be regenerated; they cannot be mixed with this production. All partner thresholds, mass windows, missing-energy boundaries, and the recovery requirement are stored and checked in map/reduce/merge metadata.
 
 The default Condor configuration uses 10 DST segments per ROOT file. This is deliberately configurable through `files_per_job`; after measuring the first jobs, change both `files_per_job` and `n_chunks = ceil(total_files / files_per_job)` together if a different file size is preferable.
 
@@ -104,7 +104,7 @@ Meson tagging considers every other valid reconstructed split cluster in `CLUSTE
 
 ## Partner and missing definitions
 
-The anchor selection keeps `min_cluster_energy`. Independently, topology partner lookup uses the strict pi0 tagging threshold. Each lookup selects the cluster with the largest absolute direct daughter deposit within its own eligible pool. A usable deposit-selected cluster in the respective energy pool is sufficient for recovery; no minimum recovered-energy fraction is required. The calibrated photon energy estimate `cluster_energy * daughter_deposit / total_deposit` and its recovery ratio remain stored as diagnostics. Thus changing the pi0 partner threshold can change separated/merged/single-contaminated/missing/other totals. The saved candidate daughter `best_cluster`/`recovered` fields describe the anchor pool; the anchor topology additionally evaluates the independent partner pool.
+The anchor selection keeps `min_cluster_energy`. Partner lookup first selects the usable truth match with the largest absolute direct daughter deposit across all positive-energy clusters. This single representative is used for both topology and saved truth-pair diagnostics. It must then satisfy strict `E > pi0_partner_min_energy` to count as recovered: a distinct partner gives separated, while an anchor-identical partner enters merged/single-contaminated classification. If it fails the energy requirement, the anchor enters missing; no lower-deposit alternative cluster is substituted. Matching-quality conditions and the disabled minimum recovered-energy fraction are unchanged. The calibrated photon energy estimate and recovery ratio remain diagnostics.
 
 For missing diagnostics, all valid positive-energy clusters are searched, including those at or below 0.1 GeV. The representative truth partner maximizes direct daughter deposit among usable truth matches, independently of the tagging threshold. Its full reconstructed cluster energy (not the truth-photon energy or the attributed fraction) determines the missing energy category. The reconstruction's own clustering thresholds remain unchanged.
 
@@ -350,3 +350,19 @@ On the first 200 Jet5 events, the previous implementation took 24.08 s wall / 22
 Commit `b7eb4d6` contains the configurable partner cuts and new missing categories while preserving the 50% recovery requirement in photon_candidate_selection. The subsequent commit disables that requirement and records topology algorithm 10, so the two productions cannot be mixed. To inspect the first version, use `git switch --detach b7eb4d6`; return to the current version with `git switch codex/photon-selection-partner-settings`. Rebuild the library for the chosen revision.
 
 On the identical 200-event Jet5 input, removing recovery changed 15 of 436 anchor topologies. All 22 compared reconstructed kinematics, tag/veto, partner-selection, and selection-flag branches were identical across the 133 written events. The independent veto check passed all 4666 decisions (1974 tags). `compare_recovery_maps.py BEFORE.root AFTER.root` reproduces this comparison. The direct-deposit match-coverage cut of 50% and the pi0-main contributor requirement are distinct cuts and remain enabled.
+
+## Topology version 11 handoff
+
+The new logic applies consistently to separated, merged and single-contaminated partner lookup. Meson veto, cluster kinematics and Region-A selection code are unchanged. Version-10 maps/partials are rejected by the updated validators/reducers; regenerate them with version 11.
+
+Map submit defaults insert `topology_v11/` before the existing configuration directory. Jet maps write to `/sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/topology_v11/<configuration>/<sample>/`; PhotonJet maps retain their workspace intermediate-files root, with the same extra version directory. The Jet production reducer and tagging-mass reducer now read directly from the Jet map root (no new workspace symlink is assumed). Their partials write to `output/plots/<workflow>/reduce/topology_v11/<configuration>/jet/partial/`. Job log filenames have a `v11_` prefix. Numeric settings and each submit's configuration choice are unchanged; align configuration names between map and reduce before submission.
+
+`run_map.sh`, `run_reduce.sh`, and `run_merge.sh` still honor explicit output arguments. For merged outputs, use `output/plots/<workflow>/topology_v11/<configuration>/jet/`. The automatic small-sample QA output and default map-check location also include `topology_v11/`. Existing directories and results are not moved or deleted. Examples above without a version directory describe older output layouts; use the versioned paths for this production.
+
+The handoff build is `PhotonAnalysisTree/build/topology_v11`. It has not been installed into the shared production prefix. Before running map jobs with the new code, install it when the production library can be replaced:
+
+```bash
+cmake --install PhotonAnalysisTree/build/topology_v11
+```
+
+Only a separate build and local regression checks were performed; no DST comparison maps or Condor jobs were launched for this change.

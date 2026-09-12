@@ -95,7 +95,7 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
       !std::isfinite(expected_min_cluster_energy) || std::abs(min_cluster_energy - expected_min_cluster_energy) > 1e-12 ||
       !std::isfinite(partner_diagnostic_min_cluster_energy) || std::abs(partner_diagnostic_min_cluster_energy - 0.0) > 1e-12 ||
       !std::isfinite(pi0_partner_min_energy) || !std::isfinite(resolved_expected_tagging_energy) ||
-      std::abs(pi0_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 10 ||
+      std::abs(pi0_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 11 ||
       !std::isfinite(eta_partner_min_energy) || std::abs(eta_partner_min_energy - (expected_eta_partner_min_energy < 0.0 ? resolved_expected_tagging_energy : expected_eta_partner_min_energy)) > 1e-12 ||
       !std::isfinite(pi0_mass_min) || std::abs(pi0_mass_min - expected_pi0_mass_min) > 1e-12 ||
       !std::isfinite(pi0_mass_max) || std::abs(pi0_mass_max - expected_pi0_mass_max) > 1e-12 ||

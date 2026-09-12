@@ -27,7 +27,7 @@
 namespace
 {
 constexpr int kMapSchema = 5;
-constexpr int kTopologyVersion = 10;
+constexpr int kTopologyVersion = 11;
 constexpr double kTopologyThreshold = 0.5;
 constexpr double kDiagnosticFloor = 0.0;
 double kPi0MassMin = 0.10;
@@ -438,7 +438,7 @@ int PlotDisplacedPartnerMassDiagnostic(
     histograms[selection]->write(kSelectionKeys[selection]);
   }
   output.cd();
-  int schema_version = 1, source_schema = kMapSchema;
+  int schema_version = 1, source_schema = kMapSchema, topology_version = kTopologyVersion;
   double topology_threshold = kTopologyThreshold, diagnostic_floor = kDiagnosticFloor, mass_min = kPi0MassMin, mass_max = kPi0MassMax;
   bool complete = require_complete;
   int metadata_shard_index = shard_index, metadata_shard_count = shard_count;
@@ -466,6 +466,7 @@ int PlotDisplacedPartnerMassDiagnostic(
   }
   TTree metadata("metadata", "Displaced-partner mass diagnostic metadata");
   metadata.Branch("schema_version", &schema_version);
+  metadata.Branch("pi0_topology_algorithm_version", &topology_version);
   metadata.Branch("selection_settings", &common_settings);
   metadata.Branch("source_map_schema_version", &source_schema);
   metadata.Branch("family", &metadata_family);

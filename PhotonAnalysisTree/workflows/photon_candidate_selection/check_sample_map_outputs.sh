@@ -50,7 +50,7 @@ if ! [[ "$tagging_partner_min_energy" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-
   exit 2
 fi
 if [[ -z "$output_directory" ]]; then
-  output_directory="$module_dir/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p1/$sample_name"
+  output_directory="$module_dir/output/intermediate_files/photon_candidate_selection/topology_v11/cluster_e_gt_0p1/$sample_name"
 fi
 if [[ ! -r "$input_manifest" ]]; then
   echo "Input manifest is not readable: $input_manifest" >&2

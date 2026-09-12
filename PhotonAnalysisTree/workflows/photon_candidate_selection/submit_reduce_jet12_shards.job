@@ -13,14 +13,14 @@ configuration      = ClusterE0p2_Pi0Partner0p5
 require_complete   = true
 n_bins             = 40
 et_max             = 40.0
-map_root            = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/$(configuration)
-partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/$(configuration)/$(family)/partial
+map_root            = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/topology_v11/$(configuration)
+partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/topology_v11/$(configuration)/$(family)/partial
 output_base         = $(partial_root)/jet12/shard_$(shard_index)/photon_candidate_selection
 log_directory       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
 
-Output             = $(log_directory)/selection_all_$(family)_$(configuration)_jet12_shard_$(shard_index).out
-Error              = $(log_directory)/selection_all_$(family)_$(configuration)_jet12_shard_$(shard_index).err
-Log                = /tmp/ryotaro-PhotonAnalysisTree-photon-candidate-selection-all-$(family)-$(configuration)-jet12-shard-$(shard_index).log
+Output             = $(log_directory)/v11_selection_all_$(family)_$(configuration)_jet12_shard_$(shard_index).out
+Error              = $(log_directory)/v11_selection_all_$(family)_$(configuration)_jet12_shard_$(shard_index).err
+Log                = /tmp/v11_ryotaro-PhotonAnalysisTree-photon-candidate-selection-all-$(family)-$(configuration)-jet12-shard-$(shard_index).log
 
 Arguments          = "$(family) $(map_root) $(output_base) $(require_complete) $(n_bins) $(et_max) jet12 $(shard_index)"
 

@@ -301,7 +301,7 @@ bool valid_metadata(const PartialMetadata& value) {
       value.min_direct_match_cluster_energy_coverage <= 1.0 &&
       std::isfinite(value.missing_diagnostic_max_delta_r) && value.missing_diagnostic_max_delta_r > 0.0 &&
       std::isfinite(value.max_abs_vertex_z) && value.max_abs_vertex_z > 0.0 &&
-      value.matcher_version > 0 && value.topology_version == 10 &&
+      value.matcher_version > 0 && value.topology_version == 11 &&
       value.bin_width_normalized == 0U &&
       value.events_processed > 0 &&
       value.events_written + value.events_invalid +

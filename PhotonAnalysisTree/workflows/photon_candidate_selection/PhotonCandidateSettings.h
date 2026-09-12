@@ -41,7 +41,7 @@ inline bool validate_partials(TTree& tree, const char* branch)
   bool ok = tree.GetEntries() > 0;
   for (Long64_t entry = 0; ok && entry < tree.GetEntries(); ++entry)
   {
-    ok = tree.GetEntry(entry) > 0 && settings && source_schema == 5 && topology_version == 10;
+    ok = tree.GetEntry(entry) > 0 && settings && source_schema == 5 && topology_version == 11;
     if (!ok) break;
     if (entry == 0) reference = *settings;
     ok = same(reference, *settings);

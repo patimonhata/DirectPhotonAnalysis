@@ -12,6 +12,7 @@ struct PartialMetadata
   std::vector<double> selection_settings;
   int schema = -1;
   int source_schema = -1;
+  int topology_version = -1;
   int shard_index = -1;
   int shard_count = -1;
   Long64_t total_entries = -1;
@@ -45,7 +46,7 @@ bool read_partial_metadata(TFile& file, PartialMetadata& value)
   std::vector<unsigned long long>* map_counts = nullptr;
   std::vector<double>* sum_weights = nullptr;
   std::vector<double>* settings = nullptr;
-  const bool ok = bind_branch(*tree, "selection_settings", &settings) && bind_branch(*tree, "schema_version", &value.schema) && bind_branch(*tree, "source_map_schema_version", &value.source_schema) &&
+  const bool ok = bind_branch(*tree, "pi0_topology_algorithm_version", &value.topology_version) && bind_branch(*tree, "selection_settings", &settings) && bind_branch(*tree, "schema_version", &value.schema) && bind_branch(*tree, "source_map_schema_version", &value.source_schema) &&
       bind_branch(*tree, "family", &family) && bind_branch(*tree, "sample_filter", &sample_filter) && bind_branch(*tree, "require_complete", &value.require_complete) &&
       bind_branch(*tree, "max_events_per_sample", &value.max_events) && bind_branch(*tree, "shard_index", &value.shard_index) &&
       bind_branch(*tree, "shard_count", &value.shard_count) && bind_branch(*tree, "total_entries", &value.total_entries) && bind_branch(*tree, "entry_begin", &value.entry_begin) && bind_branch(*tree, "entry_end", &value.entry_end) &&
@@ -71,7 +72,7 @@ bool read_partial_metadata(TFile& file, PartialMetadata& value)
 
 bool compatible_partial(const PartialMetadata& value, const PartialMetadata& reference, bool require_complete_partials)
 {
-  return photon_candidate_settings::same(value.selection_settings, reference.selection_settings) && value.schema == 1 && value.source_schema == kMapSchema && value.family == reference.family && value.release == reference.release &&
+  return photon_candidate_settings::same(value.selection_settings, reference.selection_settings) && value.schema == 1 && value.source_schema == kMapSchema && value.topology_version == kTopologyVersion && value.family == reference.family && value.release == reference.release &&
       value.model == reference.model && (!require_complete_partials || value.require_complete) && value.max_events == 0 && close(value.topology_threshold, kTopologyThreshold) &&
       close(value.diagnostic_floor, kDiagnosticFloor) &&
       close(value.emulated_tag_threshold, 0.2) && std::isfinite(value.mass_min) && std::isfinite(value.mass_max) && value.mass_min >= 0.0 && value.mass_min < value.mass_max &&
@@ -165,6 +166,7 @@ int MergeDisplacedPartnerMassDiagnostic(const std::string family, const std::str
   int metadata_shard_count_override = shard_count_override;
   TTree metadata("metadata", "Merged displaced-partner mass diagnostic metadata");
   metadata.Branch("schema_version", &schema_version);
+  metadata.Branch("pi0_topology_algorithm_version", &reference.topology_version);
   metadata.Branch("selection_settings", &reference.selection_settings);
   metadata.Branch("source_map_schema_version", &source_schema);
   metadata.Branch("family", &metadata_family);

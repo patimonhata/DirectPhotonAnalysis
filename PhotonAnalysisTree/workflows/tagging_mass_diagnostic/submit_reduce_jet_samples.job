@@ -11,14 +11,14 @@ job_lease_duration = 86400
 family             = jet
 configuration      = ClusterE0p12_Pi0Partner0p5
 require_complete   = true
-map_root           = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/$(configuration)
-partial_root       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/reduce/$(configuration)/$(family)/partial
+map_root           = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/topology_v11/$(configuration)
+partial_root       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/reduce/topology_v11/$(configuration)/$(family)/partial
 output_base        = $(partial_root)/$(sample_name)/shard_0
 log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_mass_diagnostic/reduce
 
-Output             = $(log_directory)/$(family)_$(configuration)_$(sample_name)_shard_0.out
-Error              = $(log_directory)/$(family)_$(configuration)_$(sample_name)_shard_0.err
-Log                = /tmp/ryotaro-tagging-mass-$(family)-$(configuration)-$(sample_name)-shard-0.log
+Output             = $(log_directory)/v11_$(family)_$(configuration)_$(sample_name)_shard_0.out
+Error              = $(log_directory)/v11_$(family)_$(configuration)_$(sample_name)_shard_0.err
+Log                = /tmp/v11_ryotaro-tagging-mass-$(family)-$(configuration)-$(sample_name)-shard-0.log
 
 Arguments          = "$(family) $(map_root) $(output_base) $(require_complete) $(sample_name) 0 1"
 

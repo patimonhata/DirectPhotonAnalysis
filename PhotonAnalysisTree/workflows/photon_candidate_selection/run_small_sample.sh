@@ -51,7 +51,7 @@ threshold_tag=${canonical_threshold//./p}
 threshold_tag=${threshold_tag//+/}
 threshold_tag=${threshold_tag//-/m}
 if [[ -z "$output_root" ]]; then
-  output_root="$module_dir/output/qa/photon_candidate_selection/cluster_e_gt_${threshold_tag}/${sample_name}_${segment_count}segments"
+  output_root="$module_dir/output/qa/photon_candidate_selection/topology_v11/cluster_e_gt_${threshold_tag}/${sample_name}_${segment_count}segments"
 fi
 
 case "$sample_name" in

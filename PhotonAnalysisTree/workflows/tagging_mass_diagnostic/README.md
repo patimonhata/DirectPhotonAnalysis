@@ -1,6 +1,6 @@
 # Tagging invariant-mass diagnostic
 
-Independent reduce/merge workflow for existing photon-candidate maps (schema 5, topology algorithm 10, recovery requirement disabled). No map rebuild is needed. All candidates use the saved **Region A before meson veto** flag; candidate ET is not an event-leading requirement.
+Independent reduce/merge workflow for existing photon-candidate maps (schema 5, topology algorithm 11, recovery requirement disabled). Version-11 maps are required; regenerate version-10 inputs. All candidates use the saved **Region A before meson veto** flag; candidate ET is not an event-leading requirement.
 
 ## Populations
 
@@ -15,7 +15,7 @@ Independent reduce/merge workflow for existing photon-candidate maps (schema 5, 
 
 Truth-pi0 means a valid pi0 anchor with main fraction > 0.5; separated is topology code 1. Prompt means the saved prompt flag and dominant fraction > 0.5, matching the candidate-composition analysis. Overlapping origins are rejected.
 
-The representative truth partner is the usable daughter truth match with maximum absolute direct daughter deposit across **all positive-energy clusters**. It is not chosen by reconstructed mass. The saved representative mass can therefore be used even when the partner is below the stored-cluster threshold. The threshold-qualified partner that establishes the separated topology can differ from this representative. Map pi0 partner thresholds consequently affect the **selected separated population**, although no additional energy cut is applied to its representative pair here. Invalid/unavailable/same-cluster representative pairs are counted separately, not silently put into mass underflow.
+The representative truth partner is the usable daughter truth match with maximum absolute direct daughter deposit across **all positive-energy clusters**. It is not chosen by reconstructed mass. The saved representative mass can therefore be used even when the partner is below the stored-cluster threshold. The same representative now establishes separated topology and must exceed the pi0 partner threshold. The below-threshold directory is retained as an empty consistency counter for valid version-11 separated inputs; it uses the saved tag-status decision to avoid float-energy rounding at the threshold. Map pi0 partner thresholds consequently affect the **selected separated population**, although no additional energy cut is applied to its representative pair here. Invalid/unavailable/same-cluster representative pairs are counted separately, not silently put into mass underflow.
 
 Prompt pairs are recomputed from stored cluster E, eta and phi using massless four-vectors. Partner selection is strictly E > the corresponding map threshold; it does not impose candidate BDT, isolation or shower cuts. Self-pairs are excluded by cluster identity. These are directed candidate–partner entries: two prompt candidates can each contribute the same unordered pair with their own candidate ET. Multiple window partners all contribute; there is no best-partner selection. The existence of each prompt candidate's pi0/eta window pairs must agree with its saved tag flags, otherwise reduce fails before publishing a result.
 
@@ -39,7 +39,7 @@ Partial metadata records entry ranges, full-sample normalization, settings and Q
 
 ## Condor production
 
-The default configuration is `ClusterE0p12_Pi0Partner0p15`. Both submit files must use the same configuration. Outputs/logs include the configuration name, so the four existing configurations can be reduced separately.
+The submit files retain the selected configuration `ClusterE0p12_Pi0Partner0p5`. Both submit files must use the same configuration. Outputs/logs include the configuration name, so the four existing configurations can be reduced separately.
 
 ```bash
 workflow=PhotonAnalysisTree/workflows/tagging_mass_diagnostic
@@ -59,8 +59,8 @@ Once all 16 jobs succeed:
 
 ```bash
 PhotonAnalysisTree/workflows/tagging_mass_diagnostic/run_merge.sh jet \
-  PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/reduce/ClusterE0p12_Pi0Partner0p15/jet/partial \
-  PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/ClusterE0p12_Pi0Partner0p15/jet
+  PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/reduce/topology_v11/ClusterE0p12_Pi0Partner0p15/jet/partial \
+  PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/topology_v11/ClusterE0p12_Pi0Partner0p15/jet
 ```
 
 Merge requires complete map inputs, every expected sample/shard, exact entry coverage, matching per-sample normalization/settings, and matching histogram axes. Existing ROOT outputs are never overwritten. Reduce and merge write temporary ROOT files and publish only after successful writing.
@@ -89,4 +89,6 @@ python PhotonAnalysisTree/workflows/tagging_mass_diagnostic/test_tagging_mass.py
 
 These exercise multiple prompt window partners, independent pi0/eta energy cuts and strict boundaries, the unthresholded representative pair, candidate-versus-pair counts, negative weights, split-versus-serial merge equivalence, PDF generation, overwrite protection, and rejection of incomplete coverage or mismatched settings.
 
-Implementation QA used the first Jet8 map from `ClusterE0p12_Pi0Partner0p15` and `ClusterE0p2_Pi0Partner0p5`: both completed reduce, merge and all 24 PDFs with no prompt veto mismatch. These single-map outputs under `output/qa/tagging_mass_diagnostic/jet8_first_map` are not full-production physics results. Condor production has not been submitted by implementation/testing.
+Historical version-10 implementation QA used the first Jet8 map from `ClusterE0p12_Pi0Partner0p15` and `ClusterE0p2_Pi0Partner0p5`: both completed reduce, merge and all 24 PDFs with no prompt veto mismatch. These single-map outputs under `output/qa/tagging_mass_diagnostic/jet8_first_map` are not full-production physics results. Condor production has not been submitted by implementation/testing.
+
+Version-11 handoff: map input is now the versioned Jet cold-storage root used by photon_candidate_selection map jobs. Partial output paths include `reduce/topology_v11/`, and log filenames have `v11_` prefixes. No production jobs have been submitted. The synthetic test has been updated so a below-threshold representative belongs to missing, not separated.

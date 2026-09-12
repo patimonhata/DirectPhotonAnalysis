@@ -92,8 +92,17 @@ int main()
   candidate.partner_diagnostics[1].match.usable = false;
   assert(classify().missing_category == Pi0MissingCategory::other);
   truth.found = true;
-  candidate.topology_partner_clusters[1] = truth;
-  auto& partner = candidate.topology_partner_clusters[1];
+  auto& partner = truth;
+  // The representative stays below threshold even if some other cluster could pass it.
+  // There is no independently selected threshold-qualified partner anymore.
+  config.min_photon_energy_recovery = 0.0;
+  partner.cluster_energy = 0.3;
+  assert(classify().topology == Pi0AnchorTopology::missing);
+  partner.cluster_energy = 0.5;
+  assert(classify().topology == Pi0AnchorTopology::missing);
+  partner.cluster_energy = std::nextafter(0.5, 1.0);
+  assert(classify().topology == Pi0AnchorTopology::separated);
+  config.min_photon_energy_recovery = 0.5;
   partner.cluster_energy = 0.6;
   partner.recovery = 0.5;
   assert(classify().topology == Pi0AnchorTopology::separated);
@@ -113,5 +122,8 @@ int main()
   assert(classify().topology == Pi0AnchorTopology::merged);
   candidate.photon_pre_cemc_interaction[1] = true;
   assert(classify().topology == Pi0AnchorTopology::single_contaminated);
+  partner.cluster_energy = 0.5;
+  assert(classify().topology == Pi0AnchorTopology::missing);
+  assert(Pi0AnchorTopologyEvaluator::kAlgorithmVersion == 11);
   std::cout << "pi0 anchor classification: passed\n";
 }

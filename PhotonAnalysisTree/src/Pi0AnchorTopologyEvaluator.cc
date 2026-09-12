@@ -411,14 +411,15 @@ void classify_pi0_anchor(const Pi0AnchorTopologyConfig& config, const Pi0Topolog
       candidate.best_cluster[0] == anchor.cluster_index;
   const bool is_best1 = candidate.recovered[1] &&
       candidate.best_cluster[1] == anchor.cluster_index;
+  // Choose the maximum-deposit truth partner before applying the tagging energy threshold.
   const auto partner_recovered = [&](std::size_t photon) {
-    const auto& partner = candidate.topology_partner_clusters[photon];
-    return partner.found && (config.min_photon_energy_recovery <= 0.0 ||
+    const auto& partner = candidate.truth_partner_clusters[photon];
+    return partner.found && partner.cluster_energy > config.tagging_partner_min_cluster_energy && (config.min_photon_energy_recovery <= 0.0 ||
         (std::isfinite(candidate.photon_energy[photon]) && candidate.photon_energy[photon] > 0.0 &&
          std::isfinite(partner.recovery) && partner.recovery >= config.min_photon_energy_recovery));
   };
   const auto partner_is_anchor = [&](std::size_t photon) {
-    return partner_recovered(photon) && candidate.topology_partner_clusters[photon].cluster_id == anchor_cluster.cluster_id;
+    return partner_recovered(photon) && candidate.truth_partner_clusters[photon].cluster_id == anchor_cluster.cluster_id;
   };
   if ((is_best0 && partner_is_anchor(1)) || (is_best1 && partner_is_anchor(0)))
   {
@@ -1059,9 +1060,6 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
     auto& truth_partner = candidate.truth_partner_clusters[photon];
     if (!truth_partner.found || direct_edep > truth_partner.direct_edep) truth_partner = partner;
-    auto& topology_partner = candidate.topology_partner_clusters[photon];
-    if (cluster_energy > config_.tagging_partner_min_cluster_energy &&
-        (!topology_partner.found || direct_edep > topology_partner.direct_edep)) topology_partner = partner;
   };
 
   for (std::size_t candidate_index = 0;

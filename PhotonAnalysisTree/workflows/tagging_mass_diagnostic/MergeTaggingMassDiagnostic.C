@@ -50,7 +50,7 @@ int MergeTaggingMassDiagnostic(const std::string family, const std::string parti
   }
   output.cd();
   TTree metadata("metadata", "Merged tagging mass diagnostic");
-  int schema_version = 1, source_schema = 5, topology_version = 10;
+  int schema_version = 1, source_schema = 5, topology_version = 11;
   auto settings = reference.selection_settings, region_settings = reference.region_settings;
   std::string metadata_family = family, metadata_filter = sample_filter, release = reference.release, model = reference.model;
   unsigned long long partial_count = sources.size();

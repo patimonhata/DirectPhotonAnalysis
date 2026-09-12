@@ -217,7 +217,6 @@ struct Pi0TopologyCandidateRecord
   std::vector<Pi0ClusterTruthMatch> cluster_matches;
   std::array<Pi0PartnerDiagnosticRecord, 2> partner_diagnostics;
   std::array<Pi0TruthPartnerClusterRecord, 2> truth_partner_clusters;
-  std::array<Pi0TruthPartnerClusterRecord, 2> topology_partner_clusters;
 };
 
 struct Pi0TopologyAnchorRecord
@@ -279,7 +278,7 @@ const char* pi0_anchor_tag_result_name(Pi0AnchorTagResult value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 10;
+  static constexpr int kAlgorithmVersion = 11;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

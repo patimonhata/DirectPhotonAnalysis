@@ -724,9 +724,11 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
                                  const std::vector<int>& colors, const std::string& output, const std::string& detail)
 {
   SetsPhenixStyle();
-  constexpr int canvas_width = 1600;
+  const bool superdetailed = detail == "superdetailed";
+  constexpr int default_canvas_width = 1600;
+  const int canvas_width = superdetailed ? 2100 : default_canvas_width;
   constexpr double plot_height = kPlotPadHeight;
-  constexpr double plot_width = kCompositionPlotWidth;
+  const double plot_width = kCompositionPlotWidth * default_canvas_width / canvas_width;
   TCanvas canvas(("c_" + detail + "_photon_candidate_composition").c_str(), "", canvas_width, kCanvasHeight);
   auto plot_pad = make_plot_pad(detail + "_photon_candidate_composition_pad", false, plot_height, plot_width);
   THStack stack(("stack_" + detail + "_photon_candidate_composition").c_str(), "");
@@ -744,9 +746,10 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   stack.Draw("HIST SAME");
   std::vector<std::unique_ptr<TLegend>> legends;
   canvas.cd();
-  if (detail == "superdetailed")
+  if (superdetailed)
   {
-    legends.push_back(std::make_unique<TLegend>(0.72, 0.05, 0.99, 0.95));
+    legends.push_back(std::make_unique<TLegend>(0.55, 0.05, 0.99, 0.95));
+    legends[0]->SetTextSize(0.035);
     for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
   }
   else if (detail == "detailed")

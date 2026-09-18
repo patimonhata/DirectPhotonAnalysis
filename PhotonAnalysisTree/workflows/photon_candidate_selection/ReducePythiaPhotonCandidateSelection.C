@@ -446,6 +446,7 @@ std::vector<std::string> caption_lines(const PlotCaption& value)
       : "Candidate Cluster: after " + value.selection;
   return {
       "#it{#bf{sPHENIX}} Internal",
+      // "#it{#bf{sPHENIX}} Simulation Work-in-Progress",
       sample + ", |z_{vertex}^{truth}| < 60 cm",
       candidate,
       pi0_tagging,

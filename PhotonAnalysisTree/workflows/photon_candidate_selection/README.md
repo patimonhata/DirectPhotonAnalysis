@@ -223,13 +223,13 @@ Both analyses produce `kinematic`, `preselection`, `preselection_tight`, `presel
 
 The composition categories partition every selected candidate into prompt photon, pi0 topology, eta, or other. The detailed pi0 categories are separated, merged, single contaminated, missing, and other. Truth-origin majorities use a strict contribution `> 0.5`; an exact contribution of `0.5` is other. An overlap is recorded per selection in metadata and makes the reducer return code 9 after writing its output.
 
-The topology prompt reference requires both the selected flag and `split_cluster_truth_prompt_cluster`. The pi0 categories partition selected valid pi0 anchors. Weighted fraction errors are computed from the weighted numerator/denominator subset covariance; weighted fractions are never added directly.
+The topology prompt reference requires both the selected flag and `split_cluster_truth_prompt_cluster`. The pi0 categories partition selected composition-pi0 clusters (valid anchors with strict majority and no origin overlap). Weighted fraction errors are computed from the weighted numerator/denominator subset covariance; weighted fractions are never added directly.
 
 The merge also computes category-conditional survival fractions relative to the kinematic selection. In each cluster-ET bin, every curve is the weighted yield for one category after the current selection divided by the weighted yield for the same category after the kinematic selection. The composition summary contains all candidates, prompt photons, aggregated pi0-origin candidates, eta-origin candidates, and other-origin candidates; its detailed version resolves the pi0 topology. The anchor-topology summary contains all pi0-main anchors and the five topology categories; its detailed version resolves the missing category.
 
 These survival curves have independent category denominators and therefore are not stacked and do not sum to one. Their uncertainties use the same weighted subset-covariance calculation as the existing fractions. A zero-denominator bin is stored as zero in the ROOT histogram and omitted from the PDF graph. The merger validates the unweighted subset relation and the weighted sum-of-squared-weights subset relation for every selection, category, and bin.
 
-The partial schema is version 5. The merged candidate-composition schema is version 7 and the merged anchor-topology schema is version 5. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
+The partial schema is version 6. The merged candidate-composition schema is version 7 and the merged anchor-topology schema is version 6. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
 
 ### Shards and partial files
 
@@ -323,9 +323,9 @@ Both plot families share one output base and the same selection directories:
 
 Each selection contains five composition PDFs (summary, detailed and superdetailed category-fraction stacks, plus summary and detailed survival fractions) and eight topology PDFs. The superdetailed composition stack splits pi0 missing into the six diagnostic categories, normalized to all selected candidates. The six additional fraction histograms are saved in `candidate_composition.root`.
 
-All PDFs use the same slide-oriented style: a 0--40 GeV x-axis, a plot pad occupying 0.68 of the canvas height, and the compact five-line caption without the stored/anchor threshold. The candidate line shows the kinematic range at the kinematic stage and only the applied cut at later stages. Short legends remain inside the plot frame; crowded detailed legends and stack legends use a full-height right column, and stack legends are ordered from the top of the stack to the bottom. Each selection still contains the isolated `workinprogress/region_a_candidate_truth_origin.pdf` plus work-in-progress copies of the summary composition survival and both summary and detailed category-fraction-stack plots; their output locations are unchanged. The origin plot compares the weighted prompt-photon-, pi0-, eta-, and other-candidate spectra after that selection; the five pi0 topology subclasses are summed into one pi0 curve. The displayed composition survival plots omit the redundant all-candidate curve, while its histogram remains available in `candidate_composition.root`.
+The existing ET PDFs use the same slide-oriented style: a 0--40 GeV x-axis, a plot pad occupying 0.68 of the canvas height, and the compact five-line caption without the stored/anchor threshold. The candidate line shows the kinematic range at the kinematic stage and only the applied cut at later stages. Short legends remain inside the plot frame; crowded detailed legends and stack legends use a full-height right column, and stack legends are ordered from the top of the stack to the bottom. Each selection still contains the isolated `workinprogress/region_a_candidate_truth_origin.pdf` plus work-in-progress copies of the summary composition survival and both summary and detailed category-fraction-stack plots; their output locations are unchanged. The origin plot compares the weighted prompt-photon-, pi0-, eta-, and other-candidate spectra after that selection; the five pi0 topology subclasses are summed into one pi0 curve. The displayed composition survival plots omit the redundant all-candidate curve, while its histogram remains available in `candidate_composition.root`.
 
-Existing schema-5 partials can be reused. Before reusing their topology missing breakdown, the merger checks that missing counts, weighted yields and errors agree with composition in every bin, including underflow and overflow. A mismatch stops the merge rather than displaying a breakdown from a different population.
+Schema-5 partials must be regenerated from existing schema-5/topology-v11 maps: schema-6 partials add BDT histograms and align the anchor population with composition. Before reusing their topology missing breakdown, the merger checks that missing counts, weighted yields and errors agree with composition in every bin, including underflow and overflow. A mismatch stops the merge rather than displaying a breakdown from a different population.
 
 Both plot families use the same compact caption layout: collaboration label, sample family and truth vertex cut, the candidate kinematics or applied selection, and separate pi0/eta tagging energy thresholds and mass windows. Values come from validated production metadata; energies are shown to two decimal places. “Candidate cluster” does not imply an event-leading selection.
 
@@ -366,3 +366,19 @@ cmake --install PhotonAnalysisTree/build/topology_v11
 ```
 
 Only a separate build and local regression checks were performed; no DST comparison maps or Condor jobs were launched for this change.
+
+
+## Pi0 BDT distributions and common population
+
+Topology spectra and BDT diagnostics now use exactly the composition pi0 category: a valid anchor with main fraction strictly greater than 0.5, with multiple-origin majorities assigned to composition Other. The map anchor construction, ancestry classifier and topology algorithm are unchanged. The reducer computes origin once for all three outputs. Reduce and merge check topology/composition agreement and BDT selected totals. Weighted total comparisons use a relative tolerance of `1e-8` (with a 1 pb scale floor), allowing roundoff from different cluster/bin summation orders. Count, metadata and binwise comparisons retain their strict checks. Old partials are rejected; rerun reduce and merge into a new output location to preserve existing results. DST/map regeneration is unnecessary for compatible maps.
+
+Every selection directory (`kinematic`, `preselection`, `preselection_isolation`, `preselection_tight`, `region_a`, `region_a_tagging_veto`) receives:
+
+- `pi0_bdt_score_by_topology.pdf`: one page, two columns (weighted yield with log axis; independently unit-normalized topology shapes).
+- `pi0_bdt_score_by_topology_isolation.pdf`: one page, three columns (all, isolated, nonisolated) and two rows (weighted yield; normalized shapes), including selections that already require isolation.
+- `pi0_bdt_score.root`: count/weighted score histograms, weighted score-versus-ET histograms, selection/invalid-score counters, and population/selection/model metadata.
+- `pi0_bdt_score_summary.csv`: selected and invalid-score counts and weights, valid-score weighted integrals, and score underflow/overflow counts for each topology/isolation group.
+
+The five BDT categories are separated, merged, single contaminated, missing and other. No missing subdivisions are added to BDT diagnostics. Existing missing-detail plots remain available. All includes the isolation gap; isolated and nonisolated use stored independent flags. Gap is saved for closure checks. Invalid scores are counted separately. Score uses 100 bins over [0,1]; exactly 1 is included in the last visible bin. True underflow/overflow is retained and reported; unit-area plots normalize visible bins only. Empty distributions are not normalized. Isolation-required stages retain empty nonisolated panels with an explanatory label. Tight selections intentionally retain their BDT cut.
+
+Run `python3 PhotonAnalysisTree/tests/test_pi0_bdt.py` in the ROOT environment for synthetic classification, partition, merge and output checks.

@@ -403,6 +403,7 @@ int MergePythiaPhotonCandidateSelection(
   std::array<std::unique_ptr<Histograms>, kSelectionCount> composition_histograms;
   std::array<Summary, kSelectionCount> composition_summaries;
   std::array<std::unique_ptr<Spectra>, kSelectionCount> topology_histograms;
+  std::array<pi0_bdt::Histograms, kSelectionCount> bdt_histograms;
   std::vector<unsigned long long> sample_events_written, sample_events_stitch_pass, sample_region_a_clusters;
   std::vector<unsigned long long> sample_region_a_prompt_clusters, sample_region_a_anchor_clusters;
   std::array<std::vector<unsigned long long>, kSelectionCount> sample_selected_clusters, sample_selected_anchor_clusters;
@@ -430,7 +431,7 @@ int MergePythiaPhotonCandidateSelection(
         std::cerr << "Missing or invalid composition partial: " << path << std::endl;
         return 3;
       }
-      if (metadata.schema_version != 5 || metadata.source_map_schema_version != 5 || metadata.family != family ||
+      if (metadata.schema_version != 6 || metadata.source_map_schema_version != 5 || metadata.family != family ||
           metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
           metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U || !same_double(metadata.sample_cross_section_pb, sample.cross_section_pb) ||
           metadata.events_stitch_pass > metadata.events_written || metadata.region_a_prompt_clusters > metadata.region_a_clusters ||
@@ -503,6 +504,8 @@ int MergePythiaPhotonCandidateSelection(
             return 5;
           }
         }
+        auto* bdt_directory = file.GetDirectory((std::string("pi0_bdt/") + kSelectionKeys[composition_selection]).c_str());
+        if (!bdt_directory || !bdt_histograms[composition_selection].add(*bdt_directory)) return 5;
         add_summary(composition_summaries[composition_selection], composition_summary.selections[composition_selection]);
       }
       for (std::size_t topology_selection = 0; topology_selection < kSelectionCount; ++topology_selection)
@@ -580,6 +583,44 @@ int MergePythiaPhotonCandidateSelection(
       if (!valid_subset(*topology_histograms[selection_index]->counts[index], *topology_histograms[0]->counts[index],
                         *topology_histograms[selection_index]->weighted_pb[index], *topology_histograms[0]->weighted_pb[index])) return 6;
     }
+  }
+
+  for (std::size_t i = 0; i < kSelectionCount; ++i)
+  {
+    if (!consistent_pi0_bdt(*composition_histograms[i], *topology_histograms[i], bdt_histograms[i])) return 6;
+    const std::string directory = output_base + "/" + kSelectionKeys[i];
+    if (!make_output_directory(directory + "/pi0_bdt_score")) return 7;
+    if (!bdt_histograms[i].export_files(directory, kSelectionLabels[i], i == 3 || i >= 4)) return 7;
+    TFile bdt_output((directory + "/pi0_bdt_score.root").c_str(), "UPDATE");
+    if (bdt_output.IsZombie()) return 7;
+    TNamed model("model_sha256", combined.model_sha256.c_str()); model.Write();
+    TNamed configuration("configuration", output_base.c_str()); configuration.Write();
+    TNamed selection_definition("selection_definition", kSelectionDefinitions[i]); selection_definition.Write();
+    TTree bdt_metadata("metadata", "Pi0 BDT source and selection metadata");
+    int bdt_schema_version = 1;
+    std::string bdt_selection_key = kSelectionKeys[i];
+    bdt_metadata.Branch("schema_version", &bdt_schema_version);
+    bdt_metadata.Branch("source_partial_schema_version", &combined.schema_version);
+    bdt_metadata.Branch("source_map_schema_version", &combined.source_map_schema_version);
+    bdt_metadata.Branch("selection_key", &bdt_selection_key);
+    bdt_metadata.Branch("family", &combined.family);
+    bdt_metadata.Branch("map_root", &combined.map_root);
+    bdt_metadata.Branch("require_complete", &combined.require_complete);
+    bdt_metadata.Branch("model_sha256", &combined.model_sha256);
+    bdt_metadata.Branch("min_cluster_energy", &combined.min_cluster_energy);
+    bdt_metadata.Branch("pi0_partner_min_energy", &combined.pi0_partner_min_energy);
+    bdt_metadata.Branch("eta_partner_min_energy", &combined.eta_partner_min_energy);
+    bdt_metadata.Branch("pi0_mass_min", &combined.pi0_mass_min);
+    bdt_metadata.Branch("pi0_mass_max", &combined.pi0_mass_max);
+    bdt_metadata.Branch("eta_mass_min", &combined.eta_mass_min);
+    bdt_metadata.Branch("eta_mass_max", &combined.eta_mass_max);
+    bdt_metadata.Branch("pi0_topology_algorithm_version", &combined.pi0_topology_algorithm_version);
+    bdt_metadata.Branch("sample_names", &combined.sample_names);
+    bdt_metadata.Branch("sample_map_counts", &combined.sample_map_counts);
+    bdt_metadata.Branch("sample_sum_generator_weights", &combined.sample_sum_generator_weights);
+    bdt_metadata.Branch("sample_cross_sections_pb", &sample_cross_sections_pb);
+    bdt_metadata.Fill();
+    bdt_metadata.Write();
   }
 
   TFile composition_output((output_base + "/candidate_composition.root").c_str(), "RECREATE");
@@ -812,16 +853,18 @@ int MergePythiaPhotonCandidateSelection(
     topology_output.cd();
   }
 
-  int topology_schema_version = 5;
+  int topology_schema_version = 6;
   int topology_source_schema_version = combined.source_map_schema_version;
   int topology_source_partial_schema_version = combined.schema_version;
   std::vector<std::string> topology_selection_keys(kSelectionKeys.begin(), kSelectionKeys.end());
   std::vector<std::string> topology_selection_labels(kSelectionLabels.begin(), kSelectionLabels.end());
   std::vector<std::string> topology_selection_definitions(kSelectionDefinitions.begin(), kSelectionDefinitions.end());
   std::string topology_prompt_definition = "selected_and_truth_prompt_cluster";
+  std::string topology_anchor_definition = "composition_pi0_valid_anchor_strict_majority_no_origin_overlap";
   std::string topology_source = "stored_map_topology_evaluated_with_strict_min_cluster_energy_from_metadata";
   unsigned int topology_sample_count = combined.sample_names.size();
   TTree topology_metadata("metadata", "Pi0-anchor topology merge metadata");
+  topology_metadata.Branch("anchor_definition", &topology_anchor_definition);
   topology_metadata.Branch("schema_version", &topology_schema_version);
   topology_metadata.Branch("source_partial_schema_version", &topology_source_partial_schema_version);
   topology_metadata.Branch("source_map_schema_version", &topology_source_schema_version);

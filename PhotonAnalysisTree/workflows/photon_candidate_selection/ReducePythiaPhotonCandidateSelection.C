@@ -1,5 +1,6 @@
 #include "../../macro/Utilities/sPhenixStyle.C"
 
+#include "Pi0BdtHistograms.h"
 #include <TCanvas.h>
 #include <TDirectory.h>
 #include <TChain.h>
@@ -720,6 +721,14 @@ std::size_t pi0_category(int topology)
   return topology == 0 ? pi0_other : category_count;
 }
 
+std::size_t origin_category(bool is_prompt, bool is_pi0, bool is_eta, int topology)
+{
+  if (static_cast<int>(is_prompt) + static_cast<int>(is_pi0) + static_cast<int>(is_eta) > 1) return other;
+  if (is_prompt) return prompt;
+  if (is_pi0) return pi0_category(topology);
+  return is_eta ? eta : other;
+}
+
 void draw_composition_components(const std::vector<TH1D*>& components, const std::vector<std::string>& labels,
                                  const std::vector<int>& colors, const std::string& output, const std::string& detail)
 {
@@ -805,9 +814,41 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
 
 constexpr std::array<std::size_t, 6> kMissingSpectrumIndices = {6, 7, 9, 10, 8, 11};
 
+// These totals accumulate the same weights in different orders (cluster order vs ET-bin order).
+// Use the histogram partition tolerance here; keep same_double strict for metadata and binwise comparisons.
+bool same_weighted_integral(double left, double right)
+{
+  return std::isfinite(left) && std::isfinite(right) &&
+      std::abs(left - right) <= 1e-8 * std::max({1.0, std::abs(left), std::abs(right)});
+}
+
+bool consistent_pi0_bdt(const candidate_composition::Histograms& composition, const Spectra& topology, const pi0_bdt::Histograms& bdt)
+{
+  if (!bdt.valid()) return false;
+  constexpr std::array<int, 5> indices = {2, 3, 4, 5, 12};
+  for (int k = 0; k < 5; ++k)
+  {
+    const auto c = candidate_composition::pi0_separated + k;
+    for (int bin = 0; bin <= composition.counts[c]->GetNbinsX() + 1; ++bin)
+      if (!same_double(composition.counts[c]->GetBinContent(bin), topology.counts[indices[k]]->GetBinContent(bin)) ||
+          !same_double(composition.weighted[c]->GetBinContent(bin), topology.weighted_pb[indices[k]]->GetBinContent(bin))) return false;
+    const auto& summary = bdt.cells[0][k]->summary;
+    const double composition_count = composition.counts[c]->Integral(0, composition.counts[c]->GetNbinsX() + 1);
+    const double composition_weight = composition.weighted[c]->Integral(0, composition.weighted[c]->GetNbinsX() + 1);
+    if (!same_double(summary.GetBinContent(1), composition_count) || !same_weighted_integral(summary.GetBinContent(3), composition_weight))
+    {
+      std::cerr << std::setprecision(17) << "Pi0 BDT total mismatch for " << pi0_bdt::keys[k]
+                << ": selected count=" << summary.GetBinContent(1) << ", composition count=" << composition_count
+                << ", selected weight=" << summary.GetBinContent(3) << ", composition weight=" << composition_weight << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
+
 std::vector<std::unique_ptr<TH1D>> composition_missing_fractions(const Histograms& composition, const Spectra& topology)
 {
-  // Topology includes half-boundary/overlap anchors excluded from composition. Reuse its split only when the populations agree.
+  // Both populations use the composition pi0 definition; verify their missing histograms agree.
   for (int bin = 0; bin <= composition.counts[pi0_missing]->GetNbinsX() + 1; ++bin)
   {
     if (!same_double(composition.counts[pi0_missing]->GetBinContent(bin), topology.counts[5]->GetBinContent(bin)) ||
@@ -877,6 +918,7 @@ int ReducePythiaPhotonCandidateSelection(
 
   std::array<std::unique_ptr<Histograms>, kSelectionCount> composition_histograms;
   std::array<std::unique_ptr<Spectra>, kSelectionCount> topology_histograms;
+  std::array<pi0_bdt::Histograms, kSelectionCount> bdt_histograms;
   for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
   {
     composition_histograms[selection_index] = std::make_unique<Histograms>(n_bins, et_max);
@@ -947,6 +989,9 @@ int ReducePythiaPhotonCandidateSelection(
     unsigned char weight_valid = 0, stitch_valid = 0, stitch_pass = 0;
     double weight_numerator = 0.0;
     std::vector<double>* et = nullptr;
+    std::vector<float>* bdt_score = nullptr;
+    std::vector<unsigned char>* bdt_valid = nullptr;
+    std::vector<unsigned char>* pass_nonisolated = nullptr;
     std::vector<unsigned char>* pass_kinematics = nullptr;
     std::vector<unsigned char>* pass_preselection = nullptr;
     std::vector<unsigned char>* pass_tight = nullptr;
@@ -975,6 +1020,9 @@ int ReducePythiaPhotonCandidateSelection(
         bind_active(tree, "sample_stitching_valid", &stitch_valid) &&
         bind_active(tree, "sample_stitching_pass", &stitch_pass) &&
         bind_active(tree, "weight_numerator_pb", &weight_numerator) &&
+        bind_active(tree, "split_cluster_bdt_score", &bdt_score) &&
+        bind_active(tree, "split_cluster_bdt_valid", &bdt_valid) &&
+        bind_active(tree, "split_cluster_pass_nonisolated", &pass_nonisolated) &&
         bind_active(tree, "split_cluster_et", &et) &&
         bind_active(tree, "split_cluster_pass_kinematics", &pass_kinematics) &&
         bind_active(tree, "split_cluster_pass_preselection", &pass_preselection) &&
@@ -1004,6 +1052,7 @@ int ReducePythiaPhotonCandidateSelection(
     for (Long64_t entry = 0; entry < tree->GetEntries(); ++entry)
     {
       tree->GetEntry(entry);
+      if (!bdt_score || !bdt_valid || !pass_nonisolated || bdt_score->size() != ncluster || bdt_valid->size() != ncluster || pass_nonisolated->size() != ncluster) return 6;
       if (!et || !pass_kinematics || !pass_preselection || !pass_tight || !pass_isolated || !pass_region_a || !pi0_tag || !eta_tag ||
           !pass_final_photon || !truth_valid || !prompt_flag || !dominant_fraction || !pi0_valid || !pi0_fraction || !topology || !missing_category ||
           !offset || !g4_pdg || !embedding || !fraction || !source || !parent || et->size() != ncluster || pass_kinematics->size() != ncluster ||
@@ -1020,13 +1069,23 @@ int ReducePythiaPhotonCandidateSelection(
       {
         const double cluster_et = (*et)[cluster];
         if (!std::isfinite(cluster_et)) return 6;
+        const double eta_contribution = eta_fraction(cluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent);
+        if (!std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;
+        const bool is_prompt = (*prompt_flag)[cluster] && (*dominant_fraction)[cluster] > kMajorityThreshold;
+        const bool is_pi0 = (*pi0_valid)[cluster] && (*pi0_fraction)[cluster] > kMajorityThreshold;
+        const bool is_eta = eta_contribution > kMajorityThreshold;
+        const int majority_count = static_cast<int>(is_prompt) + static_cast<int>(is_pi0) + static_cast<int>(is_eta);
+        const bool half_boundary = ((*prompt_flag)[cluster] && (*dominant_fraction)[cluster] == kMajorityThreshold) ||
+            ((*pi0_valid)[cluster] && (*pi0_fraction)[cluster] == kMajorityThreshold) || eta_contribution == kMajorityThreshold;
+        const std::size_t category = origin_category(is_prompt, is_pi0, is_eta, (*topology)[cluster]);
+        if (category == category_count) return 6;
         const bool computed_final_photon = (*pass_region_a)[cluster] && !(*pi0_tag)[cluster] && !(*eta_tag)[cluster];
         if (static_cast<bool>((*pass_final_photon)[cluster]) != computed_final_photon) return 6;
         if ((*pass_region_a)[cluster])
         {
           ++region_a_clusters;
           if ((*prompt_flag)[cluster]) ++region_a_prompt_clusters;
-          if ((*pi0_valid)[cluster]) ++region_a_anchor_clusters;
+          if (category >= pi0_separated && category <= pi0_other) ++region_a_anchor_clusters;
         }
         std::array<bool, kSelectionCount> selected_by = {};
         for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
@@ -1038,7 +1097,9 @@ int ReducePythiaPhotonCandidateSelection(
           ++topology_selected_clusters[topology_selection];
           Spectra& spectra = *topology_histograms[topology_selection];
           if ((*prompt_flag)[cluster]) spectra.fill(0, cluster_et, weight);
-          if (!(*pi0_valid)[cluster]) continue;
+          if (category < pi0_separated || category > pi0_other) continue;
+          if (!bdt_histograms[topology_selection].fill(static_cast<int>(category - pi0_separated), (*bdt_score)[cluster], (*bdt_valid)[cluster],
+              (*pass_isolated)[cluster], (*pass_nonisolated)[cluster], cluster_et, weight)) return 6;
           ++topology_selected_anchor_clusters[topology_selection];
           spectra.fill(1, cluster_et, weight);
           const int topology_value = (*topology)[cluster];
@@ -1061,22 +1122,6 @@ int ReducePythiaPhotonCandidateSelection(
           else return 6;
         }
         if (std::none_of(selected_by.begin(), selected_by.end(), [](bool selected) { return selected; })) continue;
-        const double eta_contribution = eta_fraction(cluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent);
-        if (!std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;
-        const bool is_prompt = (*prompt_flag)[cluster] && (*dominant_fraction)[cluster] > kMajorityThreshold;
-        const bool is_pi0 = (*pi0_valid)[cluster] && (*pi0_fraction)[cluster] > kMajorityThreshold;
-        const bool is_eta = eta_contribution > kMajorityThreshold;
-        const int majority_count = static_cast<int>(is_prompt) + static_cast<int>(is_pi0) + static_cast<int>(is_eta);
-        const bool half_boundary = ((*prompt_flag)[cluster] && (*dominant_fraction)[cluster] == kMajorityThreshold) ||
-            ((*pi0_valid)[cluster] && (*pi0_fraction)[cluster] == kMajorityThreshold) || eta_contribution == kMajorityThreshold;
-        std::size_t category = other;
-        if (majority_count <= 1)
-        {
-          if (is_prompt) category = prompt;
-          else if (is_pi0) category = pi0_category((*topology)[cluster]);
-          else if (is_eta) category = eta;
-        }
-        if (category == category_count) return 6;
         for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
         {
           if (!selected_by[selection_index]) continue;
@@ -1101,6 +1146,7 @@ int ReducePythiaPhotonCandidateSelection(
   for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
   {
     const Summary& summary = composition_summaries[selection_index];
+    if (!consistent_pi0_bdt(*composition_histograms[selection_index], *topology_histograms[selection_index], bdt_histograms[selection_index])) return 7;
     if (summary.selected != summary.prompt + summary.pi0 + summary.eta + summary.other ||
         !candidate_composition::valid_partition(composition_histograms[selection_index]->counts) ||
         !candidate_composition::valid_partition(composition_histograms[selection_index]->weighted) ||
@@ -1136,7 +1182,15 @@ int ReducePythiaPhotonCandidateSelection(
     }
   }
   output.cd();
-  int schema_version = 5, source_schema_version = 5, signal_embedding_id = kSignalEmbeddingId;
+  auto* bdt_directory = output.mkdir("pi0_bdt");
+  if (!bdt_directory) return 8;
+  for (std::size_t i = 0; i < kSelectionCount; ++i)
+  {
+    auto* selection_directory = bdt_directory->mkdir(kSelectionKeys[i]);
+    if (!selection_directory || !bdt_histograms[i].write(*selection_directory)) return 8;
+  }
+  output.cd();
+  int schema_version = 6, source_schema_version = 5, signal_embedding_id = kSignalEmbeddingId;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
   std::string eta_definition = "sum_signal_embedding_g4_eta_or_generator_eta_decay_photon_contributor_fraction";

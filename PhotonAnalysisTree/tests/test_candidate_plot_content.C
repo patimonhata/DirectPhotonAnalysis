@@ -45,6 +45,39 @@ void test_candidate_plot_content(const std::string preview = "")
   assert(same_double(sum, 0.1)); // Denominator is all selected candidates, not only pi0 anchors.
   topology.counts[5]->Fill(7.0);
   assert(composition_missing_fractions(composition, topology).empty());
+  // Distinct populations catch accidental use of kinematic or the adjacent stage as denominator.
+  using namespace candidate_composition_merge;
+  const std::array<int, kSelectionCount> stage_counts = {100, 80, 30, 40, 20, 10};
+  const std::array<int, kSelectionCount> denominator_counts = {100, 100, 80, 80, 80, 20};
+  const std::array<std::string, kSelectionCount> denominator_keys = {
+      "kinematic", "kinematic", "preselection", "preselection", "preselection", "region_a"};
+  std::array<std::unique_ptr<Histograms>, kSelectionCount> stages;
+  for (std::size_t stage = 0; stage < kSelectionCount; ++stage)
+  {
+    stages[stage] = std::make_unique<Histograms>(2, 10.0);
+    for (int entry = 0; entry < stage_counts[stage]; ++entry)
+    {
+      stages[stage]->fill(prompt, 7.0, 1.0);
+      stages[stage]->fill(prompt, 7.0, 2.0);
+    }
+  }
+  for (std::size_t stage = 0; stage < kSelectionCount; ++stage)
+  {
+    assert(kSelectionKeys[kPreviousCutSelections[stage]] == denominator_keys[stage]);
+    const auto& selected = *stages[stage];
+    const auto& reference = *stages[kPreviousCutSelections[stage]];
+    assert(valid_subset(*selected.counts[prompt], *reference.counts[prompt], *selected.weighted[prompt], *reference.weighted[prompt]));
+    auto curve = make_survival_curve(*selected.weighted[prompt], *reference.weighted[prompt],
+        "qa_previous_cut_" + std::to_string(stage), "Prompt", kBlack, kPreviousCutLabels[stage]);
+    const double expected = double(stage_counts[stage]) / denominator_counts[stage];
+    assert(same_double(curve->histogram->GetBinContent(2), expected));
+    assert(same_double(std::pow(curve->histogram->GetBinError(2), 2), 5.0 * expected * (1.0 - expected) / (9.0 * denominator_counts[stage])));
+    assert(curve->histogram->GetBinContent(1) == 0.0 && curve->graph->GetN() == 1);
+    assert(std::string(curve->histogram->GetYaxis()->GetTitle()).find(kPreviousCutLabels[stage]) != std::string::npos);
+    if (stage > 0) assert(!valid_subset(*reference.counts[prompt], *selected.counts[prompt], *reference.weighted[prompt], *selected.weighted[prompt]));
+    if (!preview.empty() && stage == 5)
+      draw_survival_curves({curve.get()}, *selected.weighted[prompt], preview + ".previous_cut.pdf", "qa_previous_cut", false, kPreviousCutLabels[stage]);
+  }
   if (!preview.empty())
   {
     std::array<std::unique_ptr<TH1D>, category_count> fractions;
@@ -53,5 +86,5 @@ void test_candidate_plot_content(const std::string preview = "")
     set_missing_labels(0.2, 0.5);
     draw_superdetailed_stack(fractions, missing, preview);
   }
-  std::cout << "plot captions, missing normalization and population guard: passed" << std::endl;
+  std::cout << "plot captions, missing normalization, population guard and previous-cut survival: passed" << std::endl;
 }

@@ -4,6 +4,10 @@
 
 namespace candidate_composition_merge
 {
+// Kinematic, preselection, tight, isolation, region A, region A + tagging veto.
+constexpr std::array<std::size_t, kSelectionCount> kPreviousCutSelections = {0, 0, 1, 1, 1, 4};
+constexpr std::array<const char*, kSelectionCount> kPreviousCutLabels = {
+    "Kinematic", "Kinematic", "Pre-selection", "Pre-selection", "Pre-selection", "Region A"};
 struct Metadata
 {
   int schema_version = -1;
@@ -330,13 +334,13 @@ std::unique_ptr<TH1D> sum_histograms(const std::vector<const TH1D*>& inputs, con
 
 std::unique_ptr<SurvivalCurve> make_survival_curve(const TH1D& numerator, const TH1D& denominator,
                                                    const std::string& name, const std::string& label,
-                                                   int color)
+                                                   int color, const std::string& denominator_label = "Kinematic")
 {
   auto curve = std::make_unique<SurvivalCurve>();
   curve->histogram = candidate_composition::fraction_histogram(numerator, denominator, name);
   curve->histogram->SetLineColor(color);
   curve->histogram->SetMarkerColor(color);
-  style_axes(curve->histogram.get(), "#splitline{Survival fraction}{relative to Kinematic}");
+  style_axes(curve->histogram.get(), ("#splitline{Survival fraction}{relative to " + denominator_label + "}").c_str());
   curve->graph = std::make_unique<TGraphErrors>();
   curve->graph->SetName((name + "_valid_bins").c_str());
   curve->graph->SetLineColor(color);
@@ -356,14 +360,14 @@ std::unique_ptr<SurvivalCurve> make_survival_curve(const TH1D& numerator, const 
 }
 
 void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const TH1D& axis_source,
-                          const std::string& output_path, const std::string& canvas_name, bool detailed)
+                          const std::string& output_path, const std::string& canvas_name, bool detailed, const std::string& denominator_label = "Kinematic")
 {
   SetsPhenixStyle();
   const bool side_legend = detailed || curves.size() > 4;
   TCanvas canvas(canvas_name.c_str(), "", side_legend ? 1600 : kCanvasWidth, kCanvasHeight);
   constexpr double plot_height = kPlotPadHeight;
   auto plot_pad = make_plot_pad(canvas_name + "_pad", false, plot_height, side_legend ? kCompositionPlotWidth : 1.0);
-  auto frame = make_plot_frame(axis_source, canvas_name + "_frame", "#splitline{Survival fraction}{relative to Kinematic}", 0.0, 1.05);
+  auto frame = make_plot_frame(axis_source, canvas_name + "_frame", ("#splitline{Survival fraction}{relative to " + denominator_label + "}").c_str(), 0.0, 1.05);
   scale_axes_to_canvas(frame.get(), plot_height);
   frame->GetYaxis()->SetTitleOffset(1.0);
   frame->Draw("AXIS");
@@ -577,6 +581,9 @@ int MergePythiaPhotonCandidateSelection(
     {
       if (!valid_subset(*composition_histograms[selection_index]->counts[index], *composition_histograms[0]->counts[index],
                         *composition_histograms[selection_index]->weighted[index], *composition_histograms[0]->weighted[index])) return 6;
+      const auto& previous = *composition_histograms[kPreviousCutSelections[selection_index]];
+      if (!valid_subset(*composition_histograms[selection_index]->counts[index], *previous.counts[index],
+                        *composition_histograms[selection_index]->weighted[index], *previous.weighted[index])) return 6;
     }
     for (std::size_t index = 0; index < kSpectrumCount; ++index)
     {
@@ -687,6 +694,28 @@ int MergePythiaPhotonCandidateSelection(
     draw_survival_curves(summary_survival, *histograms.weighted[denominator],
         work_in_progress_base + "/photon_candidate_composition_survival_fraction_relative_to_kinematic.pdf",
         std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_workinprogress", false);
+    const auto& previous = *composition_histograms[kPreviousCutSelections[composition_selection]];
+    const std::string previous_label = kPreviousCutLabels[composition_selection];
+    std::array<std::unique_ptr<SurvivalCurve>, category_count> previous_survival;
+    for (std::size_t index = 0; index < category_count; ++index)
+    {
+      const std::string key = index == denominator ? "all" : candidate_composition::kKeys[index];
+      const std::string label = index == denominator ? "All candidates" : candidate_composition::kLabels[index];
+      const int color = index == denominator ? kBlack : candidate_composition::kColors[index];
+      previous_survival[index] = make_survival_curve(*histograms.weighted[index], *previous.weighted[index],
+          "h_candidate_" + key + "_survival_fraction_relative_to_previous_cut", label, color, previous_label);
+    }
+    std::vector<const TH1D*> previous_pi0_inputs;
+    for (std::size_t index = pi0_separated; index <= pi0_other; ++index) previous_pi0_inputs.push_back(previous.weighted[index].get());
+    auto previous_pi0 = sum_histograms(previous_pi0_inputs, "h_previous_pi0_for_survival");
+    if (!previous_pi0) return 7;
+    auto previous_pi0_survival = make_survival_curve(*selected_pi0, *previous_pi0,
+        "h_candidate_pi0_survival_fraction_relative_to_previous_cut", "#pi^{0}", candidate_composition::kColors[pi0_separated], previous_label);
+    const std::vector<const SurvivalCurve*> previous_summary_survival = {
+        previous_survival[prompt].get(), previous_pi0_survival.get(), previous_survival[eta].get(), previous_survival[other].get()};
+    draw_survival_curves(previous_summary_survival, *histograms.weighted[denominator],
+        selection_output_base + "_survival_fraction_relative_to_previous_cut.pdf",
+        std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_previous_cut", false, previous_label);
     TDirectory* directory = composition_output.mkdir(kSelectionKeys[composition_selection]);
     if (!directory) return 7;
     directory->cd();
@@ -696,15 +725,20 @@ int MergePythiaPhotonCandidateSelection(
       histograms.weighted[index]->Write();
       if (index > 0) fractions[index]->Write();
       survival[index]->histogram->Write();
+      previous_survival[index]->histogram->Write();
     }
     for (auto& fraction : missing_fractions) fraction->Write();
     pi0_survival->histogram->Write();
+    previous_pi0_survival->histogram->Write();
     composition_output.cd();
   }
   std::vector<std::string> composition_selection_keys(kSelectionKeys.begin(), kSelectionKeys.end());
   std::vector<std::string> composition_selection_labels(kSelectionLabels.begin(), kSelectionLabels.end());
   std::vector<std::string> composition_selection_definitions(kSelectionDefinitions.begin(), kSelectionDefinitions.end());
-  int composition_schema_version = 7;
+  std::vector<std::string> previous_cut_denominator_selections;
+  for (std::size_t index : kPreviousCutSelections) previous_cut_denominator_selections.emplace_back(kSelectionKeys[index]);
+  std::string previous_cut_survival_fraction_definition = "weighted_selected_category_yield_divided_by_weighted_previous_cut_category_yield_per_cluster_et_bin";
+  int composition_schema_version = 8;
   int composition_source_partial_schema_version = combined.schema_version;
   std::string survival_fraction_denominator_selection = "kinematic";
   std::string survival_fraction_definition = "weighted_selected_category_yield_divided_by_weighted_kinematic_category_yield_per_cluster_et_bin";
@@ -742,6 +776,8 @@ int MergePythiaPhotonCandidateSelection(
   metadata.Branch("weight_definition", &combined.weight_definition);
   metadata.Branch("survival_fraction_denominator_selection", &survival_fraction_denominator_selection);
   metadata.Branch("survival_fraction_definition", &survival_fraction_definition);
+  metadata.Branch("previous_cut_denominator_selections", &previous_cut_denominator_selections);
+  metadata.Branch("previous_cut_survival_fraction_definition", &previous_cut_survival_fraction_definition);
   metadata.Branch("survival_fraction_uncertainty", &survival_fraction_uncertainty);
   metadata.Branch("survival_fraction_zero_denominator", &survival_fraction_zero_denominator);
   metadata.Branch("analysis_release", &combined.analysis_release);

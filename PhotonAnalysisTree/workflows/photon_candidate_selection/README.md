@@ -376,11 +376,20 @@ Topology spectra and BDT diagnostics now use exactly the composition pi0 categor
 
 Every selection directory (`kinematic`, `preselection`, `preselection_isolation`, `preselection_tight`, `region_a`, `region_a_tagging_veto`) receives:
 
-- `pi0_bdt_score_by_topology.pdf`: one page, two columns (weighted yield with log axis; independently unit-normalized topology shapes).
-- `pi0_bdt_score_by_topology_isolation.pdf`: one page, three columns (all, isolated, nonisolated) and two rows (weighted yield; normalized shapes), including selections that already require isolation.
+- `pi0_bdt_score_by_topology.pdf`: six pages, two columns (weighted yield with log axis; independently unit-normalized topology shapes).
+- `pi0_bdt_score_by_topology_isolation.pdf`: six pages, three columns (all, isolated, nonisolated) and two rows (weighted yield; normalized shapes), including selections that already require isolation.
 - `pi0_bdt_score.root`: count/weighted score histograms, weighted score-versus-ET histograms, selection/invalid-score counters, and population/selection/model metadata.
 - `pi0_bdt_score_summary.csv`: selected and invalid-score counts and weights, valid-score weighted integrals, and score underflow/overflow counts for each topology/isolation group.
 
 The five BDT categories are separated, merged, single contaminated, missing and other. No missing subdivisions are added to BDT diagnostics. Existing missing-detail plots remain available. All includes the isolation gap; isolated and nonisolated use stored independent flags. Gap is saved for closure checks. Invalid scores are counted separately. Score uses 100 bins over [0,1]; exactly 1 is included in the last visible bin. True underflow/overflow is retained and reported; unit-area plots normalize visible bins only. Empty distributions are not normalized. Isolation-required stages retain empty nonisolated panels with an explanatory label. Tight selections intentionally retain their BDT cut.
 
 Run `python3 PhotonAnalysisTree/tests/test_pi0_bdt.py` in the ROOT environment for synthetic classification, partition, merge and output checks.
+
+
+### ET pages and redraw from existing BDT ROOT files
+
+Both BDT PDFs use pages 1--5 for reconstructed anchor ET in [5,6), [6,8), [8,10), [10,18), [18,30) GeV, respectively, and page 6 for the original full selection (5 < ET < 35 GeV). The existing kinematic cut excludes exactly 5 GeV. The 30--35 GeV population appears only on page 6. Each slice projects the stored 0.5-GeV-bin score-versus-ET histogram, preserving weighted errors. Shape normalization is independent for each ET/isolation/topology combination. Empty pages/panels are retained.
+
+The saved ROOT histograms and CSV continue to contain the original full-ET counters and 2D weighted distributions. Since unweighted and invalid-BDT counters were not stored by ET, slice pages show the ET range instead of those counters; the full-ET page retains the original counter annotations. No reduce rerun or schema change is required.
+
+To update only the two BDT PDFs in all six selection directories of an existing merged output, load `ReplotPi0BdtScores.C` and call `ReplotPi0BdtScores("/absolute/path/to/merged/jet")` in ROOT. This reads each `pi0_bdt_score.root` without modifying it or the CSV. Future ordinary merges automatically produce the six-page PDFs as well.

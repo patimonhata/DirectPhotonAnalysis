@@ -1,6 +1,7 @@
 import ROOT
 import os
 import tempfile
+import re
 from pathlib import Path
 
 repo = Path(__file__).resolve().parents[2]
@@ -35,6 +36,27 @@ int test_pi0_bdt_roundoff() {
   }
   if (consistent_pi0_bdt(composition, topology, bdt)) return 5;
   if (same_weighted_integral(NAN, binned) || same_weighted_integral(INFINITY, binned)) return 6;
+  return 0;
+}
+
+int test_pi0_bdt_et_slices() {
+  pi0_bdt::Histograms h;
+  const double energies[] = {5.5, 6., 7.999, 8., 10., 18., 30., 32.};
+  for (double et : energies) if (!h.fill(0, .9, true, true, false, et, 2.)) return 1;
+  if (!h.fill(0, NAN, false, true, false, 6.5, 3.)) return 2;
+  const double counts[] = {1, 2, 1, 1, 1};
+  for (int slice = 0; slice < 5; ++slice) {
+    auto projection = h.score_histogram(0, 0, slice);
+    if (projection->Integral() != 2 * counts[slice]) return 3;
+    const double error = projection->GetBinError(projection->FindFixBin(.9));
+    if (std::abs(error * error - 4 * counts[slice]) > 1e-10) return 4;
+    if (h.score_histogram(2, 0, slice)->Integral() != 0) return 5;
+  }
+  if (h.score_histogram(0, 0)->Integral() != 16) return 6; // 30--35 GeV remains in the final page.
+  { TFile f("et_slices.root", "RECREATE"); if (!h.write(f)) return 7; }
+  pi0_bdt::Histograms restored;
+  { TFile f("et_slices.root"); if (!restored.add(f)) return 8; }
+  if (restored.score_histogram(0, 0, 1)->Integral() != 4) return 9;
   return 0;
 }
 
@@ -74,9 +96,14 @@ int test_pi0_bdt() {
   return 0;
 }
 ''')
+    assert ROOT.test_pi0_bdt_et_slices() == 0
     roundoff_result = ROOT.test_pi0_bdt_roundoff()
     print("roundoff regression result:", roundoff_result)
     assert roundoff_result == 0
     result = ROOT.test_pi0_bdt()
     print('test result:', result)
     assert result == 0
+    for pdf in Path("selections").glob("*/*.pdf"):
+        pages = len(re.findall(rb"/Type\s*/Page\b", pdf.read_bytes()))
+        assert pages == 6, (str(pdf), pages)
+    print("ET boundaries, projection errors, and all 12 six-page PDFs: passed")

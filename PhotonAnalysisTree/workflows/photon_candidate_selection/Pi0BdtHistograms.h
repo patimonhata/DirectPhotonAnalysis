@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iomanip>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,7 @@ namespace pi0_bdt
 constexpr std::array<const char*, 5> keys = {"separated", "merged", "single_contaminated", "missing", "other"};
 constexpr std::array<const char*, 5> labels = {"Separated", "Merged", "Single contaminated", "Missing", "Other"};
 constexpr std::array<const char*, 4> isolation = {"all", "isolated", "nonisolated", "gap"};
+constexpr std::array<double, 6> et_edges = {5, 6, 8, 10, 18, 30};
 constexpr std::array<int, 5> colors = {kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2, kGray + 1};
 struct Histograms
 {
@@ -94,14 +96,33 @@ struct Histograms
       }
     return true;
   }
-  void panel(int group, bool normalized, const std::string& selection, bool requires_isolation) const
+  // slice=-1 preserves the original full-ET histogram, including 30--35 GeV.
+  std::unique_ptr<TH1D> score_histogram(int group, int category, int slice = -1) const
+  {
+    const auto& cell = *cells.at(group).at(category);
+    std::unique_ptr<TH1D> result;
+    if (slice < 0) result.reset(static_cast<TH1D*>(cell.weighted.Clone()));
+    else
+    {
+      const double low = et_edges.at(slice), high = et_edges.at(slice + 1);
+      const auto* axis = cell.score_et.GetYaxis();
+      const int first = axis->FindFixBin(low), last = axis->FindFixBin(high) - 1;
+      const std::string name = std::string(cell.weighted.GetName()) + "_et_slice_" + std::to_string(slice);
+      result.reset(cell.score_et.ProjectionX(name.c_str(), first, last, "e"));
+    }
+    result->SetDirectory(nullptr);
+    return result;
+  }
+  void panel(int group, bool normalized, const std::string& selection, bool requires_isolation, int slice = -1) const
   {
     std::vector<std::unique_ptr<TH1D>> plots;
-    double maximum = 0; double selected = 0; double invalid = 0;
+    double maximum = 0; double selected = 0; double invalid = 0; bool has_scores = false;
     for (int k = 0; k < 5; ++k)
     {
       const auto& c = *cells[group][k]; selected += c.summary.GetBinContent(1); invalid += c.summary.GetBinContent(2);
-      auto h = std::unique_ptr<TH1D>(static_cast<TH1D*>(c.weighted.Clone())); h->SetDirectory(nullptr); h->SetStats(false);
+      auto h = score_histogram(group, k, slice); h->SetStats(false);
+      for (int b = 0; b <= h->GetNbinsX() + 1; ++b)
+        has_scores = has_scores || h->GetBinContent(b) != 0.0 || h->GetBinError(b) != 0.0;
       if (normalized && h->Integral() > 0) h->Scale(1.0 / h->Integral());
       h->SetLineColor(colors[k]); h->SetLineWidth(2); maximum = std::max(maximum, h->GetMaximum()); plots.push_back(std::move(h));
     }
@@ -128,10 +149,20 @@ struct Histograms
       double gap = 0; for (const auto& cell : cells[3]) gap += cell->summary.GetBinContent(1);
       counts += ", gap=" + std::to_string(static_cast<long long>(gap));
     }
-    text.DrawLatex(0.16, 0.88, counts.c_str());
-    if (selected == 0)
+    if (slice < 0)
     {
-      text.DrawLatex(0.24, 0.46, "0 entries");
+      text.DrawLatex(0.16, 0.88, counts.c_str());
+      text.DrawLatex(0.16, 0.83, "All E_{T}: 5 < E_{T} < 35 GeV");
+    }
+    else
+    {
+      std::ostringstream range;
+      range << et_edges[slice] << (slice == 0 ? " < E_{T} < " : " #leq E_{T} < ") << et_edges[slice + 1] << " GeV";
+      text.DrawLatex(0.16, 0.88, range.str().c_str());
+    }
+    if (slice < 0 ? selected == 0 : !has_scores)
+    {
+      text.DrawLatex(0.24, 0.46, slice < 0 || (requires_isolation && group == 2) ? "0 entries" : "No valid BDT entries");
       if (requires_isolation && group == 2) text.DrawLatex(0.24, 0.40, "Isolated required by selection");
     }
     gPad->RedrawAxis();
@@ -154,12 +185,34 @@ struct Histograms
       csv << ',' << c.weighted.Integral(0, 101) << ',' << c.count.GetBinContent(0) << ',' << c.count.GetBinContent(101) << '\n';
     }
     if (!csv.good()) return false;
-    TCanvas standard("pi0_bdt_standard", "", 1600, 700); standard.Divide(2, 1);
-    for (int j = 0; j < 2; ++j) { standard.cd(j + 1); panel(0, j == 1, selection, requires_isolation); }
-    standard.SaveAs((directory + "/pi0_bdt_score_by_topology.pdf").c_str());
-    TCanvas split("pi0_bdt_isolation", "", 2100, 1300); split.Divide(3, 2);
-    for (int j = 0; j < 2; ++j) for (int i = 0; i < 3; ++i) { split.cd(j * 3 + i + 1); panel(i, j == 1, selection, requires_isolation); }
-    split.SaveAs((directory + "/pi0_bdt_score_by_topology_isolation.pdf").c_str());
+    return export_plots(directory, selection, requires_isolation);
+  }
+  bool export_plots(const std::string& directory, const std::string& selection, bool requires_isolation) const
+  {
+    if (!valid()) return false;
+    const std::string standard_path = directory + "/pi0_bdt_score_by_topology.pdf";
+    const std::string isolation_path = directory + "/pi0_bdt_score_by_topology_isolation.pdf";
+    for (int book = 0; book < 2; ++book)
+    {
+      const bool split = book == 1;
+      const std::string& path = split ? isolation_path : standard_path;
+      TCanvas canvas(split ? "pi0_bdt_isolation" : "pi0_bdt_standard", "", split ? 2100 : 1600, split ? 1300 : 700);
+      canvas.Print((path + "[").c_str());
+      for (int page = 0; page < 6; ++page)
+      {
+        const int slice = page < 5 ? page : -1;
+        canvas.Clear(); canvas.Divide(split ? 3 : 2, split ? 2 : 1);
+        if (split)
+        {
+          for (int j = 0; j < 2; ++j) for (int i = 0; i < 3; ++i)
+          { canvas.cd(j * 3 + i + 1); panel(i, j == 1, selection, requires_isolation, slice); }
+        }
+        else
+          for (int j = 0; j < 2; ++j) { canvas.cd(j + 1); panel(0, j == 1, selection, requires_isolation, slice); }
+        canvas.Print(path.c_str());
+      }
+      canvas.Print((path + "]").c_str());
+    }
     return true;
   }
 };

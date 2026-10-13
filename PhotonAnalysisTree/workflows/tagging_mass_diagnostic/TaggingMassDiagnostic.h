@@ -12,6 +12,7 @@
 #include <TLatex.h>
 #include <TLegend.h>
 #include <TLine.h>
+#include <TPad.h>
 #include <TStyle.h>
 #include <TSystem.h>
 #include <TLeaf.h>
@@ -27,6 +28,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace tagging_mass
 {
@@ -42,10 +44,10 @@ constexpr std::array<const char*, 7> kSelectionKeys = {
     "separated_truth_pair", "missing_energy_band_truth_pair", "separated_or_missing_energy_band_truth_pair", "prompt_pi0_all_pairs", "prompt_pi0_window_pairs", "prompt_eta_all_pairs", "prompt_eta_window_pairs"};
 constexpr std::array<const char*, 7> kSelectionLabels = {
     "Separated truth pair", "Missing energy-band truth pair", "Separated or missing energy-band truth pair", "Prompt: all #pi^{0} partners", "Prompt: #pi^{0} window pairs", "Prompt: all #eta partners", "Prompt: #eta window pairs"};
-// End bins retain candidates outside the five shape intervals within the displayed ET range.
+// Saved spectra retain the full ET range; shape overlays omit sparse high-ET intervals.
 constexpr std::array<double, 8> kAnchorEtEdges = {0, 5, 6, 8, 10, 18, 30, 40};
 constexpr int kAnchorEtBins = kAnchorEtEdges.size() - 1;
-constexpr std::array<double, 6> kShapeEtEdges = {5, 6, 8, 10, 18, 30};
+constexpr std::array<double, 4> kShapeEtEdges = {5, 6, 8, 10};
 constexpr std::array<int, 10> kColors = {kBlack, kBlue + 1, kRed + 1, kGreen + 2, kMagenta + 1,
                                          kOrange + 7, kCyan + 2, kViolet + 1, kAzure + 7, kPink + 7};
 
@@ -306,6 +308,32 @@ inline double pair_mass(double e, double eta, double phi, double pe, double peta
   return std::isfinite(mass2) && mass2 >= 0 ? std::sqrt(mass2) : -1.0;
 }
 
+// Match photon_candidate_selection's canvas layout and canvas-relative axis text sizes.
+constexpr int kCanvasWidth = 1600; // Wide captions and side legends, as in the candidate-selection detail plots.
+constexpr int kCanvasHeight = 1000;
+constexpr double kPlotPadHeight = 0.68;
+constexpr double kSidePlotWidth = 0.70;
+
+std::unique_ptr<TPad> make_plot_pad(const std::string& name, double width = 1.0)
+{
+  auto pad = std::make_unique<TPad>(name.c_str(), "", 0, 0, width, kPlotPadHeight);
+  pad->Draw();
+  pad->cd();
+  return pad;
+}
+
+void style_axes(TH1* histogram)
+{
+  for (const auto& entry : {std::make_pair(histogram->GetXaxis(), "X"), std::make_pair(histogram->GetYaxis(), "Y"), std::make_pair(histogram->GetZaxis(), "Z")})
+  {
+    entry.first->CenterTitle();
+    entry.first->SetLabelSize(gStyle->GetLabelSize(entry.second) / kPlotPadHeight);
+    entry.first->SetTitleSize(gStyle->GetTitleSize(entry.second) / kPlotPadHeight);
+    // Keep the enlarged titles inside the pad margins.
+    entry.first->SetTitleOffset(gStyle->GetTitleOffset(entry.second) * kPlotPadHeight);
+  }
+}
+
 void lines(double maximum)
 {
   for (double x : {kPi0MassMin, kPi0MassMax})
@@ -313,7 +341,7 @@ void lines(double maximum)
     TLine line(x, 0, x, maximum);
     line.SetLineColor(kRed + 1);
     line.SetLineStyle(2);
-    line.SetLineWidth(2);
+    line.SetLineWidth(gStyle->GetHistLineWidth());
     line.DrawClone();
   }
 }
@@ -322,34 +350,43 @@ void label(const std::string& text_value)
 {
   TLatex text;
   text.SetNDC();
-  text.SetTextSize(0.031);
-  text.DrawLatex(0.15, 0.96, "#it{#bf{sPHENIX}} Internal");
+  text.SetTextAlign(13);
+  text.SetTextColor(kBlack);
+  text.DrawLatex(0.055, 0.975, "#it{#bf{sPHENIX}} Internal");
   std::istringstream stream(text_value);
   std::string line;
-  double y = 0.91;
-  while (std::getline(stream, line)) { text.DrawLatex(0.15, y, line.c_str()); y -= 0.04; }
+  std::size_t index = 1;
+  while (std::getline(stream, line))
+  {
+    text.DrawLatex(0.055, 0.975 - 0.06 * index - (index >= 2 ? 0.01 : 0.0), line.c_str());
+    ++index;
+  }
 }
 
 void draw_mass(TH1D* histogram, const std::string& path, const std::string& text)
 {
-  TCanvas canvas("c_mass", "", 1000, 800);
-  canvas.SetTopMargin(0.23);
+  TCanvas canvas("c_mass", "", kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad("mass_pad");
+  style_axes(histogram);
   histogram->SetStats(false);
   histogram->SetLineColor(kBlue + 1);
-  histogram->SetLineWidth(2);
+  histogram->SetLineWidth(gStyle->GetHistLineWidth());
   histogram->GetXaxis()->SetTitle("m_{#gamma#gamma} [GeV]");
   histogram->GetYaxis()->SetTitle("Cross section [pb / 5 MeV]");
   histogram->Draw("HIST");
   lines(std::max(1.0, 1.05 * histogram->GetMaximum()));
+  plot_pad->RedrawAxis();
+  canvas.cd();
   label(text);
   canvas.SaveAs(path.c_str());
 }
 
 void draw_2d(TH2D* histogram, const std::string& path, const char* x_title, const std::string& text)
 {
-  TCanvas canvas(("c_" + std::string(histogram->GetName())).c_str(), "", 1000, 800);
-  canvas.SetRightMargin(0.15);
-  canvas.SetTopMargin(0.23);
+  TCanvas canvas(("c_" + std::string(histogram->GetName())).c_str(), "", kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad("mass_vs_et_pad");
+  plot_pad->SetRightMargin(0.18);
+  style_axes(histogram);
   histogram->SetStats(false);
   histogram->GetXaxis()->SetTitle(x_title);
   histogram->GetYaxis()->SetTitle("m_{#gamma#gamma} [GeV]");
@@ -360,9 +397,11 @@ void draw_2d(TH2D* histogram, const std::string& path, const char* x_title, cons
     TLine line(histogram->GetXaxis()->GetXmin(), y, histogram->GetXaxis()->GetXmax(), y);
     line.SetLineColor(kRed + 1);
     line.SetLineStyle(2);
-    line.SetLineWidth(2);
+    line.SetLineWidth(gStyle->GetHistLineWidth());
     line.DrawClone();
   }
+  plot_pad->RedrawAxis();
+  canvas.cd();
   label(text);
   canvas.SaveAs(path.c_str());
 }
@@ -370,14 +409,13 @@ void draw_2d(TH2D* histogram, const std::string& path, const char* x_title, cons
 template <std::size_t N>
 void draw_shapes(TH2D* source, const std::array<double, N>& edges, const std::string& path, const std::string& text)
 {
-  TCanvas canvas(("c_shape_" + std::string(source->GetName())).c_str(), "", 1100, 850);
-  canvas.SetTopMargin(0.27);
-  canvas.SetRightMargin(0.30);
-  TLegend legend(0.72, 0.30, 0.99, 0.76);
+  TCanvas canvas(("c_shape_" + std::string(source->GetName())).c_str(), "", kCanvasWidth, kCanvasHeight);
+  auto plot_pad = make_plot_pad("shape_pad", kSidePlotWidth);
+  TLegend legend(0.72, 0.22, 0.99, 0.62);
   legend.SetBorderSize(0);
   legend.SetFillStyle(0);
-  legend.SetTextSize(0.024);
-  legend.SetHeader("Candidate cluster E_{T}");
+  legend.SetTextSize(gStyle->GetLegendTextSize());
+  legend.SetHeader("Cluster E_{T}");
   std::vector<std::unique_ptr<TH1D>> shapes;
   double maximum = 0;
   for (std::size_t bin = 1; bin < N; ++bin)
@@ -389,13 +427,14 @@ void draw_shapes(TH2D* source, const std::array<double, N>& edges, const std::st
     if (entries != 0) shape->Scale(1.0 / entries);
     else shape->Reset();
     shape->SetLineColor(kColors[(bin - 1) % kColors.size()]);
-    shape->SetLineWidth(2);
+    shape->SetLineWidth(gStyle->GetHistLineWidth());
     maximum = std::max(maximum, shape->GetMaximum());
     std::ostringstream item;
     item << std::fixed << std::setprecision(0) << edges[bin - 1] << "-" << edges[bin] << " GeV";
     legend.AddEntry(shape.get(), item.str().c_str(), "l");
     shapes.push_back(std::move(shape));
   }
+  style_axes(shapes.front().get());
   shapes.front()->SetStats(false);
   shapes.front()->SetMaximum(std::max(0.02, 1.15 * maximum));
   shapes.front()->GetXaxis()->SetTitle("m_{#gamma#gamma} [GeV]");
@@ -403,6 +442,8 @@ void draw_shapes(TH2D* source, const std::array<double, N>& edges, const std::st
   shapes.front()->Draw("HIST");
   for (std::size_t index = 1; index < shapes.size(); ++index) shapes[index]->Draw("HIST SAME");
   lines(shapes.front()->GetMaximum());
+  plot_pad->RedrawAxis();
+  canvas.cd();
   legend.Draw();
   label(text);
   canvas.SaveAs(path.c_str());
@@ -423,14 +464,14 @@ void plot_groups(const std::array<std::unique_ptr<Histograms>, kSelectionKeys.si
     else if (i == 0) caption << "Topology partner E > " << metadata.selection_settings[1] << " GeV";
     else
     {
-      caption << "Missing: " << metadata.selection_settings[7] << " < E_{representative} #leq " << metadata.selection_settings[8] << " GeV";
-      if (i == 2) caption << "; separated: E > " << metadata.selection_settings[1] << " GeV";
+      caption << "Missing: " << metadata.selection_settings[7] << " < E_{rep} #leq " << metadata.selection_settings[8];
+      if (i == 2) caption << "; sep.: E > " << metadata.selection_settings[1];
     }
     caption << "; window " << kPi0MassMin << "-" << kPi0MassMax << " GeV";
     draw_mass(groups[i]->mass_pb.get(), directory + "/mass.pdf", caption.str());
     draw_2d(groups[i]->mass_vs_anchor_et_pb.get(), directory + "/mass_vs_candidate_et.pdf", "Candidate cluster E_{T} [GeV]", caption.str());
-    draw_shapes(groups[i]->mass_vs_anchor_et_count.get(), kShapeEtEdges, directory + "/mass_by_candidate_et_raw_shape.pdf", caption.str() + "\nRaw pairs: unit-normalized per candidate E_{T} bin, including mass overflow.");
-    draw_shapes(groups[i]->mass_vs_anchor_et_pb.get(), kShapeEtEdges, directory + "/mass_by_candidate_et_weighted_shape.pdf", caption.str() + "\nWeighted pairs: unit-normalized per candidate E_{T} bin, including mass overflow.");
+    draw_shapes(groups[i]->mass_vs_anchor_et_count.get(), kShapeEtEdges, directory + "/mass_by_candidate_et_raw_shape.pdf", caption.str() + "\nRaw: unit-normalized per E_{T} bin (including mass overflow).");
+    draw_shapes(groups[i]->mass_vs_anchor_et_pb.get(), kShapeEtEdges, directory + "/mass_by_candidate_et_weighted_shape.pdf", caption.str() + "\nWeighted: unit-normalized per E_{T} bin (including mass overflow).");
   }
 }
 }

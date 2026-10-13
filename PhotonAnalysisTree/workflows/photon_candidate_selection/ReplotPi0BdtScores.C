@@ -7,6 +7,7 @@ int ReplotPi0BdtScores(const std::string output_base)
   const std::array<const char*, 6> selections = {"kinematic", "preselection", "preselection_tight", "preselection_isolation", "region_a", "region_a_tagging_veto"};
   std::array<std::unique_ptr<pi0_bdt::Histograms>, 6> histograms;
   std::array<std::string, 6> labels;
+  std::array<std::vector<std::string>, 6> captions;
   for (std::size_t i = 0; i < selections.size(); ++i)
   {
     const std::string path = output_base + "/" + selections[i] + "/pi0_bdt_score.root";
@@ -19,8 +20,9 @@ int ReplotPi0BdtScores(const std::string output_base)
       return 1;
     }
     labels[i] = selection->GetTitle();
+    captions[i] = pi0_bdt::read_plot_caption(input, labels[i]);
   }
   for (std::size_t i = 0; i < selections.size(); ++i)
-    if (!histograms[i]->export_plots(output_base + "/" + selections[i], labels[i], i >= 3)) return 2;
+    if (!histograms[i]->export_plots(output_base + "/" + selections[i], labels[i], i >= 3, captions[i])) return 2;
   return 0;
 }

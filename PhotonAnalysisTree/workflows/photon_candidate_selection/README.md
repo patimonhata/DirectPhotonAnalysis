@@ -370,6 +370,12 @@ cmake --install PhotonAnalysisTree/build/topology_v11
 Only a separate build and local regression checks were performed; no DST comparison maps or Condor jobs were launched for this change.
 
 
+### Plot layout and work-in-progress preservation
+
+The `workinprogress/` origin spectrum, summary survival, and summary/detailed composition stacks retain their existing drawing settings. Ordinary topology plots and side-legend survival plots use compact `Contaminated` labels; long missing-category descriptions continue on a second legend row. Detailed topology and side-legend survival canvases reserve a wider right column while retaining the plot width in pixels. Ordinary topology and superdetailed composition plots also use shorter axis-title offsets to keep titles inside the plot pad. The superdetailed composition legend uses the same compact labels and continuation rows.
+
+BDT pages explicitly apply the bundled sPHENIX style, center axis titles, and show a shared selection/sample/tagging caption and ET range above the panels. Each panel retains its isolation label and, on the full-ET page, selected/invalid/gap counts. The compact topology legend sits on the left of each panel. The two-column and three-column/two-row layouts and the ET-slices-first, full-ET-last page order are unchanged. Standalone `ReplotPi0BdtScores.C` restores the caption from the existing ROOT metadata; files without complete caption metadata show only the sPHENIX and selection labels.
+
 ## Pi0 BDT distributions and common population
 
 Topology spectra and BDT diagnostics now use exactly the composition pi0 category: a valid anchor with main fraction strictly greater than 0.5, with multiple-origin majorities assigned to composition Other. The map anchor construction, ancestry classifier and topology algorithm are unchanged. The reducer computes origin once for all three outputs. Reduce and merge check topology/composition agreement and BDT selected totals. Weighted total comparisons use a relative tolerance of `1e-8` (with a 1 pb scale floor), allowing roundoff from different cluster/bin summation orders. Count, metadata and binwise comparisons retain their strict checks. Old partials are rejected; rerun reduce and merge into a new output location to preserve existing results. DST/map regeneration is unnecessary for compatible maps.

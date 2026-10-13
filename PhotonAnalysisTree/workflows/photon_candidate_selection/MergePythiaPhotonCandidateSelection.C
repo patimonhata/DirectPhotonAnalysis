@@ -364,20 +364,25 @@ void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const
 {
   SetsPhenixStyle();
   const bool side_legend = detailed || curves.size() > 4;
-  TCanvas canvas(canvas_name.c_str(), "", side_legend ? 1600 : kCanvasWidth, kCanvasHeight);
+  TCanvas canvas(canvas_name.c_str(), "", side_legend ? kDetailedCanvasWidth : kCanvasWidth, kCanvasHeight);
   constexpr double plot_height = kPlotPadHeight;
-  auto plot_pad = make_plot_pad(canvas_name + "_pad", false, plot_height, side_legend ? kCompositionPlotWidth : 1.0);
+  auto plot_pad = make_plot_pad(canvas_name + "_pad", false, plot_height, side_legend ? kDetailedPlotWidth : 1.0);
   auto frame = make_plot_frame(axis_source, canvas_name + "_frame", ("#splitline{Survival fraction}{relative to " + denominator_label + "}").c_str(), 0.0, 1.05);
   scale_axes_to_canvas(frame.get(), plot_height);
+  if (side_legend) frame->GetXaxis()->SetTitleOffset(1.0);
   frame->GetYaxis()->SetTitleOffset(1.0);
   frame->Draw("AXIS");
   for (const SurvivalCurve* curve : curves) curve->graph->Draw("PE1 SAME");
   std::vector<std::unique_ptr<TLegend>> legends;
   if (side_legend) canvas.cd();
   legends.push_back(side_legend
-      ? std::make_unique<TLegend>(0.72, detailed ? 0.10 : 0.25, 0.99, detailed ? 0.90 : 0.75)
+      ? std::make_unique<TLegend>(kDetailedLegendLeft, detailed ? 0.05 : 0.25, 0.99, detailed ? 0.95 : 0.75)
       : std::make_unique<TLegend>(0.60, 0.68, 0.955, 0.94));
-  for (const SurvivalCurve* curve : curves) legends[0]->AddEntry(curve->graph.get(), curve->label.c_str(), "lep");
+  for (const SurvivalCurve* curve : curves)
+  {
+    if (side_legend) add_readable_legend_entry(*legends[0], curve->graph.get(), curve->label, "lep");
+    else legends[0]->AddEntry(curve->graph.get(), curve->label.c_str(), "lep");
+  }
   for (auto& legend : legends)
   {
     if (!side_legend) scale_legend_to_canvas(*legend, plot_height);
@@ -597,7 +602,8 @@ int MergePythiaPhotonCandidateSelection(
     if (!consistent_pi0_bdt(*composition_histograms[i], *topology_histograms[i], bdt_histograms[i])) return 6;
     const std::string directory = output_base + "/" + kSelectionKeys[i];
     if (!make_output_directory(directory + "/pi0_bdt_score")) return 7;
-    if (!bdt_histograms[i].export_files(directory, kSelectionLabels[i], i == 3 || i >= 4)) return 7;
+    plot_caption.selection = kSelectionLabels[i];
+    if (!bdt_histograms[i].export_files(directory, kSelectionLabels[i], i == 3 || i >= 4, caption_lines(plot_caption))) return 7;
     TFile bdt_output((directory + "/pi0_bdt_score.root").c_str(), "UPDATE");
     if (bdt_output.IsZombie()) return 7;
     TNamed model("model_sha256", combined.model_sha256.c_str()); model.Write();

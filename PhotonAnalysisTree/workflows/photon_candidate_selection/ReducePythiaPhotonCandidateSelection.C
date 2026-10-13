@@ -469,24 +469,58 @@ void draw_annotations()
   }
 }
 
+// Presentation-only labels: keep stored category names and work-in-progress plots unchanged.
+std::string compact_legend_label(std::string label)
+{
+  for (const std::string word : {"Single contaminated", "single contaminated"})
+  {
+    const auto pos = label.find(word);
+    if (pos != std::string::npos) label.replace(pos, word.size(), word.front() == 'S' ? "Contaminated" : "contaminated");
+  }
+  return label;
+}
+
+void add_readable_legend_entry(TLegend& legend, TObject* object, const std::string& source, const char* option)
+{
+  const std::string label = compact_legend_label(source);
+  auto split = label.find(", mass ");
+  if (split != std::string::npos)
+  {
+    legend.AddEntry(object, label.substr(0, split).c_str(), option);
+    legend.AddEntry(static_cast<TObject*>(nullptr), ("  " + label.substr(split + 2)).c_str(), "");
+  }
+  else if ((split = label.find(" or no CEMC deposit")) != std::string::npos)
+  {
+    legend.AddEntry(object, label.substr(0, split).c_str(), option);
+    legend.AddEntry(static_cast<TObject*>(nullptr), "  or no CEMC deposit", "");
+  }
+  else legend.AddEntry(object, label.c_str(), option);
+}
+
+constexpr int kDetailedCanvasWidth = 2000;
+constexpr double kDetailedPlotWidth = 1600.0 * kCompositionPlotWidth / kDetailedCanvasWidth;
+constexpr double kDetailedLegendLeft = kDetailedPlotWidth + 0.02;
+
 void draw_spectrum(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& density, const std::vector<std::size_t>& indices,
                    const std::string& output_path, bool detailed)
 {
   SetsPhenixStyle();
   const bool side_legend = detailed;
-  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum").c_str(), "", side_legend ? 1600 : kCanvasWidth, kCanvasHeight);
+  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum").c_str(), "", side_legend ? kDetailedCanvasWidth : kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_spectrum_pad", true, kPlotPadHeight,
-                                side_legend ? kCompositionPlotWidth : 1.0);
+                                side_legend ? kDetailedPlotWidth : 1.0);
   scale_axes_to_canvas(density[indices.front()].get(), kPlotPadHeight);
+  density[indices.front()]->GetXaxis()->SetTitleOffset(1.0);
+  density[indices.front()]->GetYaxis()->SetTitleOffset(1.0);
   density[indices.front()]->SetMinimum(kSpectrumYMinimum);
   density[indices.front()]->SetMaximum(kSpectrumYMaximum);
   density[indices.front()]->Draw("HIST");
   for (std::size_t position = 1; position < indices.size(); ++position) density[indices[position]]->Draw("HIST SAME");
   if (side_legend) canvas.cd();
-  TLegend legend(side_legend ? 0.72 : 0.52, side_legend ? 0.05 : 0.38, side_legend ? 0.99 : 0.98, side_legend ? 0.95 : 0.94);
+  TLegend legend(side_legend ? kDetailedLegendLeft : 0.46, side_legend ? 0.05 : 0.38, side_legend ? 0.99 : 0.98, side_legend ? 0.95 : 0.94);
   if (!side_legend) scale_legend_to_canvas(legend, kPlotPadHeight);
   legend.SetFillStyle(0);
-  for (std::size_t index : indices) legend.AddEntry(density[index].get(), kLabels[index].c_str(), "l");
+  for (std::size_t index : indices) add_readable_legend_entry(legend, density[index].get(), kLabels[index], "l");
   legend.Draw();
   plot_pad->RedrawAxis();
   canvas.cd();
@@ -530,19 +564,21 @@ void draw_fraction_lines(const std::vector<std::unique_ptr<TH1D>>& fractions, co
 {
   SetsPhenixStyle();
   const bool side_legend = detailed;
-  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction").c_str(), "", side_legend ? 1600 : kCanvasWidth, kCanvasHeight);
+  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction").c_str(), "", side_legend ? kDetailedCanvasWidth : kCanvasWidth, kCanvasHeight);
   auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_pad", false, kPlotPadHeight,
-                                side_legend ? kCompositionPlotWidth : 1.0);
+                                side_legend ? kDetailedPlotWidth : 1.0);
   scale_axes_to_canvas(fractions.front().get(), kPlotPadHeight);
+  fractions.front()->GetXaxis()->SetTitleOffset(1.0);
+  fractions.front()->GetYaxis()->SetTitleOffset(1.0);
   fractions.front()->SetMinimum(0.0);
   fractions.front()->SetMaximum(1.05);
   fractions.front()->Draw("E1");
   for (std::size_t index = 1; index < fractions.size(); ++index) fractions[index]->Draw("E1 SAME");
   if (side_legend) canvas.cd();
-  TLegend legend(side_legend ? 0.72 : 0.52, side_legend ? 0.10 : 0.50, side_legend ? 0.99 : 0.98, side_legend ? 0.90 : 0.94);
+  TLegend legend(side_legend ? kDetailedLegendLeft : 0.46, side_legend ? 0.10 : 0.50, side_legend ? 0.99 : 0.98, side_legend ? 0.90 : 0.94);
   if (!side_legend) scale_legend_to_canvas(legend, kPlotPadHeight);
   legend.SetFillStyle(0);
-  for (std::size_t index = 0; index < fractions.size(); ++index) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "lep");
+  for (std::size_t index = 0; index < fractions.size(); ++index) add_readable_legend_entry(legend, fractions[index].get(), kLabels[indices[index]], "lep");
   legend.Draw();
   plot_pad->RedrawAxis();
   canvas.cd();
@@ -554,9 +590,9 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
                          const std::string& output_path, bool detailed)
 {
   SetsPhenixStyle();
-  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack").c_str(), "", 1600, kCanvasHeight);
+  TCanvas canvas(("c_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack").c_str(), "", detailed ? kDetailedCanvasWidth : 1600, kCanvasHeight);
   auto plot_pad = make_plot_pad(std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction_stack_pad", false, kPlotPadHeight,
-                                kCompositionPlotWidth);
+                                detailed ? kDetailedPlotWidth : kCompositionPlotWidth);
   THStack stack(("stack_" + std::string(detailed ? "detailed" : "summary") + "_region_a_topology_fraction").c_str(), "");
   for (std::size_t index = 0; index < fractions.size(); ++index)
   {
@@ -568,14 +604,16 @@ void draw_fraction_stack(std::vector<std::unique_ptr<TH1D>>& fractions, const st
   stack.SetMaximum(1.05);
   stack.Draw("HIST");
   scale_axes_to_canvas(stack.GetXaxis(), stack.GetYaxis(), kPlotPadHeight);
+  stack.GetXaxis()->SetTitleOffset(1.0);
+  stack.GetYaxis()->SetTitleOffset(1.0);
   stack.GetXaxis()->SetTitle("Candidate Cluster E_{T} [GeV]");
   stack.GetYaxis()->SetTitle("Fraction");
   stack.GetXaxis()->CenterTitle();
   stack.GetYaxis()->CenterTitle();
   canvas.cd();
-  TLegend legend(0.72, detailed ? 0.10 : 0.30, 0.99, detailed ? 0.90 : 0.70);
+  TLegend legend(detailed ? kDetailedLegendLeft : 0.72, detailed ? 0.05 : 0.30, 0.99, detailed ? 0.95 : 0.70);
   legend.SetFillStyle(0);
-  for (std::size_t index = fractions.size(); index-- > 0;) legend.AddEntry(fractions[index].get(), kLabels[indices[index]].c_str(), "f");
+  for (std::size_t index = fractions.size(); index-- > 0;) add_readable_legend_entry(legend, fractions[index].get(), kLabels[indices[index]], "f");
   legend.Draw();
   plot_pad->RedrawAxis();
   canvas.cd();
@@ -751,6 +789,11 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   stack.SetMaximum(1.05);
   auto frame = make_plot_frame(*components.front(), "h_candidate_composition_frame", "Fraction", 0.0, 1.05);
   scale_axes_to_canvas(frame.get(), plot_height);
+  if (superdetailed)
+  {
+    frame->GetXaxis()->SetTitleOffset(1.0);
+    frame->GetYaxis()->SetTitleOffset(1.0);
+  }
   frame->Draw("AXIS");
   stack.Draw("HIST SAME");
   std::vector<std::unique_ptr<TLegend>> legends;
@@ -758,8 +801,8 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   if (superdetailed)
   {
     legends.push_back(std::make_unique<TLegend>(0.55, 0.05, 0.99, 0.95));
-    legends[0]->SetTextSize(0.035);
-    for (std::size_t i = components.size(); i-- > 0;) legends[0]->AddEntry(components[i], labels[i].c_str(), "f");
+    legends[0]->SetTextSize(0.04);
+    for (std::size_t i = components.size(); i-- > 0;) add_readable_legend_entry(*legends[0], components[i], labels[i], "f");
   }
   else if (detail == "detailed")
   {

@@ -112,6 +112,9 @@ enum class Pi0TopologyEventStatus : int
 struct Pi0AnchorTopologyConfig
 {
   Pi0SampleMode sample_mode = Pi0SampleMode::pythia;
+  // Defaults preserve the existing pi0 selection. Eta uses 221 and an explicit HepMC two-photon decay check.
+  int parent_pdg_id = 111;
+  bool require_hepmc_two_photon_decay = false;
   std::string truth_node_name = "G4TruthInfo";
   std::string hepmc_event_map_node_name = "PHHepMCGenEventMap";
   std::string tower_node_name = "TOWERINFO_CALIB_CEMC";

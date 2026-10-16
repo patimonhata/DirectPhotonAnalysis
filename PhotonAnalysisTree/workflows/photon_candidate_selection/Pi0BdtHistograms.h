@@ -194,16 +194,20 @@ struct Histograms
     }
     gPad->RedrawAxis();
   }
-  bool export_files(const std::string& directory, const std::string& selection, bool requires_isolation, const std::vector<std::string>& caption = {}) const
+  bool export_files(const std::string& directory, const std::string& selection, bool requires_isolation,
+                    const std::vector<std::string>& caption = {}, const std::string& parent = "pi0") const
   {
     if (!valid()) return false;
-    TFile output((directory + "/pi0_bdt_score.root").c_str(), "RECREATE");
+    TFile output((directory + "/" + parent + "_bdt_score.root").c_str(), "RECREATE");
     if (output.IsZombie() || !write(output)) return false;
-    TNamed definition("population", "composition pi0: valid anchor, main fraction > 0.5, no multiple-origin majority"); definition.Write();
+    const char* population = parent == "pi0"
+        ? "composition pi0: valid anchor, main fraction > 0.5, no multiple-origin majority"
+        : "composition eta subset: direct eta to two photons, same-parent main fraction > 0.5";
+    TNamed definition("population", population); definition.Write();
     TNamed cut("selection", selection.c_str()); cut.Write();
     TNamed normalization("normalization", "cross-section and generator weighted; unit area uses visible score bins; invalid BDT counted separately"); normalization.Write();
     output.Close();
-    std::ofstream csv(directory + "/pi0_bdt_score_summary.csv");
+    std::ofstream csv(directory + "/" + parent + "_bdt_score_summary.csv");
     csv << "isolation,topology,selected_count,invalid_bdt_count,selected_pb,invalid_bdt_pb,valid_bdt_pb,underflow_count,overflow_count\n" << std::setprecision(17);
     for (int i = 0; i < 4; ++i) for (int k = 0; k < 5; ++k)
     {
@@ -212,14 +216,15 @@ struct Histograms
       csv << ',' << c.weighted.Integral(0, 101) << ',' << c.count.GetBinContent(0) << ',' << c.count.GetBinContent(101) << '\n';
     }
     if (!csv.good()) return false;
-    return export_plots(directory, selection, requires_isolation, caption);
+    return export_plots(directory, selection, requires_isolation, caption, parent);
   }
-  bool export_plots(const std::string& directory, const std::string& selection, bool requires_isolation, const std::vector<std::string>& caption = {}) const
+  bool export_plots(const std::string& directory, const std::string& selection, bool requires_isolation,
+                    const std::vector<std::string>& caption = {}, const std::string& parent = "pi0") const
   {
     if (!valid()) return false;
     SetsPhenixStyle();
-    const std::string standard_path = directory + "/pi0_bdt_score_by_topology.pdf";
-    const std::string isolation_path = directory + "/pi0_bdt_score_by_topology_isolation.pdf";
+    const std::string standard_path = directory + "/" + parent + "_bdt_score_by_topology.pdf";
+    const std::string isolation_path = directory + "/" + parent + "_bdt_score_by_topology_isolation.pdf";
     for (int book = 0; book < 2; ++book)
     {
       const bool split = book == 1;

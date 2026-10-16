@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace
@@ -21,8 +22,9 @@ bool close_enough(double first, double second)
 }
 }
 
-int check_pythia_photon_candidate_tree(const char* path)
+int check_pythia_photon_candidate_tree(const char* path, const std::string parent = "pi0")
 {
+  if (parent != "pi0" && parent != "eta") return 1;
   TFile file(path, "READ");
   auto* events = file.Get<TTree>("event_tree");
   auto* metadata = file.Get<TTree>("metadata");
@@ -113,37 +115,37 @@ int check_pythia_photon_candidate_tree(const char* path)
   ok &= bind(events, "split_cluster_pass_region_d", &region_d);
   ok &= bind(events, "split_cluster_pass_final_photon", &final_photon);
   ok &= bind(events, "split_cluster_pi0_tag", &pi0_tag);
-  ok &= bind(events, "split_cluster_pi0_partner_cluster_id", &pi0_partner_cluster_id);
-  ok &= bind(events, "split_cluster_pi0_anchor_valid", &pi0_anchor_valid);
-  ok &= bind(events, "split_cluster_pi0_anchor_partner_alignment", &pi0_anchor_partner_alignment);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_tag_status", &pi0_anchor_truth_partner_tag_status);
-  ok &= bind(events, "split_cluster_pi0_anchor_tag_result", &pi0_anchor_tag_result);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_cluster_id", &pi0_anchor_truth_partner_cluster_id);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_cluster_e", &pi0_anchor_truth_partner_cluster_e);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_cluster_eta", &pi0_anchor_truth_partner_cluster_eta);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_cluster_phi", &pi0_anchor_truth_partner_cluster_phi);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_delta_r", &pi0_anchor_truth_partner_delta_r);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_direct_edep", &pi0_anchor_truth_partner_direct_edep);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_reconstructed_e", &pi0_anchor_truth_partner_reconstructed_e);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_recovery", &pi0_anchor_truth_partner_recovery);
-  ok &= bind(events, "split_cluster_pi0_anchor_truth_partner_mass", &pi0_anchor_truth_partner_mass);
-  ok &= bind(events, "split_cluster_pi0_anchor_selected_tag_partner_matches_truth_partner", &pi0_anchor_selected_tag_partner_matches_truth_partner);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_partner_cluster_id").c_str(), &pi0_partner_cluster_id);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_valid").c_str(), &pi0_anchor_valid);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_partner_alignment").c_str(), &pi0_anchor_partner_alignment);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_tag_status").c_str(), &pi0_anchor_truth_partner_tag_status);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_tag_result").c_str(), &pi0_anchor_tag_result);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_cluster_id").c_str(), &pi0_anchor_truth_partner_cluster_id);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_cluster_e").c_str(), &pi0_anchor_truth_partner_cluster_e);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_cluster_eta").c_str(), &pi0_anchor_truth_partner_cluster_eta);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_cluster_phi").c_str(), &pi0_anchor_truth_partner_cluster_phi);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_delta_r").c_str(), &pi0_anchor_truth_partner_delta_r);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_direct_edep").c_str(), &pi0_anchor_truth_partner_direct_edep);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_reconstructed_e").c_str(), &pi0_anchor_truth_partner_reconstructed_e);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_recovery").c_str(), &pi0_anchor_truth_partner_recovery);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_truth_partner_mass").c_str(), &pi0_anchor_truth_partner_mass);
+  ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_selected_tag_partner_matches_truth_partner").c_str(), &pi0_anchor_selected_tag_partner_matches_truth_partner);
   ok &= bind(events, "split_cluster_eta_tag", &eta_tag);
   ok &= bind(events, "split_cluster_shower_patch_e", &patch);
   ok &= bind(events, "split_pair_cluster_i", &pair_i);
-  ok &= bind(events, "pi0_topology_anchor_count", &topology_anchor_count);
-  ok &= bind(events, "pi0_topology_anchor_cluster_id", &topology_anchor_cluster_id);
-  ok &= bind(events, "pi0_topology_anchor_partner_alignment", &topology_anchor_partner_alignment);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_tag_status", &topology_anchor_truth_partner_tag_status);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_cluster_id", &topology_anchor_truth_partner_cluster_id);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_cluster_e", &topology_anchor_truth_partner_cluster_e);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_cluster_eta", &topology_anchor_truth_partner_cluster_eta);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_cluster_phi", &topology_anchor_truth_partner_cluster_phi);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_delta_r", &topology_anchor_truth_partner_delta_r);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_direct_edep", &topology_anchor_truth_partner_direct_edep);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_reconstructed_e", &topology_anchor_truth_partner_reconstructed_e);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_recovery", &topology_anchor_truth_partner_recovery);
-  ok &= bind(events, "pi0_topology_anchor_truth_partner_mass", &topology_anchor_truth_partner_mass);
+  ok &= bind(events, (parent + "_topology_anchor_count").c_str(), &topology_anchor_count);
+  ok &= bind(events, (parent + "_topology_anchor_cluster_id").c_str(), &topology_anchor_cluster_id);
+  ok &= bind(events, (parent + "_topology_anchor_partner_alignment").c_str(), &topology_anchor_partner_alignment);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_tag_status").c_str(), &topology_anchor_truth_partner_tag_status);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_cluster_id").c_str(), &topology_anchor_truth_partner_cluster_id);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_cluster_e").c_str(), &topology_anchor_truth_partner_cluster_e);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_cluster_eta").c_str(), &topology_anchor_truth_partner_cluster_eta);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_cluster_phi").c_str(), &topology_anchor_truth_partner_cluster_phi);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_delta_r").c_str(), &topology_anchor_truth_partner_delta_r);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_direct_edep").c_str(), &topology_anchor_truth_partner_direct_edep);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_reconstructed_e").c_str(), &topology_anchor_truth_partner_reconstructed_e);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_recovery").c_str(), &topology_anchor_truth_partner_recovery);
+  ok &= bind(events, (parent + "_topology_anchor_truth_partner_mass").c_str(), &topology_anchor_truth_partner_mass);
   if (!ok)
   {
     std::cerr << "Missing required branch" << std::endl;
@@ -202,13 +204,14 @@ int check_pythia_photon_candidate_tree(const char* path)
       const int tag_result = (*pi0_anchor_tag_result)[cluster];
       const int truth_partner_id = (*pi0_anchor_truth_partner_cluster_id)[cluster];
       const bool selected_partner_matches = (*pi0_anchor_selected_tag_partner_matches_truth_partner)[cluster] != 0U;
+      const bool parent_tag = parent == "eta" ? (*eta_tag)[cluster] : (*pi0_tag)[cluster];
       if (anchor)
       {
         event_ok &= alignment >= 0 && alignment <= 4 && truth_tag_status >= 0 && truth_tag_status <= 6;
-        const int expected_tag_result = !(*pi0_tag)[cluster] ? 1 : (truth_tag_status == 1 ? 2 : 3);
+        const int expected_tag_result = !parent_tag ? 1 : (truth_tag_status == 1 ? 2 : 3);
         event_ok &= tag_result == expected_tag_result;
-        event_ok &= truth_tag_status != 1 || (*pi0_tag)[cluster];
-        event_ok &= !selected_partner_matches || ((*pi0_tag)[cluster] && (*pi0_partner_cluster_id)[cluster] == truth_partner_id);
+        event_ok &= truth_tag_status != 1 || parent_tag;
+        event_ok &= !selected_partner_matches || (parent_tag && (*pi0_partner_cluster_id)[cluster] == truth_partner_id);
         if (truth_tag_status == 0 || truth_tag_status == 2) event_ok &= truth_partner_id == -999;
         else event_ok &= truth_partner_id >= 0 && std::isfinite((*pi0_anchor_truth_partner_cluster_e)[cluster]) &&
             std::isfinite((*pi0_anchor_truth_partner_cluster_eta)[cluster]) && std::isfinite((*pi0_anchor_truth_partner_cluster_phi)[cluster]) &&

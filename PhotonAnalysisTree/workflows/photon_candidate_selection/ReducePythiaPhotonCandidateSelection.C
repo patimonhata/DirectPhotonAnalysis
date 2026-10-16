@@ -133,6 +133,7 @@ struct MapMetadata
   double missing_energy_max = -1.0;
   double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
+  int eta_topology_algorithm_version = -1;
   unsigned long long events_written = 0;
   unsigned long long events_vertex_rejected = 0;
   unsigned long long events_invalid = 0;
@@ -193,6 +194,7 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   ok &= bind(tree, "missing_energy_max", &value.missing_energy_max);
   ok &= bind(tree, "min_photon_energy_recovery", &value.min_photon_energy_recovery);
   ok &= bind(tree, "pi0_topology_algorithm_version", &value.pi0_topology_algorithm_version);
+  ok &= bind(tree, "eta_topology_algorithm_version", &value.eta_topology_algorithm_version);
   ok &= bind(tree, "sample_upper_unbounded", &value.upper_unbounded);
   ok &= bind(tree, "sum_generator_weight_processed", &value.sum_generator_weight_processed);
   ok &= bind(tree, "n_events_processed", &value.events_processed);
@@ -211,11 +213,11 @@ bool read_metadata(const std::string& path, MapMetadata& value)
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 5 && value.sample_name == sample.name && !value.input_manifest.empty() &&
+  return value.schema_version == 6 && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
       std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.0) &&
-      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 11 &&
+      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 11 && value.eta_topology_algorithm_version == 1 &&
       std::isfinite(value.eta_partner_min_energy) && value.eta_partner_min_energy >= 0.0 &&
       std::isfinite(value.pi0_mass_min) && value.pi0_mass_min >= 0.0 &&
       std::isfinite(value.pi0_mass_max) && value.pi0_mass_max >= 0.0 &&
@@ -250,7 +252,8 @@ bool compatible(const MapMetadata& value, const MapMetadata& reference)
       same_double(value.eta_mass_max, reference.eta_mass_max) &&
       same_double(value.missing_energy_min, reference.missing_energy_min) &&
       same_double(value.missing_energy_max, reference.missing_energy_max) &&
-      same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) && value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version;
+      same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) && value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version &&
+      value.eta_topology_algorithm_version == reference.eta_topology_algorithm_version;
 }
 
 bool collect_maps(const std::string& pattern, const SampleDefinition& sample, bool require_complete, std::vector<MapMetadata>& maps)
@@ -933,6 +936,8 @@ void draw_superdetailed_stack(std::array<std::unique_ptr<TH1D>, category_count>&
 
 }
 
+#include "EtaTopologyHistograms.h"
+
 int ReducePythiaPhotonCandidateSelection(
     const std::string family,
     const std::string map_root,
@@ -962,10 +967,13 @@ int ReducePythiaPhotonCandidateSelection(
   std::array<std::unique_ptr<Histograms>, kSelectionCount> composition_histograms;
   std::array<std::unique_ptr<Spectra>, kSelectionCount> topology_histograms;
   std::array<pi0_bdt::Histograms, kSelectionCount> bdt_histograms;
+  std::array<std::unique_ptr<Spectra>, kSelectionCount> eta_histograms;
+  std::array<pi0_bdt::Histograms, kSelectionCount> eta_bdt_histograms;
   for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
   {
     composition_histograms[selection_index] = std::make_unique<Histograms>(n_bins, et_max);
     topology_histograms[selection_index] = std::make_unique<Spectra>(n_bins, et_max);
+    eta_histograms[selection_index] = std::make_unique<Spectra>(n_bins, et_max);
   }
   std::vector<std::string> sample_names;
   std::vector<unsigned long long> sample_map_counts;
@@ -983,6 +991,7 @@ int ReducePythiaPhotonCandidateSelection(
   double missing_energy_max = -1.0;
   double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
+  int eta_topology_algorithm_version = -1;
   std::array<Summary, kSelectionCount> composition_summaries;
   unsigned long long events_written = 0, expected_events_written = 0, events_stitch_pass = 0;
   unsigned long long region_a_clusters = 0, region_a_prompt_clusters = 0, region_a_anchor_clusters = 0;
@@ -1009,6 +1018,7 @@ int ReducePythiaPhotonCandidateSelection(
   min_photon_energy_recovery = maps.front().min_photon_energy_recovery;
   set_missing_labels(missing_energy_min, missing_energy_max);
   pi0_topology_algorithm_version = maps.front().pi0_topology_algorithm_version;
+  eta_topology_algorithm_version = maps.front().eta_topology_algorithm_version;
   double sample_sumw = 0.0;
   for (const auto& map : maps) sample_sumw += map.sum_generator_weight_processed;
   if (!std::isfinite(sample_sumw) || sample_sumw <= 0.0) return 4;
@@ -1050,6 +1060,10 @@ int ReducePythiaPhotonCandidateSelection(
     std::vector<float>* pi0_fraction = nullptr;
     std::vector<int>* topology = nullptr;
     std::vector<int>* missing_category = nullptr;
+    std::vector<unsigned char>* eta_valid = nullptr;
+    std::vector<float>* eta_main_fraction = nullptr;
+    std::vector<int>* eta_topology = nullptr;
+    std::vector<int>* eta_missing_category = nullptr;
     std::vector<unsigned int>* offset = nullptr;
     std::vector<int>* g4_pdg = nullptr;
     std::vector<int>* embedding = nullptr;
@@ -1082,6 +1096,10 @@ int ReducePythiaPhotonCandidateSelection(
         bind_active(tree, "split_cluster_pi0_anchor_main_fraction", &pi0_fraction) &&
         bind_active(tree, "split_cluster_pi0_anchor_topology", &topology) &&
         bind_active(tree, "split_cluster_pi0_anchor_missing_category", &missing_category) &&
+        bind_active(tree, "split_cluster_eta_anchor_valid", &eta_valid) &&
+        bind_active(tree, "split_cluster_eta_anchor_main_fraction", &eta_main_fraction) &&
+        bind_active(tree, "split_cluster_eta_anchor_topology", &eta_topology) &&
+        bind_active(tree, "split_cluster_eta_anchor_missing_category", &eta_missing_category) &&
         bind_active(tree, "split_cluster_truth_contributor_offset", &offset) &&
         bind_active(tree, "split_cluster_truth_contributor_g4_pdg_id", &g4_pdg) &&
         bind_active(tree, "split_cluster_truth_contributor_embedding_id", &embedding) &&
@@ -1104,6 +1122,8 @@ int ReducePythiaPhotonCandidateSelection(
           truth_valid->size() != ncluster || prompt_flag->size() != ncluster || dominant_fraction->size() != ncluster ||
           pi0_valid->size() != ncluster || pi0_fraction->size() != ncluster || topology->size() != ncluster || missing_category->size() != ncluster ||
           !valid_contributors(ncluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent)) return 6;
+      if (!eta_valid || !eta_main_fraction || !eta_topology || !eta_missing_category || eta_valid->size() != ncluster ||
+          eta_main_fraction->size() != ncluster || eta_topology->size() != ncluster || eta_missing_category->size() != ncluster) return 6;
       if (!weight_valid || !stitch_valid || !stitch_pass) continue;
       ++events_stitch_pass;
       const double weight = weight_numerator / sample_sumw;
@@ -1140,6 +1160,14 @@ int ReducePythiaPhotonCandidateSelection(
           ++topology_selected_clusters[topology_selection];
           Spectra& spectra = *topology_histograms[topology_selection];
           if ((*prompt_flag)[cluster]) spectra.fill(0, cluster_et, weight);
+          auto& eta_spectra = *eta_histograms[topology_selection];
+          if ((*prompt_flag)[cluster]) eta_spectra.fill(0, cluster_et, weight);
+          if (category == eta && (*eta_valid)[cluster] && (*eta_main_fraction)[cluster] > kMajorityThreshold)
+          {
+            if (!eta_topology::fill(eta_spectra, (*eta_topology)[cluster], (*eta_missing_category)[cluster], cluster_et, weight) ||
+                !eta_bdt_histograms[topology_selection].fill(eta_topology::bdt_category((*eta_topology)[cluster]), (*bdt_score)[cluster],
+                    (*bdt_valid)[cluster], (*pass_isolated)[cluster], (*pass_nonisolated)[cluster], cluster_et, weight)) return 6;
+          }
           if (category < pi0_separated || category > pi0_other) continue;
           if (!bdt_histograms[topology_selection].fill(static_cast<int>(category - pi0_separated), (*bdt_score)[cluster], (*bdt_valid)[cluster],
               (*pass_isolated)[cluster], (*pass_nonisolated)[cluster], cluster_et, weight)) return 6;
@@ -1189,7 +1217,8 @@ int ReducePythiaPhotonCandidateSelection(
   for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
   {
     const Summary& summary = composition_summaries[selection_index];
-    if (!consistent_pi0_bdt(*composition_histograms[selection_index], *topology_histograms[selection_index], bdt_histograms[selection_index])) return 7;
+    if (!consistent_pi0_bdt(*composition_histograms[selection_index], *topology_histograms[selection_index], bdt_histograms[selection_index]) ||
+        !eta_topology::valid(*composition_histograms[selection_index], *eta_histograms[selection_index], eta_bdt_histograms[selection_index])) return 7;
     if (summary.selected != summary.prompt + summary.pi0 + summary.eta + summary.other ||
         !candidate_composition::valid_partition(composition_histograms[selection_index]->counts) ||
         !candidate_composition::valid_partition(composition_histograms[selection_index]->weighted) ||
@@ -1233,7 +1262,9 @@ int ReducePythiaPhotonCandidateSelection(
     if (!selection_directory || !bdt_histograms[i].write(*selection_directory)) return 8;
   }
   output.cd();
-  int schema_version = 6, source_schema_version = 5, signal_embedding_id = kSignalEmbeddingId;
+  if (!eta_topology::write_partial(output, eta_histograms, eta_bdt_histograms)) return 8;
+  output.cd();
+  int schema_version = 7, source_schema_version = 6, signal_embedding_id = kSignalEmbeddingId;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
   std::string eta_definition = "sum_signal_embedding_g4_eta_or_generator_eta_decay_photon_contributor_fraction";
@@ -1264,6 +1295,7 @@ int ReducePythiaPhotonCandidateSelection(
   metadata.Branch("missing_energy_max", &missing_energy_max);
   metadata.Branch("min_photon_energy_recovery", &min_photon_energy_recovery);
   metadata.Branch("pi0_topology_algorithm_version", &pi0_topology_algorithm_version);
+  metadata.Branch("eta_topology_algorithm_version", &eta_topology_algorithm_version);
   metadata.Branch("signal_embedding_id", &signal_embedding_id);
   metadata.Branch("majority_threshold", &majority_threshold);
   metadata.Branch("majority_comparison", &majority_comparison);

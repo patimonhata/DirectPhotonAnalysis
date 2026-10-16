@@ -29,6 +29,7 @@ struct Metadata
   double missing_energy_max = -1.0;
   double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
+  int eta_topology_algorithm_version = -1;
   int signal_embedding_id = -1;
   double majority_threshold = -1.0;
   std::string majority_comparison;
@@ -157,6 +158,7 @@ bool read_metadata(TFile& file, Metadata& value)
   ok &= bind(tree, "missing_energy_max", &value.missing_energy_max);
   ok &= bind(tree, "min_photon_energy_recovery", &value.min_photon_energy_recovery);
   ok &= bind(tree, "pi0_topology_algorithm_version", &value.pi0_topology_algorithm_version);
+  ok &= bind(tree, "eta_topology_algorithm_version", &value.eta_topology_algorithm_version);
   ok &= bind(tree, "signal_embedding_id", &value.signal_embedding_id);
   ok &= bind(tree, "majority_threshold", &value.majority_threshold);
   ok &= bind(tree, "majority_comparison", &majority_comparison);
@@ -174,7 +176,7 @@ bool read_metadata(TFile& file, Metadata& value)
   ok &= bind(tree, "region_a_clusters", &value.region_a_clusters);
   ok &= bind(tree, "region_a_prompt_clusters", &value.region_a_prompt_clusters);
   ok &= bind(tree, "region_a_anchor_clusters", &value.region_a_anchor_clusters);
-  if (!ok || tree->GetEntry(0) <= 0 || value.pi0_topology_algorithm_version != 11 || !family || !map_root || !majority_comparison || !eta_definition ||
+  if (!ok || tree->GetEntry(0) <= 0 || value.pi0_topology_algorithm_version != 11 || value.eta_topology_algorithm_version != 1 || !family || !map_root || !majority_comparison || !eta_definition ||
       !other_definition || !weight_definition || !analysis_release || !model_sha256 || !sample_names || !sample_map_counts ||
       !sample_sum_generator_weights) return false;
   value.family = *family;
@@ -262,6 +264,7 @@ bool compatible(const Metadata& value, const Metadata& reference)
       same_double(value.missing_energy_max, reference.missing_energy_max) &&
       same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) &&
       value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version &&
+      value.eta_topology_algorithm_version == reference.eta_topology_algorithm_version &&
       value.signal_embedding_id == reference.signal_embedding_id && same_double(value.majority_threshold, reference.majority_threshold) &&
       value.majority_comparison == reference.majority_comparison && value.eta_definition == reference.eta_definition &&
       value.other_definition == reference.other_definition && value.weight_definition == reference.weight_definition &&
@@ -396,6 +399,8 @@ void draw_survival_curves(const std::vector<const SurvivalCurve*>& curves, const
 }
 }
 
+#include "EtaTopologyPlots.h"
+
 int MergePythiaPhotonCandidateSelection(
     const std::string family,
     const std::string partial_root,
@@ -413,6 +418,8 @@ int MergePythiaPhotonCandidateSelection(
   std::array<Summary, kSelectionCount> composition_summaries;
   std::array<std::unique_ptr<Spectra>, kSelectionCount> topology_histograms;
   std::array<pi0_bdt::Histograms, kSelectionCount> bdt_histograms;
+  std::array<std::unique_ptr<Spectra>, kSelectionCount> eta_histograms;
+  std::array<pi0_bdt::Histograms, kSelectionCount> eta_bdt_histograms;
   std::vector<unsigned long long> sample_events_written, sample_events_stitch_pass, sample_region_a_clusters;
   std::vector<unsigned long long> sample_region_a_prompt_clusters, sample_region_a_anchor_clusters;
   std::array<std::vector<unsigned long long>, kSelectionCount> sample_selected_clusters, sample_selected_anchor_clusters;
@@ -440,7 +447,7 @@ int MergePythiaPhotonCandidateSelection(
         std::cerr << "Missing or invalid composition partial: " << path << std::endl;
         return 3;
       }
-      if (metadata.schema_version != 6 || metadata.source_map_schema_version != 5 || metadata.family != family ||
+      if (metadata.schema_version != 7 || metadata.source_map_schema_version != 6 || metadata.family != family ||
           metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
           metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U || !same_double(metadata.sample_cross_section_pb, sample.cross_section_pb) ||
           metadata.events_stitch_pass > metadata.events_written || metadata.region_a_prompt_clusters > metadata.region_a_clusters ||
@@ -515,6 +522,17 @@ int MergePythiaPhotonCandidateSelection(
         }
         auto* bdt_directory = file.GetDirectory((std::string("pi0_bdt/") + kSelectionKeys[composition_selection]).c_str());
         if (!bdt_directory || !bdt_histograms[composition_selection].add(*bdt_directory)) return 5;
+        auto* eta_bdt_directory = file.GetDirectory((std::string("eta_bdt/") + kSelectionKeys[composition_selection]).c_str());
+        if (!eta_bdt_directory || !eta_bdt_histograms[composition_selection].add(*eta_bdt_directory)) return 5;
+        if (!eta_histograms[composition_selection]) eta_histograms[composition_selection] = std::make_unique<Spectra>(metadata.n_bins, metadata.et_max);
+        for (std::size_t index = 0; index < kSpectrumCount; ++index)
+        {
+          const std::string prefix = std::string("eta_anchor_topology/") + kSelectionKeys[composition_selection] + "/h_region_a_" + eta_topology::spectrum_key(index) + "_et_";
+          auto* count = file.Get<TH1D>((prefix + "count").c_str());
+          auto* weighted = file.Get<TH1D>((prefix + "pb").c_str());
+          if (!valid_histogram(count, metadata) || !valid_histogram(weighted, metadata) ||
+              !eta_histograms[composition_selection]->counts[index]->Add(count) || !eta_histograms[composition_selection]->weighted_pb[index]->Add(weighted)) return 5;
+        }
         add_summary(composition_summaries[composition_selection], composition_summary.selections[composition_selection]);
       }
       for (std::size_t topology_selection = 0; topology_selection < kSelectionCount; ++topology_selection)
@@ -599,7 +617,11 @@ int MergePythiaPhotonCandidateSelection(
 
   for (std::size_t i = 0; i < kSelectionCount; ++i)
   {
-    if (!consistent_pi0_bdt(*composition_histograms[i], *topology_histograms[i], bdt_histograms[i])) return 6;
+    if (!consistent_pi0_bdt(*composition_histograms[i], *topology_histograms[i], bdt_histograms[i]) ||
+        !eta_topology::valid(*composition_histograms[i], *eta_histograms[i], eta_bdt_histograms[i])) return 6;
+    for (std::size_t index = 0; index < kSpectrumCount; ++index)
+      if (!valid_subset(*eta_histograms[i]->counts[index], *eta_histograms[0]->counts[index],
+                        *eta_histograms[i]->weighted_pb[index], *eta_histograms[0]->weighted_pb[index])) return 6;
     const std::string directory = output_base + "/" + kSelectionKeys[i];
     if (!make_output_directory(directory + "/pi0_bdt_score")) return 7;
     plot_caption.selection = kSelectionLabels[i];
@@ -971,6 +993,8 @@ int MergePythiaPhotonCandidateSelection(
   }
   selection_summary.Write();
   topology_output.Close();
+
+  if (!eta_topology::export_outputs(output_base, combined, sample_cross_sections_pb, composition_histograms, eta_histograms, eta_bdt_histograms)) return 7;
 
   std::cout << "MergePythiaPhotonCandidateSelection - family/selections/samples/output = "
             << family << "/" << kSelectionCount << "/" << combined.sample_names.size() << "/" << output_base << std::endl;

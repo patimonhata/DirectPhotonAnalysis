@@ -29,6 +29,9 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
     return tree_status;
   }
 
+  const int eta_tree_status = check_pythia_photon_candidate_tree(path, "eta");
+  if (eta_tree_status != 0) return eta_tree_status;
+
   TFile file(path, "READ");
   auto* events = file.Get<TTree>("event_tree");
   auto* metadata = file.Get<TTree>("metadata");
@@ -55,6 +58,7 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   double missing_energy_max = -1.0;
   double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
+  int eta_topology_algorithm_version = -1;
   unsigned long long n_clusters_region_b = 0ULL;
   unsigned long long n_clusters_region_c = 0ULL;
   unsigned long long n_clusters_region_d = 0ULL;
@@ -82,20 +86,21 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   ok &= map_bind(metadata, "missing_energy_max", &missing_energy_max);
   ok &= map_bind(metadata, "min_photon_energy_recovery", &min_photon_energy_recovery);
   ok &= map_bind(metadata, "pi0_topology_algorithm_version", &pi0_topology_algorithm_version);
+  ok &= map_bind(metadata, "eta_topology_algorithm_version", &eta_topology_algorithm_version);
   ok &= map_bind(metadata, "n_events_written", &n_events_written);
   ok &= map_bind(metadata, "n_clusters_region_a", &n_clusters_region_a);
   ok &= map_bind(metadata, "n_clusters_region_b", &n_clusters_region_b);
   ok &= map_bind(metadata, "n_clusters_region_c", &n_clusters_region_c);
   ok &= map_bind(metadata, "n_clusters_region_d", &n_clusters_region_d);
   ok &= map_bind(metadata, "n_clusters_final_photon", &n_clusters_final_photon);
-  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 5 || !input_manifest || input_manifest->empty() ||
+  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 6 || !input_manifest || input_manifest->empty() ||
       manifest_begin < 0 || manifest_end <= manifest_begin || input_file_count != manifest_end - manifest_begin ||
       !first_input_suffix || first_input_suffix->empty() || !last_input_suffix || last_input_suffix->empty() ||
       !sample_name || sample_name->empty() || !std::isfinite(min_cluster_energy) || min_cluster_energy < 0.0 ||
       !std::isfinite(expected_min_cluster_energy) || std::abs(min_cluster_energy - expected_min_cluster_energy) > 1e-12 ||
       !std::isfinite(partner_diagnostic_min_cluster_energy) || std::abs(partner_diagnostic_min_cluster_energy - 0.0) > 1e-12 ||
       !std::isfinite(pi0_partner_min_energy) || !std::isfinite(resolved_expected_tagging_energy) ||
-      std::abs(pi0_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 11 ||
+      std::abs(pi0_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 11 || eta_topology_algorithm_version != 1 ||
       !std::isfinite(eta_partner_min_energy) || std::abs(eta_partner_min_energy - (expected_eta_partner_min_energy < 0.0 ? resolved_expected_tagging_energy : expected_eta_partner_min_energy)) > 1e-12 ||
       !std::isfinite(pi0_mass_min) || std::abs(pi0_mass_min - expected_pi0_mass_min) > 1e-12 ||
       !std::isfinite(pi0_mass_max) || std::abs(pi0_mass_max - expected_pi0_mass_max) > 1e-12 ||

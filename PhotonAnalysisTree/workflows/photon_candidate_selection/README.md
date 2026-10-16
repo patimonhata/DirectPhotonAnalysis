@@ -1,6 +1,6 @@
 # Pythia photon-candidate selection
 
-This workflow covers the map, reduce, and merge stages of the Pythia photon-candidate analysis. A map job reads a contiguous range of synchronized DST segments and writes one event-wise ROOT TTree containing split-cluster shower shapes, BDT and isolation selections, neutral-meson tags, and detailed pi0 truth topology.
+This workflow covers the map, reduce, and merge stages of the Pythia photon-candidate analysis. A map job reads a contiguous range of synchronized DST segments and writes one event-wise ROOT TTree containing split-cluster shower shapes, BDT and isolation selections, neutral-meson tags, and detailed pi0 and direct eta-to-two-photon truth topology.
 
 ## Build
 
@@ -34,7 +34,7 @@ A production map job processes all events in several DST segments and writes one
 PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_<threshold>/<sample>/map_<chunk>.root
 ~~~
 
-The current map schema is 5 and the topology algorithm version is 11. This version selects the maximum-deposit representative truth partner across all positive-energy usable matches before applying the strict pi0 partner threshold. The photon-energy recovery requirement remains disabled (`min_photon_energy_recovery = 0`). The direct-deposit matching quality and dominance conditions remain unchanged. Older maps and partials must be regenerated; they cannot be mixed with this production. All partner thresholds, mass windows, missing-energy boundaries, and the recovery requirement are stored and checked in map/reduce/merge metadata.
+The current map schema is 6, the pi0 topology algorithm version is 11, and the eta topology extension version is 1. This version selects the maximum-deposit representative truth partner across all positive-energy usable matches before applying the strict pi0 partner threshold. The photon-energy recovery requirement remains disabled (`min_photon_energy_recovery = 0`). The direct-deposit matching quality and dominance conditions remain unchanged. Older maps and partials must be regenerated; they cannot be mixed with this production. All partner thresholds, mass windows, missing-energy boundaries, and the recovery requirement are stored and checked in map/reduce/merge metadata.
 
 The default Condor configuration uses 10 DST segments per ROOT file. This is deliberately configurable through `files_per_job`; after measuring the first jobs, change both `files_per_job` and `n_chunks = ceil(total_files / files_per_job)` together if a different file size is preferable.
 
@@ -231,7 +231,7 @@ The composition merge additionally writes `photon_candidate_composition_survival
 
 These survival curves have independent category denominators and therefore are not stacked and do not sum to one. Their uncertainties use the same weighted subset-covariance calculation as the existing fractions. A zero-denominator bin is stored as zero in the ROOT histogram and omitted from the PDF graph. The merger validates the unweighted subset relation and the weighted sum-of-squared-weights subset relation for every selection, category, and bin.
 
-The partial schema is version 6. The merged candidate-composition schema is version 8 and the merged anchor-topology schema is version 6. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
+The partial schema is version 7. The merged candidate-composition schema is version 8 and the merged anchor-topology schema is version 6. Both merged metadata trees record the source partial schema, the kinematic denominator, the survival-fraction definition, uncertainty prescription, and zero-denominator convention.
 
 ### Shards and partial files
 
@@ -315,6 +315,8 @@ Both plot families share one output base and the same selection directories:
 <OUTPUT_BASE>/
 ├── candidate_composition.root
 ├── pi0_anchor_topology.root
+├── eta_anchor_topology.root
+├── candidate_composition_eta_topology.root
 ├── kinematic/*.pdf
 ├── preselection/*.pdf
 ├── preselection_tight/*.pdf
@@ -399,3 +401,72 @@ Both BDT PDFs use pages 1--5 for reconstructed anchor ET in [5,6), [6,8), [8,10)
 The saved ROOT histograms and CSV continue to contain the original full-ET counters and 2D weighted distributions. Since unweighted and invalid-BDT counters were not stored by ET, slice pages show the ET range instead of those counters; the full-ET page retains the original counter annotations. No reduce rerun or schema change is required.
 
 To update only the two BDT PDFs in all six selection directories of an existing merged output, load `ReplotPi0BdtScores.C` and call `ReplotPi0BdtScores("/absolute/path/to/merged/jet")` in ROOT. This reads each `pi0_bdt_score.root` without modifying it or the CSV. Future ordinary merges automatically produce the six-page PDFs as well.
+
+
+## Direct eta-to-two-photon topology extension
+
+Schema-6 maps add `eta_topology_*` candidate/daughter/anchor records and
+`split_cluster_eta_anchor_*` cluster links. The shared evaluator is run separately
+for PDG 221. Generator candidates must have exactly two photon daughters in the
+HepMC decay vertex and exactly two corresponding G4-primary photons. Unique photon
+bookkeeping copies are followed. G4-primary eta candidates must have exactly two
+direct G4 photon daughters. Eta-to-pi0 cascades and all other eta decays are excluded.
+The pi0 candidate selection and algorithm version 11 are unchanged.
+
+Eta topology uses the existing `eta_partner_min_energy` and `eta_mass_min/max`
+settings, including for missing energy-band mass classification and truth-pair
+taggability. Anchor energy, eta acceptance, missing-energy bands, deposit matching,
+and pre-CEMC interaction definitions are shared with pi0. Recovery remains disabled.
+
+Legacy composition is unchanged: `eta_fraction()` still sums compatible eta-origin
+contributors without grouping by parent. New eta topology and BDT histograms use a
+subset of that existing composition eta category: a valid direct eta-to-two-photon
+anchor with the **same-parent** contribution strictly greater than 0.5. An exact
+0.5 is excluded. Multiple eta parents whose sum exceeds 0.5, unsupported decays,
+and other eta composition entries without such an anchor remain in the residual
+`Other eta contributions` category in the new composition plots. That residual is
+formed by subtracting the anchor subset from legacy eta; its Sumw2 is subtracted
+as well, respecting subset covariance. The five eta topology categories partition
+all selected eta anchors, and the six missing categories partition missing.
+
+All six existing selection directories gain these separate outputs:
+
+- `region_a_eta_anchor_topology*.pdf`: eight spectrum, fraction, stack and
+  kinematic-relative survival plots with the same layout and normalization as pi0.
+- `eta_bdt_score_by_topology.pdf` and `eta_bdt_score_by_topology_isolation.pdf`:
+  the same six ET pages, isolation groups and invalid-score accounting as pi0.
+- `eta_bdt_score.root` and `eta_bdt_score_summary.csv`.
+- `photon_candidate_composition_eta_topology_category_fraction_stack_detailed.pdf`:
+  prompt, aggregate pi0, five eta topology categories, residual eta and other origin.
+- `photon_candidate_composition_eta_topology_category_fraction_stack_superdetailed.pdf`:
+  the same partition with eta missing expanded into its six categories.
+- `photon_candidate_composition_eta_topology_survival_fraction_relative_to_kinematic_detailed.pdf`:
+  the survival of the detailed components relative to their own kinematic population.
+
+The additional spectra, fractions, uncertainties and source metadata are saved in
+`eta_anchor_topology.root` and `candidate_composition_eta_topology.root` (schema 1).
+Existing pi0 and composition file names, histogram categories and plot layouts are
+retained. No BDT model is retrained or changed. `ReplotEtaBdtScores.C` redraws only
+eta BDT PDFs from their stored ROOT histograms.
+
+Regenerate maps from DST, then reduce and merge. Old schema-5 maps and schema-6
+partials cannot supply the new eta records. Current submission and QA defaults use
+`topology_v11_eta_v1/` to preserve previous production directories. No jobs are
+submitted by this change. Use a new output base when invoking merge explicitly.
+The pi0-only spectrum workflow and event display are outside this extension.
+
+A dedicated build can be prepared without replacing the shared installed library:
+
+~~~bash
+/usr/bin/cmake -S PhotonAnalysisTree/src -B PhotonAnalysisTree/build/eta_topology \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$PWD/PhotonAnalysisTree/install"
+/usr/bin/cmake --build PhotonAnalysisTree/build/eta_topology --parallel 4
+bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/eta_topology"
+~~~
+
+Map production uses the installed headers/library. Install this build after jobs
+using the current shared library have finished. The tests include HepMC direct
+eta decay and photon-copy ancestry, rejection of extra daughters and pi0 cascades,
+eta mass-window boundaries, ROOT branch roundtrips, category/BDT closure, residual
+covariance, and a synthetic four-sample map-to-reduce-to-merge run that verifies both
+pi0 and eta plot families.

@@ -1,4 +1,5 @@
 #include "Pi0AnchorTopologyEvaluator.h"
+#include "HepMCDiphotonDecay.h"
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
@@ -54,58 +55,10 @@ struct Projection
   double phi = -999.0;
 };
 
-std::vector<const HepMC::GenParticle*> incoming(const HepMC::GenVertex* vertex)
+Pi0Origin trace_pi0_origin(const HepMC::GenParticle* photon, int parent_pdg_id)
 {
-  std::vector<const HepMC::GenParticle*> result;
-  if (!vertex)
-  {
-    return result;
-  }
-  for (auto iterator = vertex->particles_in_const_begin();
-       iterator != vertex->particles_in_const_end(); ++iterator)
-  {
-    if (*iterator)
-    {
-      result.push_back(*iterator);
-    }
-  }
-  return result;
-}
-
-Pi0Origin trace_pi0_origin(const HepMC::GenParticle* photon)
-{
-  Pi0Origin result;
-  if (!photon || photon->pdg_id() != 22)
-  {
-    return result;
-  }
-  const HepMC::GenParticle* current = photon;
-  std::set<int> visited;
-  if (current->barcode() != 0)
-  {
-    visited.insert(current->barcode());
-  }
-  while (current)
-  {
-    const auto parents = incoming(current->production_vertex());
-    if (parents.size() == 1U && parents.front()->pdg_id() == 22)
-    {
-      current = parents.front();
-      if (current->barcode() != 0 &&
-          !visited.insert(current->barcode()).second)
-      {
-        return result;
-      }
-      continue;
-    }
-    if (parents.size() == 1U && parents.front()->pdg_id() == 111)
-    {
-      result.valid = true;
-      result.parent = parents.front();
-    }
-    return result;
-  }
-  return result;
+  const auto* parent = photon_tree::hepmc_photon_parent(photon, parent_pdg_id);
+  return {parent != nullptr, parent};
 }
 
 bool finite_hepmc_kinematics(const HepMC::GenParticle* particle,
@@ -169,7 +122,7 @@ std::size_t contributor_candidate_index(
     return invalid_index;
   }
   const HepMC::GenParticle* particle = contributor_hepmc_particle(contributor, event_map);
-  if (contributor.g4_pdg_id == 111 && particle && particle->pdg_id() == 111)
+  if (contributor.g4_pdg_id == config.parent_pdg_id && particle && particle->pdg_id() == config.parent_pdg_id)
   {
     const auto found = g4_candidate_by_barcode.find(particle->barcode());
     return found == g4_candidate_by_barcode.end()
@@ -179,7 +132,7 @@ std::size_t contributor_candidate_index(
   {
     return invalid_index;
   }
-  const Pi0Origin origin = trace_pi0_origin(particle);
+  const Pi0Origin origin = trace_pi0_origin(particle, config.parent_pdg_id);
   if (!origin.valid || !origin.parent)
   {
     return invalid_index;
@@ -733,8 +686,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         continue;
       }
       const HepMC::GenParticle* hepmc_particle = event->barcode_to_particle(primary->get_barcode());
-      if (primary->get_pid() == 111 && hepmc_particle &&
-          hepmc_particle->pdg_id() == 111)
+      if (primary->get_pid() == config_.parent_pdg_id && hepmc_particle &&
+          hepmc_particle->pdg_id() == config_.parent_pdg_id)
       {
         const auto found = children_by_parent.find(primary->get_track_id());
         if (found == children_by_parent.end() || found->second.size() != 2U ||
@@ -765,7 +718,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       {
         continue;
       }
-      const Pi0Origin origin = trace_pi0_origin(hepmc_particle);
+      const Pi0Origin origin = trace_pi0_origin(hepmc_particle, config_.parent_pdg_id);
       if (!origin.valid || !origin.parent)
       {
         continue;
@@ -776,7 +729,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
     for (const auto& [barcode, pending] : pending_generator)
     {
-      if (!pending.parent || pending.photons.size() != 2U)
+      if (!pending.parent || pending.photons.size() != 2U ||
+          (config_.require_hepmc_two_photon_decay && !photon_tree::has_hepmc_two_photon_decay(pending.parent)))
       {
         ++result.malformed_candidate_count;
         continue;
@@ -804,7 +758,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
          iterator != primary_range.second; ++iterator)
     {
       const PHG4Particle* primary = iterator->second;
-      if (!primary || primary->get_pid() != 111)
+      if (!primary || primary->get_pid() != config_.parent_pdg_id)
       {
         continue;
       }

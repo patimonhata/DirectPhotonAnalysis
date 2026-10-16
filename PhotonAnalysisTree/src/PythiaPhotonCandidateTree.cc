@@ -83,37 +83,42 @@ void PhotonCandidateSelectionBranches::clear()
   *this = PhotonCandidateSelectionBranches{};
 }
 
-void PhotonCandidateSelectionBranches::create_branches(TTree* tree)
+void PhotonCandidateSelectionBranches::create_branches(TTree* tree, const std::string& parent, bool anchors_only)
 {
-#define BRANCH(member) tree->Branch("split_cluster_" #member, &member)
-  BRANCH(bdt_score);
-  BRANCH(bdt_valid);
-  BRANCH(bdt_tight_boundary);
-  BRANCH(bdt_nontight_lower);
-  BRANCH(bdt_nontight_upper);
-  BRANCH(pass_kinematics);
-  BRANCH(pass_preselection);
-  BRANCH(pass_tight);
-  BRANCH(pass_nontight);
-  BRANCH(iso_raw_et);
-  BRANCH(iso_corrected_et);
-  BRANCH(iso_boundary);
-  BRANCH(noniso_boundary);
-  BRANCH(iso_topocluster_count);
-  BRANCH(pass_isolated);
-  BRANCH(pass_nonisolated);
-  BRANCH(pass_region_a);
-  BRANCH(pass_region_b);
-  BRANCH(pass_region_c);
-  BRANCH(pass_region_d);
-  BRANCH(pass_final_photon);
-  BRANCH(pi0_tag);
-  BRANCH(eta_tag);
-  BRANCH(pi0_partner_cluster_id);
-  BRANCH(eta_partner_cluster_id);
-  BRANCH(pi0_partner_mass);
-  BRANCH(eta_partner_mass);
-  BRANCH(truth_prompt_cluster);
+#define BRANCH(member) tree->Branch((std::string("split_cluster_") + #member).c_str(), &member)
+  if (!anchors_only)
+  {
+    BRANCH(bdt_score);
+    BRANCH(bdt_valid);
+    BRANCH(bdt_tight_boundary);
+    BRANCH(bdt_nontight_lower);
+    BRANCH(bdt_nontight_upper);
+    BRANCH(pass_kinematics);
+    BRANCH(pass_preselection);
+    BRANCH(pass_tight);
+    BRANCH(pass_nontight);
+    BRANCH(iso_raw_et);
+    BRANCH(iso_corrected_et);
+    BRANCH(iso_boundary);
+    BRANCH(noniso_boundary);
+    BRANCH(iso_topocluster_count);
+    BRANCH(pass_isolated);
+    BRANCH(pass_nonisolated);
+    BRANCH(pass_region_a);
+    BRANCH(pass_region_b);
+    BRANCH(pass_region_c);
+    BRANCH(pass_region_d);
+    BRANCH(pass_final_photon);
+    BRANCH(pi0_tag);
+    BRANCH(eta_tag);
+    BRANCH(pi0_partner_cluster_id);
+    BRANCH(eta_partner_cluster_id);
+    BRANCH(pi0_partner_mass);
+    BRANCH(eta_partner_mass);
+    BRANCH(truth_prompt_cluster);
+  }
+#undef BRANCH
+#define BRANCH(member) tree->Branch(("split_cluster_" + parent + std::string(#member).substr(3)).c_str(), &member)
   BRANCH(pi0_anchor_valid);
   BRANCH(pi0_anchor_candidate_index);
   BRANCH(pi0_anchor_main_fraction);
@@ -241,9 +246,9 @@ void Pi0TopologyTreeBranches::fill(const Pi0AnchorTopologyEventResult& result)
   }
 }
 
-void Pi0TopologyTreeBranches::create_branches(TTree* tree)
+void Pi0TopologyTreeBranches::create_branches(TTree* tree, const std::string& parent)
 {
-#define BRANCH(member) tree->Branch("pi0_topology_" #member, &member)
+#define BRANCH(member) tree->Branch((parent + "_topology_" #member).c_str(), &member)
   BRANCH(candidate_count);
   BRANCH(candidate_pathway);
   BRANCH(candidate_parent_barcode);
@@ -478,6 +483,12 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.enable_missing_diagnostics = true;
   config.verbosity = verbosity_;
   topology_evaluator_.configure(config);
+  config.parent_pdg_id = 221;
+  config.require_hepmc_two_photon_decay = true;
+  config.tagging_partner_min_cluster_energy = eta_partner_min_energy_;
+  config.tagging_pi0_mass_min = eta_mass_min_;
+  config.tagging_pi0_mass_max = eta_mass_max_;
+  eta_topology_evaluator_.configure(config);
 
   try
   {
@@ -556,8 +567,16 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
+  const auto eta_result = eta_topology_evaluator_.evaluate(topNode);
+  if (eta_result.status != photon_tree::Pi0TopologyEventStatus::accepted)
+  {
+    ++n_events_invalid_;
+    return Fun4AllReturnCodes::ABORTEVENT;
+  }
   topology_.fill(topology_result);
-  fill_topology_cluster_links(topology_result);
+  eta_topology_.fill(eta_result);
+  fill_topology_cluster_links(topology_result, selection_, true);
+  fill_topology_cluster_links(eta_result, eta_selection_, false);
   if (!fill_candidate_selection(split_clusters, topo_clusters))
   {
     ++n_events_invalid_;
@@ -661,7 +680,7 @@ bool PythiaPhotonCandidateTree::fill_event_truth(const PHHepMCGenEventMap* event
   return true;
 }
 
-void PythiaPhotonCandidateTree::fill_topology_cluster_links(const photon_tree::Pi0AnchorTopologyEventResult& result)
+void PythiaPhotonCandidateTree::fill_topology_cluster_links(const photon_tree::Pi0AnchorTopologyEventResult& result, photon_tree::PhotonCandidateSelectionBranches& links, bool fill_truth)
 {
   const auto& ids = common_.split().data.cluster_id;
   std::map<unsigned int, std::size_t> result_index_by_id;
@@ -678,49 +697,51 @@ void PythiaPhotonCandidateTree::fill_topology_cluster_links(const photon_tree::P
     }
   }
 
-  cluster_truth_.clear();
+  if (fill_truth) cluster_truth_.clear();
   for (unsigned int id : ids)
   {
-    const auto result_found = result_index_by_id.find(id);
-    if (result_found == result_index_by_id.end())
+    if (fill_truth)
     {
-      cluster_truth_.append({});
-      selection_.truth_prompt_cluster.push_back(0U);
+      const auto result_found = result_index_by_id.find(id);
+      if (result_found == result_index_by_id.end())
+      {
+        cluster_truth_.append({});
+        links.truth_prompt_cluster.push_back(0U);
+      }
+      else
+      {
+        const std::size_t index = result_found->second;
+        cluster_truth_.append(result.clusters[index].truth);
+        links.truth_prompt_cluster.push_back(index < result.prompt_cluster.size() ? result.prompt_cluster[index] : 0U);
+      }
     }
-    else
-    {
-      const std::size_t index = result_found->second;
-      cluster_truth_.append(result.clusters[index].truth);
-      selection_.truth_prompt_cluster.push_back(index < result.prompt_cluster.size() ? result.prompt_cluster[index] : 0U);
-    }
-
     const auto anchor_found = anchor_by_id.find(id);
     const auto* anchor = anchor_found == anchor_by_id.end() ? nullptr : anchor_found->second;
-    selection_.pi0_anchor_valid.push_back(anchor ? 1U : 0U);
-    selection_.pi0_anchor_candidate_index.push_back(anchor ? static_cast<int>(anchor->candidate_index) : -999);
-    selection_.pi0_anchor_main_fraction.push_back(anchor ? anchor->main_fraction : invalid_float);
-    selection_.pi0_anchor_second_fraction.push_back(anchor ? anchor->second_fraction : invalid_float);
-    selection_.pi0_anchor_unmatched_max_fraction.push_back(anchor ? anchor->unmatched_max_fraction : invalid_float);
-    selection_.pi0_anchor_ambiguous_main.push_back(anchor && anchor->ambiguous_main ? 1U : 0U);
-    selection_.pi0_anchor_topology.push_back(anchor ? static_cast<int>(anchor->topology) : -999);
-    selection_.pi0_anchor_reason.push_back(anchor ? static_cast<int>(anchor->reason) : -999);
-    selection_.pi0_anchor_missing_category.push_back(anchor ? static_cast<int>(anchor->missing_category) : -999);
-    selection_.pi0_anchor_missing_detail.push_back(anchor ? static_cast<int>(anchor->missing_detail) : -999);
-    selection_.pi0_anchor_partner_photon_index.push_back(anchor ? anchor->partner_photon_index : -999);
-    selection_.pi0_anchor_partner_diagnostic_mass.push_back(anchor ? anchor->partner_diagnostic_invariant_mass : invalid_float);
-    selection_.pi0_anchor_partner_alignment.push_back(anchor ? static_cast<int>(anchor->partner_alignment) : -999);
-    selection_.pi0_anchor_truth_partner_tag_status.push_back(anchor ? static_cast<int>(anchor->truth_partner_tag_status) : -999);
-    selection_.pi0_anchor_tag_result.push_back(static_cast<int>(photon_tree::Pi0AnchorTagResult::not_applicable));
-    selection_.pi0_anchor_truth_partner_cluster_id.push_back(anchor ? anchor->truth_partner_cluster_id : -999);
-    selection_.pi0_anchor_truth_partner_cluster_e.push_back(anchor ? anchor->truth_partner_cluster_energy : invalid_float);
-    selection_.pi0_anchor_truth_partner_cluster_eta.push_back(anchor ? anchor->truth_partner_cluster_eta : invalid_float);
-    selection_.pi0_anchor_truth_partner_cluster_phi.push_back(anchor ? anchor->truth_partner_cluster_phi : invalid_float);
-    selection_.pi0_anchor_truth_partner_delta_r.push_back(anchor ? anchor->truth_partner_delta_r : invalid_float);
-    selection_.pi0_anchor_truth_partner_direct_edep.push_back(anchor ? anchor->truth_partner_direct_edep : invalid_float);
-    selection_.pi0_anchor_truth_partner_reconstructed_e.push_back(anchor ? anchor->truth_partner_reconstructed_photon_energy : invalid_float);
-    selection_.pi0_anchor_truth_partner_recovery.push_back(anchor ? anchor->truth_partner_recovery : invalid_float);
-    selection_.pi0_anchor_truth_partner_mass.push_back(anchor ? anchor->truth_partner_invariant_mass : invalid_float);
-    selection_.pi0_anchor_selected_tag_partner_matches_truth_partner.push_back(0U);
+    links.pi0_anchor_valid.push_back(anchor ? 1U : 0U);
+    links.pi0_anchor_candidate_index.push_back(anchor ? static_cast<int>(anchor->candidate_index) : -999);
+    links.pi0_anchor_main_fraction.push_back(anchor ? anchor->main_fraction : invalid_float);
+    links.pi0_anchor_second_fraction.push_back(anchor ? anchor->second_fraction : invalid_float);
+    links.pi0_anchor_unmatched_max_fraction.push_back(anchor ? anchor->unmatched_max_fraction : invalid_float);
+    links.pi0_anchor_ambiguous_main.push_back(anchor && anchor->ambiguous_main ? 1U : 0U);
+    links.pi0_anchor_topology.push_back(anchor ? static_cast<int>(anchor->topology) : -999);
+    links.pi0_anchor_reason.push_back(anchor ? static_cast<int>(anchor->reason) : -999);
+    links.pi0_anchor_missing_category.push_back(anchor ? static_cast<int>(anchor->missing_category) : -999);
+    links.pi0_anchor_missing_detail.push_back(anchor ? static_cast<int>(anchor->missing_detail) : -999);
+    links.pi0_anchor_partner_photon_index.push_back(anchor ? anchor->partner_photon_index : -999);
+    links.pi0_anchor_partner_diagnostic_mass.push_back(anchor ? anchor->partner_diagnostic_invariant_mass : invalid_float);
+    links.pi0_anchor_partner_alignment.push_back(anchor ? static_cast<int>(anchor->partner_alignment) : -999);
+    links.pi0_anchor_truth_partner_tag_status.push_back(anchor ? static_cast<int>(anchor->truth_partner_tag_status) : -999);
+    links.pi0_anchor_tag_result.push_back(static_cast<int>(photon_tree::Pi0AnchorTagResult::not_applicable));
+    links.pi0_anchor_truth_partner_cluster_id.push_back(anchor ? anchor->truth_partner_cluster_id : -999);
+    links.pi0_anchor_truth_partner_cluster_e.push_back(anchor ? anchor->truth_partner_cluster_energy : invalid_float);
+    links.pi0_anchor_truth_partner_cluster_eta.push_back(anchor ? anchor->truth_partner_cluster_eta : invalid_float);
+    links.pi0_anchor_truth_partner_cluster_phi.push_back(anchor ? anchor->truth_partner_cluster_phi : invalid_float);
+    links.pi0_anchor_truth_partner_delta_r.push_back(anchor ? anchor->truth_partner_delta_r : invalid_float);
+    links.pi0_anchor_truth_partner_direct_edep.push_back(anchor ? anchor->truth_partner_direct_edep : invalid_float);
+    links.pi0_anchor_truth_partner_reconstructed_e.push_back(anchor ? anchor->truth_partner_reconstructed_photon_energy : invalid_float);
+    links.pi0_anchor_truth_partner_recovery.push_back(anchor ? anchor->truth_partner_recovery : invalid_float);
+    links.pi0_anchor_truth_partner_mass.push_back(anchor ? anchor->truth_partner_invariant_mass : invalid_float);
+    links.pi0_anchor_selected_tag_partner_matches_truth_partner.push_back(0U);
   }
 }
 
@@ -850,6 +871,19 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
           pi0_partner == selection_.pi0_anchor_truth_partner_cluster_id[index] ? 1U : 0U;
     }
 
+    if (eta_selection_.pi0_anchor_valid[index])
+    {
+      const bool truth_partner_taggable = eta_selection_.pi0_anchor_truth_partner_tag_status[index] ==
+          static_cast<int>(photon_tree::Pi0TruthPartnerTagStatus::taggable);
+      const photon_tree::Pi0AnchorTagResult tag_result = !eta_tag
+          ? photon_tree::Pi0AnchorTagResult::survived
+          : (truth_partner_taggable ? photon_tree::Pi0AnchorTagResult::truth_pair_taggable_veto
+                                    : photon_tree::Pi0AnchorTagResult::combinatorial_only_veto);
+      eta_selection_.pi0_anchor_tag_result[index] = static_cast<int>(tag_result);
+      eta_selection_.pi0_anchor_selected_tag_partner_matches_truth_partner[index] = eta_tag &&
+          eta_partner == eta_selection_.pi0_anchor_truth_partner_cluster_id[index] ? 1U : 0U;
+    }
+
     const bool common_selection = kinematics && preselection;
     const bool region_a = common_selection && isolated && tight;
     const bool region_b = common_selection && nonisolated && tight;
@@ -921,6 +955,8 @@ void PythiaPhotonCandidateTree::reset_event()
   cluster_truth_.clear();
   selection_.clear();
   topology_.clear();
+  eta_selection_.clear();
+  eta_topology_.clear();
 }
 
 void PythiaPhotonCandidateTree::create_output()
@@ -965,6 +1001,8 @@ void PythiaPhotonCandidateTree::create_output()
   cluster_truth_.create_branches(event_tree_, "split");
   selection_.create_branches(event_tree_);
   topology_.create_branches(event_tree_);
+  eta_selection_.create_branches(event_tree_, "eta", true);
+  eta_topology_.create_branches(event_tree_, "eta");
 
   metadata_tree_ = new TTree("metadata", "Pythia photon-candidate workflow metadata");
   metadata_tree_->Branch("schema_version", &metadata_schema_version_);
@@ -997,6 +1035,9 @@ void PythiaPhotonCandidateTree::create_output()
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);
   metadata_tree_->Branch("partner_diagnostic_min_cluster_energy", &partner_diagnostic_min_cluster_energy_);
   metadata_tree_->Branch("pi0_topology_algorithm_version", &pi0_topology_algorithm_version_);
+  metadata_tree_->Branch("eta_topology_algorithm_version", &eta_topology_algorithm_version_);
+  metadata_tree_->Branch("eta_topology_parent_pdg", &eta_topology_parent_pdg_);
+  metadata_tree_->Branch("eta_topology_decay_definition", &eta_topology_decay_definition_);
   metadata_tree_->Branch("shower_shape_min_tower_energy", &shower_shape_min_tower_energy_);
   metadata_tree_->Branch("candidate_et_min", &candidate_et_min_);
   metadata_tree_->Branch("candidate_et_max", &candidate_et_max_);

@@ -1,4 +1,5 @@
 #include "../workflows/photon_candidate_selection/MergePythiaPhotonCandidateSelection.C"
+#undef NDEBUG
 #include <cassert>
 
 void test_candidate_plot_content(const std::string preview = "")

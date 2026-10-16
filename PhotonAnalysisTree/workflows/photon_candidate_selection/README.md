@@ -470,3 +470,111 @@ eta decay and photon-copy ancestry, rejection of extra daughters and pi0 cascade
 eta mass-window boundaries, ROOT branch roundtrips, category/BDT closure, residual
 covariance, and a synthetic four-sample map-to-reduce-to-merge run that verifies both
 pi0 and eta plot families.
+
+## Eta decay flight diagnostic (independent of origin classification)
+
+`CheckEtaDecayFlight.C` reads existing G4Hits DSTs directly. It does not load the
+analysis library, regenerate maps, or change composition/topology/origin selection.
+It records one row per G4-primary eta in the requested embedding (default 1),
+regardless of reconstruction, cluster multiplicity, collision-z or stitching cuts.
+
+After sourcing the sPHENIX environment, run from the repository root:
+
+~~~bash
+root -l -b -q 'PhotonAnalysisTree/workflows/photon_candidate_selection/CheckEtaDecayFlight.C("PhotonAnalysisTree/input/jet40/g4hits.list","PhotonAnalysisTree/output/qa/eta_decay_flight/jet40_check",0,3,100)'
+~~~
+
+Arguments, in order:
+
+1. Input G4Hits list: one local path or FROG-resolvable DST name per line; blank
+   lines and lines beginning with `#` are ignored. Paths relative to the list are
+   supported. Duplicate inputs are rejected.
+2. Output base, without extension. Existing ROOT/PDF/CSV/overview files are never
+   overwritten; choose a new base for another run.
+3. First file index (default 0).
+4. Number of files (default 1; 0 means all remaining files).
+5. Maximum events per file (default 0 means all). Inclusive mode reads the first N
+   entries in each selected file; use a list with dispersed file indices to avoid
+   treating this as an unbiased random sample.
+6. Optional request CSV (default empty), selecting specific eta tracks rather than
+   an inclusive population. Required columns are `source_file_id,event_in_file,eta_track_id`;
+   `g4_eta_track` is accepted as an alias. `source_file_id` is the final segment
+   number in the input DST filename, not the position in the list. Optional
+   `sample,eta_barcode,hepmc_event_number` columns prevent provenance mismatches.
+   `sample` uses names such as `jet40`; it is matched to `pythia8_Jet40` in the
+   filename. Prior `eta_residual/dst_decay_modes.csv` is accepted directly.
+   Duplicate track requests count once. Unmatched selected requests fail the run
+   when no event limit is set; file ranges may intentionally exclude other requests.
+7. Embedding ID (default 1).
+8. Positive sample normalization factor (default 1), multiplied by the first
+   HepMC event weight when available. Missing/empty HepMC weights fall back to one
+   and are flagged per eta. Negative or nonfinite event weights remain in raw
+   counts but are excluded from weighted probability/CDF calculations.
+
+For example, recheck the previously audited residual eta decays for Jet40:
+
+~~~bash
+root -l -b -q 'PhotonAnalysisTree/workflows/photon_candidate_selection/CheckEtaDecayFlight.C("PhotonAnalysisTree/input/jet40/g4hits.list","PhotonAnalysisTree/output/qa/eta_decay_flight/jet40_residual_check",0,0,0,"PhotonAnalysisTree/output/qa/eta_residual/dst_decay_modes.csv")'
+~~~
+
+The eta production vertex comes from `eta.get_vtx_id()`. Direct daughters are
+selected by `daughter.get_parent_id() == eta.get_track_id()` and grouped by their
+production vertices. Different vertex IDs are coalesced only when their position,
+time and process are exactly equal; merely nearby vertices are not merged.
+A single `kPDecay` vertex identifies a confirmed decay. If process information is
+unavailable, a single vertex with a recognized gamma-gamma, three-pi0,
+pi-plus/pi-minus/pi0 or pi-plus/pi-minus/gamma final state is marked **inferred**.
+Explicit non-decay interactions are never reinterpreted as decays. Multiple decay
+vertices, missing vertices/daughters, and decays accompanied by other vertices stay
+in the diagnostic census and are excluded from the usable straight-flight sample.
+
+`length_cm` is the three-dimensional **displacement from the eta production
+vertex to the decay vertex**, not the transverse radius relative to the beam and
+not an accumulated track path length. `transverse_cm`, the displacement projected
+parallel/perpendicular to the initial eta momentum, and its alignment cosine are
+also stored. Vertex times and `delta_t` use raw `PHG4VtxPoint::get_t()` units; no
+lifetime/unit conversion is assumed. Negative delta-t cases are excluded; missing
+times are counted separately while finite geometric displacement remains usable.
+
+Outputs:
+
+- `<base>.root`: `eta_tree` with eta/daughter IDs, production/decay coordinates,
+  process, mode, status, displacement and weight flags; `event_tree` with eta,
+  usable/unresolved and long-displacement counts; one-entry `metadata` with schema,
+  scope, input paths, settings and `completed=true` after successful output.
+- `<base>_summary.csv`: raw and weighted short-distance fractions, raw median,
+  95th/99th percentile and maximum, plus all diagnostic status counts. Groups
+  include all eta, each decay mode, and eta-pT/energy bands 0--5, 5--10, 10--20,
+  20--40, 40--80 and >=80 GeV.
+- `<base>_cumulative.csv`: strict `L < threshold` CDF points and subset-covariance
+  errors (binomial for raw counts), including exact zeros in their denominators.
+- `<base>.pdf`: distance, transverse distance, CDF and census pages per group.
+- `<base>_overview.png`: the all-eta overview page.
+
+ROOT also stores distance-versus-eta-pT/energy and alignment histograms, per-group
+status histograms and both raw/weighted CDFs. Distance logarithms cover -14 to +2
+in cm; positive values outside that range are retained in under/overflow and in
+the raw tree/CSV statistics. Exact zero displacement and shared production/decay
+vertex IDs are counted explicitly, never replaced by a made-up positive distance.
+Zero in saved truth does not establish a physically zero lifetime or a measured
+sub-resolution flight distribution. Groups with no usable eta have `nan` CSV
+fractions/quantiles and empty ROOT CDFs. The 1 um, 10 um, 0.1 mm and 1 mm thresholds
+are reporting points only and are **not origin cuts**. Unresolved eta must not be
+counted as short-flight eta when interpreting event-level counts.
+
+An inclusive run and a requested/preselected run have different populations;
+compare them as separate checks. For multiple production samples, inspect raw
+counts per sample and use the appropriate cross-section/full-sample normalization
+for weighted comparisons. First establish validity with this diagnostic; later
+pseudo-primary daughter-pion origin classification remains a separate change.
+
+Synthetic tests can run without rebuilding or installing PhotonAnalysisTree:
+
+~~~bash
+root -l -b -q 'PhotonAnalysisTree/tests/test_eta_decay_flight.C()'
+~~~
+
+They cover translation-invariant displacement, process-confirmed/inferred decays,
+zero/same-ID vertices, missing/ambiguous vertices, interactions, invalid coordinates,
+negative times, strict CDF boundaries and weighted errors, plus split ROOT input,
+request deduplication, output protection and missing-request failure handling.

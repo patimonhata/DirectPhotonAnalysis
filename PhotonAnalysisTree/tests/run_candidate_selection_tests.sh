@@ -19,6 +19,7 @@ root -l -b -q "$module_dir/tests/test_candidate_metadata.C"
 root -l -b -q "$module_dir/tests/test_candidate_plot_content.C"
 python3 "$module_dir/tests/test_pi0_bdt.py"
 root -l -b -q "$module_dir/tests/test_eta_topology.C"
+root -l -b -q "$module_dir/tests/test_eta_decay_flight.C"
 python3 "$module_dir/tests/test_eta_pipeline.py"
 for script in "$module_dir/workflows/photon_candidate_selection/"*.sh "$module_dir/workflows/pi0_anchor_topology/"*.sh; do
   bash -n "$script"

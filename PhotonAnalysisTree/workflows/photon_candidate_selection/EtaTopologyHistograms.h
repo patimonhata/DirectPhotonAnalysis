@@ -1,7 +1,7 @@
 #ifndef ETA_TOPOLOGY_HISTOGRAMS_H
 #define ETA_TOPOLOGY_HISTOGRAMS_H
 
-// Included after the existing spectra and composition helpers. Existing pi0 and composition populations remain unchanged.
+// Included after the spectra and composition helpers; eta topology is a strict subset of the selected eta composition.
 namespace eta_topology
 {
 inline const char* spectrum_key(std::size_t index) { return index == 1 ? "eta_anchor" : ::kKeys[index]; }

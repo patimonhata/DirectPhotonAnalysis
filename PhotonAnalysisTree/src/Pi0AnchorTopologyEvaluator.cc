@@ -1,5 +1,6 @@
 #include "Pi0AnchorTopologyEvaluator.h"
 #include "HepMCDiphotonDecay.h"
+#include "EtaCascadeTruth.h"
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
@@ -10,6 +11,7 @@
 #include <calobase/TowerInfoContainer.h>
 #include <g4detectors/PHG4CellContainer.h>
 #include <g4main/PHG4Hit.h>
+#include <g4main/PHG4MCProcessDefs.h>
 #include <g4main/PHG4HitContainer.h>
 #include <g4main/PHG4Particle.h>
 #include <g4main/PHG4TruthInfoContainer.h>
@@ -115,6 +117,12 @@ std::size_t contributor_candidate_index(
     const auto found = single_candidate_by_track.find(contributor.g4_track_id);
     return found == single_candidate_by_track.end()
         ? invalid_index : found->second;
+  }
+  if (config.eta_pseudo_primary && config.parent_pdg_id == 111 && contributor.embedding_id == config.signal_embedding_id &&
+      contributor.pi0_parent_track_id != 0)
+  {
+    const auto found = single_candidate_by_track.find(contributor.pi0_parent_track_id);
+    if (found != single_candidate_by_track.end()) return found->second;
   }
   if (contributor.embedding_id != config.signal_embedding_id ||
       !contributor.hepmc_valid)
@@ -312,6 +320,7 @@ const char* pi0_pathway_name(Pi0Pathway value)
   case Pi0Pathway::g4_primary_decay: return "g4_primary_decay";
   case Pi0Pathway::generator_decay: return "generator_decay";
   case Pi0Pathway::single_particle_g4_decay: return "single_particle_g4_decay";
+  case Pi0Pathway::eta_daughter_g4_decay: return "eta_daughter_g4_decay";
   }
   return "unknown";
 }
@@ -666,6 +675,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
   }
 
+  EtaCascadeTruth eta_cascade(truth, event_map);
   std::vector<CandidateWork> candidates;
   if (pythia)
   {
@@ -786,6 +796,36 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
   }
 
+  if (pythia && config_.eta_pseudo_primary && config_.parent_pdg_id == 111)
+  {
+    for (auto it = secondary_range.first; it != secondary_range.second; ++it)
+    {
+      const auto* pion = it->second;
+      if (!eta_cascade.is_eta_daughter_pi0(pion)) continue;
+      const auto* eta = truth->GetParticle(pion->get_parent_id());
+      if (truth->isEmbeded(eta->get_track_id()) != config_.signal_embedding_id) continue;
+      const auto found = children_by_parent.find(pion->get_track_id());
+      if (found == children_by_parent.end() || found->second.size() != 2 || found->second[0]->get_pid() != 22 || found->second[1]->get_pid() != 22)
+      { ++result.malformed_candidate_count; continue; }
+      bool decay = true;
+      for (const auto* gamma : found->second)
+      {
+        const auto* vertex = truth->GetVtx(gamma->get_vtx_id());
+        decay = decay && vertex && vertex->get_process() == PHG4MCProcess::kPDecay;
+      }
+      if (!decay) continue;
+      CandidateWork work;
+      work.record.pathway = Pi0Pathway::eta_daughter_g4_decay;
+      work.record.parent_barcode = 0;
+      work.record.g4_parent_track_id = pion->get_track_id();
+      if (!finite_g4_kinematics(pion, work.record.energy, work.record.pt, work.record.eta, work.record.phi)) continue;
+      fill_photon_kinematics(work.record, 0, found->second[0], truth, projection_radius, config_.cemc_acceptance_eta_max);
+      fill_photon_kinematics(work.record, 1, found->second[1], truth, projection_radius, config_.cemc_acceptance_eta_max);
+      candidates.push_back(std::move(work));
+      ++result.g4_candidate_count;
+    }
+  }
+
   struct DiagnosticCluster
   {
     const RawCluster* cluster = nullptr;
@@ -843,6 +883,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     record.anchor_acceptance = std::abs(record.eta) < config_.anchor_cluster_eta_max;
     record.truth = truth_matcher_.match(
         cluster, towers, raw_truth_towers, truth, event_map, true);
+    if (config_.eta_pseudo_primary && record.truth.valid)
+      eta_cascade.refine(record.truth, cluster, towers, raw_truth_towers, truth_cells, truth_hits);
     if (!record.truth.valid)
     {
       ++result.cluster_invalid_truth_count;

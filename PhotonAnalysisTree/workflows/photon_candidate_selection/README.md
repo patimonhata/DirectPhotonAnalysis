@@ -578,3 +578,59 @@ They cover translation-invariant displacement, process-confirmed/inferred decays
 zero/same-ID vertices, missing/ambiguous vertices, interactions, invalid coordinates,
 negative times, strict CDF boundaries and weighted errors, plus split ROOT input,
 request deduplication, output protection and missing-request failure handling.
+
+## Eta daughter pseudo-primary composition (map schema 7 / topology v12, eta v2)
+
+Candidate maps now resolve G4-primary eta decays to three pi0 or pi+ pi- pi0 into
+individual daughter-pion contributions. The same ancestry information is recorded
+when these decays happen in HepMC, including the mixed case where HepMC produces a
+pi0 which subsequently decays in Geant4. No eta-flight cut is applied.
+
+For Geant4 decays, direct eta daughters must have an explicit `kPDecay` vertex and
+the exact exclusive daughter PDG set. Cluster tower/cell/hit ancestry measures each
+pion's deposit. The daughter shares must close to the eta's hit deposit, and all
+cluster towers must have complete matching information. These conditional shares
+partition the **existing eta shower deposit**: total cluster truth energy and all
+non-eta contributions are preserved. No generator-energy weighting is used.
+Missing/partial hit ancestry or failure of the daughter sum retains the original
+eta contributor, flagged unresolved; it is never assumed to be a resolved mode.
+
+A pi0 daughter with a verified two-photon G4 decay is a topology candidate, keyed
+by its G4 track ID rather than a possibly nonunique secondary barcode. Its two
+photons use the existing direct-photon matching and topology logic. At reduce,
+a single pi0 parent with contribution strictly greater than 0.5 takes priority.
+Otherwise, descendants are grouped by **one eta parent**, and that eta must also
+contribute strictly greater than 0.5. Distinct eta parents are never summed.
+The eta two-photon topology remains restricted to a direct two-photon decay.
+Residual eta contributions are separated into resolved three-pi0, resolved charged
+pions plus pi0, unresolved daughter shares, and other eta contributions. Prompt
+classification and the reconstructed photon selection/tagging cuts are unchanged.
+
+Consequently, pi0 shares 30%/30%/40% from one eta are classified as eta->3pi0, while
+20%/20%/60% is assigned to the 60% pi0's topology. A charged-pion mode is treated
+by exactly the same priority rule. A sum of 30% from each of two different eta
+parents gives no eta majority and remains Other unless another origin qualifies.
+
+New flat truth-contributor branches retain `eta_parent_barcode`,
+`eta_parent_track_id`, `eta_decay_mode` (0 unknown, 1 gamma gamma, 2 three pi0,
+3 pi+ pi- pi0, 4 other), `eta_split_status` (1 resolved, -1 unresolved, 0 not needed),
+`pi0_parent_barcode`, and `pi0_parent_track_id`. IDs are scoped to each event and
+embedding; HepMC eta barcodes are used when available, with G4 eta track IDs as a
+fallback. Per-cluster truth branches also store `pi0_total_fraction`,
+`eta_main_fraction`, `eta_main_decay_mode`, `eta_main_barcode`,
+`eta_main_track_id`, and `eta_main_unresolved` for the signal embedding (1).
+The pi0 total is a diagnostic and is never substituted for a single-parent majority.
+
+Reduce saves the disjoint eta-mode subsets under `eta_decay/<selection>`; merge
+checks raw-count and Sumw2 closure against the eta composition and direct eta
+anchors. Existing eta-topology composition stack/survival PDFs now resolve these
+subsets. `eta_cascade_composition_summary.csv` reports raw and weighted yields and
+fractions per selection and ET bin; bin -1 is the full range including flows.
+This makes the remaining Other fraction available without reading a plot.
+
+Rebuild/install the library with `src/build.sh`, then rerun **map, reduce, merge**
+into a new output directory. Old maps lack the daughter shares and are rejected.
+Submit files and small-sample defaults now use `topology_v12_eta_v2`, preserving
+prior v11/eta-v1 output files. The synthetic cascade test covers both generation
+paths, both pion modes, 30/30/40 sharing, split-tower allocation, closure, missing
+provenance, interaction rejection and grouping by distinct eta parents.

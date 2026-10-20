@@ -1,3 +1,4 @@
+#include "../../src/EtaOriginFractions.h"
 #include "../../macro/Utilities/sPhenixStyle.C"
 
 #include "Pi0BdtHistograms.h"
@@ -213,11 +214,11 @@ bool read_metadata(const std::string& path, MapMetadata& value)
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 6 && value.sample_name == sample.name && !value.input_manifest.empty() &&
+  return value.schema_version == 7 && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
       std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.0) &&
-      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 11 && value.eta_topology_algorithm_version == 1 &&
+      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 12 && value.eta_topology_algorithm_version == 2 &&
       std::isfinite(value.eta_partner_min_energy) && value.eta_partner_min_energy >= 0.0 &&
       std::isfinite(value.pi0_mass_min) && value.pi0_mass_min >= 0.0 &&
       std::isfinite(value.pi0_mass_max) && value.pi0_mass_max >= 0.0 &&
@@ -738,20 +739,6 @@ bool valid_contributors(unsigned int ncluster, const std::vector<unsigned int>& 
       std::adjacent_find(offset.begin(), offset.end(), std::greater<unsigned int>()) == offset.end();
 }
 
-double eta_fraction(std::size_t cluster, const std::vector<unsigned int>& offset, const std::vector<int>& g4_pdg,
-                    const std::vector<int>& embedding, const std::vector<float>& fraction,
-                    const std::vector<int>& source, const std::vector<int>& parent)
-{
-  double result = 0.0;
-  for (std::size_t contributor = offset[cluster]; contributor < offset[cluster + 1U]; ++contributor)
-  {
-    if (embedding[contributor] != kSignalEmbeddingId) continue;
-    const bool g4_eta = std::abs(g4_pdg[contributor]) == 221;
-    const bool generator_eta_photon = g4_pdg[contributor] == 22 && (parent[contributor] == 221 || source[contributor] == 3);
-    if (g4_eta || generator_eta_photon) result += fraction[contributor];
-  }
-  return result;
-}
 
 std::size_t pi0_category(int topology)
 {
@@ -937,6 +924,7 @@ void draw_superdetailed_stack(std::array<std::unique_ptr<TH1D>, category_count>&
 }
 
 #include "EtaTopologyHistograms.h"
+#include "EtaDecayHistograms.h"
 
 int ReducePythiaPhotonCandidateSelection(
     const std::string family,
@@ -992,6 +980,8 @@ int ReducePythiaPhotonCandidateSelection(
   double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
   int eta_topology_algorithm_version = -1;
+  eta_decay::Selections eta_decay_histograms;
+  for (auto& hist : eta_decay_histograms) hist = std::make_unique<eta_decay::Histograms>(n_bins, et_max);
   std::array<Summary, kSelectionCount> composition_summaries;
   unsigned long long events_written = 0, expected_events_written = 0, events_stitch_pass = 0;
   unsigned long long region_a_clusters = 0, region_a_prompt_clusters = 0, region_a_anchor_clusters = 0;
@@ -1070,6 +1060,13 @@ int ReducePythiaPhotonCandidateSelection(
     std::vector<float>* fraction = nullptr;
     std::vector<int>* source = nullptr;
     std::vector<int>* parent = nullptr;
+    std::vector<int>* eta_parent_barcode = nullptr;
+    std::vector<int>* eta_parent_track_id = nullptr;
+    std::vector<int>* eta_decay_mode = nullptr;
+    std::vector<int>* eta_split_status = nullptr;
+    std::vector<int>* pi0_parent_barcode = nullptr;
+    std::vector<int>* pi0_parent_track_id = nullptr;
+
     tree->SetBranchStatus("*", false);
     tree->SetCacheSize(kEventTreeCacheSize);
     bool ok = bind_active(tree, "split_ncluster", &ncluster) &&
@@ -1106,6 +1103,12 @@ int ReducePythiaPhotonCandidateSelection(
         bind_active(tree, "split_cluster_truth_contributor_fraction", &fraction) &&
         bind_active(tree, "split_cluster_truth_contributor_photon_source", &source) &&
         bind_active(tree, "split_cluster_truth_contributor_classification_parent_pdg", &parent);
+    ok &= bind_active(tree, "split_cluster_truth_contributor_eta_parent_barcode", &eta_parent_barcode);
+    ok &= bind_active(tree, "split_cluster_truth_contributor_eta_parent_track_id", &eta_parent_track_id);
+    ok &= bind_active(tree, "split_cluster_truth_contributor_eta_decay_mode", &eta_decay_mode);
+    ok &= bind_active(tree, "split_cluster_truth_contributor_eta_split_status", &eta_split_status);
+    ok &= bind_active(tree, "split_cluster_truth_contributor_pi0_parent_barcode", &pi0_parent_barcode);
+    ok &= bind_active(tree, "split_cluster_truth_contributor_pi0_parent_track_id", &pi0_parent_track_id);
     if (!ok) return 5;
     tree->StopCacheLearningPhase();
     events_written += static_cast<unsigned long long>(tree->GetEntries());
@@ -1124,6 +1127,12 @@ int ReducePythiaPhotonCandidateSelection(
           !valid_contributors(ncluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent)) return 6;
       if (!eta_valid || !eta_main_fraction || !eta_topology || !eta_missing_category || eta_valid->size() != ncluster ||
           eta_main_fraction->size() != ncluster || eta_topology->size() != ncluster || eta_missing_category->size() != ncluster) return 6;
+      if (!eta_parent_barcode || eta_parent_barcode->size() != fraction->size()) return 6;
+      if (!eta_parent_track_id || eta_parent_track_id->size() != fraction->size()) return 6;
+      if (!eta_decay_mode || eta_decay_mode->size() != fraction->size()) return 6;
+      if (!eta_split_status || eta_split_status->size() != fraction->size()) return 6;
+      if (!pi0_parent_barcode || pi0_parent_barcode->size() != fraction->size()) return 6;
+      if (!pi0_parent_track_id || pi0_parent_track_id->size() != fraction->size()) return 6;
       if (!weight_valid || !stitch_valid || !stitch_pass) continue;
       ++events_stitch_pass;
       const double weight = weight_numerator / sample_sumw;
@@ -1132,11 +1141,13 @@ int ReducePythiaPhotonCandidateSelection(
       {
         const double cluster_et = (*et)[cluster];
         if (!std::isfinite(cluster_et)) return 6;
-        const double eta_contribution = eta_fraction(cluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent);
+        const auto eta_origin = eta_origin::summarize((*offset)[cluster], (*offset)[cluster + 1], *embedding, *fraction,
+            *eta_parent_barcode, *eta_parent_track_id, *eta_decay_mode, *eta_split_status, *pi0_parent_barcode, *pi0_parent_track_id);
+        const double eta_contribution = eta_origin.fraction;
         if (!std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;
         const bool is_prompt = (*prompt_flag)[cluster] && (*dominant_fraction)[cluster] > kMajorityThreshold;
         const bool is_pi0 = (*pi0_valid)[cluster] && (*pi0_fraction)[cluster] > kMajorityThreshold;
-        const bool is_eta = eta_contribution > kMajorityThreshold;
+        const bool is_eta = !is_pi0 && eta_contribution > kMajorityThreshold;
         const int majority_count = static_cast<int>(is_prompt) + static_cast<int>(is_pi0) + static_cast<int>(is_eta);
         const bool half_boundary = ((*prompt_flag)[cluster] && (*dominant_fraction)[cluster] == kMajorityThreshold) ||
             ((*pi0_valid)[cluster] && (*pi0_fraction)[cluster] == kMajorityThreshold) || eta_contribution == kMajorityThreshold;
@@ -1206,7 +1217,11 @@ int ReducePythiaPhotonCandidateSelection(
           spectra.fill(category, cluster_et, weight);
           if (category == prompt) ++summary.prompt;
           else if (category >= pi0_separated && category <= pi0_other) ++summary.pi0;
-          else if (category == eta) ++summary.eta;
+          else if (category == eta)
+          {
+            ++summary.eta;
+            eta_decay_histograms[selection_index]->fill(eta_origin.mode, eta_origin.unresolved, cluster_et, weight);
+          }
           else ++summary.other;
         }
       }
@@ -1224,8 +1239,18 @@ int ReducePythiaPhotonCandidateSelection(
         !candidate_composition::valid_partition(composition_histograms[selection_index]->weighted) ||
         !::valid_partition(topology_histograms[selection_index]->counts) || !::valid_partition(topology_histograms[selection_index]->weighted_pb)) return 7;
   }
+  for (std::size_t i = 0; i < kSelectionCount; ++i)
+    if (!eta_decay_histograms[i]->valid(*composition_histograms[i]->counts[eta], *composition_histograms[i]->weighted[eta],
+                                      *eta_histograms[i]->counts[1], *eta_histograms[i]->weighted_pb[1])) return 7;
   TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;
+  auto* decay_root = output.mkdir("eta_decay");
+  if (!decay_root) return 8;
+  for (std::size_t i = 0; i < kSelectionCount; ++i)
+  {
+    auto* directory = decay_root->mkdir(kSelectionKeys[i]);
+    if (!directory || !eta_decay_histograms[i]->write(*directory)) return 8;
+  }
   TDirectory* composition_root_directory = output.mkdir("composition");
   if (!composition_root_directory) return 8;
   for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
@@ -1264,10 +1289,10 @@ int ReducePythiaPhotonCandidateSelection(
   output.cd();
   if (!eta_topology::write_partial(output, eta_histograms, eta_bdt_histograms)) return 8;
   output.cd();
-  int schema_version = 7, source_schema_version = 6, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 8, source_schema_version = 7, signal_embedding_id = kSignalEmbeddingId;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
-  std::string eta_definition = "sum_signal_embedding_g4_eta_or_generator_eta_decay_photon_contributor_fraction";
+  std::string eta_definition = "max_same_eta_parent_descendant_fraction_after_single_pi0_majority_priority";
   std::string other_definition = "no_unique_prompt_pi0_eta_strict_majority_including_exact_0p5";
   std::string weight_definition = "cross_section_pb_times_generator_weight_divided_by_full_sample_sum_generator_weight_processed";
   std::string metadata_family = family;

@@ -481,6 +481,7 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.tagging_pi0_mass_max = pi0_mass_max_;
   config.max_abs_vertex_z = max_abs_vertex_z_;
   config.enable_missing_diagnostics = true;
+  config.eta_pseudo_primary = true;
   config.verbosity = verbosity_;
   topology_evaluator_.configure(config);
   config.parent_pdg_id = 221;

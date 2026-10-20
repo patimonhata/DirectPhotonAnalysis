@@ -30,6 +30,12 @@ struct TruthContributor
   int photon_source = -999;
   int immediate_parent_pdg = -999;
   int classification_parent_pdg = -999;
+  int eta_parent_barcode = 0;
+  int eta_parent_track_id = 0;
+  int eta_decay_mode = 0;
+  int eta_split_status = 0; // 1: daughter shares resolved; -1: missing/incomplete hit ancestry; 0: not needed.
+  int pi0_parent_barcode = 0;
+  int pi0_parent_track_id = 0;
 };
 
 struct ClusterTruthMatch
@@ -97,6 +103,17 @@ struct ClusterTruthCollection
   std::vector<int> contributor_photon_source;
   std::vector<int> contributor_immediate_parent_pdg;
   std::vector<int> contributor_classification_parent_pdg;
+
+  std::vector<int> contributor_eta_parent_barcode;
+  std::vector<int> contributor_eta_parent_track_id;
+  std::vector<int> contributor_eta_decay_mode;
+  std::vector<int> contributor_eta_split_status;
+  std::vector<int> contributor_pi0_parent_barcode;
+  std::vector<int> contributor_pi0_parent_track_id;
+
+  std::vector<float> pi0_total_fraction, eta_main_fraction;
+  std::vector<int> eta_main_decay_mode, eta_main_barcode, eta_main_track_id;
+  std::vector<unsigned char> eta_main_unresolved;
 
   void clear();
   void append(const ClusterTruthMatch& match);

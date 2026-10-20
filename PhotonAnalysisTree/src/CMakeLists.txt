@@ -41,6 +41,7 @@ endforeach()
 
 add_library(
   PhotonAnalysisTree SHARED
+  EtaCascadeTruth.cc
   HepMCPhotonClassifier.cc
   Pi0AnchorTopologyEvaluator.cc
   Pi0ClusterTruthMatcher.cc
@@ -106,6 +107,8 @@ target_compile_options(Pi0GammaOnnx PRIVATE -Wall -Wextra -Wpedantic)
 install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
 install(
   FILES
+    EtaCascadeTruth.h
+    EtaOriginFractions.h
     HepMCPhotonClassifier.h
     Pi0AnchorTopologyEvaluator.h
     Pi0ClusterTruthMatcher.h

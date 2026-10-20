@@ -5,9 +5,9 @@
 void test_candidate_metadata()
 {
   MapMetadata map;
-  map.schema_version = 6;
-  map.eta_topology_algorithm_version = 1;
-  map.pi0_topology_algorithm_version = 11;
+  map.schema_version = 7;
+  map.eta_topology_algorithm_version = 2;
+  map.pi0_topology_algorithm_version = 12;
   map.min_photon_energy_recovery = 0.0;
   assert(compatible(map, map));
   const std::array<double MapMetadata::*, 10> map_fields = {

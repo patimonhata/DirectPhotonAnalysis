@@ -211,7 +211,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 6;
+  static constexpr int schema_version_ = 7;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);
@@ -300,7 +300,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   bool metadata_filled_ = false;
   int metadata_schema_version_ = schema_version_;
   int pi0_topology_algorithm_version_ = photon_tree::Pi0AnchorTopologyEvaluator::kAlgorithmVersion;
-  int eta_topology_algorithm_version_ = 1;
+  int eta_topology_algorithm_version_ = 2;
   int eta_topology_parent_pdg_ = 221;
   std::string eta_topology_decay_definition_ = "direct_eta_to_two_photons_same_parent_strict_majority";
 

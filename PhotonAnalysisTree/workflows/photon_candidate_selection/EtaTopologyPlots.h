@@ -1,5 +1,7 @@
 #ifndef ETA_TOPOLOGY_PLOTS_H
 #define ETA_TOPOLOGY_PLOTS_H
+#include <fstream>
+#include <iomanip>
 
 namespace eta_topology
 {
@@ -14,10 +16,10 @@ inline void write_metadata(TFile& output, const candidate_composition_merge::Met
   // Local copies keep branch addresses valid until Fill completes.
   auto metadata = source;
   auto sample_cross_sections = cross_sections;
-  int schema_version = 1, parent_pdg = 221;
+  int schema_version = 2, parent_pdg = 221;
   double majority_threshold = 0.5;
-  std::string population = "composition_eta_subset_direct_eta_to_two_photons_same_parent_fraction_gt_0p5";
-  std::string residual = "legacy_composition_eta_minus_selected_eta_two_photon_anchors";
+  std::string population = "same_parent_eta_majority_after_single_pi0_priority_direct_two_photon_subset";
+  std::string residual = "same_parent_eta_minus_direct_two_photon_anchors_and_resolved_pion_modes";
   std::string denominator = "kinematic";
   std::string uncertainty = "weighted_subset_covariance";
   TTree tree("metadata", "Eta topology source and population metadata");
@@ -61,7 +63,7 @@ struct CompositionComponents
   std::vector<std::string> labels;
   std::vector<int> colors;
 };
-inline CompositionComponents composition_components(const candidate_composition::Histograms& composition, const Spectra& topology, bool missing_detail)
+inline CompositionComponents composition_components(const candidate_composition::Histograms& composition, const Spectra& topology, bool missing_detail, const eta_decay::Histograms* modes = nullptr)
 {
   using namespace candidate_composition;
   CompositionComponents result;
@@ -86,6 +88,12 @@ inline CompositionComponents composition_components(const candidate_composition:
     append(*topology.counts[index], *topology.weighted_pb[index], std::string("eta_") + spectrum_key(index), "#eta#rightarrow#gamma#gamma: " + ::kLabels[index], ::kColors[index]);
   auto residual_count = residual_histogram(*composition.counts[eta], *topology.counts[1], "h_eta_residual_count");
   auto residual_weight = residual_histogram(*composition.weighted[eta], *topology.weighted_pb[1], "h_eta_residual_pb");
+  if (modes) for (std::size_t i = 0; i < eta_decay::keys.size(); ++i)
+  {
+    append(*modes->counts[i], *modes->weighted[i], eta_decay::keys[i], eta_decay::labels[i], eta_decay::colors[i]);
+    residual_count = residual_histogram(*residual_count, *modes->counts[i], "h_eta_remaining_count");
+    residual_weight = residual_histogram(*residual_weight, *modes->weighted[i], "h_eta_remaining_pb");
+  }
   append(*residual_count, *residual_weight, "eta_residual", "Other #eta contributions", candidate_composition::kColors[eta]);
   append(*composition.counts[other], *composition.weighted[other], "other", "Other origin", candidate_composition::kColors[other]);
   return result;
@@ -95,7 +103,7 @@ inline bool export_outputs(const std::string& output_base, const candidate_compo
                            const std::vector<double>& cross_sections,
                            const std::array<std::unique_ptr<candidate_composition::Histograms>, kSelectionCount>& composition,
                            const std::array<std::unique_ptr<Spectra>, kSelectionCount>& topology_histograms,
-                           const std::array<pi0_bdt::Histograms, kSelectionCount>& bdt)
+                           const std::array<pi0_bdt::Histograms, kSelectionCount>& bdt, const eta_decay::Selections* modes = nullptr)
 {
   const auto original_labels = ::kLabels;
   struct RestoreLabels { decltype(::kLabels) labels; ~RestoreLabels() { ::kLabels = labels; } } restore{original_labels};
@@ -107,6 +115,8 @@ inline bool export_outputs(const std::string& output_base, const candidate_compo
   {
     plot_caption.selection = kSelectionLabels[topology_selection];
     Spectra& spectra = *topology_histograms[topology_selection];
+    if (modes && !(*modes)[topology_selection]->valid(*composition[topology_selection]->counts[candidate_composition::eta],
+        *composition[topology_selection]->weighted[candidate_composition::eta], *spectra.counts[1], *spectra.weighted_pb[1])) return false;
     const std::string selection_output_base = output_base + "/" + kSelectionKeys[topology_selection] + "/region_a_eta_anchor_topology";
     if (!make_output_directory(selection_output_base)) return false;
     std::array<std::unique_ptr<TH1D>, kSpectrumCount> density;
@@ -170,6 +180,29 @@ inline bool export_outputs(const std::string& output_base, const candidate_compo
 
   write_metadata(topology_output, metadata, cross_sections);
   write_metadata(composition_output, metadata, cross_sections);
+  std::ofstream census(output_base + "/eta_cascade_composition_summary.csv");
+  if (!census) return false;
+  census << "selection,bin,et_low,et_high,category,raw_count,weighted_pb,total_raw_count,total_weighted_pb,raw_fraction,weighted_fraction\n";
+  census << std::setprecision(17);
+  for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
+  {
+    const auto components = composition_components(*composition[selection], *topology_histograms[selection], false, modes ? (*modes)[selection].get() : nullptr);
+    const auto& total_n = *composition[selection]->counts[candidate_composition::denominator];
+    const auto& total_w = *composition[selection]->weighted[candidate_composition::denominator];
+    for (int bin = -1; bin <= total_n.GetNbinsX() + 1; ++bin)
+    {
+      const auto value = [bin](const TH1D& h) { return bin < 0 ? h.Integral(0, h.GetNbinsX() + 1) : h.GetBinContent(bin); };
+      const double n = value(total_n), w = value(total_w);
+      for (std::size_t i = 0; i < components.counts.size(); ++i)
+      {
+        census << kSelectionKeys[selection] << ',' << bin << ',' << (bin < 0 ? 0 : total_n.GetXaxis()->GetBinLowEdge(bin)) << ','
+               << (bin < 0 ? total_n.GetXaxis()->GetXmax() : total_n.GetXaxis()->GetBinUpEdge(bin)) << ',' << components.counts[i]->GetName() << ','
+               << value(*components.counts[i]) << ',' << value(*components.weighted[i]) << ',' << n << ',' << w << ','
+               << (n > 0 ? value(*components.counts[i]) / n : 0) << ',' << (w != 0 ? value(*components.weighted[i]) / w : 0) << '\n';
+      }
+    }
+  }
+  if (!census) return false;
   for (std::size_t selection = 0; selection < kSelectionCount; ++selection)
   {
     const std::string directory = output_base + "/" + kSelectionKeys[selection];
@@ -183,8 +216,8 @@ inline bool export_outputs(const std::string& output_base, const candidate_compo
     for (bool detailed : {false, true})
     {
       const std::string detail = detailed ? "superdetailed" : "detailed";
-      auto components = composition_components(*composition[selection], *topology_histograms[selection], detailed);
-      auto kinematic = composition_components(*composition[0], *topology_histograms[0], detailed);
+      auto components = composition_components(*composition[selection], *topology_histograms[selection], detailed, modes ? (*modes)[selection].get() : nullptr);
+      auto kinematic = composition_components(*composition[0], *topology_histograms[0], detailed, modes ? (*modes)[0].get() : nullptr);
       std::vector<std::unique_ptr<TH1D>> fractions;
       std::vector<TH1D*> fraction_pointers;
       std::vector<std::unique_ptr<SurvivalCurve>> survival;

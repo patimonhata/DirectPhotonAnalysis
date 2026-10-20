@@ -1,6 +1,7 @@
 #include "PythiaClusterTruthMatcher.h"
 
 #include "HepMCPhotonClassifier.h"
+#include "EtaOriginFractions.h"
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawTower.h>
@@ -249,14 +250,32 @@ void ClusterTruthCollection::append(const ClusterTruthMatch& match)
     contributor_photon_source.push_back(contributor.photon_source);
     contributor_immediate_parent_pdg.push_back(contributor.immediate_parent_pdg);
     contributor_classification_parent_pdg.push_back(contributor.classification_parent_pdg);
+    contributor_eta_parent_barcode.push_back(contributor.eta_parent_barcode);
+    contributor_eta_parent_track_id.push_back(contributor.eta_parent_track_id);
+    contributor_eta_decay_mode.push_back(contributor.eta_decay_mode);
+    contributor_eta_split_status.push_back(contributor.eta_split_status);
+    contributor_pi0_parent_barcode.push_back(contributor.pi0_parent_barcode);
+    contributor_pi0_parent_track_id.push_back(contributor.pi0_parent_track_id);
   }
   contributor_offset.push_back(static_cast<unsigned int>(contributor_g4_track_id.size()));
+  const auto origin = eta_origin::summarize(contributor_offset[cluster_index], contributor_offset[cluster_index + 1], contributor_embedding_id,
+      contributor_fraction, contributor_eta_parent_barcode, contributor_eta_parent_track_id, contributor_eta_decay_mode,
+      contributor_eta_split_status, contributor_pi0_parent_barcode, contributor_pi0_parent_track_id);
+  pi0_total_fraction.push_back(origin.pi0_total_fraction); eta_main_fraction.push_back(origin.fraction);
+  eta_main_decay_mode.push_back(origin.mode); eta_main_barcode.push_back(origin.barcode); eta_main_track_id.push_back(origin.track);
+  eta_main_unresolved.push_back(origin.unresolved);
 }
 
 void ClusterTruthCollection::create_branches(TTree* tree, const std::string& prefix)
 {
   const auto name = [&prefix](const char* suffix) { return prefix + "_cluster_truth_" + suffix; };
   tree->Branch(name("valid").c_str(), &valid);
+  tree->Branch(name("pi0_total_fraction").c_str(), &pi0_total_fraction);
+  tree->Branch(name("eta_main_fraction").c_str(), &eta_main_fraction);
+  tree->Branch(name("eta_main_decay_mode").c_str(), &eta_main_decay_mode);
+  tree->Branch(name("eta_main_barcode").c_str(), &eta_main_barcode);
+  tree->Branch(name("eta_main_track_id").c_str(), &eta_main_track_id);
+  tree->Branch(name("eta_main_unresolved").c_str(), &eta_main_unresolved);
   tree->Branch(name("total_edep").c_str(), &total_edep);
   tree->Branch(name("n_contributor").c_str(), &n_contributor);
   tree->Branch(name("dominant_g4_track_id").c_str(), &dominant_g4_track_id);
@@ -285,5 +304,11 @@ void ClusterTruthCollection::create_branches(TTree* tree, const std::string& pre
   tree->Branch(name("contributor_photon_source").c_str(), &contributor_photon_source);
   tree->Branch(name("contributor_immediate_parent_pdg").c_str(), &contributor_immediate_parent_pdg);
   tree->Branch(name("contributor_classification_parent_pdg").c_str(), &contributor_classification_parent_pdg);
+  tree->Branch(name("contributor_eta_parent_barcode").c_str(), &contributor_eta_parent_barcode);
+  tree->Branch(name("contributor_eta_parent_track_id").c_str(), &contributor_eta_parent_track_id);
+  tree->Branch(name("contributor_eta_decay_mode").c_str(), &contributor_eta_decay_mode);
+  tree->Branch(name("contributor_eta_split_status").c_str(), &contributor_eta_split_status);
+  tree->Branch(name("contributor_pi0_parent_barcode").c_str(), &contributor_pi0_parent_barcode);
+  tree->Branch(name("contributor_pi0_parent_track_id").c_str(), &contributor_pi0_parent_track_id);
 }
 }

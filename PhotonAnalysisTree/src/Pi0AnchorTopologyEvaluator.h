@@ -24,7 +24,8 @@ enum class Pi0Pathway : int
 {
   g4_primary_decay = 1,
   generator_decay = 2,
-  single_particle_g4_decay = 3
+  single_particle_g4_decay = 3,
+  eta_daughter_g4_decay = 4
 };
 
 enum class Pi0AnchorTopology : int
@@ -115,6 +116,7 @@ struct Pi0AnchorTopologyConfig
   // Defaults preserve the existing pi0 selection. Eta uses 221 and an explicit HepMC two-photon decay check.
   int parent_pdg_id = 111;
   bool require_hepmc_two_photon_decay = false;
+  bool eta_pseudo_primary = false;
   std::string truth_node_name = "G4TruthInfo";
   std::string hepmc_event_map_node_name = "PHHepMCGenEventMap";
   std::string tower_node_name = "TOWERINFO_CALIB_CEMC";
@@ -281,7 +283,7 @@ const char* pi0_anchor_tag_result_name(Pi0AnchorTagResult value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 11;
+  static constexpr int kAlgorithmVersion = 12;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

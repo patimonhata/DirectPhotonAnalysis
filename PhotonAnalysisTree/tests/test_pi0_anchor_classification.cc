@@ -124,6 +124,6 @@ int main()
   assert(classify().topology == Pi0AnchorTopology::single_contaminated);
   partner.cluster_energy = 0.5;
   assert(classify().topology == Pi0AnchorTopology::missing);
-  assert(Pi0AnchorTopologyEvaluator::kAlgorithmVersion == 11);
+  assert(Pi0AnchorTopologyEvaluator::kAlgorithmVersion == 12);
   std::cout << "pi0 anchor classification: passed\n";
 }

@@ -176,7 +176,7 @@ bool read_metadata(TFile& file, Metadata& value)
   ok &= bind(tree, "region_a_clusters", &value.region_a_clusters);
   ok &= bind(tree, "region_a_prompt_clusters", &value.region_a_prompt_clusters);
   ok &= bind(tree, "region_a_anchor_clusters", &value.region_a_anchor_clusters);
-  if (!ok || tree->GetEntry(0) <= 0 || value.pi0_topology_algorithm_version != 11 || value.eta_topology_algorithm_version != 1 || !family || !map_root || !majority_comparison || !eta_definition ||
+  if (!ok || tree->GetEntry(0) <= 0 || value.pi0_topology_algorithm_version != 12 || value.eta_topology_algorithm_version != 2 || !family || !map_root || !majority_comparison || !eta_definition ||
       !other_definition || !weight_definition || !analysis_release || !model_sha256 || !sample_names || !sample_map_counts ||
       !sample_sum_generator_weights) return false;
   value.family = *family;
@@ -425,6 +425,7 @@ int MergePythiaPhotonCandidateSelection(
   std::array<std::vector<unsigned long long>, kSelectionCount> sample_selected_clusters, sample_selected_anchor_clusters;
   std::vector<double> sample_cross_sections_pb;
   Metadata combined;
+  eta_decay::Selections eta_decay_histograms;
   bool have_reference = false;
   for (const SampleDefinition& sample : samples)
   {
@@ -447,7 +448,7 @@ int MergePythiaPhotonCandidateSelection(
         std::cerr << "Missing or invalid composition partial: " << path << std::endl;
         return 3;
       }
-      if (metadata.schema_version != 7 || metadata.source_map_schema_version != 6 || metadata.family != family ||
+      if (metadata.schema_version != 8 || metadata.source_map_schema_version != 7 || metadata.family != family ||
           metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
           metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U || !same_double(metadata.sample_cross_section_pb, sample.cross_section_pb) ||
           metadata.events_stitch_pass > metadata.events_written || metadata.region_a_prompt_clusters > metadata.region_a_clusters ||
@@ -533,6 +534,9 @@ int MergePythiaPhotonCandidateSelection(
           if (!valid_histogram(count, metadata) || !valid_histogram(weighted, metadata) ||
               !eta_histograms[composition_selection]->counts[index]->Add(count) || !eta_histograms[composition_selection]->weighted_pb[index]->Add(weighted)) return 5;
         }
+        if (!eta_decay_histograms[composition_selection]) eta_decay_histograms[composition_selection] = std::make_unique<eta_decay::Histograms>(metadata.n_bins, metadata.et_max);
+        auto* decay_directory = file.GetDirectory((std::string("eta_decay/") + kSelectionKeys[composition_selection]).c_str());
+        if (!decay_directory || !eta_decay_histograms[composition_selection]->add(*decay_directory)) return 5;
         add_summary(composition_summaries[composition_selection], composition_summary.selections[composition_selection]);
       }
       for (std::size_t topology_selection = 0; topology_selection < kSelectionCount; ++topology_selection)
@@ -994,7 +998,7 @@ int MergePythiaPhotonCandidateSelection(
   selection_summary.Write();
   topology_output.Close();
 
-  if (!eta_topology::export_outputs(output_base, combined, sample_cross_sections_pb, composition_histograms, eta_histograms, eta_bdt_histograms)) return 7;
+  if (!eta_topology::export_outputs(output_base, combined, sample_cross_sections_pb, composition_histograms, eta_histograms, eta_bdt_histograms, &eta_decay_histograms)) return 7;
 
   std::cout << "MergePythiaPhotonCandidateSelection - family/selections/samples/output = "
             << family << "/" << kSelectionCount << "/" << combined.sample_names.size() << "/" << output_base << std::endl;

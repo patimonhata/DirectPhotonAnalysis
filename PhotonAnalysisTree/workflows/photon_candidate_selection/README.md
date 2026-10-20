@@ -634,3 +634,66 @@ Submit files and small-sample defaults now use `topology_v12_eta_v2`, preserving
 prior v11/eta-v1 output files. The synthetic cascade test covers both generation
 paths, both pion modes, 30/30/40 sharing, split-tower allocation, closure, missing
 provenance, interaction rejection and grouping by distinct eta parents.
+
+## Other-origin diagnostics (existing map schema 7, new partial schema 9)
+
+`OtherOriginHistograms.h` adds a disjoint subdivision of **existing composition
+Other only**. Prompt, pi0, eta, their topology populations, and all reconstructed
+selection/tagging decisions keep their existing definitions. No model or training
+labels are changed. Existing v12/eta-v2 maps contain all required inputs; only
+reduce and merge must be rerun. No library rebuild/install is needed.
+
+Summary plots separate long-lived charged particles, other-hadron decay-photon
+majority, and the remaining Other population. Detailed plots distinguish:
+
+- Charged hadrons: one signal-embedding contributor with abs(PDG) 211, 321 or 2212
+  and fraction strictly greater than 0.5 (pi+/pi-, K+/K-, proton/antiproton).
+- Electrons/positrons and muons, separately, with the same single-contributor rule.
+- Other-hadron decay photon: one signal G4-primary gamma with fraction >0.5 whose
+  physical HepMC parent is unique (`photon_category == 3`) and is a ROOT PDG
+  Meson/Baryon (including charm/beauty classes),
+  excluding pi0 and eta. Photon bookkeeping copies are already skipped in the map.
+- Remaining particle majority, including neutral kaons, D/B, pi0 without a diphoton
+  anchor, and photons not meeting the above parent definition.
+- No single-contributor majority (an exact fraction of 0.5 belongs here).
+- Unresolved truth: invalid/empty truth, a non-signal dominant contributor, or an
+  existing origin overlap. These are never treated as identified charged/photon
+  populations.
+
+The three charged subcategories form the summary long-lived charged category.
+Contributions from different charged particles are not summed to invent a single
+particle majority. This is an origin diagnostic using stored contributors, not a
+new claim that a charged track reached the EMCAL surface.
+
+A decay-photon majority is **not yet a clean single-photon training label**: an
+omega daughter gamma can dominate a cluster containing another particle's deposit.
+The ROOT diagnostics retain main-contributor fraction versus ET, other G4-primary
+photon fraction versus ET, BDT score versus ET, leading PDG and decay-parent PDG.
+The additional-photon diagnostic does not include photons hidden inside a G4-primary
+pi0/hadron; the main-fraction diagnostic includes their contamination in its
+complement. No purity threshold is silently imposed. A G4-primary omega/other
+hadron is retained under remaining particle majority; extracting its daughter
+photon shares would require a separate map diagnostic, not an assumption in reduce.
+
+Merge writes `other_origin.root` and `other_origin_summary.csv`. Each selection
+gets these separate PDFs (with `_detailed` versions):
+
+- `photon_candidate_other_origin_category_fraction_stack.pdf`: normalized to Other.
+- `photon_candidate_composition_other_origin_category_fraction_stack.pdf`:
+  normalized to all selected candidates, keeping prompt/pi0/eta aggregated.
+- `photon_candidate_other_origin_survival_fraction_relative_to_kinematic.pdf`:
+  category-conditional survival relative to the kinematic selection.
+
+Axes explicitly distinguish the two fraction denominators. CSV bin -1 reports
+full-range yields including under/overflow; per-bin rows also give weighted
+fractions relative to both Other and all candidates. Every ET bin (including flows)
+must reproduce the existing Other raw count, weighted yield and Sumw2 before output.
+Histogram axes/types and algorithm metadata are checked when partials are merged.
+
+Old partial schema 8 is rejected because it lacks these histograms. Reduce submit
+files now write to `.../jet/partial_other_v1` while reading the same v12/eta-v2 maps.
+Choose a new merge output directory, such as a configuration ending in
+`_v12_eta_v2_other_v1`, to preserve previous plots. The synthetic tests cover both
+particle signs, hadron versus parton/diquark photon parents, exact-half boundaries,
+non-signal/invalid truth, photon contamination, negative-weight closure and ROOT
+roundtrips, plus map-to-reduce-to-merge output and unchanged pi0/eta populations.

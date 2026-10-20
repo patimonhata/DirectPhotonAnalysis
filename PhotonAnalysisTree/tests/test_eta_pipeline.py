@@ -50,7 +50,7 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
   std::vector<unsigned char> prompt = {0}, pi0_valid = {0}, eta_valid = {0}, pi0_tag = {0}, eta_tag = {0};
   std::vector<int> pi0_topology = {-999}, eta_topology = {-999}, pi0_missing = {-999}, eta_missing = {-999};
   std::vector<unsigned int> offsets = {0, 1};
-  std::vector<int> pdg = {22}, embedding = {1}, source = {0}, parent = {0};
+  std::vector<int> pdg = {22}, embedding = {1}, source = {0}, parent = {0}, photon_category = {0};
 #define E(name, value) events.Branch(name, &value)
   E("split_ncluster", ncluster); E("event_weight_valid", enabled); E("sample_stitching_valid", enabled); E("sample_stitching_pass", enabled);
   E("weight_numerator_pb", weight); E("split_cluster_et", et); E("split_cluster_bdt_score", score); E("split_cluster_bdt_valid", yes);
@@ -64,6 +64,7 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
   E("split_cluster_eta_anchor_topology", eta_topology); E("split_cluster_eta_anchor_missing_category", eta_missing);
   E("split_cluster_truth_contributor_offset", offsets); E("split_cluster_truth_contributor_g4_pdg_id", pdg);
   E("split_cluster_truth_contributor_embedding_id", embedding); E("split_cluster_truth_contributor_fraction", fraction);
+  E("split_cluster_truth_contributor_photon_category", photon_category);
   E("split_cluster_truth_contributor_photon_source", source); E("split_cluster_truth_contributor_classification_parent_pdg", parent);
   std::vector<int> eta_parent_barcode = {0}; E("split_cluster_truth_contributor_eta_parent_barcode", eta_parent_barcode);
   std::vector<int> eta_parent_track_id = {0}; E("split_cluster_truth_contributor_eta_parent_track_id", eta_parent_track_id);
@@ -87,7 +88,7 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
     } else if (row == 16) { offsets = {0, 2}; pdg = {22, 22}; embedding = {1, 1}; fraction = {.3, .3}; source = {3, 3}; parent = {221, 221}; }
     else if (row == 17) { eta_valid[0] = 1; eta_fraction[0] = .5; fraction[0] = .5; eta_topology[0] = 0; eta_missing[0] = 0; parent[0] = 221; }
     else if (row == 18) { pdg[0] = 221; }
-    else { pdg[0] = 211; }
+    else { pdg[0] = 22; parent[0] = 223; }
     eta_parent_barcode.assign(fraction.size(), 0); eta_parent_track_id.assign(fraction.size(), 0);
     eta_decay_mode.assign(fraction.size(), 0); eta_split_status.assign(fraction.size(), 0);
     pi0_parent_barcode.assign(fraction.size(), 0); pi0_parent_track_id.assign(fraction.size(), 0);
@@ -103,8 +104,10 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
         pdg = {111, 111, 111}; fraction = {.2, .2, .6}; eta_decay_mode = {2, 2, 2}; pi0_parent_barcode = {111, 112, 113};
         pi0_valid[0] = 1; pi0_fraction[0] = .6; pi0_topology[0] = 2; pi0_missing[0] = 0;
       }
-      if (row == 22) { eta_parent_barcode = {100, 101, 0}; eta_decay_mode = {2, 2, 0}; }
+      if (row == 22) { fraction = {.6, .2, .2}; eta_parent_barcode = {0, 0, 0}; eta_decay_mode = {0, 0, 0}; }
     }
+    photon_category.clear();
+    for (std::size_t i = 0; i < pdg.size(); ++i) photon_category.push_back(pdg[i] == 22 ? (std::abs(parent[i]) > 37 ? 3 : 0) : -1);
     final[0] = region[0] && !pi0_tag[0] && !eta_tag[0]; events.Fill();
   }
   events.Write();
@@ -129,6 +132,9 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
         assert f.Get('eta_decay/kinematic/h_candidate_eta_three_pi0_et_count').Integral() == 1
         assert f.Get('eta_decay/kinematic/h_candidate_eta_charged_pions_pi0_et_count').Integral() == 1
         assert f.Get('composition/kinematic/h_candidate_other_et_count').Integral() == 4
+        assert f.Get('other_origin/kinematic/h_other_decay_photon_et_count').Integral() == 1
+        assert f.Get('other_origin/kinematic/h_other_charged_hadron_et_count').Integral() == 1
+        assert f.Get('other_origin/kinematic/h_other_mixed_et_count').Integral() == 2
         f.Close()
     output = root / 'merged'
     assert ROOT.MergePythiaPhotonCandidateSelection('photonjet', str(root / 'partial'), str(output)) == 0
@@ -141,6 +147,17 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
     census = list(csv.DictReader((output / 'eta_cascade_composition_summary.csv').open()))
     other = next(row for row in census if row['selection'] == 'kinematic' and row['bin'] == '-1' and row['category'] == 'h_candidate_other_et_count')
     assert float(other['raw_count']) == 16 and float(other['total_raw_count']) == 92
+    detailed = ROOT.TFile.Open(str(output / 'other_origin.root'))
+    assert detailed.Get('kinematic/h_other_decay_photon_et_count').Integral() == 4
+    assert detailed.Get('kinematic/h_other_charged_hadron_et_count').Integral() == 4
+    assert detailed.Get('kinematic/h_other_mixed_et_count').Integral() == 8
+    assert detailed.Get('kinematic/h_other_decay_photon_main_fraction_vs_et_pb').GetEntries() == 4
+    detailed.Close()
+    other_rows = list(csv.DictReader((output / 'other_origin_summary.csv').open()))
+    row = next(x for x in other_rows if x['selection'] == 'kinematic' and x['bin'] == '-1' and x['category'] == 'decay_photon')
+    assert float(row['raw_count']) == 4 and float(row['other_raw_count']) == 16 and float(row['all_raw_count']) == 92
+    assert (output / 'preselection/photon_candidate_other_origin_category_fraction_stack.pdf').is_file()
+    assert (output / 'preselection/photon_candidate_composition_other_origin_category_fraction_stack_detailed.pdf').is_file()
     f = ROOT.TFile.Open(str(output / 'pi0_anchor_topology.root'))
     assert f.Get('kinematic/h_region_a_pi0_anchor_et_count').Integral() == 24
     f.Close()

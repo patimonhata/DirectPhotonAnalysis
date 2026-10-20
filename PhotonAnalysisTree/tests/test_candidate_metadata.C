@@ -43,5 +43,8 @@ void test_candidate_metadata()
   auto different_eta = partial;
   --different_eta.eta_topology_algorithm_version;
   assert(!candidate_composition_merge::compatible(partial, different_eta));
+  auto different_other = partial;
+  --different_other.other_origin_algorithm_version;
+  assert(!candidate_composition_merge::compatible(partial, different_other));
   std::cout << "map and partial metadata compatibility: passed" << std::endl;
 }

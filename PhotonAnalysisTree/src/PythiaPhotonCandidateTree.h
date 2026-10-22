@@ -2,6 +2,7 @@
 #define RYOTARO_PYTHIAPHOTONCANDIDATETREE_H_20260901
 
 #include "HepMCPhotonClassifier.h"
+#include "DecayOriginDiagnostics.h"
 #include "PhotonTreeCommon.h"
 #include "Pi0AnchorTopologyEvaluator.h"
 #include "PythiaClusterTruthMatcher.h"
@@ -211,7 +212,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 7;
+  static constexpr int schema_version_ = 8;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);
@@ -288,6 +289,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   photon_tree::Pi0AnchorTopologyEvaluator topology_evaluator_;
   photon_tree::Pi0AnchorTopologyEvaluator eta_topology_evaluator_;
   photon_tree::ClusterTruthCollection cluster_truth_;
+  photon_tree::DecayOriginCollection decay_origin_;
   photon_tree::PhotonCandidateSelectionBranches selection_;
   photon_tree::Pi0TopologyTreeBranches topology_;
   photon_tree::PhotonCandidateSelectionBranches eta_selection_;
@@ -300,6 +302,9 @@ class PythiaPhotonCandidateTree : public SubsysReco
   bool metadata_filled_ = false;
   int metadata_schema_version_ = schema_version_;
   int pi0_topology_algorithm_version_ = photon_tree::Pi0AnchorTopologyEvaluator::kAlgorithmVersion;
+  int decay_origin_algorithm_version_ = photon_tree::DecayOriginDiagnostics::kAlgorithmVersion;
+  double decay_origin_max_proper_length_cm_ = photon_tree::DecayOriginDiagnostics::kMaxProperLengthCm;
+  double decay_origin_max_flight_cm_ = photon_tree::DecayOriginDiagnostics::kMaxFlightCm;
   int eta_topology_algorithm_version_ = 2;
   int eta_topology_parent_pdg_ = 221;
   std::string eta_topology_decay_definition_ = "direct_eta_to_two_photons_same_parent_strict_majority";

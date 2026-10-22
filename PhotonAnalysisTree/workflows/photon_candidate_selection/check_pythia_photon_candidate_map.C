@@ -35,7 +35,8 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   TFile file(path, "READ");
   auto* events = file.Get<TTree>("event_tree");
   auto* metadata = file.Get<TTree>("metadata");
-  int schema_version = -1;
+  int schema_version = -1, decay_origin_algorithm_version = -1;
+  double decay_origin_max_proper_length_cm = -1, decay_origin_max_flight_cm = -1;
   std::string* input_manifest = nullptr;
   std::string* first_input_suffix = nullptr;
   std::string* last_input_suffix = nullptr;
@@ -66,6 +67,12 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
 
   bool ok = true;
   ok &= map_bind(metadata, "schema_version", &schema_version);
+  ok &= map_bind(metadata, "decay_origin_algorithm_version", &decay_origin_algorithm_version);
+  ok &= map_bind(metadata, "decay_origin_max_proper_length_cm", &decay_origin_max_proper_length_cm);
+  ok &= map_bind(metadata, "decay_origin_max_flight_cm", &decay_origin_max_flight_cm);
+  for (const char* field : {"valid", "offset", "pdg", "embedding", "source", "id", "root_track_id", "parent_pdg", "parent_source", "parent_id", "status", "pathway",
+                           "diphoton", "long_lived", "daughter_count", "daughter_pi0_count", "daughter_gamma_count", "daughter_charged_count", "fraction", "gamma0_fraction", "gamma1_fraction", "flight_cm", "parent_flight_cm", "proper_length_cm"})
+    ok &= events->GetBranch((std::string("split_cluster_decay_origin_") + field).c_str()) != nullptr;
   ok &= map_bind(metadata, "input_manifest", &input_manifest);
   ok &= map_bind(metadata, "manifest_begin", &manifest_begin);
   ok &= map_bind(metadata, "manifest_end", &manifest_end);
@@ -93,7 +100,9 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   ok &= map_bind(metadata, "n_clusters_region_c", &n_clusters_region_c);
   ok &= map_bind(metadata, "n_clusters_region_d", &n_clusters_region_d);
   ok &= map_bind(metadata, "n_clusters_final_photon", &n_clusters_final_photon);
-  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 7 || !input_manifest || input_manifest->empty() ||
+  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 8 || decay_origin_algorithm_version != 1 ||
+      !std::isfinite(decay_origin_max_proper_length_cm) || std::abs(decay_origin_max_proper_length_cm - 1e-4) > 1e-12 ||
+      !std::isfinite(decay_origin_max_flight_cm) || std::abs(decay_origin_max_flight_cm - 1e-2) > 1e-12 || !input_manifest || input_manifest->empty() ||
       manifest_begin < 0 || manifest_end <= manifest_begin || input_file_count != manifest_end - manifest_begin ||
       !first_input_suffix || first_input_suffix->empty() || !last_input_suffix || last_input_suffix->empty() ||
       !sample_name || sample_name->empty() || !std::isfinite(min_cluster_energy) || min_cluster_energy < 0.0 ||

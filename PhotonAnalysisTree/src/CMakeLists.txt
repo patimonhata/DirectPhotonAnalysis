@@ -12,7 +12,7 @@ if(NOT DEFINED ENV{OFFLINE_MAIN})
 endif()
 
 set(SPHENIX_PREFIX "$ENV{OFFLINE_MAIN}")
-find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist TMVA TMVAUtils)
+find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist EG TMVA TMVAUtils)
 
 find_path(
   PI0RECONSTRUCTION_INCLUDE_DIR
@@ -41,6 +41,7 @@ endforeach()
 
 add_library(
   PhotonAnalysisTree SHARED
+  DecayOriginDiagnostics.cc
   EtaCascadeTruth.cc
   HepMCPhotonClassifier.cc
   Pi0AnchorTopologyEvaluator.cc
@@ -74,6 +75,7 @@ target_link_libraries(
     ROOT::RIO
     ROOT::Tree
     ROOT::Hist
+    ROOT::EG
     ROOT::TMVA
     ROOT::TMVAUtils
 )
@@ -107,6 +109,7 @@ target_compile_options(Pi0GammaOnnx PRIVATE -Wall -Wextra -Wpedantic)
 install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
 install(
   FILES
+    DecayOriginDiagnostics.h
     EtaCascadeTruth.h
     EtaOriginFractions.h
     HepMCPhotonClassifier.h

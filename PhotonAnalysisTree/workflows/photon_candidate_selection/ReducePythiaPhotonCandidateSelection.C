@@ -108,6 +108,8 @@ struct MapMetadata
 {
   std::string path;
   int schema_version = -1;
+  int decay_origin_algorithm_version = -1;
+  double decay_origin_max_proper_length_cm = -1, decay_origin_max_flight_cm = -1;
   std::string input_manifest;
   std::string sample_name;
   std::string analysis_release;
@@ -172,6 +174,9 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   std::string* model_sha256 = nullptr;
   bool ok = true;
   ok &= bind(tree, "schema_version", &value.schema_version);
+  ok &= bind(tree, "decay_origin_algorithm_version", &value.decay_origin_algorithm_version);
+  ok &= bind(tree, "decay_origin_max_proper_length_cm", &value.decay_origin_max_proper_length_cm);
+  ok &= bind(tree, "decay_origin_max_flight_cm", &value.decay_origin_max_flight_cm);
   ok &= bind(tree, "input_manifest", &input_manifest);
   ok &= bind(tree, "sample_name", &sample_name);
   ok &= bind(tree, "analysis_release", &analysis_release);
@@ -214,7 +219,8 @@ bool read_metadata(const std::string& path, MapMetadata& value)
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 7 && value.sample_name == sample.name && !value.input_manifest.empty() &&
+  return value.schema_version == 8 && value.decay_origin_algorithm_version == 1 &&
+      same_double(value.decay_origin_max_proper_length_cm, 1e-4) && same_double(value.decay_origin_max_flight_cm, 1e-2) && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
       std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.0) &&
@@ -238,7 +244,9 @@ bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 
 bool compatible(const MapMetadata& value, const MapMetadata& reference)
 {
-  return value.schema_version == reference.schema_version && value.input_manifest == reference.input_manifest &&
+  return value.schema_version == reference.schema_version && value.decay_origin_algorithm_version == reference.decay_origin_algorithm_version &&
+      same_double(value.decay_origin_max_proper_length_cm, reference.decay_origin_max_proper_length_cm) &&
+      same_double(value.decay_origin_max_flight_cm, reference.decay_origin_max_flight_cm) && value.input_manifest == reference.input_manifest &&
       value.sample_name == reference.sample_name && value.analysis_release == reference.analysis_release &&
       value.model_sha256 == reference.model_sha256 && same_double(value.cross_section_pb, reference.cross_section_pb) &&
       same_double(value.window_min, reference.window_min) && same_double(value.window_max, reference.window_max) &&
@@ -816,7 +824,11 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   plot_pad->RedrawAxis();
   canvas.cd();
   draw_annotations();
-  canvas.SaveAs(output.c_str());
+  // ROOT's unembedded Symbol mu can be substituted incorrectly by PDF viewers.
+  const bool embed_fonts = output.size() >= 4 && output.compare(output.size() - 4, 4, ".pdf") == 0 &&
+      std::any_of(labels.begin(), labels.end(), [](const std::string& label) { return label.find("#mu") != std::string::npos; });
+  if (embed_fonts) canvas.Print(output.c_str(), "EmbedFonts");
+  else canvas.SaveAs(output.c_str());
 }
 
 void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, const std::string& output, bool detailed)
@@ -926,6 +938,7 @@ void draw_superdetailed_stack(std::array<std::unique_ptr<TH1D>, category_count>&
 #include "EtaTopologyHistograms.h"
 #include "EtaDecayHistograms.h"
 #include "OtherOriginHistograms.h"
+#include "DecayOriginHistograms.h"
 
 int ReducePythiaPhotonCandidateSelection(
     const std::string family,
@@ -946,7 +959,7 @@ int ReducePythiaPhotonCandidateSelection(
   std::string normalized_map_root = map_root;
   while (normalized_map_root.size() > 1U && normalized_map_root.back() == '/') normalized_map_root.pop_back();
   const std::string configuration = normalized_map_root.substr(normalized_map_root.find_last_of('/') + 1U);
-  const std::string default_output_suffix = "/partial_other_v1/" + sample_name + "/shard_" + std::to_string(shard_index) + "/photon_candidate_selection";
+  const std::string default_output_suffix = "/partial_decay_v1/" + sample_name + "/shard_" + std::to_string(shard_index) + "/photon_candidate_selection";
   const std::string resolved_output_base = output_base.empty()
       ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/" +
             configuration + "/" + family + default_output_suffix
@@ -981,6 +994,8 @@ int ReducePythiaPhotonCandidateSelection(
   double min_photon_energy_recovery = -1.0;
   int pi0_topology_algorithm_version = -1;
   int eta_topology_algorithm_version = -1;
+  decay_origin::Selections diagnostic_histograms;
+  for (auto& h : diagnostic_histograms) h = std::make_unique<decay_origin::Histograms>(n_bins, et_max);
   other_origin::Selections other_histograms;
   for (auto& h : other_histograms) h = std::make_unique<other_origin::Histograms>(n_bins, et_max);
   eta_decay::Selections eta_decay_histograms;
@@ -1031,6 +1046,7 @@ int ReducePythiaPhotonCandidateSelection(
     TFile file(map.path.c_str(), "READ");
     auto* tree = file.Get<TTree>("event_tree");
     if (file.IsZombie() || !tree) return 5;
+    decay_origin::Reader diagnostic;
     unsigned int ncluster = 0;
     unsigned char weight_valid = 0, stitch_valid = 0, stitch_pass = 0;
     double weight_numerator = 0.0;
@@ -1107,6 +1123,7 @@ int ReducePythiaPhotonCandidateSelection(
         bind_active(tree, "split_cluster_truth_contributor_fraction", &fraction) &&
         bind_active(tree, "split_cluster_truth_contributor_photon_source", &source) &&
         bind_active(tree, "split_cluster_truth_contributor_classification_parent_pdg", &parent);
+    ok &= diagnostic.bind(tree);
     ok &= bind_active(tree, "split_cluster_truth_contributor_photon_category", &photon_category);
     ok &= bind_active(tree, "split_cluster_truth_contributor_eta_parent_barcode", &eta_parent_barcode);
     ok &= bind_active(tree, "split_cluster_truth_contributor_eta_parent_track_id", &eta_parent_track_id);
@@ -1132,7 +1149,7 @@ int ReducePythiaPhotonCandidateSelection(
           !valid_contributors(ncluster, *offset, *g4_pdg, *embedding, *fraction, *source, *parent)) return 6;
       if (!eta_valid || !eta_main_fraction || !eta_topology || !eta_missing_category || eta_valid->size() != ncluster ||
           eta_main_fraction->size() != ncluster || eta_topology->size() != ncluster || eta_missing_category->size() != ncluster) return 6;
-      if (!photon_category || photon_category->size() != fraction->size()) return 6;
+      if (!photon_category || photon_category->size() != fraction->size() || !diagnostic.consistent(ncluster, *offset, *fraction)) return 6;
       if (!eta_parent_barcode || eta_parent_barcode->size() != fraction->size()) return 6;
       if (!eta_parent_track_id || eta_parent_track_id->size() != fraction->size()) return 6;
       if (!eta_decay_mode || eta_decay_mode->size() != fraction->size()) return 6;
@@ -1231,6 +1248,7 @@ int ReducePythiaPhotonCandidateSelection(
           else
           {
             ++summary.other;
+            diagnostic_histograms[selection_index]->fill(decay_origin::classify(diagnostic, cluster), cluster_et, weight, (*bdt_score)[cluster], (*bdt_valid)[cluster]);
             const auto detail = other_origin::classify((*truth_valid)[cluster], (*offset)[cluster], (*offset)[cluster + 1],
                 *g4_pdg, *embedding, *fraction, *parent, *photon_category, majority_count > 1);
             other_histograms[selection_index]->fill(detail, cluster_et, weight, (*bdt_score)[cluster], (*bdt_valid)[cluster]);
@@ -1256,8 +1274,17 @@ int ReducePythiaPhotonCandidateSelection(
                                       *eta_histograms[i]->counts[1], *eta_histograms[i]->weighted_pb[1])) return 7;
   for (std::size_t i = 0; i < kSelectionCount; ++i)
     if (!other_histograms[i]->valid(*composition_histograms[i]->counts[other], *composition_histograms[i]->weighted[other])) return 7;
+  for (std::size_t i = 0; i < kSelectionCount; ++i)
+    if (!diagnostic_histograms[i]->valid(*composition_histograms[i]->counts[other], *composition_histograms[i]->weighted[other])) return 7;
   TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;
+  auto* diagnostic_root = output.mkdir("decay_origin");
+  if (!diagnostic_root) return 8;
+  for (std::size_t i = 0; i < kSelectionCount; ++i)
+  {
+    auto* directory = diagnostic_root->mkdir(kSelectionKeys[i]);
+    if (!directory || !diagnostic_histograms[i]->write(*directory)) return 8;
+  }
   auto* other_root = output.mkdir("other_origin");
   if (!other_root) return 8;
   for (std::size_t i = 0; i < kSelectionCount; ++i)
@@ -1310,7 +1337,10 @@ int ReducePythiaPhotonCandidateSelection(
   output.cd();
   if (!eta_topology::write_partial(output, eta_histograms, eta_bdt_histograms)) return 8;
   output.cd();
-  int schema_version = 9, source_schema_version = 7, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 10, source_schema_version = 8, signal_embedding_id = kSignalEmbeddingId;
+  int decay_origin_algorithm_version = maps.front().decay_origin_algorithm_version;
+  double decay_origin_max_proper_length_cm = maps.front().decay_origin_max_proper_length_cm;
+  double decay_origin_max_flight_cm = maps.front().decay_origin_max_flight_cm;
   int other_origin_algorithm_version = other_origin::kAlgorithmVersion;
   double majority_threshold = kMajorityThreshold;
   std::string majority_comparison = "strictly_greater_than";
@@ -1326,6 +1356,9 @@ int ReducePythiaPhotonCandidateSelection(
   metadata.Branch("schema_version", &schema_version);
   metadata.Branch("source_map_schema_version", &source_schema_version);
   metadata.Branch("other_origin_algorithm_version", &other_origin_algorithm_version);
+  metadata.Branch("decay_origin_algorithm_version", &decay_origin_algorithm_version);
+  metadata.Branch("decay_origin_max_proper_length_cm", &decay_origin_max_proper_length_cm);
+  metadata.Branch("decay_origin_max_flight_cm", &decay_origin_max_flight_cm);
   metadata.Branch("family", &metadata_family);
   metadata.Branch("map_root", &normalized_map_root);
   metadata.Branch("require_complete", &metadata_require_complete);

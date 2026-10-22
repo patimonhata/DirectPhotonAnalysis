@@ -6,6 +6,10 @@
 #include <calobase/TowerInfoContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <fun4all/Fun4AllInputManager.h>
+#include <g4main/PHG4TruthInfoContainer.h>
+#include <g4main/PHG4HitContainer.h>
+#include <g4detectors/PHG4CellContainer.h>
+#include <calobase/RawTowerContainer.h>
 #include <jetbase/Jet.h>
 #include <jetbase/JetContainer.h>
 #include <phhepmc/PHHepMCGenEvent.h>
@@ -584,6 +588,23 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
+  // Supplemental ancestry diagnostics do not feed the selection, legacy contributors or topology evaluators.
+  auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
+  auto* events = findNode::getClass<PHHepMCGenEventMap>(topNode, hepmc_event_map_node_name_);
+  auto* raw = findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
+  auto* cells = findNode::getClass<PHG4CellContainer>(topNode, truth_cell_node_name_);
+  auto* hits = findNode::getClass<PHG4HitContainer>(topNode, truth_hit_node_name_);
+  photon_tree::DecayOriginDiagnostics diagnostic(truth, events);
+  std::map<unsigned int, const photon_tree::ClusterTruthMatch*> original;
+  for (const auto& record : topology_result.clusters) original[record.cluster_id] = &record.truth;
+  decay_origin_.clear();
+  for (unsigned int id : common_.split().data.cluster_id)
+  {
+    const auto found = original.find(id);
+    decay_origin_.append(found == original.end() ? photon_tree::DecayOriginMatch{} :
+        diagnostic.diagnose(*found->second, split_clusters->getCluster(id), towers, raw, cells, hits));
+  }
+
   const auto topo_range = topo_clusters->getClusters();
   for (auto iterator = topo_range.first; iterator != topo_range.second; ++iterator)
   {
@@ -1000,6 +1021,7 @@ void PythiaPhotonCandidateTree::create_output()
 #undef EVENT_BRANCH
   common_.create_collection_branches(event_tree_, "split", common_.split().data, false);
   cluster_truth_.create_branches(event_tree_, "split");
+  decay_origin_.create_branches(event_tree_);
   selection_.create_branches(event_tree_);
   topology_.create_branches(event_tree_);
   eta_selection_.create_branches(event_tree_, "eta", true);
@@ -1007,6 +1029,9 @@ void PythiaPhotonCandidateTree::create_output()
 
   metadata_tree_ = new TTree("metadata", "Pythia photon-candidate workflow metadata");
   metadata_tree_->Branch("schema_version", &metadata_schema_version_);
+  metadata_tree_->Branch("decay_origin_algorithm_version", &decay_origin_algorithm_version_);
+  metadata_tree_->Branch("decay_origin_max_proper_length_cm", &decay_origin_max_proper_length_cm_);
+  metadata_tree_->Branch("decay_origin_max_flight_cm", &decay_origin_max_flight_cm_);
   metadata_tree_->Branch("analysis_release", &analysis_release_);
   metadata_tree_->Branch("input_file", &input_file_name_);
   metadata_tree_->Branch("input_manifest", &manifest_path_);

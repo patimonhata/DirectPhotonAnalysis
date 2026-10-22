@@ -635,13 +635,15 @@ prior v11/eta-v1 output files. The synthetic cascade test covers both generation
 paths, both pion modes, 30/30/40 sharing, split-tower allocation, closure, missing
 provenance, interaction rejection and grouping by distinct eta parents.
 
-## Other-origin diagnostics (existing map schema 7, new partial schema 9)
+## Other-origin diagnostics (introduced with map schema 7, partial schema 9)
 
 `OtherOriginHistograms.h` adds a disjoint subdivision of **existing composition
 Other only**. Prompt, pi0, eta, their topology populations, and all reconstructed
 selection/tagging decisions keep their existing definitions. No model or training
-labels are changed. Existing v12/eta-v2 maps contain all required inputs; only
-reduce and merge must be rerun. No library rebuild/install is needed.
+labels are changed. Commit `a8121c1` supports this subdivision using existing
+v12/eta-v2 maps, with reduce and merge only. The current supplemental decay-origin
+extension below requires new schema-8 maps and schema-10 partials; it retains the
+same Other-origin subdivision as a separate output.
 
 Summary plots separate long-lived charged particles, other-hadron decay-photon
 majority, and the remaining Other population. Detailed plots distinguish:
@@ -684,16 +686,151 @@ gets these separate PDFs (with `_detailed` versions):
 - `photon_candidate_other_origin_survival_fraction_relative_to_kinematic.pdf`:
   category-conditional survival relative to the kinematic selection.
 
+Detailed PDFs containing `#mu` embed their fonts using ROOT's `EmbedFonts` option
+(requires Ghostscript, `gs`). The default unembedded Symbol font can display mu as
+a proportional sign in some viewers. This affects rendering only; labels and data
+are unchanged. Existing PDFs can be repaired by embedding fonts without rerunning
+map/reduce.
+
 Axes explicitly distinguish the two fraction denominators. CSV bin -1 reports
 full-range yields including under/overflow; per-bin rows also give weighted
 fractions relative to both Other and all candidates. Every ET bin (including flows)
 must reproduce the existing Other raw count, weighted yield and Sumw2 before output.
 Histogram axes/types and algorithm metadata are checked when partials are merged.
 
-Old partial schema 8 is rejected because it lacks these histograms. Reduce submit
-files now write to `.../jet/partial_other_v1` while reading the same v12/eta-v2 maps.
-Choose a new merge output directory, such as a configuration ending in
-`_v12_eta_v2_other_v1`, to preserve previous plots. The synthetic tests cover both
+The original Other-only production used `.../jet/partial_other_v1` and merge
+configuration suffix `_v12_eta_v2_other_v1`. Current submit files use the new
+map/partial directories described below. The synthetic tests cover both
 particle signs, hadron versus parton/diquark photon parents, exact-half boundaries,
 non-signal/invalid truth, photon contamination, negative-weight closure and ROOT
 roundtrips, plus map-to-reduce-to-merge output and unchanged pi0/eta populations.
+
+
+## Supplemental decay origins (map schema 8, partial schema 10)
+
+`src/DecayOriginDiagnostics.{h,cc}` adds independent per-cluster truth information.
+It never modifies the legacy truth contributors, prompt flags, pi0/eta anchors,
+selection decisions, model scores or existing topology classifications. Diagnostics
+are saved for every stored cluster; reduce/merge plots use **existing composition
+Other only**, so the new categories form a disjoint partition of that population.
+
+The same policy applies to hadron decay chains on both sides of the HepMC/G4
+boundary. ROOT PDG lifetime, or hbar*c/width when needed, must imply proper decay
+length **< 1e-4 cm (1 micrometre)**, and the recorded lab displacement must be
+**<= 1e-2 cm (0.1 mm)**. These are explicit diagnostic policy parameters, not
+reconstructed selection cuts or newly trained labels. Both are stored and checked
+in map, partial and merged diagnostic metadata. Unknown lifetimes or missing decay
+vertices are not interpreted as zero. HepMC lengths are converted from the event's
+length unit; G4 vertex lengths are in cm.
+
+Eligible short-lived hadrons are expanded recursively, stopping at an individual
+pi0, a direct eta->gamma gamma, a photon, a charged particle that is not an eligible
+short-lived hadron, or a long-lived/displaced parent. For example, omega->pi+ pi-
+pi0 is resolved into pi+, pi- and pi0; omega->pi0 gamma into pi0 and the direct
+gamma. G4 vertices must explicitly be decays; interactions are never unfolded as
+prompt decays. A HepMC decay must have one incoming physical hadron; beams and
+partonic/hadronization ancestry are not treated as hadron decay parents.
+
+G4-primary particles are joined to matching HepMC identities by embedding and
+barcode, with PDG agreement and unique primary-barcode mapping required. Only one
+representation of a decay is expanded. Photon bookkeeping copies are skipped.
+For a HepMC pi0 represented by multiple G4-primary photons, contributions are
+recombined by the *same parent identity*, not by PDG. The same rule applies to
+eta->gamma gamma. Long-lived/unknown ancestors remain barriers even if their decay
+was already performed in HepMC: a K_S->2pi0->4gamma chain is not silently promoted
+to an origin-vertex pi0. K_S remains the diagnostic parent, with its flight length
+and direct daughter counts saved.
+
+G4 daughter shares are measured using the existing cluster/tower/cell/hit ancestry
+matcher and the same split-tower allocation. The sum of daughter deposits must
+close to the measured parent deposit. Those conditional shares partition the
+original contributor fraction; the original shower normalization and total are
+preserved. Missing hits/ancestry, material interactions, or failed closure retain
+the parent with an unresolved status. No daughter energy is inferred from momentum
+fractions or branching ratios. Original contributor objects are never mutated.
+
+The flat table has prefix `split_cluster_decay_origin_`:
+
+- `valid` has one entry per cluster and carries input-truth validity and fraction
+  closure; daughter resolution is given by each row's `status`. `offset` has ncluster+1 entries.
+- `pdg`, `embedding`, `source`, `id` identify each diagnostic contributor. Source 1
+  means an event/embedding-scoped HepMC barcode; source 2 a G4 track ID. Distinct
+  meson parents remain distinct. `root_track_id` retains the input track, or 0 if
+  multiple input contributors were combined.
+- `fraction`, `parent_pdg`, `parent_source`, `parent_id`, `flight_cm`,
+  `parent_flight_cm`, `proper_length_cm` retain contribution and physical ancestry.
+  Unknown lengths are -1; stable PDG entries use a finite 1e30 cm proper-length sentinel. Parent identity is scoped to the contributor embedding.
+- `daughter_count`, `daughter_pi0_count`, `daughter_gamma_count`,
+  `daughter_charged_count` retain the direct decay content even for stopped parents.
+- `diphoton` requires exactly two direct photons from a pi0/eta. `gamma0_fraction`
+  and `gamma1_fraction` use the same cluster truth denominator. They sum to the
+  meson's fraction when resolved; both are -1 if photon shares cannot be measured.
+  Photon indices use sorted canonical identities, not leading/subleading energy.
+- `status`: 0 retained/grouped identity, 1 contains a measured daughter split,
+  -1 missing/incomplete provenance or deposit closure, -2 non-decay/inconsistent G4
+  interaction, -3 unavailable lifetime/flight/PDG information. When grouping rows,
+  any unresolved status is retained. `pathway` is a bit mask: 1 HepMC regrouping or
+  expansion, 2 G4 regrouping or expansion. `long_lived` flags a decay retained by
+  the proper-length or lab-displacement policy.
+
+`decay_origin.root` contains counts, weighted ET yields, main fraction and BDT
+score versus ET, main/parent PDG, status/pathway, log10 flight distributions, and
+`second_gamma_fraction_vs_et_pb` (the smaller of the two meson photon contributions).
+Unknown flights/photon shares go to underflow; an exactly zero flight is recorded
+in the first log-flight bin. These photon shares do **not** implement a new global
+separated/missing/merged topology or establish a clean single-photon label.
+
+The disjoint Other categories are pi0->gamma gamma majority, eta->gamma gamma
+majority, other-hadron decay-gamma majority, long-lived charged majority,
+long-lived/displaced parent majority, remaining particle majority, no single
+particle majority, and unresolved. Majority is strictly >0.5 for one signal-embedding
+particle. Charged includes pi+/pi-, K+/K-, p/antip, electrons and muons. If no
+majority exists and unresolved contributors might change that decision, the result
+is unresolved rather than known mixed. Raw yields, weighted yields and Sumw2 must
+close to existing Other for every ET bin, including flows.
+
+Each selection receives two extra PDFs:
+
+- `photon_candidate_other_decay_origin_category_fraction_stack.pdf`
+- `photon_candidate_other_decay_origin_survival_fraction_relative_to_kinematic.pdf`
+
+`decay_origin_summary.csv` gives raw and weighted yields and fractions relative to
+both Other and all selected candidates. Bin -1 is the full range including flows.
+The existing `other_origin.*` and all prior plot families are also still produced.
+
+### Running the new diagnostic production
+
+**Build/install -> map -> reduce -> merge is required.** Schema-7 maps and older
+partials are rejected by the current reducer/merger because they lack the new
+information. Submit files now use `topology_v12_eta_v2_decay_v1`, and reduce outputs
+use `partial_decay_v1`. Old files are not overwritten. Run from the repository root:
+
+```bash
+source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
+cmake -S PhotonAnalysisTree/src -B PhotonAnalysisTree/build/candidate -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build PhotonAnalysisTree/build/candidate --parallel 4
+cmake --install PhotonAnalysisTree/build/candidate --prefix "$PWD/PhotonAnalysisTree/install"
+
+workflow="$PWD/PhotonAnalysisTree/workflows/photon_candidate_selection"
+logs="$PWD/PhotonAnalysisTree/output/condor/photon_candidate_selection"
+for sample in jet3 jet5 jet8 jet12 jet20 jet30 jet40; do
+  mkdir -p "$logs/v12_eta_v2_decay_v1_$sample"
+  condor_submit "$workflow/submit_$sample.job"
+done
+# After all maps pass validation:
+mkdir -p "$logs/reduce"
+condor_submit "$workflow/submit_reduce_jet_samples.job"
+condor_submit "$workflow/submit_reduce_jet12_shards.job"
+# After all reduce shards finish:
+plots="$PWD/PhotonAnalysisTree/output/plots/photon_candidate_selection"
+bash "$workflow/run_merge.sh" jet \
+  "$plots/reduce/topology_v12_eta_v2_decay_v1/ClusterE0p12_Pi0Partner0p5/jet/partial_decay_v1" \
+  "$plots/ClusterE0p12_Pi0Partner0p5_v12_eta_v2_decay_v1/jet"
+```
+
+The focused tests cover identical omega->3pi/omega->pi0 gamma deposit partitions in
+HepMC, G4 and mixed pathways, canonical identity, K_S barriers in either pathway,
+nonzero flight and mm-to-cm conversion, interaction rejection, missing hit data,
+photon subshares, exact-half majority, branch roundtrips, corrupted closure,
+negative weights and histogram flows. The schema-8 synthetic map/reduce/merge test
+also checks the new ROOT/CSV/PDF outputs while preserving previous populations.

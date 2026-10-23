@@ -7,7 +7,7 @@ fi
 workflow_dir=$(cd "$(dirname "$0")" && pwd)
 configuration=$1
 output_directory=$2
-partial_root=/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/reduce/$configuration/jet/partial
+partial_root=/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/$configuration/partials/jet
 mkdir -p "$output_directory"
 output_root=$output_directory/tagging_purity_diagnostic.root
 if [[ -e "$output_root" ]]; then echo "Output already exists: $output_root" >&2; exit 2; fi

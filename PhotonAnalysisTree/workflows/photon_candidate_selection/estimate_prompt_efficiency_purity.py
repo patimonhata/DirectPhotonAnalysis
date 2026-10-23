@@ -17,7 +17,7 @@ import ROOT
 
 ROOT.gROOT.SetBatch(True)
 BASE = Path(__file__).resolve().parents[2]
-DEFAULT_INPUT = BASE / 'output/plots/photon_candidate_selection/ClusterE0p12_Pi0Partner0p5/jet/candidate_composition.root'
+DEFAULT_INPUT = BASE / 'output/photon_candidate_selection/productions/topology_v11/ClusterE0p12_Pi0Partner0p5/results/jet/candidate_composition.root'
 CATEGORIES = ('prompt', 'pi0_separated', 'pi0_merged', 'pi0_single_contaminated', 'pi0_missing', 'pi0_other', 'eta', 'other')
 SELECTIONS = ('preselection', 'preselection_tight', 'region_a', 'region_a_tagging_veto')
 

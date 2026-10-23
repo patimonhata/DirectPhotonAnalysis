@@ -12,14 +12,14 @@ family             = jet
 configuration      = ClusterE0p12_Pi0Partner0p15_Pi0Window0p08-0p18
 require_complete   = true
 shard_count        = 10
-map_root           = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/topology_v11/$(configuration)
-partial_root       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_working_point_scan/v2/reduce/topology_v11/$(configuration)/$(family)/partial
+map_root           = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v11/$(configuration)/maps
+partial_root       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_working_point_scan/productions/scan_v2/$(configuration)/partials/$(family)
 output_base        = $(partial_root)/jet12/shard_$(shard_index)
-log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_working_point_scan/v2/reduce
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_working_point_scan
 
-Output             = $(log_directory)/v11_$(family)_$(configuration)_jet12_shard_$(shard_index).out
-Error              = $(log_directory)/v11_$(family)_$(configuration)_jet12_shard_$(shard_index).err
-Log                = /tmp/v11_ryotaro-working-point-scan-v2-$(family)-$(configuration)-jet12-shard-$(shard_index).log
+Output = $(log_directory)/reduce_jet12_shards_$(ProcId).out
+Error = $(log_directory)/reduce_jet12_shards_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-tagging_working_point_scan-reduce_jet12_shards_$(ProcId).log
 
 Arguments          = "$(family) $(map_root) $(output_base) $(require_complete) jet12 $(shard_index) $(shard_count)"
 

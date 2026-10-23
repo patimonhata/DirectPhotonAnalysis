@@ -26,8 +26,8 @@ def compare(x, y, context):
         raise AssertionError((context, x, y))
     checks += 1
 
-for config, bit in [('ClusterE0p12_Pi0Partner0p5_v11', 4), ('ClusterE0p12_Pi0Partner0p15_v11', 5), ('ClusterE0p12_Pi0Partner0p15_v11_Pi0Window0p08-0p18', 0)]:
-    reference = open_root(a.composition_base / config / 'jet/candidate_composition.root')
+for config, bit in [('ClusterE0p12_Pi0Partner0p5', 4), ('ClusterE0p12_Pi0Partner0p15', 5), ('ClusterE0p12_Pi0Partner0p15_Pi0Window0p08-0p18', 0)]:
+    reference = open_root(a.composition_base / config / 'results/jet/candidate_composition.root')
     for kind in ['count', 'pb']:
         for selection, selected in [('region_a', False), ('region_a_tagging_veto', True)]:
             for category, origins, components in [

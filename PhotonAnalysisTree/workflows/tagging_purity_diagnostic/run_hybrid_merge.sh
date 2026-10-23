@@ -6,7 +6,7 @@ if (( $# != 1 )); then
 fi
 workflow_dir=$(cd "$(dirname "$0")" && pwd)
 output_directory=$1
-partial_root=/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/hybrid_reduce/jet/partial
+partial_root=/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/hybrid_threshold/partials/jet
 mkdir -p "$output_directory"
 output_root=$output_directory/hybrid_threshold_diagnostic.root
 if [[ -e "$output_root" ]]; then echo "Output already exists: $output_root" >&2; exit 2; fi

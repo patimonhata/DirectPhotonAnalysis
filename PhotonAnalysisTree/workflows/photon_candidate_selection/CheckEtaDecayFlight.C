@@ -1,7 +1,7 @@
 #ifndef CHECK_ETA_DECAY_FLIGHT_C
 #define CHECK_ETA_DECAY_FLIGHT_C
 
-#include "../../macro/Utilities/sPhenixStyle.C"
+#include "../common/plotting/sPhenixStyle.C"
 #include <frog/FROG.h>
 #include <g4main/PHG4MCProcessDefs.h>
 #include <g4main/PHG4Particle.h>
@@ -573,7 +573,7 @@ inline int run(const std::string& input_list, const std::string& base, Long64_t 
 }
 }
 
-int CheckEtaDecayFlight(const std::string input_list, const std::string output_base = "PhotonAnalysisTree/output/qa/eta_decay_flight/check",
+int CheckEtaDecayFlight(const std::string input_list, const std::string output_base = "PhotonAnalysisTree/output/photon_candidate_selection/qa/eta_decay_flight/check",
                        Long64_t first_file = 0, Long64_t n_files = 1, Long64_t max_events_per_file = 0,
                        const std::string requests_csv = "", int embedding_id = 1, double sample_weight = 1.)
 {

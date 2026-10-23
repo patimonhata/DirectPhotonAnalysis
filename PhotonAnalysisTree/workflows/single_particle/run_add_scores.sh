@@ -58,11 +58,11 @@ trap cleanup EXIT
 cp --reflink=auto -- "$input_file" "$temporary_file"
 chmod u+w -- "$temporary_file"
 
-root -l -b -q -e ".L $module_dir/macro/add_split_bdt.C" -e "gSystem->Exit(add_split_bdt(\"$temporary_file\",\"$split_bdt_model\"));"
-root -l -b -q -e ".L $module_dir/macro/add_split_bdt_ppg15v1.C" -e "gSystem->Exit(add_split_bdt_ppg15v1(\"$temporary_file\",\"$split_bdt_ppg15v1_model\"));"
-root -l -b -q -e ".L $module_dir/macro/add_nosplit_bdt.C" -e "gSystem->Exit(add_nosplit_bdt(\"$temporary_file\",\"$nosplit_bdt_model\"));"
-root -l -b -q -e ".L $module_dir/macro/add_split_gamma_onnx.C" -e "gSystem->Exit(add_split_gamma_onnx(\"$temporary_file\",\"$split_onnx_model\"));"
-root -l -b -q -e ".L $module_dir/macro/add_nosplit_gamma_onnx.C" -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$temporary_file\",\"$nosplit_onnx_model\"));"
+root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_split_bdt.C" -e "gSystem->Exit(add_split_bdt(\"$temporary_file\",\"$split_bdt_model\"));"
+root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_split_bdt_ppg15v1.C" -e "gSystem->Exit(add_split_bdt_ppg15v1(\"$temporary_file\",\"$split_bdt_ppg15v1_model\"));"
+root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_nosplit_bdt.C" -e "gSystem->Exit(add_nosplit_bdt(\"$temporary_file\",\"$nosplit_bdt_model\"));"
+root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_split_gamma_onnx.C" -e "gSystem->Exit(add_split_gamma_onnx(\"$temporary_file\",\"$split_onnx_model\"));"
+root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_nosplit_gamma_onnx.C" -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$temporary_file\",\"$nosplit_onnx_model\"));"
 
 root -l -b -q -e ".L $workflow_dir/check_tree.C" -e "gSystem->Exit(check_tree(\"$temporary_file\",false));"
 root -l -b -q -e ".L $workflow_dir/check_scored_tree.C" -e "gSystem->Exit(check_scored_tree(\"$temporary_file\"));"

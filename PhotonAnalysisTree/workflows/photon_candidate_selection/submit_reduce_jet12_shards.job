@@ -13,14 +13,14 @@ configuration      = ClusterE0p12_Pi0Partner0p5
 require_complete   = true
 n_bins             = 40
 et_max             = 40.0
-map_root            = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/topology_v12_eta_v2_decay_v1/$(configuration)
-partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/topology_v12_eta_v2_decay_v1/$(configuration)/$(family)/partial_decay_v1
+map_root            = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v12_eta_v2_decay_v1/$(configuration)/maps
+partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v12_eta_v2_decay_v1/$(configuration)/partials/$(family)
 output_base         = $(partial_root)/jet12/shard_$(shard_index)/photon_candidate_selection
-log_directory       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection/reduce
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection
 
-Output             = $(log_directory)/v12_eta_v2_decay_v1_selection_all_$(family)_$(configuration)_jet12_shard_$(shard_index).out
-Error              = $(log_directory)/v12_eta_v2_decay_v1_selection_all_$(family)_$(configuration)_jet12_shard_$(shard_index).err
-Log                = /tmp/v12_eta_v2_decay_v1_ryotaro-PhotonAnalysisTree-photon-candidate-selection-all-$(family)-$(configuration)-jet12-shard-$(shard_index).log
+Output = $(log_directory)/reduce_jet12_shards_$(ProcId).out
+Error = $(log_directory)/reduce_jet12_shards_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-photon_candidate_selection-reduce_jet12_shards_$(ProcId).log
 
 Arguments          = "$(family) $(map_root) $(output_base) $(require_complete) $(n_bins) $(et_max) jet12 $(shard_index)"
 

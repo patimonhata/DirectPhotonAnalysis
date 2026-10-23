@@ -10,11 +10,11 @@ job_lease_duration = 86400
 
 low_map_root       = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/cluster_e_gt_0p2
 high_map_root      = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/cluster_e_gt_0p5
-output_file        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/hybrid_reduce/jet/partial/jet12/shard_$(shard)/hybrid_threshold_diagnostic.root
-log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_purity_diagnostic/hybrid_reduce
-Output             = $(log_directory)/jet12_shard_$(shard).out
-Error              = $(log_directory)/jet12_shard_$(shard).err
-Log                = /tmp/ryotaro-hybrid-threshold-jet12-shard-$(shard).log
+output_file        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/hybrid_threshold/partials/jet/jet12/shard_$(shard)/hybrid_threshold_diagnostic.root
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_purity_diagnostic
+Output = $(log_directory)/hybrid_jet12_shards_$(ProcId).out
+Error = $(log_directory)/hybrid_jet12_shards_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-tagging_purity_diagnostic-hybrid_jet12_shards_$(ProcId).log
 Arguments          = "$(low_map_root) $(high_map_root) $(output_file) jet12 $(shard) 10 true 0"
 
 Queue shard from (

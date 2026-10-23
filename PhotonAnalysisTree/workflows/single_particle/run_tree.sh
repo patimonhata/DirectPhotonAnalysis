@@ -11,7 +11,7 @@ if ! [[ "$process_id" =~ ^[0-9]+$ ]] || ! [[ "$n_events" =~ ^[0-9]+$ ]]; then
 fi
 
 printf -v process_tag '%06d' "$process_id"
-output_file="$module_dir/output/root/photon_analysis_tree_${process_tag}.root"
+output_file="$module_dir/output/single_particle/productions/historical/default/maps/photon_analysis_tree_${process_tag}.root"
 if [[ -e "$output_file" ]]; then
   echo "Refusing to overwrite existing tree output: $output_file" >&2
   exit 3

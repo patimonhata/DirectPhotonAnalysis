@@ -21,7 +21,7 @@ repository rootから1 segmentだけ実行する例です。第1引数はsource/
 PhotonAnalysisTree/workflows/single_particle/run_tree.sh 0 0
 ~~~
 
-defaultの入力はSinglePi0GunSimulation/output/DST_pi0_3to15GeV_etapm1_vertexpm60、出力はPhotonAnalysisTree/output/root/photon_analysis_tree_<ID>.rootです。入力directory、出力directory、primary PDGを変える場合はFun4All_PhotonAnalysisTree.Cを直接呼びます。
+defaultの入力はSinglePi0GunSimulation/output/DST_pi0_3to15GeV_etapm1_vertexpm60、出力はPhotonAnalysisTree/output/single_particle/productions/historical/default/maps/photon_analysis_tree_<ID>.rootです。入力directory、出力directory、primary PDGを変える場合はFun4All_PhotonAnalysisTree.Cを直接呼びます。
 
 Condor production:
 
@@ -42,8 +42,8 @@ condor_submit -append 'n_jobs = 100' -append 'job_offset = 500' submit_tree.job
 
 ~~~bash
 PhotonAnalysisTree/workflows/single_particle/run_add_scores.sh \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_000000.root \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_000000_scored.root
+  PhotonAnalysisTree/output/single_particle/productions/historical/default/maps/photon_analysis_tree_000000.root \
+  PhotonAnalysisTree/output/single_particle/productions/historical/default/maps/photon_analysis_tree_000000_scored.root
 ~~~
 
 wrapperはbase fileを事前検査し、final outputと同じdirectoryに一時コピーを作ります。そのコピーへsplit/no-split BDT、PPG15v1 split BDT、split/no-split ONNX scoreを追加し、base/scored checkerがすべて成功した場合だけfinal output名へrenameします。入力fileは変更しません。失敗時は一時fileを削除し、既存のfinal outputは上書きしません。
@@ -62,13 +62,13 @@ score wrapperの任意引数でmodel pathを上書きできます。default mode
 scored fileだけを明示的な6桁ID patternでmergeします。
 
 ~~~bash
-mkdir -p PhotonAnalysisTree/output/merged
-hadd -f PhotonAnalysisTree/output/merged/all.root \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_[0-9][0-9][0-9][0-9][0-9][0-9]_scored.root
+mkdir -p PhotonAnalysisTree/output/single_particle/productions/historical/default/results
+hadd -f PhotonAnalysisTree/output/single_particle/productions/historical/default/results/all.root \
+  PhotonAnalysisTree/output/single_particle/productions/historical/default/maps/photon_analysis_tree_[0-9][0-9][0-9][0-9][0-9][0-9]_scored.root
 PhotonAnalysisTree/workflows/single_particle/make_dataset_manifest.sh
 ~~~
 
-default manifestはPhotonAnalysisTree/output/merged/manifest.jsonです。引数はSCORED_DIR MERGED_ROOT MANIFEST_JSON BDT_MODEL ONNX_MODELの順です。既存manifestを置き換える場合だけFORCE=1を指定します。
+default manifestはPhotonAnalysisTree/output/single_particle/productions/historical/default/results/manifest.jsonです。引数はSCORED_DIR MERGED_ROOT MANIFEST_JSON BDT_MODEL ONNX_MODELの順です。既存manifestを置き換える場合だけFORCE=1を指定します。
 
 copy_analysis_trees.Cは、古いROOT fileに余分なtop-level objectやkey cycleがある場合に、event_treeとmetadataだけをclean copyする補助macroです。通常の新規productionでは必須ではありません。
 

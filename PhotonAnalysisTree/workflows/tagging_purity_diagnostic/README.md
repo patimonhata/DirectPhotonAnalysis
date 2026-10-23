@@ -1,5 +1,7 @@
 # Tagging-purity diagnostic
 
+Historical investigation, low priority. Results and source are retained; original map inputs may no longer exist. Reproduction/latest-definition updates are outside this layout change. See [layout](../../docs/layout.md).
+
 This workflow reads the existing schema-5 photon-candidate map trees. It does not alter the production selection.
 
 For every Region-A anchor and 1 GeV ET bin it records raw and cross-section-weighted counts before tagging, pi0-only vetoes, eta-only vetoes, overlaps, and final survivors. The same flow is split into prompt and background anchors. Truth-pi0 anchors are further split by truth-pair taggability, combinatorial-only veto, selected-partner truth matching, displaced selected truth partners, and missing category.
@@ -13,7 +15,7 @@ The existing 0.2 GeV maps contain the selected partners and cluster features nee
 ~~~bash
 root -l -b -q \
   -e '.L PhotonAnalysisTree/workflows/tagging_purity_diagnostic/ReduceTaggingPurityDiagnostic.C' \
-  -e 'gSystem->Exit(ReduceTaggingPurityDiagnostic("PhotonAnalysisTree/output/intermediate_files/photon_candidate_selection/cluster_e_gt_0p2","PhotonAnalysisTree/output/qa/tagging_purity_diagnostic/jet8_10000events.root",0.2,"jet8",0,1,true,10000))'
+  -e 'gSystem->Exit(ReduceTaggingPurityDiagnostic("PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v10/cluster_e_gt_0p2/maps","PhotonAnalysisTree/output/tagging_purity_diagnostic/qa/tagging_purity_diagnostic/jet8_10000events.root",0.2,"jet8",0,1,true,10000))'
 ~~~
 
 ## Full Jet reduction
@@ -21,7 +23,7 @@ root -l -b -q \
 The two submit files create 12 ordinary-sample jobs and 20 Jet12 shards, covering both production thresholds.
 
 ~~~bash
-mkdir -p PhotonAnalysisTree/output/condor/tagging_purity_diagnostic/reduce
+mkdir -p PhotonAnalysisTree/output/condor/tagging_purity_diagnostic
 condor_submit PhotonAnalysisTree/workflows/tagging_purity_diagnostic/submit_reduce_jet_samples.job
 condor_submit PhotonAnalysisTree/workflows/tagging_purity_diagnostic/submit_reduce_jet12_shards.job
 ~~~
@@ -34,9 +36,9 @@ After all partials finish:
 
 ~~~bash
 PhotonAnalysisTree/workflows/tagging_purity_diagnostic/run_merge.sh cluster_e_gt_0p2 \
-  PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/cluster_e_gt_0p2/jet
+  PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/cluster_e_gt_0p2/results/jet
 PhotonAnalysisTree/workflows/tagging_purity_diagnostic/run_merge.sh cluster_e_gt_0p5 \
-  PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/cluster_e_gt_0p5/jet
+  PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/cluster_e_gt_0p5/results/jet
 ~~~
 
 Each merge writes the summed ROOT file plus long-form flow and metric TSV files. Fraction errors use the weighted-subset covariance formula. The prompt definition and event weights match the production composition reducer: strict prompt contribution above 0.5 and cross section times generator weight divided by the full per-sample generator-weight sum.
@@ -47,11 +49,11 @@ The paired reducer joins the 0.2 and 0.5 GeV maps by event UID and cluster ID an
 0.5/0.5, 0.2/0.2, pi0=0.2 with eta=0.5, and the inverse. It also stores common survivors so comparison errors include overlap covariance.
 
 ~~~bash
-mkdir -p PhotonAnalysisTree/output/condor/tagging_purity_diagnostic/hybrid_reduce
+mkdir -p PhotonAnalysisTree/output/condor/tagging_purity_diagnostic
 condor_submit PhotonAnalysisTree/workflows/tagging_purity_diagnostic/submit_hybrid_jet_samples.job
 condor_submit PhotonAnalysisTree/workflows/tagging_purity_diagnostic/submit_hybrid_jet12_shards.job
 PhotonAnalysisTree/workflows/tagging_purity_diagnostic/run_hybrid_merge.sh \
-  PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/hybrid_threshold/jet
+  PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/hybrid_threshold/results/jet
 ~~~
 
 The merge writes ROOT, flow TSV, metric TSV, and correlated-comparison TSV outputs. See `RESULTS.md` for the current full-statistics result.

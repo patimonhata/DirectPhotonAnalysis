@@ -1,3 +1,4 @@
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/single_particle
 Universe           = vanilla
 Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/single_particle
 Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/single_particle/run_tree.sh
@@ -13,11 +14,11 @@ n_events           = 0
 job_offset         = 0
 n_jobs            = 5000
 process_id         = $(Process) + $(job_offset)
-output_directory   = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor
+output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/single_particle
 
-Output             = $(output_directory)/tree_$INT(process_id,%06d).out
-Error              = $(output_directory)/tree_$INT(process_id,%06d).err
-Log                = /tmp/ryotaro-PhotonAnalysisTree-tree_$INT(process_id,%06d).log
+Output = $(log_directory)/tree_$(ProcId).out
+Error = $(log_directory)/tree_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-single_particle-tree_$(ProcId).log
 Arguments          = "$INT(process_id) $(n_events)"
 
 Queue $(n_jobs)

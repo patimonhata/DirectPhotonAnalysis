@@ -1,7 +1,7 @@
 #ifndef TAGGING_MASS_DIAGNOSTIC_H
 #define TAGGING_MASS_DIAGNOSTIC_H
 #include "../photon_candidate_selection/PhotonCandidateSettings.h"
-#include "../../macro/Utilities/sPhenixStyle.C"
+#include "../common/plotting/sPhenixStyle.C"
 
 #include <TCanvas.h>
 #include <TChain.h>

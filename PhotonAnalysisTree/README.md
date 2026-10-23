@@ -1,5 +1,11 @@
 # PhotonAnalysisTree
 
+コードは `workflows/`、成果物は `output/<workflow>/productions/<production>/<configuration>/` にまとめています。[配置と保全方針](docs/layout.md)、[過去 study の再実行](docs/reproduction.md)を参照してください。
+
+主解析は [photon_candidate_selection](workflows/photon_candidate_selection/README.md) です。正式結果は `output/photon_candidate_selection/current/jet/`、v11/schema 5 は `output/photon_candidate_selection/productions/topology_v11/` にあります。Condor ログは `output/condor/<workflow>/` の固定場所を再利用します。
+
+以下は tree 生成・score 追加に関する説明です。Pythia の入口は `workflows/pythia_tree/`、共有処理は `workflows/common/` へ移動しています。
+
 Pythia DSTには別frontendの`PythiaPhotonAnalysisTree`を使います。cluster/tower/shower-shape
 処理はsingle-particle版と共有しますが、event truthは複数primaryを前提としたcluster contributor
 schemaです。詳細は[docs/pythia_tree_schema.md](docs/pythia_tree_schema.md)を参照してください。
@@ -51,7 +57,7 @@ Single-particle固有の実行手順とfile一覧は[workflows/single_particle/R
 ./PhotonAnalysisTree/workflows/single_particle/run_tree.sh 0 0
 ```
 
-第1引数はsource/process ID、第2引数はevent数です。`0` event指定は全eventです。default inputは`DST_pi0_3to15GeV_etapm1_vertexpm60`、default outputは`PhotonAnalysisTree/output/root`です。
+第1引数はsource/process ID、第2引数はevent数です。`0` event指定は全eventです。default inputは`DST_pi0_3to15GeV_etapm1_vertexpm60`、default outputは`PhotonAnalysisTree/output/single_particle/productions/historical/default/maps`です。
 
 直接ROOT macroを呼ぶ場合は、input/output directoryとexpected primary PDGも変更できます。
 
@@ -65,7 +71,7 @@ basenameで登録し、schema version 4の専用treeを作ります。
 
 ```bash
 root -l -b -q \
-  'PhotonAnalysisTree/macro/Fun4All_PhotonAnalysisTreePythia.C("pythia8_Jet5-0000000028-000000.root",0)'
+  'PhotonAnalysisTree/workflows/pythia_tree/Fun4All_PhotonAnalysisTreePythia.C("pythia8_Jet5-0000000028-000000.root",0)'
 ```
 
 第1引数はstream prefixを除いた共通suffix、第2引数はevent数（`0`は全event）です。
@@ -77,7 +83,7 @@ wrapperはsingle-particle版と分離しており、生成後に`check_pythia_tr
 schema version、branch alignment、contributor offsetとfractionを検証します。
 
 ```bash
-./PhotonAnalysisTree/run_tree_pythia.sh \
+./PhotonAnalysisTree/workflows/pythia_tree/run_tree.sh \
   pythia8_Jet5-0000000028-000000.root 0
 ```
 
@@ -85,7 +91,7 @@ schema version、branch alignment、contributor offsetとfractionを検証しま
 次を実行します。4リストの行数、順序、suffixが一致しない場合は生成に失敗します。
 
 ```bash
-./PhotonAnalysisTree/make_pythia_input_manifest.sh
+./PhotonAnalysisTree/workflows/common/workflows/common/make_pythia_input_manifest.sh
 ```
 
 ## scoreを追加する
@@ -94,8 +100,8 @@ single-particle用wrapperは入力ROOT fileを変更せず、最終outputと同�
 
 ```bash
 ./PhotonAnalysisTree/workflows/single_particle/run_add_scores.sh \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_000000.root \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_000000_scored.root
+  PhotonAnalysisTree/output/single_particle/productions/historical/default/maps/photon_analysis_tree_000000.root \
+  PhotonAnalysisTree/output/single_particle/productions/historical/default/maps/photon_analysis_tree_000000_scored.root
 ```
 
 wrapperは最後に`check_scored_tree.C`を実行し、cluster、tower、pair、score vectorの長さに加え、`metadata` TTreeが実際に読めること、event数とsource file IDが一致することを検証します。scored ROOT fileのtop-level objectは`event_tree`と`metadata`だけです。adapterのcluster数、valid数、malformed数などの集計は標準出力（Condor log）だけに記録します。既存の最終outputは上書きせず、score/valid branchが既にある入力もエラーにします。Condorで多数jobを同時実行してもACLiCの共有build fileが競合しないよう、score macroは各process内でloadします。
@@ -104,9 +110,9 @@ Pythia schema version 4にはsplit専用wrapperを使います。第3引数に�
 split clusterで学習したONNX modelを必ず明示します。
 
 ```bash
-./PhotonAnalysisTree/run_add_scores_pythia.sh \
-  PhotonAnalysisTree/output/root/pythia_photon_analysis_tree_pythia8_Jet5-0000000028-000000.root \
-  PhotonAnalysisTree/output/root/pythia_photon_analysis_tree_pythia8_Jet5-0000000028-000000_scored.root \
+./PhotonAnalysisTree/workflows/pythia_tree/run_add_scores.sh \
+  PhotonAnalysisTree/output/pythia_tree/productions/historical/default/maps/pythia_photon_analysis_tree_pythia8_Jet5-0000000028-000000.root \
+  PhotonAnalysisTree/output/pythia_tree/productions/historical/default/maps/pythia_photon_analysis_tree_pythia8_Jet5-0000000028-000000_scored.root \
   /path/to/split_model.onnx
 ```
 
@@ -130,7 +136,7 @@ NO_SPLIT clusterで学習したBDTも`workflows/single_particle/run_add_scores.s
 
 ```bash
 root -l -b \
-  -e '.L PhotonAnalysisTree/macro/add_nosplit_bdt.C' \
+  -e '.L PhotonAnalysisTree/workflows/common/scoring/add_nosplit_bdt.C' \
   -e 'gSystem->Exit(add_nosplit_bdt("input.root"));'
 ```
 
@@ -140,7 +146,7 @@ SPLIT clusterで学習したONNX modelが用意できた後は、model pathを�
 
 ```bash
 root -l -b \
-  -e '.L PhotonAnalysisTree/macro/add_split_gamma_onnx.C' \
+  -e '.L PhotonAnalysisTree/workflows/common/scoring/add_split_gamma_onnx.C' \
   -e 'gSystem->Exit(add_split_gamma_onnx("input.root", "split_model.onnx"));'
 ```
 
@@ -151,9 +157,9 @@ root -l -b \
 merged fileは個別fileと同じdirectoryへ置かず、入力に6桁のprocess IDを明示したpatternを使います。
 
 ```bash
-mkdir -p PhotonAnalysisTree/output/merged
-hadd -f PhotonAnalysisTree/output/merged/all.root \
-  PhotonAnalysisTree/output/root/photon_analysis_tree_[0-9][0-9][0-9][0-9][0-9][0-9]_scored.root
+mkdir -p PhotonAnalysisTree/output/single_particle/productions/historical/default/results
+hadd -f PhotonAnalysisTree/output/single_particle/productions/historical/default/results/all.root \
+  PhotonAnalysisTree/output/single_particle/productions/historical/default/maps/photon_analysis_tree_[0-9][0-9][0-9][0-9][0-9][0-9]_scored.root
 ```
 
 正常なmergeでは`event_tree`と`metadata`がそれぞれmergeされ、`metadata`のentry数は入力file数になります。個別fileに`TNamed`や`TParameter`を保存しないため、同名objectのbackup cycleは発生しません。
@@ -164,11 +170,11 @@ merge後にdataset全体の生成条件を`manifest.json`へ記録します。sc
 ./PhotonAnalysisTree/workflows/single_particle/make_dataset_manifest.sh
 ```
 
-default出力は`PhotonAnalysisTree/output/merged/manifest.json`です。引数は`SCORED_DIR MERGED_ROOT MANIFEST_JSON BDT_MODEL ONNX_MODEL`の順で、省略できます。既存manifestを意図的に更新する場合だけ`FORCE=1`を指定します。
+default出力は`PhotonAnalysisTree/output/single_particle/productions/historical/default/results/manifest.json`です。引数は`SCORED_DIR MERGED_ROOT MANIFEST_JSON BDT_MODEL ONNX_MODEL`の順で、省略できます。既存manifestを意図的に更新する場合だけ`FORCE=1`を指定します。
 
 ## Model provenanceと制約
 
-model path、SHA-256、score branch、feature schema、domain warning、event数、source file範囲、codeのgit commitはdataset単位の`output/merged/manifest.json`へ1回だけ保存します。個別ROOT fileには重複保存しません。
+model path、SHA-256、score branch、feature schema、domain warning、event数、source file範囲、codeのgit commitはdataset単位の`output/single_particle/productions/historical/default/results/manifest.json`へ1回だけ保存します。個別ROOT fileには重複保存しません。
 
 同梱`models/best_model.onnx`のSHA-256は`194eb9a0394b5752619d324aa8a17dde547ff67713ea908dcfed869ef0931a6d`です。元は`Pi0DirectGammaSeparation/Pi0GammaClassifier/output/baseline`で、`models/onnx_metadata.json`も同梱しています。
 
@@ -178,16 +184,16 @@ ONNX modelは`n_cluster == 1`のNO_SPLIT eventだけで学習されています�
 
 ## HTCondor production
 
-single-particle用の実行scriptとsubmit fileは`workflows/single_particle`にあります。Pythia用fileは`PhotonAnalysisTree`直下に残しています。
+single-particle用の実行scriptとsubmit fileは`workflows/single_particle`にあります。Pythia用fileは`workflows/pythia_tree`にまとめています。
 
 ```bash
 cd /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
 condor_submit workflows/single_particle/submit_tree.job
-condor_submit run_tree_pythia.job
+condor_submit workflows/pythia_tree/submit_tree.job
 # tree jobsの完了後
 condor_submit workflows/single_particle/submit_scores.job
 # manifestの先頭から1 jobだけsubmit
-condor_submit -append "manifest_slice = [0:1]" -maxjobs 1 run_add_scores_pythia.job
+condor_submit -append "manifest_slice = [0:1]" -maxjobs 1 workflows/pythia_tree/submit_scores.job
 ```
 
 `workflows/single_particle/submit_tree.job`のjob数とoffsetはsubmit時に上書きできます。両submit fileともdefaultは5000 jobで、`n_jobs`と`job_offset`をsubmit時に上書きできます。
@@ -200,14 +206,14 @@ condor_submit -append "job_offset = 500" workflows/single_particle/submit_scores
 Pythia scoringを段階的に増やす場合はmanifestとsliceをsubmit時に上書きできます。
 
 ```bash
-condor_submit -append "input_manifest = input/jet5/segments.list" -append "manifest_slice = [0:10]" -maxjobs 10 run_add_scores_pythia.job
+condor_submit -append "input_manifest = input/jet5/segments.list" -append "manifest_slice = [0:10]" -maxjobs 10 workflows/pythia_tree/submit_scores.job
 ```
 
 - `workflows/single_particle/run_tree.sh`, `workflows/single_particle/submit_tree.job`: single-particle DSTからbase TTreeを生成
-- `run_tree_pythia.sh`, `run_tree_pythia.job`: Pythia 4-stream DSTからschema 4 treeを生成
-- `make_pythia_input_manifest.sh`: 4つのstream別listを検証して共通suffix manifestを生成
+- `workflows/pythia_tree/run_tree.sh`, `workflows/pythia_tree/submit_tree.job`: Pythia 4-stream DSTからschema 4 treeを生成
+- `workflows/common/workflows/common/make_pythia_input_manifest.sh`: 4つのstream別listを検証して共通suffix manifestを生成
 - `workflows/single_particle/run_add_scores.sh`, `workflows/single_particle/submit_scores.job`: BDT/gamma score branchを追加して検証
-- `run_add_scores_pythia.sh`, `run_add_scores_pythia.job`: Pythia schema 4 treeへsplit scoreだけをtransactionalに追加して検証
+- `workflows/pythia_tree/run_add_scores.sh`, `workflows/pythia_tree/submit_scores.job`: Pythia schema 4 treeへsplit scoreだけをtransactionalに追加して検証
 - `workflows/single_particle/make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
 
 ## Minimum-bias truth pT spectra
@@ -223,7 +229,7 @@ diagnostic histogramも保存します。詳細な粒子定義は
 
 ```bash
 cd /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
-./make_pythia_input_manifest.sh input/minimum_bias input/minimum_bias/segments.list
+./workflows/common/workflows/common/make_pythia_input_manifest.sh input/minimum_bias input/minimum_bias/segments.list
 ```
 
 truth pT spectrumの集計とplotは、`workflows/truth_pt`のmap-reduce workflowを
@@ -239,7 +245,7 @@ partialの範囲・解析条件を検証して統合し、最後にbin幅で規�
 `expected_manifest_end`を指定するため、partialの欠落も検出します。
 
 ```bash
-root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/intermediate_files/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root","output/plots/minbias_truth_pt_prompt_eta07_inclusive_pi0_decay",0,200000)'
+root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/partials/minimum_bias/partial_*.root","output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/results/minimum_bias/prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
 粒子選択、partial schema、再開方法は
@@ -253,5 +259,5 @@ default cut、pathway定義、実行方法は
 [cluster-ET workflow](workflows/cluster_et/README.md)を参照してください。
 最終density histogramの単位は`clusters/GeV`です。
 
-`run_tree_pythia.job`は`input/jet5/segments.list`を`queue ... from`で読み、
+`workflows/pythia_tree/submit_tree.job`は`input/jet5/segments.list`を`queue ... from`で読み、
 manifestの1行につき1つの同期した4-stream DST jobを生成します。

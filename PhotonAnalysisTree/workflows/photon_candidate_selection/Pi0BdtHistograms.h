@@ -1,6 +1,6 @@
 #ifndef PI0_BDT_HISTOGRAMS_H
 #define PI0_BDT_HISTOGRAMS_H
-#include "../../macro/Utilities/sPhenixStyle.C"
+#include "../common/plotting/sPhenixStyle.C"
 #include <TCanvas.h>
 #include <TPad.h>
 #include <TTree.h>

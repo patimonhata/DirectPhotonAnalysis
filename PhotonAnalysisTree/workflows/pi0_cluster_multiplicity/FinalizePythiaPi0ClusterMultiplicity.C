@@ -243,8 +243,8 @@ bool make_output_directory(const std::string& output_base)
 }
 
 int FinalizePythiaPi0ClusterMultiplicity(
-    const std::string partial_pattern = "output/intermediate_files/pi0_cluster_multiplicity_partial/jet12_10k/primary_generator_truth_eta07/partial_*.root",
-    const std::string output_base = "output/plots/pi0_cluster_multiplicity/jet12_10k/primary_generator_truth_eta07",
+    const std::string partial_pattern = "output/pi0_cluster_multiplicity/productions/historical/jet12_10k/partials/primary_generator_truth_eta07/partial_*.root",
+    const std::string output_base = "output/pi0_cluster_multiplicity/productions/historical/preserved_results/results/jet12_10k/primary_generator_truth_eta07",
     const long long expected_manifest_begin = 0,
     const long long expected_manifest_end = -1)
 {

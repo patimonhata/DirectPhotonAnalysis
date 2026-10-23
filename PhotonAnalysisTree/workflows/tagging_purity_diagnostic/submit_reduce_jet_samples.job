@@ -9,11 +9,11 @@ Priority           = 20
 job_lease_duration = 86400
 
 map_root           = /sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/$(configuration)
-output_file        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/tagging_purity_diagnostic/reduce/$(configuration)/jet/partial/$(sample)/shard_0/tagging_purity_diagnostic.root
-log_directory      = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_purity_diagnostic/reduce
-Output             = $(log_directory)/$(configuration)_$(sample)_shard_0.out
-Error              = $(log_directory)/$(configuration)_$(sample)_shard_0.err
-Log                = /tmp/ryotaro-tagging-purity-$(configuration)-$(sample)-shard-0.log
+output_file        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/$(configuration)/partials/jet/$(sample)/shard_0/tagging_purity_diagnostic.root
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_purity_diagnostic
+Output = $(log_directory)/reduce_jet_samples_$(ProcId).out
+Error = $(log_directory)/reduce_jet_samples_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-tagging_purity_diagnostic-reduce_jet_samples_$(ProcId).log
 Arguments          = "$(map_root) $(output_file) $(threshold) $(sample) 0 1 true 0"
 
 Queue configuration, threshold, sample from (

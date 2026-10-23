@@ -3,9 +3,9 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../.." && pwd)
-scored_dir=${1:-$module_dir/output/root}
-merged_file=${2:-$module_dir/output/merged/all.root}
-manifest_file=${3:-$module_dir/output/merged/manifest.json}
+scored_dir=${1:-$module_dir/output/single_particle/productions/historical/default/maps}
+merged_file=${2:-$module_dir/output/single_particle/productions/historical/default/results/all.root}
+manifest_file=${3:-$module_dir/output/single_particle/productions/historical/default/results/manifest.json}
 bdt_model=${4:-/sphenix/user/shuhangli/ppg12/FunWithxgboost/binned_models/model_base_v3E_split_single_tmva.root}
 onnx_model=${5:-$module_dir/models/best_model.onnx}
 onnx_metadata="$module_dir/models/onnx_metadata.json"

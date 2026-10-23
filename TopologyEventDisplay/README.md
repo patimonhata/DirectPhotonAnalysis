@@ -2,7 +2,7 @@
 
 This package is a diagnostic view of the pi0 anchor-topology decision.  The
 decision itself is not implemented in the display: both
-`PythiaPi0AnchorClusterSpectrum` and this package call the shared
+the photon-candidate workflow and this package call the shared
 `photon_tree::Pi0AnchorTopologyEvaluator` in `PhotonAnalysisTree`.
 
 ## Main entry points
@@ -36,7 +36,7 @@ Fun4All dumper.
 ## Pythia workflow
 
 The input manifest has the same suffix format used by
-`PhotonAnalysisTree/workflows/pi0_anchor_topology`.  Each suffix resolves the
+`PhotonAnalysisTree/workflows/photon_candidate_selection`.  Each suffix resolves the
 four synchronized catalog files `DST_CALO_CLUSTER_*`, `DST_MBD_EPD_*`,
 `DST_TRUTH_JET_*`, and `G4Hits_*`.
 

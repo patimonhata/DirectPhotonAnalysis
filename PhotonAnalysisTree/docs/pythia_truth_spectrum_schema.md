@@ -89,6 +89,6 @@ final photons, terminal pi0s, and G4 pi0 decay photons. It also records photon
 copy edges, nonterminal pi0 copies, invalid ancestry/kinematics, and unmatched
 G4 candidates.
 
-Use `macro/check_pythia_truth_spectrum_tree.C` to validate the schema, vector
+Use `workflows/pythia_tree/check_pythia_truth_spectrum_tree.C` to validate the schema, vector
 alignment, unique particle IDs, aggregate counts, and G4-parent/HepMC-pi0
 barcode consistency.

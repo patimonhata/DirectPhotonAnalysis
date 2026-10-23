@@ -1,4 +1,4 @@
-#include "../../macro/Utilities/sPhenixStyle.C"
+#include "../common/plotting/sPhenixStyle.C"
 
 #include <TCanvas.h>
 #include <TChain.h>
@@ -204,8 +204,8 @@ double smallest_positive_bin(const std::vector<TH1D*>& histograms)
 }
 
 int FinalizePythiaTruthPtSpectra(
-    const std::string partial_pattern = "output/intermediate_files/truth_pt_partial/minimum_bias/prompt_eta07_unweighted_inclusive_pi0_decay/partial_*.root",
-    const std::string output_base = "output/plots/truth_pT/minbias/prompt_eta07_inclusive_pi0_decay",
+    const std::string partial_pattern = "output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/partials/minimum_bias/partial_*.root",
+    const std::string output_base = "output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/results/minimum_bias/prompt_eta07_inclusive_pi0_decay",
     const Long64_t expected_manifest_begin = 0,
     const Long64_t expected_manifest_end = -1)
 {

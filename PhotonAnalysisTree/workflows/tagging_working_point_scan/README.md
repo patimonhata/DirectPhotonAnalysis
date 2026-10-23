@@ -1,5 +1,7 @@
 # Pi0 veto working-point scan
 
+Historical investigation, low priority. Results and source are retained; original map inputs may no longer exist. Reproduction/latest-definition updates are outside this layout change. See [layout](../../docs/layout.md).
+
 Read one common topology-v11 map production with stored-cluster threshold at or below 0.12 GeV and baseline pi0 E > 0.15 GeV, 0.08 < mass < 0.18 GeV. Recompute all pairs for every saved Region-A candidate, simultaneously evaluating six settings (v2):
 
 | Key | Pi0 partner E | Pi0 mass window |
@@ -27,7 +29,7 @@ Fraction errors use weighted subset covariance at candidate level, as in the exi
 ## Run
 
 ```bash
-mkdir -p PhotonAnalysisTree/output/condor/tagging_working_point_scan/v2/reduce
+mkdir -p PhotonAnalysisTree/output/condor/tagging_working_point_scan
 condor_submit PhotonAnalysisTree/workflows/tagging_working_point_scan/submit_reduce_jet_samples.job
 condor_submit PhotonAnalysisTree/workflows/tagging_working_point_scan/submit_reduce_jet12_shards.job
 ```
@@ -36,15 +38,15 @@ After both submissions complete:
 
 ```bash
 PhotonAnalysisTree/workflows/tagging_working_point_scan/run_merge.sh jet \
-  PhotonAnalysisTree/output/plots/tagging_working_point_scan/v2/reduce/topology_v11/ClusterE0p12_Pi0Partner0p15_Pi0Window0p08-0p18/jet/partial \
-  PhotonAnalysisTree/output/plots/tagging_working_point_scan/v2/topology_v11/ClusterE0p12_Pi0Partner0p15_Pi0Window0p08-0p18/jet
+  PhotonAnalysisTree/output/tagging_working_point_scan/productions/scan_v2/ClusterE0p12_Pi0Partner0p15_Pi0Window0p08-0p18/partials/jet \
+  PhotonAnalysisTree/output/tagging_working_point_scan/productions/scan_v2/ClusterE0p12_Pi0Partner0p15_Pi0Window0p08-0p18/results/jet
 ```
 
 Existing ROOT outputs are not overwritten. Event-limited and incomplete-map QA outputs cannot be used for a production merge. The same optional QA parameters as tagging_mass_diagnostic are available on the C++ functions.
 
 ## QA
 
-The v2 QA uses two Jet8 maps (64,344 events, 56 Region-A candidates), one reduce partial, and a merge under `output/qa/tagging_working_point_scan/v2/`. Input symlinks live under `output/qa/tagging_working_point_scan/two_maps/maps/jet8/`. `check_scan.py MAP_GLOB MERGED_ROOT` independently recomputes all six pair predicates and exclusive pi0/prompt classification in Python and compares every raw/weighted mask bin and Sumw2 error; this passed. It is intended for small QA inputs only.
+The v2 QA uses two Jet8 maps (64,344 events, 56 Region-A candidates), one reduce partial, and a merge under `output/tagging_working_point_scan/qa/tagging_working_point_scan/v2/`. Input symlinks live under `output/tagging_working_point_scan/qa/tagging_working_point_scan/two_maps/maps/jet8/`. `check_scan.py MAP_GLOB MERGED_ROOT` independently recomputes all six pair predicates and exclusive pi0/prompt classification in Python and compares every raw/weighted mask bin and Sumw2 error; this passed. It is intended for small QA inputs only.
 
 For a production v2 output, `check_reference_outputs.py SCAN_ROOT COMPOSITION_BASE PREVIOUS_SCAN_ROOT` compares all raw and weighted prompt/all/pi0 yields and variances before/after veto to the three existing photon compositions (E > 0.5 with 0.10–0.20; E > 0.15 with 0.10–0.20 and 0.08–0.18). It also projects out the new mask bits to compare every bin and variance with the v1 four-setting scan.
 

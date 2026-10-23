@@ -25,6 +25,6 @@ root -l -b -q "$module_dir/tests/test_decay_origin_reduce.C"
 root -l -b -q "$module_dir/tests/test_eta_cascade.C"
 root -l -b -q "$module_dir/tests/test_eta_decay_flight.C"
 python3 "$module_dir/tests/test_eta_pipeline.py"
-for script in "$module_dir/workflows/photon_candidate_selection/"*.sh "$module_dir/workflows/pi0_anchor_topology/"*.sh; do
+for script in "$module_dir/workflows/photon_candidate_selection/"*.sh; do
   bash -n "$script"
 done

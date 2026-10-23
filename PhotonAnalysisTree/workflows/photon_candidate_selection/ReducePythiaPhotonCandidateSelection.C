@@ -1,5 +1,5 @@
 #include "../../src/EtaOriginFractions.h"
-#include "../../macro/Utilities/sPhenixStyle.C"
+#include "../common/plotting/sPhenixStyle.C"
 
 #include "Pi0BdtHistograms.h"
 #include <TCanvas.h>
@@ -958,11 +958,13 @@ int ReducePythiaPhotonCandidateSelection(
       n_bins <= 0 || !std::isfinite(et_max) || et_max <= 0.0) return 1;
   std::string normalized_map_root = map_root;
   while (normalized_map_root.size() > 1U && normalized_map_root.back() == '/') normalized_map_root.pop_back();
-  const std::string configuration = normalized_map_root.substr(normalized_map_root.find_last_of('/') + 1U);
-  const std::string default_output_suffix = "/partial_decay_v1/" + sample_name + "/shard_" + std::to_string(shard_index) + "/photon_candidate_selection";
+  const std::string configuration_root = normalized_map_root.substr(normalized_map_root.find_last_of('/') + 1U) == "maps"
+      ? normalized_map_root.substr(0, normalized_map_root.find_last_of('/')) : normalized_map_root;
+  const std::string configuration = configuration_root.substr(configuration_root.find_last_of('/') + 1U);
+  const std::string default_output_suffix = "/partials/" + family + "/" + sample_name + "/shard_" + std::to_string(shard_index) + "/photon_candidate_selection";
   const std::string resolved_output_base = output_base.empty()
-      ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/plots/photon_candidate_selection/reduce/" +
-            configuration + "/" + family + default_output_suffix
+      ? "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v12_eta_v2_decay_v1/" +
+            configuration + default_output_suffix
       : output_base;
   if (!make_output_directory(resolved_output_base)) return 2;
 

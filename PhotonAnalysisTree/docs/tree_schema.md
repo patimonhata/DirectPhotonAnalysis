@@ -114,7 +114,7 @@ NO_SPLIT collectionではtower keyはevent内で一意です。SPLIT collection�
 | `split_cluster_p_gamma` | SPLIT学習ONNXによるSPLIT clusterのdirect-gamma probability |
 | `split_cluster_p_gamma_valid` | SPLIT constituent feature integrity checks passed and inference succeeded |
 
-Scored files intentionally contain only the `event_tree` and `metadata` TTrees. Adapter counters are written to the job log. Model paths, hashes, feature order, and domain warnings are recorded once per merged dataset in `output/merged/manifest.json`.
+Scored files intentionally contain only the `event_tree` and `metadata` TTrees. Adapter counters are written to the job log. Model paths, hashes, feature order, and domain warnings are recorded once per merged dataset in `output/single_particle/productions/historical/default/results/manifest.json`.
 
 ## Metadata tree
 

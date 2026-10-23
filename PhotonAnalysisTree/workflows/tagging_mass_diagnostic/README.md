@@ -1,101 +1,49 @@
 # Tagging invariant-mass diagnostic
 
-Independent reduce/merge workflow for existing photon-candidate maps (schema 5, topology algorithm 11, recovery requirement disabled). Version-11 maps are required; regenerate version-10 inputs. All candidates use the saved **Region A before meson veto** flag; candidate ET is not an event-leading requirement.
-
-## Populations
-
-| ROOT directory | Entries |
-|---|---|
-| `separated_truth_pair` | Every valid reconstructed representative truth pair of a Region-A truth-pi0 separated candidate, without a partner-energy or mass-window cut |
-| `missing_energy_band_truth_pair` | Region-A truth-pi0 missing candidates in the representative-energy interval `missing_energy_min < E <= missing_energy_max`, combining the mass-window-in and mass-window-out categories |
-| `separated_or_missing_energy_band_truth_pair` | Union of the separated and missing-energy-band populations above, one representative pair per candidate |
-| `prompt_pi0_all_pairs` | Every Region-A prompt candidate paired with every other stored cluster above the pi0 partner threshold |
-| `prompt_pi0_window_pairs` | All such pairs inside the strict pi0 mass window |
-| `prompt_eta_all_pairs` | Every Region-A prompt candidate paired with every other stored cluster above the eta partner threshold |
-| `prompt_eta_window_pairs` | All such pairs inside the strict eta mass window |
-
-Truth-pi0 means a valid pi0 anchor with main fraction > 0.5; separated is topology code 1. Prompt means the saved prompt flag and dominant fraction > 0.5, matching the candidate-composition analysis. Overlapping origins are rejected.
-
-The representative truth partner is the usable daughter truth match with maximum absolute direct daughter deposit across **all positive-energy clusters**. It is not chosen by reconstructed mass. The saved representative mass can therefore be used even when the partner is below the stored-cluster threshold. The same representative establishes separated topology and must exceed the pi0 partner threshold. Map pi0 partner thresholds consequently affect the **selected separated population**, although no additional energy cut is applied to its representative pair here. Invalid/unavailable/same-cluster representative pairs are counted separately, not silently put into mass underflow.
-
-Prompt pairs are recomputed from stored cluster E, eta and phi using massless four-vectors. Partner selection is strictly E > the corresponding map threshold; it does not impose candidate BDT, isolation or shower cuts. Self-pairs are excluded by cluster identity. These are directed candidate–partner entries: two prompt candidates can each contribute the same unordered pair with their own candidate ET. Multiple window partners all contribute; there is no best-partner selection. The existence of each prompt candidate's pi0/eta window pairs must agree with its saved tag flags, otherwise reduce fails before publishing a result.
-
-## Configuration and input validation
-
-`configuration` selects an input directory, not numerical cut overrides. Thresholds and mass windows are read from map metadata, checked across all files, retained in outputs and used in plot captions/window lines. The pi0 **and** eta partner thresholds must be at least the map stored-cluster threshold, so all eligible combinatorial partners are available. Missing-energy boundaries are retained but not used in these separated/prompt selections. Region-A kinematic/isolation settings, release and BDT model hash are also compared. No thresholds are emulated by this workflow.
-
-Map files must have contiguous manifest coverage starting at zero, sequential chunk IDs, compatible schemas/settings and consistent per-sample cross section/stitching bounds. `require_complete=true` additionally requires the whole sample manifest. Stitching validity/pass and event-weight validity are required. Weights are `weight_numerator_pb / sum(metadata.sum_generator_weight_processed)` for the entire available sample, never per shard. Jet and PhotonJet are processed separately.
-
-## Output and counting
-
-Each population stores raw and cross-section-weighted mass spectra, mass versus candidate ET, and raw/weighted one-dimensional projections for every ET bin. Merge creates four PDFs per population: weighted mass, weighted mass versus ET, and raw/weighted unit-normalized ET-bin overlays.
-
-Plots follow the `photon_candidate_selection` sPHENIX styling: 1600 × 1000 canvases (the candidate-selection side-legend layout), a lower plot pad of height 0.68, canvas-relative axis text sizes, centered axis titles, and captions at x = 0.055 with 0.06 line spacing. Caption and legend fonts/sizes and histogram line widths come from sPHENIX style. Axis-title offsets are compensated for the enlarged pad text to prevent clipping; 2D plots reserve a right margin for the color scale.
-
-Mass uses 240 bins from 0 to 1.2 GeV (5 MeV per bin). The candidate ET axis spans 0–40 GeV. Shape overlays use only 5–6, 6–8 and 8–10 GeV, identified by the candidate-cluster ET legend. The 10–18 and 18–30 GeV shapes are omitted because of low statistics, as most candidates in this range are merged clusters. The saved 2D histograms and projections retain all ET bins, including 0–5, 10–18, 18–30 and 30–40 GeV. Raw and weighted shape captions explicitly state normalization within each candidate ET bin. Mass overflow is retained and included in shape-normalization denominators; only 0–1.2 GeV is displayed. An ET bin with zero signed normalization is displayed as an empty shape. These fixed ET bins define the saved 2D axes.
-
-`*_window_count` and `*_window_pb` store exact outside/inside classification versus candidate ET, with strict mass boundaries read from metadata. Their `*_fraction` projections are calculated from these counters, including mass overflow, rather than by integrating approximate mass bins. For truth pairs the window is pi0; for prompt groups it is the named meson window. Fractions and uncertainties are recomputed after merging. Histogram Sumw2 and fraction errors use pair-level weight sums and subset covariance; pairs sharing a candidate/event are correlated, so these are not event-clustered uncertainty estimates. Photon veto efficiencies should use candidate counts, not pair totals.
-
-Top-level `candidate_flow_count` and `candidate_flow_pb` separately count separated candidates, selected missing-energy-band candidates, valid representative pairs in their union, invalid pairs in their union, prompt candidates, pi0-vetoed prompt candidates, eta-vetoed prompt candidates, and prompt candidates vetoed by either meson. Pi0/eta overlaps count once in the last category. Every counter is also binned in candidate ET.
-
-Partial metadata records entry ranges, full-sample normalization, settings and QA limits. Merged outputs preserve each source's complete metadata under `sources/partial_<index>/metadata`; normalization denominators are not added across shards. `selection_settings` uses the order documented in `PhotonCandidateSettings.h`. `region_settings` is ordered as shower tower threshold, candidate ET min/max, candidate |eta| max, vertex |z| max, isolation radius/scale/offset and nonisolation gap.
-
-## Condor production
-
-The submit files retain the selected configuration `ClusterE0p12_Pi0Partner0p5`. Both submit files must use the same configuration. Outputs/logs include the configuration name, so the four existing configurations can be reduced separately.
-
-```bash
-workflow=PhotonAnalysisTree/workflows/tagging_mass_diagnostic
-mkdir -p PhotonAnalysisTree/output/condor/tagging_mass_diagnostic/reduce
-condor_submit "$workflow/submit_reduce_jet_samples.job"
-condor_submit "$workflow/submit_reduce_jet12_shards.job"
-```
-
-There are six ordinary Jet sample jobs and ten contiguous Jet12 entry shards. No script submits jobs automatically. To select another existing configuration, pass the same override to both submissions:
-
-```bash
-condor_submit -append 'configuration = ClusterE0p2_Pi0Partner0p5' PhotonAnalysisTree/workflows/tagging_mass_diagnostic/submit_reduce_jet_samples.job
-condor_submit -append 'configuration = ClusterE0p2_Pi0Partner0p5' PhotonAnalysisTree/workflows/tagging_mass_diagnostic/submit_reduce_jet12_shards.job
-```
-
-Once all 16 jobs succeed:
-
-```bash
-PhotonAnalysisTree/workflows/tagging_mass_diagnostic/run_merge.sh jet \
-  PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/reduce/topology_v11/ClusterE0p12_Pi0Partner0p15/jet/partial \
-  PhotonAnalysisTree/output/plots/tagging_mass_diagnostic/topology_v11/ClusterE0p12_Pi0Partner0p15/jet
-```
-
-Merge requires complete map inputs, every expected sample/shard, exact entry coverage, matching per-sample normalization/settings, and matching histogram axes. Existing ROOT outputs are never overwritten. Reduce and merge write temporary ROOT files and publish only after successful writing.
-
-## Local and QA usage
+保存する本番は map schema 5 / topology v11 の `ClusterE0p12_Pi0Partner0p5`。v10 本番・旧 QA は削除済み。最新定義への更新や新しい物理結果の生成は今回行っていない。
 
 ```text
-run_reduce.sh FAMILY MAP_ROOT OUTPUT_BASE REQUIRE_COMPLETE SAMPLE_NAME SHARD_INDEX SHARD_COUNT
-run_merge.sh FAMILY PARTIAL_ROOT OUTPUT_BASE
+output/tagging_mass_diagnostic/productions/topology_v11/ClusterE0p12_Pi0Partner0p5/
+  partials/jet/<sample>/shard_<index>/tagging_mass_diagnostic.root
+  results/jet/tagging_mass_diagnostic.root
 ```
 
-For limited-event QA, call the C++ reducer directly (the final argument is the event limit; zero means no limit):
+元 map は `output/photon_candidate_selection/productions/topology_v11/ClusterE0p12_Pi0Partner0p5/maps/<sample>/` を参照する。元の shared input を削除しない。current candidate の schema-8 map を渡してはいけない。
 
-```cpp
-.L PhotonAnalysisTree/workflows/tagging_mass_diagnostic/ReduceTaggingMassDiagnostic.C
-ReduceTaggingMassDiagnostic("jet", "MAP_ROOT", "NEW_OUTPUT", true, "jet8", 0, 1, 1000);
-```
+## Populations and counting
 
-For a complete reduction of a partial input sample, use `require_complete=false`. The resulting normalization uses only available maps and is **QA-only**. Targeted QA merge accepts trailing arguments `sample_filter`, `shard_count_override`, `require_complete_partials`, `make_plots`. It still rejects event-limited partials and requires coverage of all entries in the available maps. Production wrappers deliberately use strict full-production merge defaults.
+Region A before meson veto を使用する。truth pi0 は有効 anchor かつ単一 parent の main fraction >0.5。prompt は保存 flag かつ dominant fraction >0.5。origin overlap は拒否する。
 
-Run the synthetic integration checks after sourcing ana.565:
+| Population | Entries |
+|---|---|
+| separated_truth_pair | separated 候補の代表 truth pair。追加の partner E / mass cut はかけない |
+| missing_energy_band_truth_pair | saved missing category が energy-band mass-window in/out の候補 |
+| separated_or_missing_energy_band_truth_pair | 上記2群の和。1候補に代表 pair 1個 |
+| prompt_pi0_all_pairs / prompt_pi0_window_pairs | prompt と保存 cluster の全組合せ / strict pi0 window 内 |
+| prompt_eta_all_pairs / prompt_eta_window_pairs | 同様の eta 組合せ |
+
+代表 partner は正の direct daughter deposit が最大の usable cluster。mass で最適化しない。prompt の組合せは directed pair で、自己 pair を除き、複数の window partner をすべて数える。pair 数を候補の veto 効率と同一視しない。window pair の有無は保存 tag flag と一致させる。
+
+閾値・mass window・missing band は map metadata から読み、全 map の一致、manifest 完全性、sample/shard coverage、full-sample generator-weight 正規化を確認する。v11 の保存設定は cluster E>0.12、pi0/eta partner E>0.5 GeV、pi0 0.10<m<0.20、eta 0.45<m<0.65 GeV、missing band 0.12<E<=0.5 GeV。recovery requirement は無効。
+
+raw count と cross-section-weighted mass / mass-vs-ET を保存する。mass は0–1.2 GeVを240 bins、ET は0,5,6,8,10,18,30,40 GeV。shape overlay は5–6、6–8、8–10 GeV。overflow を保ち、正規化は merge 後に行う。誤差は pair-level Sumw2 / subset covariance で、event-level の相関は推定しない。7群×4 PDFを出力する。
+
+## Replay
+
+既存16 partial から再描画する場合は、新しい出力先を指定する。
 
 ```bash
-python PhotonAnalysisTree/workflows/tagging_mass_diagnostic/test_tagging_mass.py
+bash PhotonAnalysisTree/workflows/tagging_mass_diagnostic/run_merge.sh jet \
+  PhotonAnalysisTree/output/tagging_mass_diagnostic/productions/topology_v11/ClusterE0p12_Pi0Partner0p5/partials/jet \
+  /tmp/tagging_mass_v11_replay
 ```
 
-These exercise multiple prompt window partners, independent pi0/eta energy cuts and strict boundaries, representative pairs, lower-exclusive and upper-inclusive missing-energy boundaries, the union of separated and missing candidates, candidate-versus-pair counts, negative weights, split-versus-serial merge equivalence, PDF generation, overwrite protection, and rejection of incomplete coverage or mismatched settings.
+map からの再集計は `run_reduce.sh FAMILY MAP_ROOT OUTPUT_BASE REQUIRE_COMPLETE SAMPLE SHARD_INDEX SHARD_COUNT`。非Jet12は1 shard、Jet12は10 shard。既存 ROOT は上書きしない。production は `require_complete=true` を使う。
 
-Historical version-10 implementation QA used the first Jet8 map from `ClusterE0p12_Pi0Partner0p15` and `ClusterE0p2_Pi0Partner0p5`: both completed reduce, merge and all 24 PDFs with no prompt veto mismatch. These single-map outputs under `output/qa/tagging_mass_diagnostic/jet8_first_map` are not full-production physics results. Condor production has not been submitted by implementation/testing.
+```bash
+python3 PhotonAnalysisTree/workflows/tagging_mass_diagnostic/test_tagging_mass.py
+```
 
-Version-11 handoff: map input is now the versioned Jet cold-storage root used by photon_candidate_selection map jobs. Partial output paths include `reduce/topology_v11/`, and log filenames have `v11_` prefixes. No production jobs have been submitted. The synthetic test has been updated so a below-threshold representative belongs to missing, not separated.
+全 sample/shard・設定・軸を検証する。各 partial の metadata は merged ROOT の sources に保持する。有限 event 数や不完全 map による QA は本番結果として扱わない。
 
-Diagnostic output schema is now 4 for the added missing and union populations and revised candidate-flow counters. Re-run reduce from topology-v11 maps and merge into a new output directory; schema-1/2/3 partials are rejected. Map regeneration is not needed.
-
-The missing selection uses topology code 3 and saved missing category 1 (`energy_band_taggable`) or 4 (`energy_band_not_taggable`) directly. These categories implement `L < E <= U`, matching the existing map classification. No energy re-comparison is made against float-stored values, preserving the original map decision at both boundaries. This selects neither acceptance nor other missing categories, even if their partner energy happens to fall in the interval. Both finite in-window and out-of-window masses are filled without a mass cut. The separated and missing populations are disjoint; the union adds their counts and weights before per-ET-bin shape normalization, rather than adding normalized shapes. The seven populations produce 28 PDFs in total.
+将来の新定義用は `output/tagging_mass_diagnostic/productions/pending_latest_definition/results/` に予約し、`not_generated` として明示する。

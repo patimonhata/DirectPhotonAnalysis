@@ -1,4 +1,4 @@
-#include "Pi0BdtHistograms.h"
+#include "../../analysis/photon_candidate_selection/Pi0BdtHistograms.h"
 #include <iostream>
 
 // Redraw only the two BDT PDFs in each selection directory; retain ROOT/CSV metadata and all other plots.

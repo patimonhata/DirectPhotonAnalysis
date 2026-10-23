@@ -45,7 +45,7 @@ fi
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"
 
-root -l -b -q -e ".L $workflow_dir/check_tree.C" -e "gSystem->Exit(check_tree(\"$input_file\",true));"
+root -l -b -q -e ".L $module_dir/validation/single_particle/check_tree.C" -e "gSystem->Exit(check_tree(\"$input_file\",true));"
 
 temporary_file=$(mktemp "$final_directory/.single-particle-scored.XXXXXX")
 cleanup()
@@ -64,8 +64,8 @@ root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_nosplit_bdt.C" -e 
 root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_split_gamma_onnx.C" -e "gSystem->Exit(add_split_gamma_onnx(\"$temporary_file\",\"$split_onnx_model\"));"
 root -l -b -q -e ".L $module_dir/workflows/common/scoring/add_nosplit_gamma_onnx.C" -e "gSystem->Exit(add_nosplit_gamma_onnx(\"$temporary_file\",\"$nosplit_onnx_model\"));"
 
-root -l -b -q -e ".L $workflow_dir/check_tree.C" -e "gSystem->Exit(check_tree(\"$temporary_file\",false));"
-root -l -b -q -e ".L $workflow_dir/check_scored_tree.C" -e "gSystem->Exit(check_scored_tree(\"$temporary_file\"));"
+root -l -b -q -e ".L $module_dir/validation/single_particle/check_tree.C" -e "gSystem->Exit(check_tree(\"$temporary_file\",false));"
+root -l -b -q -e ".L $module_dir/validation/single_particle/check_scored_tree.C" -e "gSystem->Exit(check_scored_tree(\"$temporary_file\"));"
 
 mv -- "$temporary_file" "$final_output"
 temporary_file=

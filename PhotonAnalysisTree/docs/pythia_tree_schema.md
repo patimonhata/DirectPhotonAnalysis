@@ -95,5 +95,5 @@ layout, validity policy, and metadata. The distinction is encoded by the
 `truth_scheme`, `truth_matcher_version`, `photon_classifier_version`, and
 allocation fields in the metadata tree.
 
-Use `workflows/pythia_tree/check_pythia_tree.C` to validate vector alignment, offsets, edep
+Use `validation/pythia_tree/check_pythia_tree.C` to validate vector alignment, offsets, edep
 sums, contributor fractions, and schema metadata.

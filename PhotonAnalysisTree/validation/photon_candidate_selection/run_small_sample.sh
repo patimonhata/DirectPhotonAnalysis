@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage()
+{
+  echo "Usage: $0 SAMPLE_NAME N_SEGMENTS [FILES_PER_MAP] [MIN_CLUSTER_ENERGY_GEV] [OUTPUT_ROOT] [N_EVENTS_PER_MAP] [PI0_PARTNER_MIN_ENERGY_GEV] [ETA_PARTNER_MIN_ENERGY_GEV] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]" >&2
+}
+
+if (( $# < 2 || $# > 14 )); then
+  usage
+  exit 2
+fi
+
+workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+module_dir=$(cd "$workflow_dir/../.." && pwd)
+sample_name=$1
+segment_count=$2
+files_per_map=${3:-10}
+min_cluster_energy=${4:-0.1}
+output_root=${5:-}
+n_events=${6:-0}
+tagging_partner_min_energy=${7:-$min_cluster_energy}
+eta_partner_min_energy=${8:-$tagging_partner_min_energy}
+pi0_mass_min=${9:-0.10}
+pi0_mass_max=${10:-0.20}
+eta_mass_min=${11:-0.45}
+eta_mass_max=${12:-0.65}
+missing_energy_min=${13:-0.2}
+missing_energy_max=${14:-0.5}
+
+for value in "$segment_count" "$files_per_map" "$n_events"; do
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "N_SEGMENTS, FILES_PER_MAP, and N_EVENTS_PER_MAP must be non-negative integers: $value" >&2
+    exit 2
+  fi
+done
+if (( segment_count == 0 || files_per_map == 0 )); then
+  echo "N_SEGMENTS and FILES_PER_MAP must be positive" >&2
+  exit 2
+fi
+if ! [[ "$min_cluster_energy" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$ ]]; then
+  echo "MIN_CLUSTER_ENERGY_GEV must be a non-negative finite number: $min_cluster_energy" >&2
+  exit 2
+fi
+if ! [[ "$tagging_partner_min_energy" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$ ]]; then
+  echo "TAGGING_PARTNER_MIN_ENERGY_GEV must be a non-negative finite number: $tagging_partner_min_energy" >&2
+  exit 2
+fi
+printf -v canonical_threshold "%.12g" "$min_cluster_energy"
+threshold_tag=${canonical_threshold//./p}
+threshold_tag=${threshold_tag//+/}
+threshold_tag=${threshold_tag//-/m}
+if [[ -z "$output_root" ]]; then
+  output_root="$module_dir/output/photon_candidate_selection/qa/topology_v12_eta_v2_decay_v1/cluster_e_gt_${threshold_tag}/${sample_name}_${segment_count}segments"
+fi
+
+case "$sample_name" in
+  jet3|jet5|jet8|jet12|jet20|jet30|jet40)
+    family=jet
+    ;;
+  photonjet3|photonjet5|photonjet10|photonjet20)
+    family=photonjet
+    ;;
+  *)
+    echo "Unsupported SAMPLE_NAME: $sample_name" >&2
+    exit 2
+    ;;
+esac
+
+input_manifest="$module_dir/input/$sample_name/segments.list"
+if [[ ! -r "$input_manifest" ]]; then
+  echo "Input manifest is not readable: $input_manifest" >&2
+  exit 2
+fi
+manifest_rows=$(wc -l < "$input_manifest")
+if (( segment_count > manifest_rows )); then
+  echo "Requested $segment_count segments, but $input_manifest has only $manifest_rows rows" >&2
+  exit 2
+fi
+
+mkdir -p -- "$output_root"
+output_root=$(cd "$output_root" && pwd)
+map_root="$output_root/maps"
+map_output="$map_root/$sample_name"
+partial_root="$output_root/reduce/$sample_name"
+map_count=$(((segment_count + files_per_map - 1) / files_per_map))
+
+echo "Small-sample QA: sample=$sample_name segments=$segment_count maps=$map_count events_per_map=$n_events min_cluster_energy=$min_cluster_energy tagging_partner_min_energy=$tagging_partner_min_energy"
+for ((job_index = 0; job_index < map_count; ++job_index)); do
+  "$workflow_dir/../../workflows/photon_candidate_selection/run_map.sh" "$job_index" 0 "$segment_count" "$files_per_map" "$input_manifest" "$sample_name" "$map_output" "$n_events" "$min_cluster_energy" "$tagging_partner_min_energy" "$eta_partner_min_energy" "$pi0_mass_min" "$pi0_mass_max" "$eta_mass_min" "$eta_mass_max" "$missing_energy_min" "$missing_energy_max"
+done
+
+shard_count=1
+if [[ "$sample_name" == jet12 ]]; then shard_count=10; fi
+if (( map_count < shard_count )); then
+  echo "Jet12 QA requires at least 10 maps so every fixed shard is non-empty: maps=$map_count" >&2
+  exit 2
+fi
+for ((shard_index = 0; shard_index < shard_count; ++shard_index)); do
+  output_base="$partial_root/shard_${shard_index}/photon_candidate_selection"
+  "$workflow_dir/../../workflows/photon_candidate_selection/run_reduce.sh" "$family" "$map_root" "$output_base" false 200 40.0 "$sample_name" "$shard_index"
+done
+
+echo "Small-sample QA maps: $map_output"
+echo "Small-sample QA partials: $partial_root"

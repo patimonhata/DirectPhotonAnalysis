@@ -7,10 +7,10 @@
 各 workflow の `reproduction.json` に入力 tree と引数を記録している。conditional 系は保存 ROOT の TNamed/TParameter を使用する。reweighted の重みは `pow(truth_pt / 3.0, -8.122)` であり、保存された指数・参照 pT・閾値を configuration ごとに渡す。
 
 ```bash
-bash PhotonAnalysisTree/workflows/conditional_efficiency/run.sh ET5to7GeV_threshold200MeV --check
-bash PhotonAnalysisTree/workflows/conditional_efficiency/run.sh ET5to7GeV_threshold200MeV --output-base /tmp/conditional_replay/result
-bash PhotonAnalysisTree/workflows/conditional_efficiency_reweighted/run.sh ET3to5GeV_threshold100MeV_widepT --output-base /tmp/reweighted_replay/result
-bash PhotonAnalysisTree/workflows/pair_matching_efficiency/run.sh default --output-base /tmp/pair_matching_replay/result
+bash PhotonAnalysisTree/workflows/studies/conditional_efficiency/run.sh ET5to7GeV_threshold200MeV --check
+bash PhotonAnalysisTree/workflows/studies/conditional_efficiency/run.sh ET5to7GeV_threshold200MeV --output-base /tmp/conditional_replay/result
+bash PhotonAnalysisTree/workflows/studies/conditional_efficiency_reweighted/run.sh ET3to5GeV_threshold100MeV_widepT --output-base /tmp/reweighted_replay/result
+bash PhotonAnalysisTree/workflows/studies/pair_matching_efficiency/run.sh default --output-base /tmp/pair_matching_replay/result
 ```
 
 `--check` は入力とレシピの存在を確認する。再実行は ana.565 を使う。pair matching は旧 ROOT に入力/cut metadata がないため、既定の pi0 schema-3 dataset と `DeltaR=0.03`、`0.10<m<0.18`、`E_cluster>0.1 GeV`、asymmetry 20 bins で保存ヒストグラム112個との一致を確認した。代表例の比較で、conditional 1,800個、reweighted 36個、pair matching 112個のヒストグラムが一致した。検証結果は `build/layout_migration/validation.json` に保存する。

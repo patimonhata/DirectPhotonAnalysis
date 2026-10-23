@@ -1,0 +1,28 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/diagnostics/tagging_mass
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/diagnostics/tagging_mass/run_reduce.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+request_memory     = 2GB
+Priority           = 20
+job_lease_duration = 86400
+
+family             = jet
+configuration      = ClusterE0p12_Pi0Partner0p5
+require_complete   = true
+shard_count        = 10
+map_root           = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v11/$(configuration)/maps
+partial_root       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_mass_diagnostic/productions/topology_v11/$(configuration)/partials/$(family)
+output_base        = $(partial_root)/jet12/shard_$(shard_index)
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_mass_diagnostic
+
+Output = $(log_directory)/reduce_jet12_shards_$(ProcId).out
+Error = $(log_directory)/reduce_jet12_shards_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-tagging_mass_diagnostic-reduce_jet12_shards_$(ProcId).log
+
+Arguments          = "$(family) $(map_root) $(output_base) $(require_complete) jet12 $(shard_index) $(shard_count)"
+
+# Override shard_indices with condor_submit -append to retry a subset.
+shard_indices = 0,1,2,3,4,5,6,7,8,9
+Queue shard_index in $(shard_indices)

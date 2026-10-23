@@ -47,7 +47,7 @@ Other samples have matching submit files. The explicit local interface is:
 run_map.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST SAMPLE OUTPUT_DIRECTORY [N_EVENTS] [MIN_CLUSTER_ENERGY] [PI0_PARTNER_MIN_ENERGY] [ETA_PARTNER_MIN_ENERGY] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]
 ```
 
-`check_sample_map_outputs.sh` checks expected file coverage and optionally performs deep ROOT validation; pass the output directory and exact cuts for a non-default production. `run_small_sample.sh` runs limited-input end-to-end QA under `output/photon_candidate_selection/qa/`; this is not a physics normalization. Jet12 QA needs at least ten maps so every fixed shard is nonempty.
+[`check_sample_map_outputs.sh`](../../validation/photon_candidate_selection/check_sample_map_outputs.sh) checks expected file coverage and optionally performs deep ROOT validation; pass the output directory and exact cuts for a non-default production. [`run_small_sample.sh`](../../validation/photon_candidate_selection/run_small_sample.sh) runs limited-input end-to-end QA under `output/photon_candidate_selection/qa/`; this is not a physics normalization. Jet12 QA needs at least ten maps so every fixed shard is nonempty.
 
 ## Reduce and merge
 
@@ -81,7 +81,13 @@ Merged outputs include candidate composition, pi0/eta anchor topology, eta casca
 
 Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the schema-8 reducer. See [reference replay](../../docs/reproduction.md).
 
-`ReplotPi0BdtScores.C` / `ReplotEtaBdtScores.C` redraw stored BDT ROOT distributions where present. `CheckEtaDecayFlight.C` is an independent DST diagnostic and does not change composition/topology selections; arguments and interpretation are in the definition notes.
+`ReplotPi0BdtScores.C` / `ReplotEtaBdtScores.C` redraw stored BDT ROOT distributions where present. [`CheckEtaDecayFlight.C`](../diagnostics/eta_decay_flight/README.md) is an independent DST diagnostic and does not change composition/topology selections; arguments and interpretation are in the definition notes.
+
+## Implementation and validation
+
+The executable reduce / merge macros delegate to `analysis/photon_candidate_selection/`. Shared histogram, metadata and plotting helpers live there;
+shared settings and plotting style live in `analysis/common/`. See [internal implementation](../../analysis/README.md).
+Production tree/map validators and small-sample QA live under [validation](../../validation/README.md). `run_map.sh` still validates each temporary output before publishing it.
 
 ## Checks
 

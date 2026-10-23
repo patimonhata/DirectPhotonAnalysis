@@ -1,4 +1,4 @@
-#include "../workflows/photon_candidate_selection/MergePythiaPhotonCandidateSelection.C"
+#include "../analysis/photon_candidate_selection/EtaTopologyPlots.h"
 #undef NDEBUG
 #include <cassert>
 

@@ -25,6 +25,7 @@ root -l -b -q "$module_dir/tests/test_decay_origin_reduce.C"
 root -l -b -q "$module_dir/tests/test_eta_cascade.C"
 root -l -b -q "$module_dir/tests/test_eta_decay_flight.C"
 python3 "$module_dir/tests/test_eta_pipeline.py"
-for script in "$module_dir/workflows/photon_candidate_selection/"*.sh; do
+python3 "$module_dir/tests/test_tagging_mass.py"
+while IFS= read -r -d '' script; do
   bash -n "$script"
-done
+done < <(find "$module_dir/workflows" "$module_dir/validation" -name '*.sh' -print0)

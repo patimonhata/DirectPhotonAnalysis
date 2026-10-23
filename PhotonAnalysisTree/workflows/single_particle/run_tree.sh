@@ -21,4 +21,4 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
 
 root -l -b -q "$workflow_dir/Fun4All_PhotonAnalysisTree.C(${process_id},${n_events})"
-root -l -b -q -e ".L $workflow_dir/check_tree.C" -e "gSystem->Exit(check_tree(\"$output_file\",true));"
+root -l -b -q -e ".L $module_dir/validation/single_particle/check_tree.C" -e "gSystem->Exit(check_tree(\"$output_file\",true));"

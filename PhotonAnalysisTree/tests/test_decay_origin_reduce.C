@@ -1,4 +1,4 @@
-#include "../workflows/photon_candidate_selection/MergePythiaPhotonCandidateSelection.C"
+#include "../analysis/photon_candidate_selection/CandidateMerge.h"
 #include "test_decay_origin.C"
 namespace
 {

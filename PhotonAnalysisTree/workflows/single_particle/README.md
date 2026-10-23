@@ -81,3 +81,5 @@ copy_analysis_trees.Cは、古いROOT fileに余分なtop-level objectやkey cyc
 - check_scored_tree.C: scored schema checker
 - copy_analysis_trees.C: optional clean-copy helper
 - make_dataset_manifest.sh: merged dataset manifest
+
+Output validators are under [`validation/single_particle/`](../../validation/single_particle/), and are called automatically where required by the run scripts.

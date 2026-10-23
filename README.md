@@ -1,12 +1,26 @@
 # DirectPhotonAnalysis
 
-単一粒子シミュレーションを入力として、CEMC の tower / cluster、pi0→\$\gamma\$ gamma 再構成、
-event display、truth 情報を調べるための個人用解析コードです。
+sPHENIX の photon / pi0 解析、入力シミュレーション、truth matching と event display をまとめたプロジェクトです。
+現在の主解析は [PhotonAnalysisTree の photon candidate selection](PhotonAnalysisTree/workflows/photon_candidate_selection/README.md) です。
 
-この README は「しばらく離れた後に、どこから再開すればよいか」を短時間で思い出すための入口です。
-詳細は `docs/` に分けています。
+## 目的から探す
 
-## 解析の流れ
+| 目的 | 入口 |
+|---|---|
+| 主解析: photon candidate の map → reduce → merge | [PhotonAnalysisTree](PhotonAnalysisTree/README.md) |
+| Pythia / single-particle の解析 tree 生成と score 追加 | [workflow 一覧](PhotonAnalysisTree/workflows/README.md) |
+| 独立解析・過去 study の再実行 | [studies](PhotonAnalysisTree/workflows/studies/README.md) |
+| 主解析の分類・tagging を調べる補助解析 | [diagnostics](PhotonAnalysisTree/workflows/diagnostics/README.md) |
+| 生成ファイルの整合性確認・小規模 QA | [validation](PhotonAnalysisTree/validation/README.md) |
+| topology 判定を event display で見る | [TopologyEventDisplay](TopologyEventDisplay/README.md) |
+| CEMC / HCAL の TopoCluster 比較 | [TopoClusterHCalStudy](TopoClusterHCalStudy/README.md) |
+| 単一 pi0 の simulation・再構成・表示 | 以下の解析フローと [実行手順](docs/workflow.md) |
+
+PhotonAnalysisTree のコードは、実行入口を `workflows/`、ROOT 集計・描画の内部実装を `analysis/`、
+Fun4All module と共有の物理処理を `src/`、出力検証を `validation/`、自動テストを `tests/` に分けています。
+詳細は [配置方針](PhotonAnalysisTree/docs/layout.md) を参照してください。
+
+## 単一粒子シミュレーションからの解析の流れ
 
 ```text
 SinglePi0GunSimulation
@@ -46,8 +60,11 @@ SinglePi0GunSimulation
 | `EventDisplay/`           | truth、CEMC hit / tower / cluster を表示用 TTree に保存 |
 | `TruthAnalysis/`          | event-display Tree から primary pi0→2gamma を集計    |
 | `EmcalEtViewer/`          | CEMC tower / cluster の lego plot 用 dump と描画     |
+| `PhotonAnalysisTree/`     | photon candidate 主解析、tree 生成、truth/topology の共有処理 |
+| `TopologyEventDisplay/`   | 共有 topology evaluator を使った診断用 event display |
+| `TopoClusterHCalStudy/`   | all-calorimeter TopoCluster の CEMC / HCAL 比較 |
 
-`src/` は Fun4All module、`macro/` は実行・描画マクロ、`build/` と `install/` はローカルビルド、
+従来の package では `src/` は Fun4All module、`macro/` は実行・描画マクロ、`build/` と `install/` はローカルビルド、
 `output/` は生成物です。
 
 ## 重要な規約
@@ -64,7 +81,7 @@ SinglePi0GunSimulation
 
 * energy / momentum の単位は GeV、位置は cm、角度は rad です。
 
-## 最短の動作確認
+## 単一粒子シミュレーションの動作確認
 
 まず [標準的な実行手順](docs/workflow.md) の環境設定とビルドを行い、5イベントだけ生成します。
 
@@ -82,7 +99,7 @@ SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/
 
 後段へ進む前に、入力ディレクトリと node 名がこの DST の設定に合っていることを確認してください。
 
-## 現在の注意点
+## 単一粒子フローの注意点
 
 * `SinglePi0GunSimulation` の現行 generator は `pt=5 GeV`, `eta=0.5`, `phi=[-pi,pi]` です。
 

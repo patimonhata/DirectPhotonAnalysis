@@ -8,7 +8,12 @@ import ROOT
 repo = Path(__file__).resolve().parents[2]
 os.chdir(repo)
 ROOT.gROOT.SetBatch(True)
-assert ROOT.gROOT.LoadMacro('PhotonAnalysisTree/workflows/photon_candidate_selection/MergePythiaPhotonCandidateSelection.C') == 0
+# Load the independent public entrypoints together, preserving ROOT's macro autoloading.
+with tempfile.NamedTemporaryFile(mode='w', suffix='.C') as entrypoints:
+    for stage in ('Reduce', 'Merge'):
+        entrypoints.write(f'#include "{repo}/PhotonAnalysisTree/workflows/photon_candidate_selection/{stage}PythiaPhotonCandidateSelection.C"\n')
+    entrypoints.flush()
+    assert ROOT.gROOT.LoadMacro(entrypoints.name) == 0
 ROOT.gInterpreter.Declare(r'''
 #include <numeric>
 void make_eta_test_map(const std::string& path, const std::string& sample_name) {

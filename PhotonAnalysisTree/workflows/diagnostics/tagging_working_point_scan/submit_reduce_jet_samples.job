@@ -1,0 +1,27 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/diagnostics/tagging_working_point_scan
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/diagnostics/tagging_working_point_scan/run_reduce.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+request_memory     = 3GB
+Priority           = 20
+job_lease_duration = 86400
+
+family             = jet
+configuration      = ClusterE0p12_Pi0Partner0p15_Pi0Window0p08-0p18
+require_complete   = true
+map_root           = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v11/$(configuration)/maps
+partial_root       = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_working_point_scan/productions/scan_v2/$(configuration)/partials/$(family)
+output_base        = $(partial_root)/$(sample_name)/shard_0
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/tagging_working_point_scan
+
+Output = $(log_directory)/reduce_jet_samples_$(ProcId).out
+Error = $(log_directory)/reduce_jet_samples_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-tagging_working_point_scan-reduce_jet_samples_$(ProcId).log
+
+Arguments          = "$(family) $(map_root) $(output_base) $(require_complete) $(sample_name) 0 1"
+
+# Override sample_names with condor_submit -append to retry a subset.
+sample_names = jet3,jet5,jet8,jet20,jet30,jet40
+Queue sample_name in $(sample_names)

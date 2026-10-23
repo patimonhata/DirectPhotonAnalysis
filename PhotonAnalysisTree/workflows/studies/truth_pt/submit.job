@@ -1,0 +1,34 @@
+Universe           = vanilla
+Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/studies/truth_pt
+Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/studies/truth_pt/run_partial.sh
+
+PeriodicHold       = (NumJobStarts >= 1 && JobStatus == 1)
+OnExitHold         = (ExitBySignal == true) || (ExitCode != 0)
+concurrency_limits = CONCURRENCY_LIMIT_DEFAULT:100
+request_memory     = 2GB
+Priority           = 20
+job_lease_duration = 86400
+
+# Full production: read all 200,000 G4Hits DSTs directly, 50 per process.
+total_files        = 200000
+files_per_job      = 50
+n_chunks           = 4000
+chunk_offset       = 0
+input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/minimum_bias/segments.list
+partial_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/partials/minimum_bias
+log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/truth_pt
+n_bins             = 100
+pt_max             = 20.0
+max_abs_eta        = 0.7
+use_event_weight   = false
+
+Output = $(log_directory)/submit_$(ProcId).out
+Error = $(log_directory)/submit_$(ProcId).err
+Log = /tmp/ryotaro-PhotonAnalysisTree-truth_pt-submit_$(ProcId).log
+Arguments          = "$(ProcId) $(chunk_offset) $(total_files) $(files_per_job) $(input_manifest) $(partial_output_directory) $(n_bins) $(pt_max) $(max_abs_eta) $(use_event_weight)"
+
+# n_chunks must equal ceil(total_files / files_per_job) - chunk_offset.
+# From this directory: condor_submit -maxjobs 4000 submit.job
+# To continue after 80 existing chunks:
+#   condor_submit -append "chunk_offset = 80" -append "n_chunks = 3920" -maxjobs 3920 submit.job
+Queue $(n_chunks)

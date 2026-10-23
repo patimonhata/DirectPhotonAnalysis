@@ -1,0 +1,20 @@
+{
+  "default": {
+    "input": "output/single_particle/productions/historical/default/results/100kevents_pi0_3to15GeV_etapm1_vertexpm60.root",
+    "macro": "workflows/studies/pair_matching_efficiency/PlotTruthPairMatching.C",
+    "function": "PlotTruthPairMatching",
+    "arguments": [
+      0.03,
+      0.1,
+      0.18,
+      0.1,
+      20
+    ],
+    "reference_root": "output/pair_matching_efficiency/productions/historical/default/results/truth_pair_matching.root",
+    "settings_source": "Original macro defaults; old result contains no input/cut metadata. Histogram comparison required.",
+    "validation": {
+      "histograms_matched": 112,
+      "values_and_sumw2_including_flows": true
+    }
+  }
+}

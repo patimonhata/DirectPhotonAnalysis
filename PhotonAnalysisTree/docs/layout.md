@@ -1,9 +1,35 @@
 # PhotonAnalysisTree の配置
 
-コードは `workflows/<workflow>/`、成果物は `output/<workflow>/` に置く。旧 `macro` と、共通の `output/plots`・`root`・`merged`・`intermediate_files`・`qa` は廃止する。旧パスへの互換リンクは作らない。
+`workflows/` は人間が実行する入口、`analysis/` は ROOT による集計・描画の内部実装、
+`src/` は Fun4All module と共有の物理処理です。生成ファイルの検証は `validation/`、自動テストは `tests/` に分けます。
 
 ```text
-workflows/<workflow>/
+src/                                      # DST 読み込み・truth matching・topology・推論
+analysis/
+  photon_candidate_selection/             # 共通型・histogram・描画・reduce/merge 実装
+  common/                                 # 解析条件検証・描画スタイル
+  tagging_mass/                           # diagnostic 内部実装
+  tagging_working_point_scan/
+workflows/
+  photon_candidate_selection/             # 主解析: submit・run・実行用 ROOT マクロ
+  pythia_tree/                            # Pythia tree 生成・score 追加
+  single_particle/                        # gun tree 生成・score 追加
+  common/                                 # manifest・scoring・replay の共通入口
+  studies/<study>/                        # 独立解析・過去 study の実行入口
+  diagnostics/<topic>/                    # 主解析を調べる補助解析の実行入口
+validation/<workflow>/                    # 出力検証・比較・小規模 QA
+tests/                                    # 自動テスト（synthetic 入力を含む）
+```
+
+実行入口の一覧は [workflows](../workflows/README.md)、
+内部部品の依存関係は [analysis](../analysis/README.md)、検証の使い方は [validation](../validation/README.md) を参照してください。
+
+## 成果物の配置
+
+コードを `studies/`・`diagnostics/` に分類しても、成果物の workflow ID と保存先は変更しません。
+例えば `workflows/diagnostics/tagging_mass/` の成果物は引き続き `output/tagging_mass_diagnostic/` にあります。
+
+```text
 output/<workflow>/
   productions/<production>/<configuration>/
     manifest.json
@@ -13,6 +39,9 @@ output/<workflow>/
   qa/
 output/condor/<workflow>/  # configuration/production に依存しない固定ログ
 ```
+
+旧 `macro` と共通の `output/plots`・`root`・`merged`・`intermediate_files`・`qa` は前回の成果物整理で廃止済みです。
+旧コードパスへの互換リンクは作りません。保存 ROOT 内の過去のパスは履歴として維持します。
 
 小規模な過去 study は production を `historical` とする。`preserved_results` は元の結果配置を保管した集合であり、単一の物理的 cut を意味しない。個別 partial の設定・sample と対応させる際は ROOT metadata を確認する。
 
@@ -49,7 +78,25 @@ output/condor/<workflow>/  # configuration/production に依存しない固定�
 
 submit ごとに同じ `output/condor/<workflow>/<stage>_<ProcId>.out/.err` を使い、別 production/configuration でも上書きする。HTCondor のイベントログはサイト規則に従って固定の `/tmp/ryotaro-PhotonAnalysisTree-<workflow>-<stage>_<ProcId>.log` を使う。
 
-## 移行時の検証
+## コード配置変更の検証
+
+今回の整理では保存成果物を移動せず、実行入口と内部実装・検証・補助解析の配置を変更した。
+Reduce / Merge の計算本体は変更前と文字列単位で一致する。
+
+- 既存の candidate テストと tagging mass の synthetic integration test を共通ランナーで実行し、すべて成功した。
+- 変更前後の synthetic schema-8 map → reduce → merge を比較した。ROOT 26ファイルの histogram 12,654個について全 bin の内容・誤差、軸・label・entry 数が一致し、44 tree の branch・182行の内容も一致した。出力先に由来するパス文字列だけを正規化した。
+- CSV 15ファイルは byte 単位で一致し、PDF 246ファイルは相対配置とページ数が一致した。PDF の描画画像そのものの一致検証は行っていない。
+- 実 DST 1 segment・2イベント（97 cluster）で、小規模 QA の map 生成 → 移動後の validator → reduce が正常終了した。QA 出力は `/tmp/` の新規ディレクトリを使った。
+- 過去 study の12 configuration で入力・再現レシピの存在を確認し、全28 submit file の dry-run を確認した。ジョブは投入していない。
+- include、Markdown link、shell の参照、Condor の実行先を確認した。既存の submit / recipe の成果物パスは維持した。
+
+テストの再実行（ana.565 を設定し、ライブラリを build 後）:
+
+```bash
+bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/candidate"
+```
+
+## 前回の成果物移行時の検証
 
 保持データ30,314件を照合し、うち1,672件は SHA-256 も確認した。外部 map リンク5件、28 submit の dry-run、ライブラリ build、既存 candidate pipeline と tagging mass のテストを確認した。代表的な過去 study の1,948 histograms と v11 両 partial 世代の1,836 histograms は再実行と保存結果が一致した。working-point scan の8,400比較も通過した。
 

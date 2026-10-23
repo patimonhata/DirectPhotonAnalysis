@@ -9,4 +9,6 @@ bash PhotonAnalysisTree/workflows/pythia_tree/run_tree.sh pythia8_Jet5-000000002
 
 個別 tree は `output/pythia_tree/productions/historical/default/maps/`、既存 merged dataset は同 configuration の `results/` に保存します。既存 dataset の schema は ROOT metadata で確認してください。scoring は split ONNX model の明示指定が必須で、入力を上書きしません。同梱 NO_SPLIT 学習モデルの SPLIT への適用は学習条件外です。
 
-`Fun4All_PythiaTruthSpectrumTree.C` と対応 checker は旧 tree-based truth study の補助として保持しています。通常の truth-pT workflow は DST を直接読む `workflows/truth_pt/` です。
+`Fun4All_PythiaTruthSpectrumTree.C` と対応 checker は旧 tree-based truth study の補助として保持しています。通常の truth-pT workflow は DST を直接読む `workflows/studies/truth_pt/` です。
+
+Output validators are under [`validation/pythia_tree/`](../../validation/pythia_tree/), and are called automatically where required by the run scripts.

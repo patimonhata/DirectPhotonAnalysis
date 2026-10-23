@@ -13,7 +13,7 @@ p.add_argument('configuration')
 p.add_argument('--check', action='store_true', help='validate input and recipe without running ROOT')
 p.add_argument('--output-base', type=Path, help='required new output base for a replay')
 a = p.parse_args()
-recipes = json.loads((module / 'workflows' / a.workflow / 'reproduction.json').read_text())
+recipes = json.loads((module / 'workflows' / 'studies' / a.workflow / 'reproduction.json').read_text())
 if a.configuration not in recipes:
     p.error('Unknown configuration. Available: ' + ', '.join(sorted(recipes)))
 r = recipes[a.configuration]

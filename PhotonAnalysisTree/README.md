@@ -1,10 +1,37 @@
 # PhotonAnalysisTree
 
-コードは `workflows/`、成果物は `output/<workflow>/productions/<production>/<configuration>/` にまとめています。[配置と保全方針](docs/layout.md)、[過去 study の再実行](docs/reproduction.md)を参照してください。
+主解析は [photon_candidate_selection](workflows/photon_candidate_selection/README.md) の **map → reduce → merge** です。
+実行時に操作する submit、shell script、ROOT マクロは `workflows/` に置きます。
 
-主解析は [photon_candidate_selection](workflows/photon_candidate_selection/README.md) です。正式結果は `output/photon_candidate_selection/current/jet/`、v11/schema 5 は `output/photon_candidate_selection/productions/topology_v11/` にあります。Condor ログは `output/condor/<workflow>/` の固定場所を再利用します。
+```text
+input/<sample>/segments.list + 同期した Pythia DST
+  → workflows/photon_candidate_selection/run_map.sh
+  → run_reduce.sh
+  → run_merge.sh
+  → output/photon_candidate_selection/current/jet/ （検証済み結果の入口）
+```
 
-以下は tree 生成・score 追加に関する説明です。Pythia の入口は `workflows/pythia_tree/`、共有処理は `workflows/common/` へ移動しています。
+再実行では新しい production/configuration と出力先を指定します。`current/jet/` は保存された検証済み結果への参照で、
+任意の実行結果を自動的に昇格させる場所ではありません。
+
+| 目的 | 配置・説明 |
+|---|---|
+| 通常の解析実行 | [workflows](workflows/README.md): 主解析、tree 生成、共通の実行入口 |
+| 独立解析・過去 study | [workflows/studies](workflows/studies/README.md) |
+| 物理的な疑問を調べる補助解析 | [workflows/diagnostics](workflows/diagnostics/README.md) |
+| ROOT 集計・描画の内部実装 | [analysis](analysis/README.md) |
+| Fun4All module・共有の物理判定 | `src/` |
+| 実ファイルの整合性確認・小規模 QA | [validation](validation/README.md) |
+| コード変更時の自動テスト | `tests/` |
+
+物理定義は [candidate definitions](docs/photon_candidate_definitions.md)、配置と成果物の保全は [layout](docs/layout.md)、
+過去 study の再実行は [reproduction](docs/reproduction.md) を参照してください。
+コードの `studies/`・`diagnostics/` 分類と、成果物の workflow ID は独立です。既存の `output/<workflow>/` と Condor ログの配置は維持しています。
+
+## Tree 生成と score 追加
+
+以下は [single_particle](workflows/single_particle/README.md) と [pythia_tree](workflows/pythia_tree/README.md) の詳細です。
+Pythia candidate の map は DST から直接生成するため、主解析の前に以下の汎用 tree を作る必要はありません。
 
 Pythia DSTには別frontendの`PythiaPhotonAnalysisTree`を使います。cluster/tower/shower-shape
 処理はsingle-particle版と共有しますが、event truthは複数primaryを前提としたcluster contributor
@@ -91,7 +118,7 @@ schema version、branch alignment、contributor offsetとfractionを検証しま
 次を実行します。4リストの行数、順序、suffixが一致しない場合は生成に失敗します。
 
 ```bash
-./PhotonAnalysisTree/workflows/common/workflows/common/make_pythia_input_manifest.sh
+./PhotonAnalysisTree/workflows/common/make_pythia_input_manifest.sh
 ```
 
 ## scoreを追加する
@@ -211,52 +238,52 @@ condor_submit -append "input_manifest = input/jet5/segments.list" -append "manif
 
 - `workflows/single_particle/run_tree.sh`, `workflows/single_particle/submit_tree.job`: single-particle DSTからbase TTreeを生成
 - `workflows/pythia_tree/run_tree.sh`, `workflows/pythia_tree/submit_tree.job`: Pythia 4-stream DSTからschema 4 treeを生成
-- `workflows/common/workflows/common/make_pythia_input_manifest.sh`: 4つのstream別listを検証して共通suffix manifestを生成
+- `workflows/common/make_pythia_input_manifest.sh`: 4つのstream別listを検証して共通suffix manifestを生成
 - `workflows/single_particle/run_add_scores.sh`, `workflows/single_particle/submit_scores.job`: BDT/gamma score branchを追加して検証
 - `workflows/pythia_tree/run_add_scores.sh`, `workflows/pythia_tree/submit_scores.job`: Pythia schema 4 treeへsplit scoreだけをtransactionalに追加して検証
 - `workflows/single_particle/make_dataset_manifest.sh`: `hadd`後のROOT fileとmodelを検証し、dataset manifestを生成
 
 ## Minimum-bias truth pT spectra
 
-cluster reconstructionを必要としないtruth粒子数の測定には、`workflows/truth_pt`の
+cluster reconstructionを必要としないtruth粒子数の測定には、`workflows/studies/truth_pt`の
 map-reduce workflowがG4Hits DSTを直接読みます。中間truth treeは生成しません。
 pi0 decay photonのpT spectrumは、HepMC内で崩壊したpi0由来のfinal photonと、
 Geant4に委譲されたsignal-primary pi0由来のphotonを合算します。HepMC/G4別の
 diagnostic histogramも保存します。詳細な粒子定義は
-`workflows/truth_pt/README.md`を参照してください。
+`workflows/studies/truth_pt/README.md`を参照してください。
 
 4 stream listのsuffix同期を検証してfull manifestを作ります。
 
 ```bash
 cd /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
-./workflows/common/workflows/common/make_pythia_input_manifest.sh input/minimum_bias input/minimum_bias/segments.list
+./workflows/common/make_pythia_input_manifest.sh input/minimum_bias input/minimum_bias/segments.list
 ```
 
-truth pT spectrumの集計とplotは、`workflows/truth_pt`のmap-reduce workflowを
+truth pT spectrumの集計とplotは、`workflows/studies/truth_pt`のmap-reduce workflowを
 使います。photonはclassifier category 1 (direct)または2 (fragmentation)、
 pi0 decay photonはHepMC/G4成分の合計です。defaultは全200,000 G4Hits DSTsを
 50 filesずつ、4,000 partial jobsへ分割します。
 
 ```bash
-condor_submit -maxjobs 4000 workflows/truth_pt/submit.job
+condor_submit -maxjobs 4000 workflows/studies/truth_pt/submit.job
 ```
 
 partialの範囲・解析条件を検証して統合し、最後にbin幅で規格化してplotします。
 `expected_manifest_end`を指定するため、partialの欠落も検出します。
 
 ```bash
-root -l -b -q 'workflows/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/partials/minimum_bias/partial_*.root","output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/results/minimum_bias/prompt_eta07_inclusive_pi0_decay",0,200000)'
+root -l -b -q 'workflows/studies/truth_pt/FinalizePythiaTruthPtSpectra.C("output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/partials/minimum_bias/partial_*.root","output/truth_pt/productions/schema3/prompt_eta07_unweighted_inclusive_pi0_decay/results/minimum_bias/prompt_eta07_inclusive_pi0_decay",0,200000)'
 ```
 
 粒子選択、partial schema、再開方法は
-[truth-pT workflow](workflows/truth_pt/README.md)を参照してください。
+[truth-pT workflow](workflows/studies/truth_pt/README.md)を参照してください。
 
 ## Minimum-bias cluster E_T spectra
 
 再構成clusterのprompt/pi0起源とseparated/merged/missing topologyは、
-4 stream DSTを直接読む`workflows/cluster_et`のmap-reduce workflowで処理します。
+4 stream DSTを直接読む`workflows/studies/cluster_et`のmap-reduce workflowで処理します。
 default cut、pathway定義、実行方法は
-[cluster-ET workflow](workflows/cluster_et/README.md)を参照してください。
+[cluster-ET workflow](workflows/studies/cluster_et/README.md)を参照してください。
 最終density histogramの単位は`clusters/GeV`です。
 
 `workflows/pythia_tree/submit_tree.job`は`input/jet5/segments.list`を`queue ... from`で読み、

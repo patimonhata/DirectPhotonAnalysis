@@ -1,4 +1,4 @@
-#include "../workflows/photon_candidate_selection/CheckEtaDecayFlight.C"
+#include "../workflows/diagnostics/eta_decay_flight/CheckEtaDecayFlight.C"
 #include <g4main/PHG4Particlev2.h>
 #include <g4main/PHG4VtxPointv1.h>
 #include <g4main/PHG4VtxPointv2.h>

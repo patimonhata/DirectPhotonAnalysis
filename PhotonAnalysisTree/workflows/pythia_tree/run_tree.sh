@@ -34,4 +34,4 @@ export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPh
 root -l -b -q "$module_dir/workflows/pythia_tree/Fun4All_PhotonAnalysisTreePythia.C(\"${input_suffix}\",${n_events},\"${output_directory}\")"
 
 # Reject incomplete or internally inconsistent schema-v4 output.
-root -l -b -q "$module_dir/workflows/pythia_tree/check_pythia_tree.C(\"${output_file}\")"
+root -l -b -q "$module_dir/validation/pythia_tree/check_pythia_tree.C(\"${output_file}\")"

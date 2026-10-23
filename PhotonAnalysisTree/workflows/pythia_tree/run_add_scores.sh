@@ -52,7 +52,7 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"
 
 # Validate the unscored schema before making any changes to the temporary copy.
-root -l -b -q "$module_dir/workflows/pythia_tree/check_pythia_tree.C(\"$temporary_file\")"
+root -l -b -q "$module_dir/validation/pythia_tree/check_pythia_tree.C(\"$temporary_file\")"
 
 root -l -b -q \
   -e ".L $module_dir/workflows/common/scoring/add_split_bdt.C" \
@@ -65,8 +65,8 @@ root -l -b -q \
   -e "gSystem->Exit(add_split_gamma_onnx(\"$temporary_file\",\"$split_onnx_model\"));"
 
 # Preserve schema-v4 truth consistency and validate all split score vectors.
-root -l -b -q "$module_dir/workflows/pythia_tree/check_pythia_tree.C(\"$temporary_file\")"
-root -l -b -q "$module_dir/workflows/pythia_tree/check_pythia_scored_tree.C(\"$temporary_file\")"
+root -l -b -q "$module_dir/validation/pythia_tree/check_pythia_tree.C(\"$temporary_file\")"
+root -l -b -q "$module_dir/validation/pythia_tree/check_pythia_scored_tree.C(\"$temporary_file\")"
 
 mv -- "$temporary_file" "$final_output"
 temporary_file=

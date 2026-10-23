@@ -98,7 +98,7 @@ export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPh
 root -l -b -q \
   "$workflow_dir/Fun4All_PythiaPhotonCandidateTreeMap.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",\"${sample_name}\",${chunk_index},${n_events},${min_cluster_energy},\"${model_file}\",${tagging_partner_min_energy},${eta_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${eta_mass_min},${eta_mass_max},${missing_energy_min},${missing_energy_max})"
 root -l -b -q \
-  "$workflow_dir/check_pythia_photon_candidate_map.C(\"${temporary_output}\",${min_cluster_energy},${tagging_partner_min_energy},${eta_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${eta_mass_min},${eta_mass_max},${missing_energy_min},${missing_energy_max})"
+  "$module_dir/validation/photon_candidate_selection/check_pythia_photon_candidate_map.C(\"${temporary_output}\",${min_cluster_energy},${tagging_partner_min_energy},${eta_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${eta_mass_min},${eta_mass_max},${missing_energy_min},${missing_energy_max})"
 
 mv -- "$temporary_output" "$final_output"
 temporary_output=

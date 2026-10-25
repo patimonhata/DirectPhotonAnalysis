@@ -12,6 +12,10 @@ if(NOT DEFINED ENV{OFFLINE_MAIN})
 endif()
 
 set(SPHENIX_PREFIX "$ENV{OFFLINE_MAIN}")
+if(DEFINED PHOTON_CONFIGURED_PREFIX AND NOT PHOTON_CONFIGURED_PREFIX STREQUAL SPHENIX_PREFIX)
+  message(FATAL_ERROR "This build directory belongs to another sPHENIX release; configure a new build directory")
+endif()
+set(PHOTON_CONFIGURED_PREFIX "${SPHENIX_PREFIX}" CACHE INTERNAL "Configured sPHENIX release")
 find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist EG TMVA TMVAUtils)
 
 find_path(
@@ -105,6 +109,7 @@ target_include_directories(
 target_link_libraries(Pi0GammaOnnx PRIVATE "${ONNXRUNTIME_LIBRARY}")
 target_compile_options(Pi0GammaOnnx PRIVATE -Wall -Wextra -Wpedantic)
 
+set_target_properties(PhotonAnalysisTree Pi0GammaOnnx PROPERTIES INSTALL_RPATH "$ORIGIN/../dependencies/Pi0Reconstruction/lib")
 install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
 install(
   FILES
@@ -124,7 +129,7 @@ install(
     PythiaPhotonCandidateTree.h
     PythiaTruthPtSpectrum.h
     PythiaTruthSpectrumTree.h
-    ../../Pi0Reconstruction/install/include/pi0reconstruction/ShowerShapeCalculator.h
+    "${PI0RECONSTRUCTION_INCLUDE_DIR}/ShowerShapeCalculator.h"
   DESTINATION include
 )
 install(FILES

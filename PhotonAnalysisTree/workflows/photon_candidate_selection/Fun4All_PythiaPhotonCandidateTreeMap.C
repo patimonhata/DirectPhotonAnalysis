@@ -15,10 +15,10 @@
 #include <string>
 #include <vector>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PythiaPhotonCandidateTree.h"
+#include <PythiaPhotonCandidateTree.h>
 
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib/libPi0Reconstruction.so)
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libPi0Reconstruction.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
 R__LOAD_LIBRARY(libcalo_reco.so)
 R__LOAD_LIBRARY(libg4detectors.so)
 R__LOAD_LIBRARY(libg4calo.so)

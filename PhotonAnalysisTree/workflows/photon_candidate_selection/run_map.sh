@@ -3,6 +3,8 @@ set -euo pipefail
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/photon_candidate_selection/run_map.sh" "$@"
 usage="usage: workflows/photon_candidate_selection/run_map.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST SAMPLE_NAME OUTPUT_DIRECTORY [N_EVENTS] [MIN_CLUSTER_ENERGY_GEV] [PI0_PARTNER_MIN_ENERGY_GEV] [ETA_PARTNER_MIN_ENERGY_GEV] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
@@ -85,22 +87,24 @@ temporary_output=$(mktemp --suffix=.root "$output_directory/.photon-candidate-ma
 cleanup()
 {
   if [[ -n "${temporary_output:-}" && -e "$temporary_output" ]]; then
-    rm -f -- "$temporary_output"
+    rm -f -- "$temporary_output" "$temporary_output.execution.json"
   fi
 }
 trap cleanup EXIT
 
-model_file="$module_dir/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root"
-set +u
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-set -u
-export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
+photon_setup_runtime "$module_dir"
+photon_check_output "$final_output"
+input_manifest_sha256=$(sha256sum "$input_manifest" | awk '{print $1}')
+export PHOTON_INPUT_MANIFEST_SHA256="$input_manifest_sha256"
+model_file="$PHOTON_SOURCE_ROOT/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root"
 root -l -b -q \
   "$workflow_dir/Fun4All_PythiaPhotonCandidateTreeMap.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",\"${sample_name}\",${chunk_index},${n_events},${min_cluster_energy},\"${model_file}\",${tagging_partner_min_energy},${eta_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${eta_mass_min},${eta_mass_max},${missing_energy_min},${missing_energy_max})"
 root -l -b -q \
   "$module_dir/validation/photon_candidate_selection/check_pythia_photon_candidate_map.C(\"${temporary_output}\",${min_cluster_energy},${tagging_partner_min_energy},${eta_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${eta_mass_min},${eta_mass_max},${missing_energy_min},${missing_energy_max})"
 
+python3 "$PHOTON_SOURCE_ROOT/tools/software.py" record --final-output "$final_output" map "$temporary_output" "$@"
 mv -- "$temporary_output" "$final_output"
+mv -- "$temporary_output.execution.json" "$final_output.execution.json"
 temporary_output=
 trap - EXIT
 echo "Pythia photon-candidate map ROOT file: $final_output"

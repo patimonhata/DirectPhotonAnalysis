@@ -3,6 +3,8 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../../../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/studies/pi0_cluster_multiplicity/run_partial.sh" "$@"
 usage="usage: workflows/studies/pi0_cluster_multiplicity/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [PT_BINS] [PT_MAX] [MULTIPLICITY_MAX] [CLUSTER_ENERGY_BINS] [CLUSTER_ENERGY_MAX] [TRUTH_ETA_MAX]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
@@ -59,8 +61,7 @@ cleanup()
 }
 trap cleanup EXIT
 
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
-export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
+photon_setup_runtime "$module_dir"
 root -l -b -q \
   "$module_dir/workflows/studies/pi0_cluster_multiplicity/Fun4All_PythiaPi0ClusterMultiplicity.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${pt_bins},${pt_max},${multiplicity_max},${cluster_energy_bins},${cluster_energy_max},${truth_eta_max})"
 root -l -b -q \

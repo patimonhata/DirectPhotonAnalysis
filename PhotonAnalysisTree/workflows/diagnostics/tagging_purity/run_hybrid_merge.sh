@@ -5,6 +5,9 @@ if (( $# != 1 )); then
   exit 2
 fi
 workflow_dir=$(cd "$(dirname "$0")" && pwd)
+module_dir=$(cd "$workflow_dir/../../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/diagnostics/tagging_purity/run_hybrid_merge.sh" "$@"
 output_directory=$1
 partial_root=/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/hybrid_threshold/partials/jet
 mkdir -p "$output_directory"
@@ -22,9 +25,7 @@ for input in "${inputs[@]}"; do
 done
 temporary="$output_root.tmp.$$"
 trap 'rm -f "$temporary"' EXIT
-set +u
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-set -u
+photon_setup_runtime "$module_dir"
 hadd -f "$temporary" "${inputs[@]}"
 root -l -b -q -e ".L $workflow_dir/SummarizeHybridThresholdDiagnostic.C" \
   -e "gSystem->Exit(SummarizeHybridThresholdDiagnostic(\"$temporary\",\"$output_directory/hybrid_threshold_diagnostic\"))"

@@ -3,6 +3,8 @@ set -eo pipefail
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/pythia_tree/run_add_scores.sh" "$@"
 usage="usage: workflows/pythia_tree/run_add_scores.sh INPUT FINAL_OUTPUT SPLIT_ONNX_MODEL [SPLIT_BDT_MODEL] [SPLIT_BDT_PPG15V1_MODEL]"
 input_file=${1:?$usage}
 final_output=${2:?$usage}
@@ -48,8 +50,7 @@ trap cleanup EXIT
 cp --reflink=auto -- "$input_file" "$temporary_file"
 chmod u+w -- "$temporary_file"
 
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
-export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"
+photon_setup_runtime "$module_dir"
 
 # Validate the unscored schema before making any changes to the temporary copy.
 root -l -b -q "$module_dir/validation/pythia_tree/check_pythia_tree.C(\"$temporary_file\")"

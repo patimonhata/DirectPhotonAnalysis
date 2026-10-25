@@ -3,6 +3,8 @@ set -eo pipefail
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/pythia_tree/run_tree.sh" "$@"
 input_suffix=${1:?usage: workflows/pythia_tree/run_tree.sh INPUT_SUFFIX [N_EVENTS] [OUTPUT_DIRECTORY]}
 n_events=${2:-0}
 output_directory=${3:-$module_dir/output/pythia_tree/productions/historical/default/maps}
@@ -26,8 +28,7 @@ if [[ -e "$output_file" ]]; then
   exit 3
 fi
 
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
-export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
+photon_setup_runtime "$module_dir"
 
 # Fun4All resolves each DST through its basename. The macro adds the four
 # stream-specific prefixes to this common input suffix.

@@ -12,6 +12,9 @@ if (( $# != 3 )); then
 fi
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/photon_candidate_selection/run_merge.sh" "$@"
 family=$1
 partial_root=$2
 output_base=$3
@@ -31,9 +34,13 @@ if [[ -z "$output_base" || "$partial_root" == *\"* || "$partial_root" == *\\* ||
 fi
 partial_root=$(cd "$partial_root" && pwd)
 
-set +u
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-set -u
+photon_setup_runtime "$module_dir"
+photon_check_output "$output_base/candidate_composition.root"
+photon_check_inputs reduce "$partial_root/*/shard_*/photon_candidate_selection.root"
 root -l -b -q "$workflow_dir/MergePythiaPhotonCandidateSelection.C(\"$family\",\"$partial_root\",\"$output_base\")"
+
+while IFS= read -r -d '' result; do
+  photon_record_execution merge "$result" "$@"
+done < <(find "$output_base" -type f -name '*.root' -print0)
 
 echo "Merged selection output base: $output_base"

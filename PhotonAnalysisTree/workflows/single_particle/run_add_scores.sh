@@ -3,6 +3,8 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/single_particle/run_add_scores.sh" "$@"
 usage="usage: workflows/single_particle/run_add_scores.sh INPUT FINAL_OUTPUT [SPLIT_BDT_MODEL] [NOSPLIT_BDT_MODEL] [SPLIT_ONNX_MODEL] [NOSPLIT_ONNX_MODEL] [SPLIT_BDT_PPG15V1_MODEL]"
 input_file=${1:?$usage}
 final_output=${2:?$usage}
@@ -42,8 +44,7 @@ if [[ ! -w "$final_directory" ]]; then
   exit 1
 fi
 
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
-export LD_LIBRARY_PATH="$module_dir/install/lib64:${LD_LIBRARY_PATH:-}"
+photon_setup_runtime "$module_dir"
 
 root -l -b -q -e ".L $module_dir/validation/single_particle/check_tree.C" -e "gSystem->Exit(check_tree(\"$input_file\",true));"
 

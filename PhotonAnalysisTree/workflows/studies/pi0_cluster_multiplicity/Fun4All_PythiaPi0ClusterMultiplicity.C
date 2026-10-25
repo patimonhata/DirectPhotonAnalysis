@@ -11,9 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PythiaPi0ClusterMultiplicity.h"
+#include <PythiaPi0ClusterMultiplicity.h>
 
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
 
 namespace
 {

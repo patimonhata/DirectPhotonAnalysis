@@ -3,6 +3,8 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../../../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/studies/truth_pt/run_partial.sh" "$@"
 usage="usage: workflows/studies/truth_pt/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [PT_MAX] [MAX_ABS_ETA] [USE_EVENT_WEIGHT]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
@@ -66,8 +68,7 @@ cleanup()
 }
 trap cleanup EXIT
 
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
-export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
+photon_setup_runtime "$module_dir"
 root -l -b -q \
   "$module_dir/workflows/studies/truth_pt/Fun4All_PythiaTruthPtSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${pt_max},${max_abs_eta},${use_event_weight})"
 root -l -b -q \

@@ -24,3 +24,5 @@ compile_commands.json
 *.png
 *.pdf
 __pycache__/
+
+/PhotonAnalysisTree/software/

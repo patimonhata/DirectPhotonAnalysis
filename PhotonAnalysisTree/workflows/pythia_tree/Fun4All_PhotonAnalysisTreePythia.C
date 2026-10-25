@@ -11,10 +11,10 @@
 #include <limits>
 #include <string>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PythiaPhotonAnalysisTree.h"
+#include <PythiaPhotonAnalysisTree.h>
 
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib/libPi0Reconstruction.so)
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libPi0Reconstruction.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
 
 int Fun4All_PhotonAnalysisTreePythia(
     const std::string input_suffix = "pythia8_Jet5-0000000028-000000.root",

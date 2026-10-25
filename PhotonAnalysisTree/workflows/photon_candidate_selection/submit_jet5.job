@@ -1,3 +1,7 @@
+# Set production_directory to a new configuration initialized with tools/software.py production.
+production_directory = UNCONFIGURED
+production_manifest = $(production_directory)/manifest.json
+Environment = "PHOTON_PRODUCTION_MANIFEST=$(production_manifest)"
 Universe           = vanilla
 Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection
 Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection/run_map.sh
@@ -24,7 +28,7 @@ eta_mass_max = 0.65
 missing_energy_min = 0.12
 missing_energy_max = 0.5
 input_manifest     = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/input/jet5/segments.list
-map_output_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v12_eta_v2_decay_v1/ClusterE0p12_Pi0Partner0p5/maps/jet5
+map_output_directory = $(production_directory)/maps/jet5
 log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection
 
 Output = $(log_directory)/jet5_$(ProcId).out

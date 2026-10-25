@@ -5,6 +5,9 @@ if (( $# != 8 )); then
   exit 2
 fi
 workflow_dir=$(cd "$(dirname "$0")" && pwd)
+module_dir=$(cd "$workflow_dir/../../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/diagnostics/tagging_purity/run_reduce.sh" "$@"
 map_root=$1
 output_file=$2
 threshold=$3
@@ -26,9 +29,7 @@ map_root=$(cd "$map_root" && pwd)
 mkdir -p "$(dirname "$output_file")"
 temporary="$output_file.tmp.$$"
 trap 'rm -f "$temporary"' EXIT
-set +u
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-set -u
+photon_setup_runtime "$module_dir"
 root -l -b -q -e ".L $workflow_dir/ReduceTaggingPurityDiagnostic.C" \
   -e "gSystem->Exit(ReduceTaggingPurityDiagnostic(\"$map_root\",\"$temporary\",$threshold,\"$sample\",$shard_index,$shard_count,$require_complete,$max_events))"
 mv "$temporary" "$output_file"

@@ -12,6 +12,9 @@ if (( $# != 8 )); then
 fi
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/photon_candidate_selection/run_reduce.sh" "$@"
 family=$1
 map_root=$2
 output_base=$3
@@ -62,9 +65,11 @@ if [[ -z "$output_base" || "$map_root" == *\"* || "$map_root" == *\\* || "$outpu
 fi
 map_root=$(cd "$map_root" && pwd)
 
-set +u
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-set -u
+photon_setup_runtime "$module_dir"
+photon_check_output "$output_base.root"
+photon_check_inputs map "$map_root/$sample_name/map_*.root"
 root -l -b -q "$workflow_dir/ReducePythiaPhotonCandidateSelection.C(\"$family\",\"$map_root\",\"$output_base\",$require_complete,$n_bins,$et_max,\"$sample_name\",$shard_index)"
+
+photon_record_execution reduce "$output_base.root" "$@"
 
 echo "Photon-candidate selection partial output base: $output_base"

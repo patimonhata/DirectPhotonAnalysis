@@ -1,3 +1,7 @@
+# Set production_directory to a new configuration initialized with tools/software.py production.
+production_directory = UNCONFIGURED
+production_manifest = $(production_directory)/manifest.json
+Environment = "PHOTON_PRODUCTION_MANIFEST=$(production_manifest)"
 Universe           = vanilla
 Initialdir         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection
 Executable         = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/workflows/photon_candidate_selection/run_reduce.sh
@@ -13,8 +17,8 @@ configuration      = ClusterE0p12_Pi0Partner0p5
 require_complete   = true
 n_bins             = 40
 et_max             = 40.0
-map_root            = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v12_eta_v2_decay_v1/$(configuration)/maps
-partial_root        = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v12_eta_v2_decay_v1/$(configuration)/partials/$(family)
+map_root            = $(production_directory)/maps
+partial_root        = $(production_directory)/partials/$(family)
 output_base         = $(partial_root)/jet12/shard_$(shard_index)/photon_candidate_selection
 log_directory = /sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/output/condor/photon_candidate_selection
 

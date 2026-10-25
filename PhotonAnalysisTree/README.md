@@ -64,12 +64,15 @@ invalid値または空vectorとして保存します。
 
 ## Build
 
-先に既存`Pi0Reconstruction`をbuild/installしてから実行します。
+開発用の既定環境は `ana.565` です。Pi0Reconstruction も同じ環境でビルドし、`install/dev/ana.565/` に同梱します。
 
 ```bash
 cd /sphenix/user/ryotaro/DirectPhotonAnalysis
-./PhotonAnalysisTree/src/build.sh
+bash PhotonAnalysisTree/src/build.sh
 ```
+
+ビルドの設計、正式 software の freeze、production との対応は [software](docs/software.md) を参照してください。
+旧 `build/current`・`candidate` と共通 `install/` は保管済みの作業領域で、新しい実行の既定先には使いません。
 
 buildは次を作ります。
 
@@ -201,7 +204,8 @@ default出力は`PhotonAnalysisTree/output/single_particle/productions/historica
 
 ## Model provenanceと制約
 
-model path、SHA-256、score branch、feature schema、domain warning、event数、source file範囲、codeのgit commitはdataset単位の`output/single_particle/productions/historical/default/results/manifest.json`へ1回だけ保存します。個別ROOT fileには重複保存しません。
+model path、SHA-256、score branch、feature schema、domain warning、event数、source file範囲はdataset単位の`output/single_particle/productions/historical/default/results/manifest.json`へ1回だけ保存します。個別ROOT fileには重複保存しません。
+この旧 dataset manifest の Git commit は manifest 作成コードの版です（`code.scope=manifest_writer_only`）。入力 tree の生成時の版は証明できないため、`generation_provenance=not_recorded` と記録します。主解析の新しい production は [software manifest と stage 履歴](docs/software.md)で生成コードを結び付けます。
 
 同梱`models/best_model.onnx`のSHA-256は`194eb9a0394b5752619d324aa8a17dde547ff67713ea908dcfed869ef0931a6d`です。元は`Pi0DirectGammaSeparation/Pi0GammaClassifier/output/baseline`で、`models/onnx_metadata.json`も同梱しています。
 

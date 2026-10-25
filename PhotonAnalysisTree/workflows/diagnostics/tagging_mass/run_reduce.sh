@@ -6,6 +6,9 @@ if (( $# != 7 )); then
   exit 2
 fi
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+module_dir=$(cd "$workflow_dir/../../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/diagnostics/tagging_mass/run_reduce.sh" "$@"
 family=$1
 map_root=$2
 output_base=$3
@@ -28,8 +31,6 @@ if [[ ! -d "$map_root" || -z "$output_base" || "$map_root$output_base$sample_nam
   exit 2
 fi
 map_root=$(cd "$map_root" && pwd)
-set +u
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-set -u
+photon_setup_runtime "$module_dir"
 root -l -b -q -e ".L $workflow_dir/ReduceTaggingMassDiagnostic.C" \
   -e "gSystem->Exit(ReduceTaggingMassDiagnostic(\"$family\",\"$map_root\",\"$output_base\",$require_complete,\"$sample_name\",$shard_index,$shard_count,0))"

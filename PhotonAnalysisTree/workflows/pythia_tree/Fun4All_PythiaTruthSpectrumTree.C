@@ -10,9 +10,9 @@
 #include <limits>
 #include <string>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PythiaTruthSpectrumTree.h"
+#include <PythiaTruthSpectrumTree.h>
 
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
 
 int Fun4All_PythiaTruthSpectrumTree(
     const std::string input_suffix = "pythia8_Detroit-0000000028-000000.root",

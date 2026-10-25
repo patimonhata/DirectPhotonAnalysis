@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <limits>
@@ -439,6 +440,14 @@ bool PythiaPhotonCandidateTree::update_input_provenance()
 
 int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
 {
+  const char* offline_main = std::getenv("OFFLINE_MAIN");
+  if (offline_main && *offline_main)
+  {
+    analysis_release_ = offline_main;
+    while (analysis_release_.size() > 1 && analysis_release_.back() == '/') analysis_release_.pop_back();
+    analysis_release_ = analysis_release_.substr(analysis_release_.find_last_of('/') + 1);
+  }
+
   const bool manifest_valid = manifest_path_.empty() || (manifest_begin_ >= 0 && manifest_end_ > manifest_begin_ && primary_input_manager_);
   if (output_file_name_.empty() || model_file_name_.empty() || signal_embedding_id_ <= 0 || !manifest_valid ||
       !std::isfinite(min_cluster_energy_) || min_cluster_energy_ < 0.0 || !std::isfinite(pi0_partner_min_energy_) ||

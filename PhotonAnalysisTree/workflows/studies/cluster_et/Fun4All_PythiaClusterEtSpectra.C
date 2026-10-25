@@ -13,9 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PythiaClusterEtSpectrum.h"
+#include <PythiaClusterEtSpectrum.h>
 
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
 R__LOAD_LIBRARY(libg4detectors.so)
 R__LOAD_LIBRARY(libg4calo.so)
 

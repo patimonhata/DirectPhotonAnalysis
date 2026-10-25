@@ -3,6 +3,8 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../../../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/studies/cluster_et/run_partial.sh" "$@"
 usage="usage: workflows/studies/cluster_et/run_partial.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST OUTPUT_DIRECTORY [N_BINS] [ET_MAX] [CLUSTER_ETA_MAX] [MIN_CLUSTER_ENERGY] [DOMINANT_FRACTION_MIN] [PI0_CONTRIBUTOR_FRACTION_MIN] [MIN_ENERGY_CONTRIBUTION_FRACTION] [SEPARATED_DR] [MERGED_DR] [RESPONSE_MIN] [RESPONSE_MAX]"
 job_index=${1:?$usage}
 chunk_offset=${2:?$usage}
@@ -63,8 +65,7 @@ cleanup()
 }
 trap cleanup EXIT
 
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
-export LD_LIBRARY_PATH="$module_dir/install/lib64:/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib:${LD_LIBRARY_PATH:-}"
+photon_setup_runtime "$module_dir"
 root -l -b -q \
   "$module_dir/workflows/studies/cluster_et/Fun4All_PythiaClusterEtSpectra.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",${n_bins},${et_max},${cluster_eta_max},${min_cluster_energy},${dominant_fraction_min},${pi0_contributor_fraction_min},${min_energy_contribution_fraction},${separated_dr},${merged_dr},${response_min},${response_max})"
 root -l -b -q \

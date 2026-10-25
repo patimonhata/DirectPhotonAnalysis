@@ -26,5 +26,5 @@ coverage 検証と小規模 QA は既定の cut を持ちます。本番とは�
 コード変更時の既存テスト（ana.565 を設定し、ライブラリを build 後）:
 
 ```bash
-bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/candidate"
+bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
 ```

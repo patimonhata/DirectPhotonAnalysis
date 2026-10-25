@@ -3,6 +3,8 @@ set -eo pipefail
 
 workflow_dir=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "workflows/single_particle/make_dataset_manifest.sh" "$@"
 scored_dir=${1:-$module_dir/output/single_particle/productions/historical/default/maps}
 merged_file=${2:-$module_dir/output/single_particle/productions/historical/default/results/all.root}
 manifest_file=${3:-$module_dir/output/single_particle/productions/historical/default/results/manifest.json}
@@ -16,7 +18,7 @@ for command in jq sha256sum; do
     exit 2
   fi
 done
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
+photon_setup_runtime "$module_dir"
 if ! command -v root >/dev/null 2>&1; then
   echo "Required command not found after sPHENIX setup: root" >&2
   exit 2
@@ -191,7 +193,7 @@ jq -n \
         domain_warning: "The model was trained only on events with exactly one no-split cluster; multi-cluster scores require separate validation."
       }
     },
-    code: {git_commit: $git_commit, working_tree_dirty: $git_dirty}
+    code: {git_commit: $git_commit, working_tree_dirty: $git_dirty, scope: "manifest_writer_only", generation_provenance: "not_recorded"}
   }' > "$temporary_manifest"
 
 mv "$temporary_manifest" "$manifest_file"

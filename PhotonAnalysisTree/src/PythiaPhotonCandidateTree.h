@@ -233,7 +233,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   std::string sample_name_;
   std::string model_key_ = "myBDT";
   std::string model_sha256_ = "5494946f40213a1035dc9e883bc71ddfdcebf86015d279300c8f44774e846248";
-  std::string analysis_release_ = "ana.565";
+  std::string analysis_release_ = "unknown";
   std::string split_cluster_node_name_ = "CLUSTERINFO_CEMC";
   std::string topo_cluster_node_name_ = "TOPOCLUSTER_ALLCALO";
   std::string tower_node_name_ = "TOWERINFO_CALIB_CEMC";

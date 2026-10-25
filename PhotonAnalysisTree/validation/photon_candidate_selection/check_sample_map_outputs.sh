@@ -3,6 +3,8 @@ set -euo pipefail
 
 workflow_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 module_dir=$(cd "$workflow_dir/../.." && pwd)
+source "$module_dir/workflows/common/runtime.sh"
+photon_dispatch "$module_dir" "validation/photon_candidate_selection/check_sample_map_outputs.sh" "$@"
 usage="usage: validation/photon_candidate_selection/check_sample_map_outputs.sh SAMPLE_NAME [FILES_PER_JOB] [DEEP_VALIDATION] [OUTPUT_DIRECTORY] [MIN_CLUSTER_ENERGY_GEV] [PI0_PARTNER_MIN_ENERGY_GEV] [ETA_PARTNER_MIN_ENERGY_GEV] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]"
 sample_name=${1:?$usage}
 files_per_job=${2:-10}
@@ -63,7 +65,7 @@ invalid=0
 
 if [[ "$deep_validation" == true ]]; then
   set +u
-  source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
+  photon_setup_runtime "$module_dir"
   set -u
 fi
 for ((chunk = 0; chunk < expected_maps; ++chunk)); do

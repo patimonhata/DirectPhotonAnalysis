@@ -24,6 +24,12 @@ tests/                                    # 自動テスト（synthetic 入力�
 実行入口の一覧は [workflows](../workflows/README.md)、
 内部部品の依存関係は [analysis](../analysis/README.md)、検証の使い方は [validation](../validation/README.md) を参照してください。
 
+## ビルドと実行ソフトウェア
+
+開発用は `build/dev/<release>/` と `install/dev/<release>/`、正式実行用は `software/<software-id>/` に分けます。
+ビルド記録・固定 source・依存 library・production manifest の設計は [software](software.md) を参照してください。
+旧 build・共通 install・保存成果物は保持しています。
+
 ## 成果物の配置
 
 コードを `studies/`・`diagnostics/` に分類しても、成果物の workflow ID と保存先は変更しません。
@@ -93,7 +99,7 @@ Reduce / Merge の計算本体は変更前と文字列単位で一致する。
 テストの再実行（ana.565 を設定し、ライブラリを build 後）:
 
 ```bash
-bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/candidate"
+bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
 ```
 
 ## 前回の成果物移行時の検証

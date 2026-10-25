@@ -12,9 +12,9 @@
 #include <string>
 #include <vector>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PythiaTruthPtSpectrum.h"
+#include <PythiaTruthPtSpectrum.h>
 
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
 
 namespace
 {

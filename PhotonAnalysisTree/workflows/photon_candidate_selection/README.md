@@ -23,14 +23,12 @@ Each map reads synchronized `DST_CALO_CLUSTER`, `DST_MBD_EPD`, `DST_TRUTH_JET`, 
 ## Build
 
 ```bash
-source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-cmake -S PhotonAnalysisTree/src -B PhotonAnalysisTree/build/candidate \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$PWD/PhotonAnalysisTree/install"
-cmake --build PhotonAnalysisTree/build/candidate --parallel 4
-cmake --install PhotonAnalysisTree/build/candidate
+bash PhotonAnalysisTree/src/build.sh
 ```
 
-Finish jobs using the installed library before installing another build.
+This builds the local dependency and module in fixed `ana.565`, under `build/dev/ana.565/` and `install/dev/ana.565/`.
+For formal productions, commit the execution code, rebuild clean source, freeze a software ID, and initialize a new production manifest.
+See [software/build provenance](../../docs/software.md) for the complete procedure. Existing outputs and legacy installs are retained.
 
 ## Map
 
@@ -38,7 +36,7 @@ Review the production/configuration and choose new map outputs when rerunning a 
 
 ```bash
 mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet5.job
+condor_submit -append "production_directory = /absolute/path/to/new_configuration" PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet5.job
 ```
 
 Other samples have matching submit files. The explicit local interface is:
@@ -56,8 +54,8 @@ One reducer fills all six selections: `kinematic`, `preselection`, `preselection
 Use full-sample generator-weight normalization, including processed events later rejected by the vertex cut. Never normalize individual map files or add per-shard normalization denominators. Jet12 has ten contiguous shards; each other Jet sample has one. Schema/settings, exact sample/shard coverage, category closure, weighted Sumw2 and subset relations are checked before final plots are produced.
 
 ```bash
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet_samples.job
-condor_submit PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet12_shards.job
+condor_submit -append "production_directory = /absolute/path/to/new_configuration" PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet_samples.job
+condor_submit -append "production_directory = /absolute/path/to/new_configuration" PhotonAnalysisTree/workflows/photon_candidate_selection/submit_reduce_jet12_shards.job
 ```
 
 Interfaces:
@@ -92,7 +90,7 @@ Production tree/map validators and small-sample QA live under [validation](../..
 ## Checks
 
 ```bash
-bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/candidate"
+bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
 ```
 
 The checks cover shared topology/eta/decay-origin behavior, branch roundtrips, metadata, closure, category covariance, veto survival and a synthetic schema-8 map → reduce → merge pipeline. Logs use one fixed `output/condor/photon_candidate_selection/<stage>_<ProcId>.out/.err` per job position and are reused across productions. HTCondor event logs use fixed `/tmp/` paths.

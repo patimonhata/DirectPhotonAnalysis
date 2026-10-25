@@ -11,10 +11,10 @@
 #include <sstream>
 #include <string>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include/PhotonAnalysisTree.h"
+#include <PhotonAnalysisTree.h>
 
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/Pi0Reconstruction/install/lib/libPi0Reconstruction.so)
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libPi0Reconstruction.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
 
 int Fun4All_PhotonAnalysisTree(
     const int process_id = 0,

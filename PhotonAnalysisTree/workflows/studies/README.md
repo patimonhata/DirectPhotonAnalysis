@@ -6,6 +6,7 @@
 
 | Study | 状態・入口 |
 |---|---|
+| [calorimeter_acceptance](calorimeter_acceptance/README.md) | ana.565 の tower 代表面による EMCAL / iHCAL / oHCAL の z-vertex 依存 acceptance |
 | [conditional_efficiency](conditional_efficiency/README.md) | 保存結果と再現レシピあり |
 | [conditional_efficiency_reweighted](conditional_efficiency_reweighted/README.md) | 保存結果と再現レシピあり |
 | [pair_matching_efficiency](pair_matching_efficiency/README.md) | 保存結果と再現レシピあり |

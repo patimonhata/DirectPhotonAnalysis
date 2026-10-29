@@ -6,6 +6,7 @@
 
 | 配置 | 対象 |
 |---|---|
+| `calorimeter_acceptance/` | tower geometry 境界、独立角度計算、vertex scan、PDF ページ数 |
 | `photon_candidate_selection/` | candidate tree/map、sample coverage、veto、recovery 比較、小規模実入力 QA |
 | `single_particle/` | gun base/scored tree |
 | `pythia_tree/` | Pythia base/scored/truth-spectrum tree |

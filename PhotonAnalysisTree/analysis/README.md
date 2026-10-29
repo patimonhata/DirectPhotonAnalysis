@@ -24,6 +24,7 @@ ROOT interpreter による従来の実行方式を維持しており、このデ
 
 ## 共通・補助解析
 
+- `calorimeter_acceptance/`: ana.565 tower geometry の抽出と解析的な z-vertex acceptance の描画。入口は `workflows/studies/calorimeter_acceptance/`。
 - `common/PhotonCandidateSettings.h`: map の条件読み取りと partial 間の条件検証。複数の診断で共有します。
 - `common/plotting/`: sPHENIX 描画スタイル。
 - `tagging_mass/` / `tagging_working_point_scan/`: 補助解析の histogram・metadata・描画部品。

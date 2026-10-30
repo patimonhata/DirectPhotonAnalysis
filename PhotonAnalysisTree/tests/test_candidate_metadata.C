@@ -5,9 +5,9 @@
 void test_candidate_metadata()
 {
   MapMetadata map;
-  map.schema_version = 8;
-  map.eta_topology_algorithm_version = 2;
-  map.pi0_topology_algorithm_version = 12;
+  map.schema_version = 9; map.common_composition_algorithm_version = 1;
+  map.eta_topology_algorithm_version = 3;
+  map.pi0_topology_algorithm_version = 13;
   map.min_photon_energy_recovery = 0.0;
   assert(compatible(map, map));
   const std::array<double MapMetadata::*, 10> map_fields = {
@@ -26,12 +26,13 @@ void test_candidate_metadata()
   changed = map;
   --changed.eta_topology_algorithm_version;
   assert(!compatible(map, changed));
-  for (int field = 0; field < 3; ++field)
+  for (int field = 0; field < 4; ++field)
   {
     auto policy = map;
     if (field == 0) ++policy.decay_origin_algorithm_version;
     if (field == 1) policy.decay_origin_max_proper_length_cm += .001;
     if (field == 2) policy.decay_origin_max_flight_cm += .001;
+    if (field == 3) ++policy.common_composition_algorithm_version;
     assert(!compatible(map, policy));
   }
   candidate_composition_merge::Metadata partial;
@@ -48,12 +49,13 @@ void test_candidate_metadata()
     different.*field += 0.01;
     assert(!candidate_composition_merge::compatible(partial, different));
   }
-  for (int field = 0; field < 3; ++field)
+  for (int field = 0; field < 4; ++field)
   {
     auto policy = partial;
     if (field == 0) ++policy.decay_origin_algorithm_version;
     if (field == 1) policy.decay_origin_max_proper_length_cm += .001;
     if (field == 2) policy.decay_origin_max_flight_cm += .001;
+    if (field == 3) ++policy.common_composition_algorithm_version;
     assert(!candidate_composition_merge::compatible(partial, policy));
   }
   auto different_eta = partial;

@@ -53,6 +53,7 @@ struct CandidateWork
 struct Projection
 {
   bool valid = false;
+  bool no_intersection = false;
   double eta = -999.0;
   double phi = -999.0;
 };
@@ -188,14 +189,14 @@ Projection project_photon(const PHG4Particle* photon, PHG4TruthInfoContainer* tr
   const double b = 2.0 * (vertex->get_x() * ux + vertex->get_y() * uy);
   const double c = vertex->get_x() * vertex->get_x() + vertex->get_y() * vertex->get_y() - target_radius * target_radius;
   const double discriminant = b * b - 4.0 * a * c;
-  if (a <= std::numeric_limits<double>::epsilon() || discriminant < 0.0) return result;
+  if (a <= std::numeric_limits<double>::epsilon() || discriminant < 0.0) { result.no_intersection = true; return result; }
   const double root = std::sqrt(discriminant);
   const double first = (-b + root) / (2.0 * a);
   const double second = (-b - root) / (2.0 * a);
   double distance = std::numeric_limits<double>::infinity();
   if (first > 0.0) distance = std::min(distance, first);
   if (second > 0.0) distance = std::min(distance, second);
-  if (!std::isfinite(distance)) return result;
+  if (!std::isfinite(distance)) { result.no_intersection = true; return result; }
   const double x = vertex->get_x() + distance * ux;
   const double y = vertex->get_y() + distance * uy;
   const double z = vertex->get_z() + distance * uz;
@@ -220,6 +221,7 @@ void fill_photon_kinematics(photon_tree::Pi0TopologyCandidateRecord& record, std
   }
   const Projection projection = project_photon(photon, truth, target_radius);
   record.photon_projection_valid[index] = projection.valid;
+  record.photon_projection_no_intersection[index] = projection.no_intersection;
   if (projection.valid)
   {
     record.photon_projection_eta[index] = projection.eta;
@@ -240,7 +242,9 @@ void fill_first_daughter_diagnostic(photon_tree::Pi0TopologyCandidateRecord& rec
   for (const PHG4Particle* child : found->second)
   {
     const PHG4VtxPoint* vertex = child && truth ? truth->GetVtx(child->get_vtx_id()) : nullptr;
-    if (!vertex || !std::isfinite(vertex->get_t()) || vertex->get_t() >= first_time) continue;
+    if (!vertex || !std::isfinite(vertex->get_t()) || !std::isfinite(vertex->get_x()) || !std::isfinite(vertex->get_y()))
+    { record.interaction_info_valid = false; continue; }
+    if (vertex->get_t() >= first_time) continue;
     first_vertex = vertex;
     first_time = vertex->get_t();
   }
@@ -260,7 +264,7 @@ void fill_cemc_edep(std::vector<photon_tree::Pi0TopologyCandidateRecord>& candid
     for (std::size_t photon = 0; photon < 2U; ++photon)
     {
       const int track_id = candidates[candidate].photon_track_ids[photon];
-      if (track_id != 0 && track_id != -999) owners[track_id].push_back({candidate, photon});
+      if (track_id != 0) owners[track_id].push_back({candidate, photon});
     }
 
   const PHG4HitContainer::ConstRange range = hits->getHits();
@@ -321,6 +325,7 @@ const char* pi0_pathway_name(Pi0Pathway value)
   case Pi0Pathway::generator_decay: return "generator_decay";
   case Pi0Pathway::single_particle_g4_decay: return "single_particle_g4_decay";
   case Pi0Pathway::eta_daughter_g4_decay: return "eta_daughter_g4_decay";
+  case Pi0Pathway::g4_secondary_decay: return "g4_secondary_decay";
   }
   return "unknown";
 }
@@ -423,7 +428,9 @@ void classify_pi0_anchor(const Pi0AnchorTopologyConfig& config, const Pi0Topolog
     }
     const auto& truth_partner = candidate.truth_partner_clusters[partner];
     anchor.missing_category = Pi0MissingCategory::other;
-    if (!projection_valid)
+    if (candidate.photon_projection_no_intersection[partner])
+    { anchor.missing_category = Pi0MissingCategory::acceptance; anchor.missing_detail = Pi0MissingDetail::partner_outside_cemc_acceptance; }
+    else if (!projection_valid)
       anchor.missing_detail = Pi0MissingDetail::partner_projection_invalid;
     else if (!candidate.photon_in_cemc_acceptance[partner])
     {
@@ -612,7 +619,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
   const PHHepMCGenEvent* signal_event = pythia && event_map
       ? event_map->get(config_.signal_embedding_id) : nullptr;
   const HepMC::GenEvent* event = signal_event ? signal_event->getEvent() : nullptr;
-  if (!truth || !towers || !raw_truth_towers || !truth_cells || !truth_hits ||
+  if (!truth || !towers || (!config_.common_composition && (!raw_truth_towers || !truth_cells || !truth_hits)) ||
       !clusters || (pythia && (!event_map || !signal_event ||
        !signal_event->is_simulated() || !event)))
   {
@@ -675,9 +682,26 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
   }
 
+  CommonDecayTruth common_truth(truth, event_map);
   EtaCascadeTruth eta_cascade(truth, event_map);
   std::vector<CandidateWork> candidates;
-  if (pythia)
+  if (config_.common_composition)
+  {
+    for (const auto& c : common_truth.diphotons(config_.parent_pdg_id, config_.signal_embedding_id))
+    {
+      CandidateWork work; work.record.parent_identity = c.parent.identity; work.record.photon_identities = c.photon_ids;
+      const auto* g4_parent = c.g4_parent_track ? truth->GetParticle(c.g4_parent_track) : nullptr;
+      work.record.pathway = g4_parent ? g4_parent->get_parent_id() ? Pi0Pathway::g4_secondary_decay : Pi0Pathway::g4_primary_decay : Pi0Pathway::generator_decay;
+      if (g4_parent) ++result.g4_candidate_count;
+      else ++result.generator_candidate_count;
+      work.record.parent_barcode = c.parent.identity.source == 1 ? c.parent.identity.id : 0;
+      work.record.g4_parent_track_id = c.g4_parent_track;
+      work.record.energy = c.energy; work.record.pt = c.pt; work.record.eta = c.eta; work.record.phi = c.phi;
+      for (int i = 0; i < 2; ++i) fill_photon_kinematics(work.record, i, c.photons[i], truth, projection_radius, config_.cemc_acceptance_eta_max);
+      candidates.push_back(std::move(work));
+    }
+  }
+  else if (pythia)
   {
     struct PendingGenerator
     {
@@ -796,7 +820,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
   }
 
-  if (pythia && config_.eta_pseudo_primary && config_.parent_pdg_id == 111)
+  if (!config_.common_composition && pythia && config_.eta_pseudo_primary && config_.parent_pdg_id == 111)
   {
     for (auto it = secondary_range.first; it != secondary_range.second; ++it)
     {
@@ -883,6 +907,8 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     record.anchor_acceptance = std::abs(record.eta) < config_.anchor_cluster_eta_max;
     record.truth = truth_matcher_.match(
         cluster, towers, raw_truth_towers, truth, event_map, true);
+    record.original_truth = record.truth;
+    if (config_.common_composition) record.composition = common_truth.resolve(record.original_truth, cluster, towers, raw_truth_towers, truth_cells, truth_hits);
     if (config_.eta_pseudo_primary && record.truth.valid)
       eta_cascade.refine(record.truth, cluster, towers, raw_truth_towers, truth_cells, truth_hits);
     if (!record.truth.valid)
@@ -960,6 +986,10 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
   }
 
+  if (config_.common_composition)
+    for (std::size_t i = 0; i < result.clusters.size(); ++i)
+      result.prompt_cluster[i] = result.clusters[i].composition.main == composition::Main::prompt;
+
   std::vector<std::vector<std::size_t>> anchors_by_candidate(
       result.candidates.size());
   constexpr double tie_tolerance = 1e-6;
@@ -974,6 +1004,16 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     }
     std::map<std::size_t, double> fraction_by_candidate;
     double unmatched_max_fraction = 0.0;
+    if (config_.common_composition)
+    {
+      const auto& c = cluster.composition;
+      const bool selected = config_.parent_pdg_id == 111 ? c.main == composition::Main::pi0 : c.main == composition::Main::eta_gg;
+      if (!selected || c.selected.decay != 1) continue;
+      for (std::size_t i = 0; i < result.candidates.size(); ++i)
+        if (result.candidates[i].parent_identity == c.selected.identity) fraction_by_candidate[i] = c.fraction;
+    }
+    else
+    {
     for (const auto& contributor : cluster.truth.contributors)
     {
       const std::size_t candidate_index = contributor_candidate_index(
@@ -987,6 +1027,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       {
         fraction_by_candidate[candidate_index] += contributor.fraction;
       }
+    }
     }
     std::size_t best_candidate = invalid_index;
     double best_fraction = -1.0;
@@ -1055,7 +1096,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       partner.delta_r = -1.0;
     }
     auto& truth_partner = candidate.truth_partner_clusters[photon];
-    if (!truth_partner.found || direct_edep > truth_partner.direct_edep) truth_partner = partner;
+    if (prefer_pi0_truth_partner(partner, truth_partner)) truth_partner = partner;
   };
 
   for (std::size_t candidate_index = 0;
@@ -1080,7 +1121,11 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       {
         match.usable = true;
       }
+      if (config_.common_composition && !match.ancestry_complete) match.usable = false;
       candidate.cluster_matches[cluster_index] = match;
+      candidate.matching_usable = candidate.matching_usable && match.usable;
+      candidate.matching_status = std::min(candidate.matching_status, static_cast<int>(match.status));
+      candidate.minimum_coverage = std::min(candidate.minimum_coverage, static_cast<double>(match.cluster_member_energy_coverage));
       if (!match.usable)
       {
         ++result.energy_match_invalid_count;
@@ -1187,13 +1232,32 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
         {
           match.usable = true;
         }
+        if (config_.common_composition && !match.ancestry_complete) match.usable = false;
         auto& candidate = result.candidates[diagnostic_candidate_indices[position]];
+        candidate.matching_usable = candidate.matching_usable && match.usable;
+        candidate.matching_status = std::min(candidate.matching_status, static_cast<int>(match.status));
+        candidate.minimum_coverage = std::min(candidate.minimum_coverage, static_cast<double>(match.cluster_member_energy_coverage));
         for (std::size_t photon = 0; photon < 2U; ++photon)
         {
           update_truth_partner(candidate, photon, cluster.id, cluster.energy, cluster.eta, cluster.phi, true, match);
           update_diagnostic(candidate, photon, cluster.id, cluster.energy, cluster.eta, cluster.phi, true, match);
         }
       }
+    }
+  }
+
+  if (config_.common_composition)
+  {
+    // Select the absolute-deposit representative across ALL positive-energy clusters before the partner threshold.
+    for (auto& c : result.candidates) for (int photon = 0; photon < 2; ++photon)
+    {
+      const auto& partner = c.truth_partner_clusters[photon]; c.best_cluster[photon] = invalid_index; c.recovered[photon] = false;
+      if (!partner.found) continue;
+      for (std::size_t i = 0; i < result.clusters.size(); ++i)
+        if (result.clusters[i].cluster_id == partner.cluster_id) c.best_cluster[photon] = i;
+      c.maximum_edep[photon] = partner.direct_edep; c.reconstructed_photon_energy[photon] = partner.reconstructed_photon_energy;
+      c.recovered[photon] = c.best_cluster[photon] != invalid_index && partner.cluster_energy > config_.tagging_partner_min_cluster_energy &&
+          (config_.min_photon_energy_recovery <= 0 || partner.recovery >= config_.min_photon_energy_recovery);
     }
   }
 
@@ -1206,6 +1270,15 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
     {
       auto& anchor = result.anchors[anchor_position];
       classify_pi0_anchor(config_, candidate, result.clusters[anchor.cluster_index], anchor);
+      if (config_.common_composition)
+      {
+        auto& c = result.clusters[anchor.cluster_index].composition;
+        const bool projection = (candidate.photon_projection_valid[0] || candidate.photon_projection_no_intersection[0]) &&
+            (candidate.photon_projection_valid[1] || candidate.photon_projection_no_intersection[1]);
+        c.applicability = candidate.matching_usable && projection && candidate.interaction_info_valid ? composition::Applicability::applicable : composition::Applicability::unknown;
+        c.matching_status = candidate.matching_status; c.minimum_coverage = candidate.minimum_coverage;
+        c.topology_reason = !candidate.matching_usable ? 4 : !projection ? 5 : !candidate.interaction_info_valid ? 6 : 0;
+      }
     }
   }
 

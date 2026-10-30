@@ -1,4 +1,5 @@
 #include "PythiaPhotonCandidateTree.h"
+#include "EtaOriginFractions.h"
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
@@ -171,6 +172,11 @@ void Pi0TopologyTreeBranches::fill(const Pi0AnchorTopologyEventResult& result)
     candidate_eta.push_back(candidate.eta);
     candidate_phi.push_back(candidate.phi);
     candidate_evaluated.push_back(candidate.topology_evaluated ? 1U : 0U);
+    candidate_parent_embedding.push_back(candidate.parent_identity.embedding); candidate_parent_source.push_back(candidate.parent_identity.source);
+    candidate_parent_id.push_back(candidate.parent_identity.id); photon0_source.push_back(candidate.photon_identities[0].source);
+    photon0_id.push_back(candidate.photon_identities[0].id); photon1_source.push_back(candidate.photon_identities[1].source); photon1_id.push_back(candidate.photon_identities[1].id);
+    candidate_matching_status.push_back(candidate.matching_status); candidate_minimum_coverage.push_back(candidate.minimum_coverage);
+    candidate_matching_usable.push_back(candidate.matching_usable);
 
     photon0_track_id.push_back(candidate.photon_track_ids[0]);
     photon1_track_id.push_back(candidate.photon_track_ids[1]);
@@ -180,6 +186,7 @@ void Pi0TopologyTreeBranches::fill(const Pi0AnchorTopologyEventResult& result)
     photon1_eta.push_back(candidate.photon_eta[1]);
     photon0_phi.push_back(candidate.photon_phi[0]);
     photon1_phi.push_back(candidate.photon_phi[1]);
+    photon0_projection_no_intersection.push_back(candidate.photon_projection_no_intersection[0]); photon1_projection_no_intersection.push_back(candidate.photon_projection_no_intersection[1]);
     photon0_projection_valid.push_back(candidate.photon_projection_valid[0] ? 1U : 0U);
     photon1_projection_valid.push_back(candidate.photon_projection_valid[1] ? 1U : 0U);
     photon0_projection_eta.push_back(candidate.photon_projection_eta[0]);
@@ -256,6 +263,9 @@ void Pi0TopologyTreeBranches::create_branches(TTree* tree, const std::string& pa
 #define BRANCH(member) tree->Branch((parent + "_topology_" #member).c_str(), &member)
   BRANCH(candidate_count);
   BRANCH(candidate_pathway);
+  BRANCH(candidate_parent_embedding); BRANCH(candidate_parent_source); BRANCH(candidate_parent_id);
+  BRANCH(photon0_source); BRANCH(photon0_id); BRANCH(photon1_source); BRANCH(photon1_id);
+  BRANCH(candidate_matching_status); BRANCH(candidate_minimum_coverage); BRANCH(candidate_matching_usable);
   BRANCH(candidate_parent_barcode);
   BRANCH(candidate_g4_parent_track_id);
   BRANCH(candidate_e);
@@ -271,6 +281,7 @@ void Pi0TopologyTreeBranches::create_branches(TTree* tree, const std::string& pa
   BRANCH(photon1_eta);
   BRANCH(photon0_phi);
   BRANCH(photon1_phi);
+  BRANCH(photon0_projection_no_intersection); BRANCH(photon1_projection_no_intersection);
   BRANCH(photon0_projection_valid);
   BRANCH(photon1_projection_valid);
   BRANCH(photon0_projection_eta);
@@ -496,6 +507,8 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.enable_missing_diagnostics = true;
   config.eta_pseudo_primary = true;
   config.verbosity = verbosity_;
+  legacy_topology_evaluator_.configure(config);
+  config.common_composition = true;
   topology_evaluator_.configure(config);
   config.parent_pdg_id = 221;
   config.require_hepmc_two_photon_decay = true;
@@ -587,6 +600,7 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     ++n_events_invalid_;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
+  const auto legacy_result = legacy_topology_evaluator_.evaluate(topNode);
   topology_.fill(topology_result);
   eta_topology_.fill(eta_result);
   fill_topology_cluster_links(topology_result, selection_, true);
@@ -606,6 +620,35 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
   photon_tree::DecayOriginDiagnostics diagnostic(truth, events);
   std::map<unsigned int, const photon_tree::ClusterTruthMatch*> original;
   for (const auto& record : topology_result.clusters) original[record.cluster_id] = &record.truth;
+  common_truth_.clear(); original_truth_.clear();
+  std::map<unsigned int, const photon_tree::Pi0TopologyClusterRecord*> shared, eta_shared;
+  std::map<unsigned int, const photon_tree::Pi0TopologyAnchorRecord*> legacy_anchors;
+  for (const auto& record : topology_result.clusters) shared[record.cluster_id] = &record;
+  for (const auto& record : eta_result.clusters) eta_shared[record.cluster_id] = &record;
+  for (const auto& a : legacy_result.anchors) legacy_anchors[legacy_result.clusters[a.cluster_index].cluster_id] = &a;
+  std::map<unsigned int, bool> legacy_prompt;
+  for (std::size_t i = 0; i < legacy_result.clusters.size(); ++i)
+  {
+    const auto& record = legacy_result.clusters[i];
+    legacy_prompt[record.cluster_id] = legacy_result.prompt_cluster[i] && !record.truth.contributors.empty() && record.truth.contributors.front().fraction > 0.5;
+  }
+  for (std::size_t i = 0; i < common_.split().data.cluster_id.size(); ++i)
+  {
+    const auto id = common_.split().data.cluster_id[i]; auto found = shared.find(id);
+    if (found == shared.end()) { common_truth_.append({}); original_truth_.append({}); continue; }
+    auto r = found->second->composition;
+    if (r.main == photon_tree::composition::Main::eta_gg && eta_shared.count(id))
+    { r.applicability = eta_shared[id]->composition.applicability; r.topology_reason = eta_shared[id]->composition.topology_reason; r.matching_status = eta_shared[id]->composition.matching_status; r.minimum_coverage = eta_shared[id]->composition.minimum_coverage; }
+    const auto origin = eta_origin::summarize(cluster_truth_.contributor_offset[i], cluster_truth_.contributor_offset[i + 1],
+        cluster_truth_.contributor_embedding_id, cluster_truth_.contributor_fraction, cluster_truth_.contributor_eta_parent_barcode,
+        cluster_truth_.contributor_eta_parent_track_id, cluster_truth_.contributor_eta_decay_mode, cluster_truth_.contributor_eta_split_status,
+        cluster_truth_.contributor_pi0_parent_barcode, cluster_truth_.contributor_pi0_parent_track_id);
+    const bool old_pi0 = legacy_anchors.count(id) && legacy_anchors[id]->main_fraction > 0.5;
+    const bool old_eta = !old_pi0 && origin.fraction > 0.5;
+    const int old_count = int(legacy_prompt[id]) + int(old_pi0) + int(old_eta);
+    const int old_origin = old_count != 1 ? 3 : legacy_prompt[id] ? 0 : old_pi0 ? 1 : 2;
+    common_truth_.append(r, old_origin); original_truth_.append(found->second->original_truth);
+  }
   decay_origin_.clear();
   for (unsigned int id : common_.split().data.cluster_id)
   {
@@ -1031,6 +1074,8 @@ void PythiaPhotonCandidateTree::create_output()
   common_.create_collection_branches(event_tree_, "split", common_.split().data, false);
   cluster_truth_.create_branches(event_tree_, "split");
   decay_origin_.create_branches(event_tree_);
+  common_truth_.create_branches(event_tree_);
+  original_truth_.create_branches(event_tree_, "original");
   selection_.create_branches(event_tree_);
   topology_.create_branches(event_tree_);
   eta_selection_.create_branches(event_tree_, "eta", true);
@@ -1038,6 +1083,7 @@ void PythiaPhotonCandidateTree::create_output()
 
   metadata_tree_ = new TTree("metadata", "Pythia photon-candidate workflow metadata");
   metadata_tree_->Branch("schema_version", &metadata_schema_version_);
+  metadata_tree_->Branch("common_composition_algorithm_version", &common_composition_algorithm_version_);
   metadata_tree_->Branch("decay_origin_algorithm_version", &decay_origin_algorithm_version_);
   metadata_tree_->Branch("decay_origin_max_proper_length_cm", &decay_origin_max_proper_length_cm_);
   metadata_tree_->Branch("decay_origin_max_flight_cm", &decay_origin_max_flight_cm_);

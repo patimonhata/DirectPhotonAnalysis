@@ -19,12 +19,12 @@ void test_candidate_plot_content(const std::string preview = "")
   assert(std::none_of(lines.begin(), lines.end(), [](const std::string& line) { return line.find("Stored/anchor") != std::string::npos; }));
   Histograms composition(2, 10.0);
   Spectra topology(2, 10.0);
-  const std::array<int, category_count> counts = {0, 40, 15, 10, 5, 10, 5, 10, 5};
+  const std::array<int, category_count> counts = {0, 35, 15, 10, 5, 10, 5, 3, 2, 10, 5};
   for (std::size_t i = 1; i < category_count; ++i)
     for (int j = 0; j < counts[i]; ++j) { composition.fill(i, 7.0, 2.0); composition.fill(denominator, 7.0, 2.0); }
   const auto origin_density = candidate_composition_merge::make_candidate_origin_density(composition, "qa_candidate_origin_");
-  assert(same_double(origin_density[0]->GetBinContent(2), 16.0));
-  assert(same_double(origin_density[1]->GetBinContent(2), 18.0));
+  assert(same_double(origin_density[0]->GetBinContent(2), 14.0));
+  assert(same_double(origin_density[1]->GetBinContent(2), 20.0));
   assert(same_double(origin_density[2]->GetBinContent(2), 4.0));
   assert(same_double(origin_density[3]->GetBinContent(2), 2.0));
   assert(std::string(origin_density[0]->GetXaxis()->GetTitle()) == "Candidate Cluster E_{T} [GeV]");

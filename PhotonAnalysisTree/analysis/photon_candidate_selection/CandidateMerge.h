@@ -14,6 +14,7 @@ constexpr std::array<const char*, kSelectionCount> kPreviousCutLabels = {
     "Kinematic", "Kinematic", "Pre-selection", "Pre-selection", "Pre-selection", "Region A"};
 struct Metadata
 {
+  int common_composition_algorithm_version = -1;
   int schema_version = -1;
   int source_map_schema_version = -1;
   std::string family;
@@ -97,7 +98,7 @@ std::array<std::unique_ptr<TH1D>, kCandidateOriginCount> make_candidate_origin_d
     density[index]->SetDirectory(nullptr);
   }
   density[1]->Reset("ICES");
-  for (std::size_t index = pi0_separated; index <= pi0_other; ++index) density[1]->Add(histograms.weighted[index].get());
+  for (std::size_t index = pi0_separated; index <= pi0_unknown; ++index) density[1]->Add(histograms.weighted[index].get());
   for (std::size_t index = 0; index < kCandidateOriginCount; ++index)
   {
     density[index]->Scale(1.0, "width");
@@ -147,6 +148,7 @@ bool read_metadata(TFile& file, Metadata& value)
   std::vector<double>* sample_sum_generator_weights = nullptr;
   bool ok = true;
   ok &= bind(tree, "schema_version", &value.schema_version);
+  ok &= bind(tree, "common_composition_algorithm_version", &value.common_composition_algorithm_version);
   ok &= bind(tree, "source_map_schema_version", &value.source_map_schema_version);
   ok &= bind(tree, "family", &family);
   ok &= bind(tree, "map_root", &map_root);
@@ -187,9 +189,9 @@ bool read_metadata(TFile& file, Metadata& value)
   ok &= bind(tree, "region_a_clusters", &value.region_a_clusters);
   ok &= bind(tree, "region_a_prompt_clusters", &value.region_a_prompt_clusters);
   ok &= bind(tree, "region_a_anchor_clusters", &value.region_a_anchor_clusters);
-  if (!ok || tree->GetEntry(0) <= 0 || value.decay_origin_algorithm_version != decay_origin::kAlgorithmVersion ||
+  if (!ok || tree->GetEntry(0) <= 0 || value.common_composition_algorithm_version != 1 || value.decay_origin_algorithm_version != decay_origin::kAlgorithmVersion ||
       !same_double(value.decay_origin_max_proper_length_cm, decay_origin::kMaxProperLengthCm) ||
-      !same_double(value.decay_origin_max_flight_cm, decay_origin::kMaxFlightCm) || value.pi0_topology_algorithm_version != 12 || value.eta_topology_algorithm_version != 2 || value.other_origin_algorithm_version != other_origin::kAlgorithmVersion || !family || !map_root || !majority_comparison || !eta_definition ||
+      !same_double(value.decay_origin_max_flight_cm, decay_origin::kMaxFlightCm) || value.pi0_topology_algorithm_version != 13 || value.eta_topology_algorithm_version != 3 || value.other_origin_algorithm_version != other_origin::kAlgorithmVersion || !family || !map_root || !majority_comparison || !eta_definition ||
       !other_definition || !weight_definition || !analysis_release || !model_sha256 || !sample_names || !sample_map_counts ||
       !sample_sum_generator_weights) return false;
   value.family = *family;
@@ -262,7 +264,7 @@ bool read_shard_metadata(TFile& file, ShardMetadata& value)
 
 bool compatible(const Metadata& value, const Metadata& reference)
 {
-  return value.schema_version == reference.schema_version && value.source_map_schema_version == reference.source_map_schema_version &&
+  return value.common_composition_algorithm_version == reference.common_composition_algorithm_version && value.schema_version == reference.schema_version && value.source_map_schema_version == reference.source_map_schema_version &&
       value.family == reference.family && value.map_root == reference.map_root &&
       value.require_complete == reference.require_complete && value.n_bins == reference.n_bins && same_double(value.et_max, reference.et_max) &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&

@@ -137,3 +137,7 @@ python3 PhotonAnalysisTree/tests/test_software.py
 - 保存版で4 sample を reduce → merge し、全26 ROOT に execution record が揃った。従来結果と histogram 12,654個の全 bin 内容・誤差・軸、44 tree の内容、CSV 15ファイルが一致した。PDF 246ファイルは配置とページ数を確認した。
 - 全28 Condor submit の dry-run と、過去 study の12再現設定の入力確認が通った。ジョブは投入していない。
 - 既存 install 直下の両 library の SHA-256 は変化していない。過去 build、保存成果物、外部 map は保持した。
+
+## Common composition の開発版
+
+map schema 9 / partial schema 11 / common composition 1 / pi0 topology 13 / eta topology 3 は新しい DST map が必要です。旧 schema 8 map や partial の再ラベル、reduce のみの移行はできません。固定 software・production manifest の作成は上記の clean-source 手順に従い、保存済み production と異なる出力先を指定してください。新しいコードを検証する開発 build に既存 cache を流用できない場合は、`--build-dir` と `--install-prefix` に独立した検証先を指定します。

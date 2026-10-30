@@ -5,6 +5,7 @@
 #include "EtaTopologyPlots.h"
 #include "OtherOriginPlots.h"
 #include "DecayOriginPlots.h"
+#include "CommonCompositionPlots.h"
 
 namespace photon_candidate_analysis
 {
@@ -35,6 +36,8 @@ int merge(
   eta_decay::Selections eta_decay_histograms;
   decay_origin::Selections diagnostic_histograms;
   other_origin::Selections other_histograms;
+  common_composition::Selections common_histograms;
+  std::array<std::unique_ptr<Histograms>, kSelectionCount> legacy_histograms;
   bool have_reference = false;
   for (const SampleDefinition& sample : samples)
   {
@@ -57,7 +60,7 @@ int merge(
         std::cerr << "Missing or invalid composition partial: " << path << std::endl;
         return 3;
       }
-      if (metadata.schema_version != 10 || metadata.source_map_schema_version != 8 || metadata.family != family ||
+      if (metadata.schema_version != 11 || metadata.source_map_schema_version != 9 || metadata.family != family ||
           metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
           metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U || !same_double(metadata.sample_cross_section_pb, sample.cross_section_pb) ||
           metadata.events_stitch_pass > metadata.events_written || metadata.region_a_prompt_clusters > metadata.region_a_clusters ||
@@ -108,6 +111,9 @@ int merge(
 
       for (std::size_t composition_selection = 0; composition_selection < kSelectionCount; ++composition_selection)
       {
+        if (!common_histograms[composition_selection]) common_histograms[composition_selection] = std::make_unique<common_composition::Histograms>(metadata.n_bins, metadata.et_max);
+        auto* common_directory = file.GetDirectory((std::string("common_composition/") + kSelectionKeys[composition_selection]).c_str());
+        if (!common_directory || !common_histograms[composition_selection]->add(*common_directory)) return 5;
         if (!composition_histograms[composition_selection])
         {
           composition_histograms[composition_selection] = std::make_unique<Histograms>(metadata.n_bins, metadata.et_max);
@@ -256,6 +262,7 @@ int merge(
     bdt_metadata.Branch("schema_version", &bdt_schema_version);
     bdt_metadata.Branch("source_partial_schema_version", &combined.schema_version);
     bdt_metadata.Branch("source_map_schema_version", &combined.source_map_schema_version);
+    bdt_metadata.Branch("common_composition_algorithm_version", &combined.common_composition_algorithm_version);
     bdt_metadata.Branch("selection_key", &bdt_selection_key);
     bdt_metadata.Branch("family", &combined.family);
     bdt_metadata.Branch("map_root", &combined.map_root);
@@ -291,15 +298,10 @@ int merge(
     }
     const std::string selection_output_base = output_base + "/" + kSelectionKeys[composition_selection] + "/photon_candidate_composition";
     if (!make_output_directory(selection_output_base)) return 7;
-    const std::string work_in_progress_base = output_base + "/" + kSelectionKeys[composition_selection] + "/workinprogress";
-    const std::string work_in_progress_output = work_in_progress_base + "/region_a_candidate_truth_origin.pdf";
-    if (!make_output_directory(work_in_progress_output)) return 7;
     auto origin_density = make_candidate_origin_density(histograms, std::string("h_") + kSelectionKeys[composition_selection] + "_candidate_origin_");
-    draw_candidate_origin_spectrum(origin_density, work_in_progress_output, kSelectionKeys[composition_selection]);
+    draw_candidate_origin_spectrum(origin_density, selection_output_base + "_truth_origin.pdf", kSelectionKeys[composition_selection]);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack.pdf", false);
-    draw_stack(fractions, work_in_progress_base + "/photon_candidate_composition_category_fraction_stack.pdf", false);
     draw_stack(fractions, selection_output_base + "_category_fraction_stack_detailed.pdf", true);
-    draw_stack(fractions, work_in_progress_base + "/photon_candidate_composition_category_fraction_stack_detailed.pdf", true);
     auto missing_fractions = composition_missing_fractions(histograms, *topology_histograms[composition_selection]);
     if (missing_fractions.size() != kMissingSpectrumIndices.size())
     {
@@ -317,7 +319,7 @@ int merge(
           "h_candidate_" + key + "_survival_fraction_relative_to_kinematic", label, color);
     }
     std::vector<const TH1D*> selected_pi0_inputs, kinematic_pi0_inputs;
-    for (std::size_t index = pi0_separated; index <= pi0_other; ++index)
+    for (std::size_t index = pi0_separated; index <= pi0_unknown; ++index)
     {
       selected_pi0_inputs.push_back(histograms.weighted[index].get());
       kinematic_pi0_inputs.push_back(composition_histograms[0]->weighted[index].get());
@@ -331,16 +333,13 @@ int merge(
         survival[prompt].get(), pi0_survival.get(), survival[eta].get(), survival[other].get()};
     const std::vector<const SurvivalCurve*> detailed_survival = {
         survival[prompt].get(), survival[pi0_separated].get(), survival[pi0_merged].get(),
-        survival[pi0_single_contaminated].get(), survival[pi0_missing].get(), survival[pi0_other].get(), survival[eta].get(), survival[other].get()};
+        survival[pi0_single_contaminated].get(), survival[pi0_missing].get(), survival[pi0_other].get(), survival[pi0_not_applicable].get(), survival[pi0_unknown].get(), survival[eta].get(), survival[other].get()};
     draw_survival_curves(summary_survival, *histograms.weighted[denominator],
         selection_output_base + "_survival_fraction_relative_to_kinematic.pdf",
         std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival", false);
     draw_survival_curves(detailed_survival, *histograms.weighted[denominator],
         selection_output_base + "_survival_fraction_relative_to_kinematic_detailed.pdf",
         std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_detailed", true);
-    draw_survival_curves(summary_survival, *histograms.weighted[denominator],
-        work_in_progress_base + "/photon_candidate_composition_survival_fraction_relative_to_kinematic.pdf",
-        std::string("c_") + kSelectionKeys[composition_selection] + "_candidate_survival_workinprogress", false);
     const auto& previous = *composition_histograms[kPreviousCutSelections[composition_selection]];
     const std::string previous_label = kPreviousCutLabels[composition_selection];
     std::array<std::unique_ptr<SurvivalCurve>, category_count> previous_survival;
@@ -353,7 +352,7 @@ int merge(
           "h_candidate_" + key + "_survival_fraction_relative_to_previous_cut", label, color, previous_label);
     }
     std::vector<const TH1D*> previous_pi0_inputs;
-    for (std::size_t index = pi0_separated; index <= pi0_other; ++index) previous_pi0_inputs.push_back(previous.weighted[index].get());
+    for (std::size_t index = pi0_separated; index <= pi0_unknown; ++index) previous_pi0_inputs.push_back(previous.weighted[index].get());
     auto previous_pi0 = sum_histograms(previous_pi0_inputs, "h_previous_pi0_for_survival");
     if (!previous_pi0) return 7;
     auto previous_pi0_survival = make_survival_curve(*selected_pi0, *previous_pi0,
@@ -395,6 +394,7 @@ int merge(
   metadata.Branch("schema_version", &composition_schema_version);
   metadata.Branch("source_partial_schema_version", &composition_source_partial_schema_version);
   metadata.Branch("source_map_schema_version", &combined.source_map_schema_version);
+  metadata.Branch("common_composition_algorithm_version", &combined.common_composition_algorithm_version);
   metadata.Branch("family", &combined.family);
   metadata.Branch("map_root", &combined.map_root);
   metadata.Branch("require_complete", &combined.require_complete);
@@ -615,8 +615,24 @@ int merge(
 
   if (!eta_topology::export_outputs(output_base, combined, sample_cross_sections_pb, composition_histograms, eta_histograms, eta_bdt_histograms, &eta_decay_histograms)) return 7;
 
-  if (!other_origin::export_outputs(output_base, combined, composition_histograms, other_histograms)) return 7;
-  if (!decay_origin::export_outputs(output_base, combined, composition_histograms, diagnostic_histograms)) return 7;
+  for (std::size_t i = 0; i < kSelectionCount; ++i)
+  {
+    if (!common_histograms[i]->valid() || !common_composition::valid_populations(*common_histograms[i], *composition_histograms[i], *topology_histograms[i], *eta_histograms[i])) return 7;
+    legacy_histograms[i] = std::make_unique<Histograms>(combined.n_bins, combined.et_max);
+    for (int old = 0; old < 3; ++old)
+    {
+      const auto category = old == 0 ? prompt : old == 1 ? pi0_other : eta;
+      legacy_histograms[i]->counts[category]->Add(common_histograms[i]->legacy_counts[old].get());
+      legacy_histograms[i]->weighted[category]->Add(common_histograms[i]->legacy_weighted[old].get());
+    }
+    legacy_histograms[i]->counts[other]->Add(common_histograms[i]->legacy_counts[3].get());
+    legacy_histograms[i]->weighted[other]->Add(common_histograms[i]->legacy_weighted[3].get());
+    legacy_histograms[i]->counts[denominator]->Add(common_histograms[i]->counts[0].get());
+    legacy_histograms[i]->weighted[denominator]->Add(common_histograms[i]->weighted[0].get());
+  }
+  if (!common_composition::export_outputs(output_base, combined, common_histograms)) return 7;
+  if (!other_origin::export_outputs(output_base, combined, legacy_histograms, other_histograms)) return 7;
+  if (!decay_origin::export_outputs(output_base, combined, legacy_histograms, diagnostic_histograms)) return 7;
 
   std::cout << "MergePythiaPhotonCandidateSelection - family/selections/samples/output = "
             << family << "/" << kSelectionCount << "/" << combined.sample_names.size() << "/" << output_base << std::endl;

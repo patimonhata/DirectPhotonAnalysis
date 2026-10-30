@@ -24,6 +24,21 @@
 
 namespace photon_tree
 {
+namespace
+{
+bool complete_hit_ancestry(int id, PHG4TruthInfoContainer* truth)
+{
+  std::set<int> seen;
+  while (id)
+  {
+    if (!seen.insert(id).second) return false;
+    const auto* p = truth ? truth->GetParticle(id) : nullptr;
+    if (!p) return false;
+    id = p->get_parent_id();
+  }
+  return true;
+}
+}
 const char* pi0_cluster_truth_match_status_name(Pi0ClusterTruthMatchStatus value)
 {
   switch (value)
@@ -170,6 +185,7 @@ Pi0ClusterTruthMatch Pi0ClusterTruthMatcher::match(
           tower_valid = false;
           break;
         }
+        if (!complete_hit_ancestry(hit->get_trkid(), truth)) result.ancestry_complete = false;
         const float allocated_edep = allocation * hit_edep;
         const int gamma = direct_gamma_index(hit->get_trkid(), truth, direct_gamma_track_ids);
         if (gamma >= 0)
@@ -239,7 +255,7 @@ std::vector<Pi0ClusterTruthMatch> Pi0ClusterTruthMatcher::match_many(
     for (std::size_t photon = 0; photon < 2U; ++photon)
     {
       const int track_id = direct_gamma_track_ids[candidate][photon];
-      if (track_id != 0 && track_id != -999) owners[track_id].push_back({candidate, photon});
+      if (track_id != 0) owners[track_id].push_back({candidate, photon});
     }
 
   Pi0ClusterTruthMatch common;
@@ -319,6 +335,7 @@ std::vector<Pi0ClusterTruthMatch> Pi0ClusterTruthMatcher::match_many(
           break;
         }
         const float allocated_edep = allocation * hit_edep;
+        if (!complete_hit_ancestry(hit->get_trkid(), truth)) common.ancestry_complete = false;
         tower_total_edep += allocated_edep;
         int track_id = hit->get_trkid();
         std::set<int> visited;

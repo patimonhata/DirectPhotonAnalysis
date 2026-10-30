@@ -11,6 +11,9 @@ export LD_LIBRARY_PATH="$build_dir:$prefix/dependencies/Pi0Reconstruction/lib:${
 g++ -std=c++17 -I"$module_dir/src" $(root-config --cflags) "$module_dir/tests/test_pi0_anchor_classification.cc" \
   -L"$build_dir" -lPhotonAnalysisTree -o "$test_dir/classification"
 "$test_dir/classification"
+g++ -std=c++17 -I"$module_dir/src" "$module_dir/tests/test_common_composition.cc" -o "$test_dir/common_composition"
+"$test_dir/common_composition"
+root -l -b -q "$module_dir/tests/test_common_decay_truth.C"
 g++ -std=c++17 -I"$module_dir/src" -I"$OFFLINE_MAIN/include" "$module_dir/tests/test_hepmc_diphoton_decay.cc" \
   -L"$OFFLINE_MAIN/lib" -L"$OFFLINE_MAIN/lib64" -lHepMC -o "$test_dir/hepmc_decay"
 "$test_dir/hepmc_decay"

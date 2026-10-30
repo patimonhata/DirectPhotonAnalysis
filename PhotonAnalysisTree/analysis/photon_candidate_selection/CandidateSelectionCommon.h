@@ -110,6 +110,7 @@ std::vector<SampleDefinition> sample_definitions(const std::string& family)
 struct MapMetadata
 {
   std::string path;
+  int common_composition_algorithm_version = -1;
   int schema_version = -1;
   int decay_origin_algorithm_version = -1;
   double decay_origin_max_proper_length_cm = -1, decay_origin_max_flight_cm = -1;
@@ -177,6 +178,7 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   std::string* model_sha256 = nullptr;
   bool ok = true;
   ok &= bind(tree, "schema_version", &value.schema_version);
+  ok &= bind(tree, "common_composition_algorithm_version", &value.common_composition_algorithm_version);
   ok &= bind(tree, "decay_origin_algorithm_version", &value.decay_origin_algorithm_version);
   ok &= bind(tree, "decay_origin_max_proper_length_cm", &value.decay_origin_max_proper_length_cm);
   ok &= bind(tree, "decay_origin_max_flight_cm", &value.decay_origin_max_flight_cm);
@@ -222,12 +224,12 @@ bool read_metadata(const std::string& path, MapMetadata& value)
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 8 && value.decay_origin_algorithm_version == 1 &&
+  return value.schema_version == 9 && value.common_composition_algorithm_version == 1 && value.decay_origin_algorithm_version == 1 &&
       same_double(value.decay_origin_max_proper_length_cm, 1e-4) && same_double(value.decay_origin_max_flight_cm, 1e-2) && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
       std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.0) &&
-      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 12 && value.eta_topology_algorithm_version == 2 &&
+      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 13 && value.eta_topology_algorithm_version == 3 &&
       std::isfinite(value.eta_partner_min_energy) && value.eta_partner_min_energy >= 0.0 &&
       std::isfinite(value.pi0_mass_min) && value.pi0_mass_min >= 0.0 &&
       std::isfinite(value.pi0_mass_max) && value.pi0_mass_max >= 0.0 &&
@@ -247,7 +249,7 @@ bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 
 bool compatible(const MapMetadata& value, const MapMetadata& reference)
 {
-  return value.schema_version == reference.schema_version && value.decay_origin_algorithm_version == reference.decay_origin_algorithm_version &&
+  return value.common_composition_algorithm_version == reference.common_composition_algorithm_version && value.schema_version == reference.schema_version && value.decay_origin_algorithm_version == reference.decay_origin_algorithm_version &&
       same_double(value.decay_origin_max_proper_length_cm, reference.decay_origin_max_proper_length_cm) &&
       same_double(value.decay_origin_max_flight_cm, reference.decay_origin_max_flight_cm) && value.input_manifest == reference.input_manifest &&
       value.sample_name == reference.sample_name && value.analysis_release == reference.analysis_release &&
@@ -375,6 +377,11 @@ bool valid_partition(const std::array<std::unique_ptr<TH1D>, kSpectrumCount>& hi
     const double scale = std::max({1.0, std::abs(histograms[1]->GetBinContent(bin)), std::abs(category_sum), std::abs(missing_sum)});
     if (std::abs(histograms[5]->GetBinContent(bin) - missing_sum) > 1e-9 * scale ||
         std::abs(histograms[1]->GetBinContent(bin) - category_sum) > 1e-9 * scale) return false;
+    double missing_w2 = 0, category_w2 = 0;
+    for (std::size_t i = 6; i <= 11; ++i) missing_w2 += std::pow(histograms[i]->GetBinError(bin),2);
+    for (int i : {2,3,4,5,12}) category_w2 += std::pow(histograms[i]->GetBinError(bin),2);
+    if (std::abs(missing_w2 - std::pow(histograms[5]->GetBinError(bin),2)) > 1e-9 * std::max(1.,missing_w2) ||
+        std::abs(category_w2 - std::pow(histograms[1]->GetBinError(bin),2)) > 1e-9 * std::max(1.,category_w2)) return false;
   }
   return true;
 }

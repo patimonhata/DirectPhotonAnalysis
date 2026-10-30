@@ -9,6 +9,16 @@ using namespace photon_tree;
 
 int main()
 {
+  Pi0TruthPartnerClusterRecord best, high_deposit, high_energy;
+  high_deposit.found = high_energy.found = true;
+  high_deposit.cluster_id = 20; high_deposit.cluster_energy = .3; high_deposit.direct_edep = .2;
+  high_energy.cluster_id = 10; high_energy.cluster_energy = 5.; high_energy.direct_edep = .1;
+  assert(prefer_pi0_truth_partner(high_energy, best)); best = high_energy;
+  assert(prefer_pi0_truth_partner(high_deposit, best)); best = high_deposit;
+  assert(!prefer_pi0_truth_partner(high_energy, best)); // No low-deposit replacement after energy threshold failure.
+  high_energy.direct_edep = best.direct_edep;
+  assert(prefer_pi0_truth_partner(high_energy, best)); best = high_energy;
+  assert(!prefer_pi0_truth_partner(high_deposit, best)); // Equal deposits have a deterministic cluster-ID tie break.
   Pi0AnchorTopologyConfig config;
   assert(config.min_photon_energy_recovery == 0.0);
   config.min_photon_energy_recovery = 0.5;
@@ -83,6 +93,9 @@ int main()
   assert(classify().missing_category == Pi0MissingCategory::acceptance);
   candidate.photon_projection_valid[1] = false;
   assert(classify().missing_category == Pi0MissingCategory::other);
+  candidate.photon_projection_no_intersection[1] = true;
+  assert(classify().missing_category == Pi0MissingCategory::acceptance); // Known non-arrival differs from missing vertex information.
+  candidate.photon_projection_no_intersection[1] = false;
   candidate.photon_projection_valid[1] = candidate.photon_in_cemc_acceptance[1] = true;
   truth.found = false;
   assert(classify().missing_category == Pi0MissingCategory::unclustered_or_no_cemc_deposit);
@@ -124,6 +137,6 @@ int main()
   assert(classify().topology == Pi0AnchorTopology::single_contaminated);
   partner.cluster_energy = 0.5;
   assert(classify().topology == Pi0AnchorTopology::missing);
-  assert(Pi0AnchorTopologyEvaluator::kAlgorithmVersion == 12);
+  assert(Pi0AnchorTopologyEvaluator::kAlgorithmVersion == 13);
   std::cout << "pi0 anchor classification: passed\n";
 }

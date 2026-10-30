@@ -2,6 +2,7 @@
 #define RYOTARO_PI0ANCHORTOPOLOGYEVALUATOR_H_20260824
 
 #include "Pi0ClusterTruthMatcher.h"
+#include "CommonDecayTruth.h"
 #include "PythiaClusterTruthMatcher.h"
 
 #include <array>
@@ -25,7 +26,8 @@ enum class Pi0Pathway : int
   g4_primary_decay = 1,
   generator_decay = 2,
   single_particle_g4_decay = 3,
-  eta_daughter_g4_decay = 4
+  eta_daughter_g4_decay = 4,
+  g4_secondary_decay = 5
 };
 
 enum class Pi0AnchorTopology : int
@@ -117,6 +119,7 @@ struct Pi0AnchorTopologyConfig
   int parent_pdg_id = 111;
   bool require_hepmc_two_photon_decay = false;
   bool eta_pseudo_primary = false;
+  bool common_composition = false;
   std::string truth_node_name = "G4TruthInfo";
   std::string hepmc_event_map_node_name = "PHHepMCGenEventMap";
   std::string tower_node_name = "TOWERINFO_CALIB_CEMC";
@@ -162,6 +165,8 @@ struct Pi0TopologyClusterRecord
   double phi = 0.0;
   bool anchor_acceptance = false;
   ClusterTruthMatch truth;
+  ClusterTruthMatch original_truth;
+  composition::Result composition;
 };
 
 struct Pi0PartnerDiagnosticRecord
@@ -193,8 +198,21 @@ struct Pi0TruthPartnerClusterRecord
   double recovery = 0.0;
 };
 
+// Select the absolute-deposit representative before testing its reconstructed energy.
+inline bool prefer_pi0_truth_partner(const Pi0TruthPartnerClusterRecord& proposed, const Pi0TruthPartnerClusterRecord& current)
+{
+  return proposed.found && (!current.found || proposed.direct_edep > current.direct_edep ||
+      (proposed.direct_edep == current.direct_edep && proposed.cluster_id < current.cluster_id));
+}
+
 struct Pi0TopologyCandidateRecord
 {
+  composition::Identity parent_identity;
+  std::array<composition::Identity, 2> photon_identities;
+  bool matching_usable = true;
+  bool interaction_info_valid = true;
+  int matching_status = 2;
+  double minimum_coverage = 1;
   Pi0Pathway pathway = Pi0Pathway::g4_primary_decay;
   int parent_barcode = 0;
   int g4_parent_track_id = -999;
@@ -207,6 +225,7 @@ struct Pi0TopologyCandidateRecord
   std::array<double, 2> photon_eta = {0.0, 0.0};
   std::array<double, 2> photon_phi = {0.0, 0.0};
   std::array<bool, 2> photon_projection_valid = {false, false};
+  std::array<bool, 2> photon_projection_no_intersection = {false, false};
   std::array<double, 2> photon_projection_eta = {-999.0, -999.0};
   std::array<double, 2> photon_projection_phi = {-999.0, -999.0};
   std::array<bool, 2> photon_in_cemc_acceptance = {false, false};
@@ -283,7 +302,7 @@ const char* pi0_anchor_tag_result_name(Pi0AnchorTagResult value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 12;
+  static constexpr int kAlgorithmVersion = 13;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

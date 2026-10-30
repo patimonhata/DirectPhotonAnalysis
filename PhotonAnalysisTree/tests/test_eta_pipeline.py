@@ -1,4 +1,4 @@
-"""Synthetic schema-8 map -> reduce -> merge, including eta cascade modes, pi0 priority and distinct-parent rejection."""
+"""Synthetic schema-9 map -> reduce -> merge, including eta cascade modes, pi0 priority and distinct-parent rejection."""
 import os
 from pathlib import Path
 import re
@@ -8,6 +8,7 @@ import ROOT
 repo = Path(__file__).resolve().parents[2]
 os.chdir(repo)
 ROOT.gROOT.SetBatch(True)
+assert ROOT.gSystem.Load('libPhotonAnalysisTree.so') >= 0
 # Load the independent public entrypoints together, preserving ROOT's macro autoloading.
 with tempfile.NamedTemporaryFile(mode='w', suffix='.C') as entrypoints:
     for stage in ('Reduce', 'Merge'):
@@ -16,12 +17,13 @@ with tempfile.NamedTemporaryFile(mode='w', suffix='.C') as entrypoints:
     assert ROOT.gROOT.LoadMacro(entrypoints.name) == 0
 ROOT.gInterpreter.Declare(r'''
 #include <numeric>
+#include "PhotonAnalysisTree/src/CommonDecayTruth.h"
 void make_eta_test_map(const std::string& path, const std::string& sample_name) {
   const auto samples = sample_definitions("photonjet");
   const auto sample = *std::find_if(samples.begin(), samples.end(), [&](const auto& s) { return sample_name == s.name; });
   TFile file(path.c_str(), "RECREATE");
   MapMetadata map;
-  map.schema_version = 8; map.decay_origin_algorithm_version = 1; map.decay_origin_max_proper_length_cm = 1e-4; map.decay_origin_max_flight_cm = 1e-2; map.pi0_topology_algorithm_version = 12; map.eta_topology_algorithm_version = 2;
+  map.schema_version = 9; map.common_composition_algorithm_version = 1; map.decay_origin_algorithm_version = 1; map.decay_origin_max_proper_length_cm = 1e-4; map.decay_origin_max_flight_cm = 1e-2; map.pi0_topology_algorithm_version = 13; map.eta_topology_algorithm_version = 3;
   map.input_manifest = "synthetic"; map.sample_name = sample.name; map.analysis_release = "ana.565"; map.model_sha256 = "synthetic";
   map.manifest_begin = 0; map.manifest_end = 1; map.input_file_count = 1;
   map.cross_section_pb = sample.cross_section_pb; map.window_min = sample.window_min; map.window_max = sample.window_max;
@@ -46,6 +48,7 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
   M("missing_energy_min", missing_energy_min); M("missing_energy_max", missing_energy_max); M("min_photon_energy_recovery", min_photon_energy_recovery);
   M("pi0_topology_algorithm_version", pi0_topology_algorithm_version); M("eta_topology_algorithm_version", eta_topology_algorithm_version);
 #undef M
+  metadata.Branch("common_composition_algorithm_version", &map.common_composition_algorithm_version);
   metadata.Fill(); metadata.Write();
   TTree events("event_tree", "Synthetic event");
   unsigned int ncluster = 1;
@@ -80,6 +83,7 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
   std::vector<int> pi0_parent_barcode = {0}; E("split_cluster_truth_contributor_pi0_parent_barcode", pi0_parent_barcode);
   std::vector<int> pi0_parent_track_id = {0}; E("split_cluster_truth_contributor_pi0_parent_track_id", pi0_parent_track_id);
 #undef E
+  photon_tree::CommonTruthCollection common; common.create_branches(&events);
   constexpr int values[] = {1, 2, 4, 3, 0};
   std::vector<unsigned char> d_valid = {1}; std::vector<unsigned int> d_offset;
   events.Branch("split_cluster_decay_origin_valid", &d_valid); events.Branch("split_cluster_decay_origin_offset", &d_offset);
@@ -148,6 +152,30 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
     d_gamma0_fraction.assign(size, -1); d_gamma1_fraction.assign(size, -1); d_flight_cm.assign(size, -1);
     d_parent_flight_cm.assign(size, -1); d_proper_length_cm.assign(size, -1);
     if (row == 19) { d_pdg[0] = 111; d_diphoton[0] = 1; d_gamma0_fraction[0] = .5; d_gamma1_fraction[0] = .3; d_pathway[0] = 2; d_status[0] = 1; }
+    photon_tree::composition::Result r; r.valid = true; r.total = 10;
+    const auto make = [](int pdg, int id, int mode = 0) {
+      photon_tree::composition::Particle p; p.identity = {1,1,id}; p.pdg = pdg; p.species_known = true;
+      p.hadron = pdg == 111 || pdg == 221 || pdg == 223; p.charged = std::abs(pdg) == 211; p.decay = mode; return p;
+    };
+    for (std::size_t i = 0; i < fraction.size(); ++i)
+    {
+      auto p = make(pdg[i], i+1); std::vector<photon_tree::composition::Particle> ancestors;
+      bool unresolved = row == 18;
+      if (row == 0) p.prompt = 1;
+      else if (row <= 5) p = make(111, 111, 1);
+      else if (row <= 15 || row == 17) p = make(221, 100, 1);
+      else if (row == 16) p = make(221, 100+i, 1);
+      else if (row == 19) p = make(111, 111, 1);
+      if (row == 20 || row == 21) { p = make(pdg[i], pi0_parent_barcode[i] ? pi0_parent_barcode[i] : i+1, pdg[i] == 111 ? 1 : 0); ancestors.push_back(make(221, 100, 2)); }
+      r.units.push_back({p, fraction[i] * 10, unresolved, ancestors}); r.attributed += fraction[i] * 10;
+    }
+    if (r.attributed < 9.999) { auto p = make(2112, 200); r.units.push_back({p, 10-r.attributed, false, {}}); r.attributed = 10; }
+    photon_tree::composition::classify(r);
+    r.applicability = (pi0_valid[0] && pi0_fraction[0] > .5) || (eta_valid[0] && eta_fraction[0] > .5) ? photon_tree::composition::Applicability::applicable : photon_tree::composition::Applicability::unknown;
+    const bool old_pi0 = pi0_valid[0] && pi0_fraction[0] > .5;
+    const auto old_eta = eta_origin::summarize(0, fraction.size(), embedding, fraction, eta_parent_barcode, eta_parent_track_id, eta_decay_mode, eta_split_status, pi0_parent_barcode, pi0_parent_track_id);
+    const int legacy = prompt[0] ? 0 : old_pi0 ? 1 : old_eta.fraction > .5 ? 2 : 3;
+    common.clear(); common.append(r, legacy);
     final[0] = region[0] && !pi0_tag[0] && !eta_tag[0]; events.Fill();
   }
   events.Write();
@@ -169,9 +197,9 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
         assert f.Get('anchor_topology/kinematic/h_region_a_pi0_anchor_et_count').Integral() == 6
         for name in ('separated', 'merged', 'single_contaminated', 'missing', 'other'):
             assert f.Get(f'anchor_topology/kinematic/h_region_a_{name}_et_count').Integral() == (2 if name == 'merged' else 1)
-        assert f.Get('eta_decay/kinematic/h_candidate_eta_three_pi0_et_count').Integral() == 1
+        assert f.Get('eta_decay/kinematic/h_candidate_eta_three_pi0_et_count').Integral() == 0
         assert f.Get('eta_decay/kinematic/h_candidate_eta_charged_pions_pi0_et_count').Integral() == 1
-        assert f.Get('composition/kinematic/h_candidate_other_et_count').Integral() == 4
+        assert f.Get('composition/kinematic/h_candidate_other_et_count').Integral() == 3
         assert f.Get('other_origin/kinematic/h_other_decay_photon_et_count').Integral() == 1
         assert f.Get('other_origin/kinematic/h_other_charged_hadron_et_count').Integral() == 1
         assert f.Get('other_origin/kinematic/h_other_mixed_et_count').Integral() == 2
@@ -180,13 +208,13 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
     assert ROOT.MergePythiaPhotonCandidateSelection('photonjet', str(root / 'partial'), str(output)) == 0
     f = ROOT.TFile.Open(str(output / 'candidate_composition_eta_topology.root'))
     assert f.Get('kinematic/detailed/h_candidate_eta_residual_et_count').Integral() == 0
-    assert f.Get('kinematic/detailed/h_candidate_eta_three_pi0_et_count').Integral() == 4
+    assert f.Get('kinematic/detailed/h_candidate_eta_three_pi0_et_count').Integral() == 0
     assert f.Get('kinematic/detailed/h_candidate_eta_charged_pions_pi0_et_count').Integral() == 4
     f.Close()
     import csv
     census = list(csv.DictReader((output / 'eta_cascade_composition_summary.csv').open()))
     other = next(row for row in census if row['selection'] == 'kinematic' and row['bin'] == '-1' and row['category'] == 'h_candidate_other_et_count')
-    assert float(other['raw_count']) == 16 and float(other['total_raw_count']) == 92
+    assert float(other['raw_count']) == 12 and float(other['total_raw_count']) == 92
     detailed = ROOT.TFile.Open(str(output / 'other_origin.root'))
     assert detailed.Get('kinematic/h_other_decay_photon_et_count').Integral() == 4
     assert detailed.Get('kinematic/h_other_charged_hadron_et_count').Integral() == 4
@@ -216,4 +244,6 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
             for suffix in ('', '_isolation'):
                 pdf = directory / f'{parent}_bdt_score_by_topology{suffix}.pdf'
                 assert len(re.findall(rb'/Type\s*/Page\b', pdf.read_bytes())) == 6
-    print('Schema-8 map -> reduce -> merge with supplemental decay origins, eta residuals, veto survival, both plot families: passed')
+    assert not list(output.rglob('workinprogress'))
+    assert (output / 'common_composition_migration.csv').is_file()
+    print('Schema-9 map -> reduce -> merge with supplemental decay origins, eta residuals, veto survival, both plot families: passed')

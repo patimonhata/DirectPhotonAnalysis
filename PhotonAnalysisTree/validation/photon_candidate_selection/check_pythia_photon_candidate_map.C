@@ -1,4 +1,5 @@
 #include "check_pythia_photon_candidate_tree.C"
+#include "../../src/CommonTruthComposition.h"
 
 #include <cmath>
 #include <string>
@@ -35,7 +36,7 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   TFile file(path, "READ");
   auto* events = file.Get<TTree>("event_tree");
   auto* metadata = file.Get<TTree>("metadata");
-  int schema_version = -1, decay_origin_algorithm_version = -1;
+  int schema_version = -1, common_composition_algorithm_version = -1, decay_origin_algorithm_version = -1;
   double decay_origin_max_proper_length_cm = -1, decay_origin_max_flight_cm = -1;
   std::string* input_manifest = nullptr;
   std::string* first_input_suffix = nullptr;
@@ -67,6 +68,7 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
 
   bool ok = true;
   ok &= map_bind(metadata, "schema_version", &schema_version);
+  ok &= map_bind(metadata, "common_composition_algorithm_version", &common_composition_algorithm_version);
   ok &= map_bind(metadata, "decay_origin_algorithm_version", &decay_origin_algorithm_version);
   ok &= map_bind(metadata, "decay_origin_max_proper_length_cm", &decay_origin_max_proper_length_cm);
   ok &= map_bind(metadata, "decay_origin_max_flight_cm", &decay_origin_max_flight_cm);
@@ -100,7 +102,7 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   ok &= map_bind(metadata, "n_clusters_region_c", &n_clusters_region_c);
   ok &= map_bind(metadata, "n_clusters_region_d", &n_clusters_region_d);
   ok &= map_bind(metadata, "n_clusters_final_photon", &n_clusters_final_photon);
-  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 8 || decay_origin_algorithm_version != 1 ||
+  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 9 || common_composition_algorithm_version != 1 || decay_origin_algorithm_version != 1 ||
       !std::isfinite(decay_origin_max_proper_length_cm) || std::abs(decay_origin_max_proper_length_cm - 1e-4) > 1e-12 ||
       !std::isfinite(decay_origin_max_flight_cm) || std::abs(decay_origin_max_flight_cm - 1e-2) > 1e-12 || !input_manifest || input_manifest->empty() ||
       manifest_begin < 0 || manifest_end <= manifest_begin || input_file_count != manifest_end - manifest_begin ||
@@ -109,7 +111,7 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
       !std::isfinite(expected_min_cluster_energy) || std::abs(min_cluster_energy - expected_min_cluster_energy) > 1e-12 ||
       !std::isfinite(partner_diagnostic_min_cluster_energy) || std::abs(partner_diagnostic_min_cluster_energy - 0.0) > 1e-12 ||
       !std::isfinite(pi0_partner_min_energy) || !std::isfinite(resolved_expected_tagging_energy) ||
-      std::abs(pi0_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 12 || eta_topology_algorithm_version != 2 ||
+      std::abs(pi0_partner_min_energy - resolved_expected_tagging_energy) > 1e-12 || pi0_topology_algorithm_version != 13 || eta_topology_algorithm_version != 3 ||
       !std::isfinite(eta_partner_min_energy) || std::abs(eta_partner_min_energy - (expected_eta_partner_min_energy < 0.0 ? resolved_expected_tagging_energy : expected_eta_partner_min_energy)) > 1e-12 ||
       !std::isfinite(pi0_mass_min) || std::abs(pi0_mass_min - expected_pi0_mass_min) > 1e-12 ||
       !std::isfinite(pi0_mass_max) || std::abs(pi0_mass_max - expected_pi0_mass_max) > 1e-12 ||
@@ -124,6 +126,16 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
     return 4;
   }
 
+  unsigned int common_ncluster = 0;
+  std::vector<int> *common_main = nullptr, *common_applicability = nullptr, *common_table = nullptr;
+  std::vector<double> *common_total = nullptr, *common_attributed = nullptr, *common_deposit = nullptr;
+  std::vector<float>* original_total = nullptr;
+  std::vector<unsigned int>* common_offset = nullptr;
+  if (!map_bind(events, "split_ncluster", &common_ncluster) ||
+      !map_bind(events, "split_cluster_common_main", &common_main) || !map_bind(events, "split_cluster_common_applicability", &common_applicability) ||
+      !map_bind(events, "split_cluster_common_table", &common_table) || !map_bind(events, "split_cluster_common_deposit", &common_deposit) ||
+      !map_bind(events, "split_cluster_common_offset", &common_offset) || !map_bind(events, "split_cluster_common_total", &common_total) ||
+      !map_bind(events, "split_cluster_common_attributed", &common_attributed) || !map_bind(events, "original_cluster_truth_total_edep", &original_total)) return 5;
   unsigned long long event_uid = 0ULL;
   unsigned int region_a_count = 0U;
   unsigned int region_b_count = 0U;
@@ -162,6 +174,17 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   for (Long64_t entry = 0; entry < events->GetEntries(); ++entry)
   {
     events->GetEntry(entry);
+    if (!common_main || !common_applicability || !common_total || !common_attributed || !original_total || !common_offset || !common_deposit || !common_table ||
+        common_main->size() != common_ncluster || common_applicability->size() != common_ncluster || common_total->size() != common_ncluster ||
+        common_attributed->size() != common_ncluster || original_total->size() != common_ncluster || common_offset->size() != common_ncluster + 1 ||
+        common_offset->front() || common_offset->back() != common_deposit->size() || common_table->size() != common_deposit->size() ||
+        !std::is_sorted(common_offset->begin(),common_offset->end())) return 6;
+    for (std::size_t i = 0; i < common_ncluster; ++i)
+    {
+      double sum = 0; for (auto j = (*common_offset)[i]; j < (*common_offset)[i+1]; ++j) if ((*common_table)[j] == 0) sum += (*common_deposit)[j];
+      if ((*common_main)[i] < 0 || (*common_main)[i] > 11 || (*common_applicability)[i] < 0 || (*common_applicability)[i] > 2 ||
+          !close_enough(sum, (*common_attributed)[i]) || !close_enough((*common_total)[i], (*original_total)[i])) return 6;
+    }
     const auto count_pass = [](const std::vector<unsigned char>& flags) {
       return static_cast<unsigned int>(std::count_if(flags.begin(), flags.end(), [](unsigned char value) { return value != 0U; }));
     };

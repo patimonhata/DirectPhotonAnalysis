@@ -1,6 +1,6 @@
 # Pythia photon-candidate selection
 
-Main map → reduce → merge workflow. Current production is map schema **8**, pi0 topology **12**, eta topology **2**, supplemental decay-origin **1**, and partial schema **10**. Physics definitions and diagnostic details are in [definition notes](../../docs/photon_candidate_definitions.md).
+Main map → reduce → merge workflow. The development implementation writes map schema **9**, common composition **1**, pi0 topology **13**, eta topology **3**, supplemental decay-origin **1**, and partial schema **11**. Existing productions remain unchanged; freeze clean software and create a new manifest before formal execution. Physics definitions and diagnostic details are in [definition notes](../../docs/photon_candidate_definitions.md).
 
 ## Results and inputs
 
@@ -69,15 +69,15 @@ After all 16 partials complete, use a new final output directory:
 
 ```bash
 bash PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge.sh jet \
-  PhotonAnalysisTree/output/photon_candidate_selection/productions/topology_v12_eta_v2_decay_v1/ClusterE0p12_Pi0Partner0p5/partials/jet \
+  PhotonAnalysisTree/output/photon_candidate_selection/productions/common_composition_v1/NEW_CONFIGURATION/partials/jet \
   /tmp/photon_candidate_merge_replay
 ```
 
-Merged outputs include candidate composition, pi0/eta anchor topology, eta cascade composition, Other-origin and supplemental decay-origin histograms, spectra/fractions/survival PDFs, ET-binned BDT distributions and summaries. ROOT histogram metadata records source map/partial versions, cuts, weights and uncertainty conventions. Statistical errors use the documented candidate/pair-level Sumw2 and subset covariance; event-level correlations are not estimated.
+Merged outputs include all-origin common composition, transition CSVs and matching/ancestry quality, candidate composition, pi0/eta anchor topology, eta cascade composition, Other-origin and supplemental decay-origin histograms, spectra/fractions/survival PDFs, ET-binned BDT distributions and summaries. ROOT histogram metadata records source map/partial versions, cuts, weights and uncertainty conventions. Statistical errors use the documented candidate/pair-level Sumw2 and subset covariance; event-level correlations are not estimated.
 
 ## Retained v11/schema-5 results
 
-Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the schema-8 reducer. See [reference replay](../../docs/reproduction.md).
+Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the schema-9 reducer. See [reference replay](../../docs/reproduction.md).
 
 `ReplotPi0BdtScores.C` / `ReplotEtaBdtScores.C` redraw stored BDT ROOT distributions where present. [`CheckEtaDecayFlight.C`](../diagnostics/eta_decay_flight/README.md) is an independent DST diagnostic and does not change composition/topology selections; arguments and interpretation are in the definition notes.
 
@@ -93,4 +93,4 @@ Production tree/map validators and small-sample QA live under [validation](../..
 bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
 ```
 
-The checks cover shared topology/eta/decay-origin behavior, branch roundtrips, metadata, closure, category covariance, veto survival and a synthetic schema-8 map → reduce → merge pipeline. Logs use one fixed `output/condor/photon_candidate_selection/<stage>_<ProcId>.out/.err` per job position and are reused across productions. HTCondor event logs use fixed `/tmp/` paths.
+The checks cover shared topology/eta/decay-origin behavior, branch roundtrips, metadata, closure, category covariance, veto survival and a synthetic schema-9 map → reduce → merge pipeline. Logs use one fixed `output/condor/photon_candidate_selection/<stage>_<ProcId>.out/.err` per job position and are reused across productions. HTCondor event logs use fixed `/tmp/` paths.

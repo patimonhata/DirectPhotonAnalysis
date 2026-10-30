@@ -76,7 +76,7 @@ inline CompositionComponents composition_components(const candidate_composition:
   };
   append(*composition.counts[prompt], *composition.weighted[prompt], "prompt", "Prompt-#gamma", candidate_composition::kColors[prompt]);
   std::vector<const TH1D*> pi0_counts, pi0_weights;
-  for (std::size_t index = pi0_separated; index <= pi0_other; ++index)
+  for (std::size_t index = pi0_separated; index <= pi0_unknown; ++index)
   {
     pi0_counts.push_back(composition.counts[index].get()); pi0_weights.push_back(composition.weighted[index].get());
   }

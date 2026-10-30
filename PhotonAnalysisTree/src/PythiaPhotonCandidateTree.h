@@ -95,6 +95,10 @@ struct Pi0TopologyTreeBranches
 {
   unsigned int candidate_count = 0;
   std::vector<int> candidate_pathway;
+  std::vector<int> candidate_parent_embedding, candidate_parent_source, candidate_parent_id;
+  std::vector<int> photon0_source, photon0_id, photon1_source, photon1_id, candidate_matching_status;
+  std::vector<float> candidate_minimum_coverage;
+  std::vector<unsigned char> candidate_matching_usable;
   std::vector<int> candidate_parent_barcode;
   std::vector<int> candidate_g4_parent_track_id;
   std::vector<float> candidate_e;
@@ -111,6 +115,7 @@ struct Pi0TopologyTreeBranches
   std::vector<float> photon1_eta;
   std::vector<float> photon0_phi;
   std::vector<float> photon1_phi;
+  std::vector<unsigned char> photon0_projection_no_intersection, photon1_projection_no_intersection;
   std::vector<unsigned char> photon0_projection_valid;
   std::vector<unsigned char> photon1_projection_valid;
   std::vector<float> photon0_projection_eta;
@@ -212,7 +217,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 8;
+  static constexpr int schema_version_ = 9;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);
@@ -286,6 +291,9 @@ class PythiaPhotonCandidateTree : public SubsysReco
   double eta_mass_max_ = 0.65;
 
   photon_tree::PhotonTreeCommon common_;
+  photon_tree::Pi0AnchorTopologyEvaluator legacy_topology_evaluator_;
+  photon_tree::CommonTruthCollection common_truth_;
+  photon_tree::ClusterTruthCollection original_truth_;
   photon_tree::Pi0AnchorTopologyEvaluator topology_evaluator_;
   photon_tree::Pi0AnchorTopologyEvaluator eta_topology_evaluator_;
   photon_tree::ClusterTruthCollection cluster_truth_;
@@ -301,11 +309,12 @@ class PythiaPhotonCandidateTree : public SubsysReco
   TTree* metadata_tree_ = nullptr;
   bool metadata_filled_ = false;
   int metadata_schema_version_ = schema_version_;
+  int common_composition_algorithm_version_ = photon_tree::composition::kAlgorithmVersion;
   int pi0_topology_algorithm_version_ = photon_tree::Pi0AnchorTopologyEvaluator::kAlgorithmVersion;
   int decay_origin_algorithm_version_ = photon_tree::DecayOriginDiagnostics::kAlgorithmVersion;
   double decay_origin_max_proper_length_cm_ = photon_tree::DecayOriginDiagnostics::kMaxProperLengthCm;
   double decay_origin_max_flight_cm_ = photon_tree::DecayOriginDiagnostics::kMaxFlightCm;
-  int eta_topology_algorithm_version_ = 2;
+  int eta_topology_algorithm_version_ = 3;
   int eta_topology_parent_pdg_ = 221;
   std::string eta_topology_decay_definition_ = "direct_eta_to_two_photons_same_parent_strict_majority";
 

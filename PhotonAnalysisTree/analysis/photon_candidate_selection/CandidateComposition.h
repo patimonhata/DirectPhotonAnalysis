@@ -14,6 +14,8 @@ enum Category : std::size_t
   pi0_single_contaminated,
   pi0_missing,
   pi0_other,
+  pi0_not_applicable,
+  pi0_unknown,
   eta,
   other,
   category_count
@@ -22,12 +24,12 @@ enum Category : std::size_t
 constexpr double kMajorityThreshold = 0.5;
 constexpr int kSignalEmbeddingId = 1;
 constexpr std::array<const char*, category_count> kKeys = {
-    "denominator", "prompt", "pi0_separated", "pi0_merged", "pi0_single_contaminated", "pi0_missing", "pi0_other", "eta", "other"};
+    "denominator", "prompt", "pi0_separated", "pi0_merged", "pi0_single_contaminated", "pi0_missing", "pi0_other", "pi0_not_applicable", "pi0_unknown", "eta", "other"};
 constexpr std::array<const char*, category_count> kLabels = {
     "Selected candidates", "Prompt-#gamma", "#pi^{0}: separated", "#pi^{0}: merged", "#pi^{0}: single contaminated",
-    "#pi^{0}: missing", "#pi^{0}: other", "#eta", "Other"};
+    "#pi^{0}: missing", "#pi^{0}: other", "#pi^{0}: topology N/A", "#pi^{0}: topology unknown", "#eta", "Other"};
 constexpr std::array<int, category_count> kColors = {
-    kBlack, kRed + 1, kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2, kGray + 1, kOrange + 7, kGray + 2};
+    kBlack, kRed + 1, kAzure + 7, kMagenta + 1, kCyan + 2, kGreen + 2, kGray + 1, kViolet + 1, kYellow + 2, kOrange + 7, kGray + 2};
 
 int required_shard_count(const std::string& sample_name)
 {
@@ -75,10 +77,10 @@ bool valid_partition(const std::array<std::unique_ptr<TH1D>, category_count>& hi
 {
   for (int bin = 0; bin <= histograms.front()->GetNbinsX() + 1; ++bin)
   {
-    double sum = 0.0;
-    for (std::size_t index = 1; index < category_count; ++index) sum += histograms[index]->GetBinContent(bin);
+    double sum = 0.0, sumw2 = 0.0;
+    for (std::size_t index = 1; index < category_count; ++index) { sum += histograms[index]->GetBinContent(bin); sumw2 += std::pow(histograms[index]->GetBinError(bin), 2); }
     const double scale = std::max({1.0, std::abs(histograms[denominator]->GetBinContent(bin)), std::abs(sum)});
-    if (std::abs(histograms[denominator]->GetBinContent(bin) - sum) > 1e-9 * scale) return false;
+    if (std::abs(histograms[denominator]->GetBinContent(bin) - sum) > 1e-9 * scale || std::abs(sumw2 - std::pow(histograms[denominator]->GetBinError(bin), 2)) > 1e-9 * std::max(1., sumw2)) return false;
   }
   return true;
 }
@@ -166,7 +168,7 @@ void draw_composition_components(const std::vector<TH1D*>& components, const std
   if (superdetailed)
   {
     legends.push_back(std::make_unique<TLegend>(0.55, 0.05, 0.99, 0.95));
-    legends[0]->SetTextSize(0.04);
+    legends[0]->SetTextSize(std::min(0.04, 0.82 / std::max(std::size_t{1}, components.size())));
     for (std::size_t i = components.size(); i-- > 0;) add_readable_legend_entry(*legends[0], components[i], labels[i], "f");
   }
   else if (detail == "detailed")
@@ -215,7 +217,7 @@ void draw_stack(std::array<std::unique_ptr<TH1D>, category_count>& fractions, co
     pi0_fraction.reset(static_cast<TH1D*>(fractions[pi0_separated]->Clone("h_candidate_pi0_fraction")));
     pi0_fraction->Reset("ICES");
     pi0_fraction->SetDirectory(nullptr);
-    for (std::size_t i = pi0_separated; i <= pi0_other; ++i) pi0_fraction->Add(fractions[i].get());
+    for (std::size_t i = pi0_separated; i <= pi0_unknown; ++i) pi0_fraction->Add(fractions[i].get());
     add(prompt);
     components.push_back(pi0_fraction.get()); labels.emplace_back("#pi^{0}"); colors.push_back(kColors[pi0_separated]);
     add(eta);

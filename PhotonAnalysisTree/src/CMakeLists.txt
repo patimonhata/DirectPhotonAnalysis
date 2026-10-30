@@ -45,6 +45,7 @@ endforeach()
 
 add_library(
   PhotonAnalysisTree SHARED
+  CommonDecayTruth.cc
   DecayOriginDiagnostics.cc
   EtaCascadeTruth.cc
   HepMCPhotonClassifier.cc
@@ -113,6 +114,8 @@ set_target_properties(PhotonAnalysisTree Pi0GammaOnnx PROPERTIES INSTALL_RPATH "
 install(TARGETS PhotonAnalysisTree Pi0GammaOnnx)
 install(
   FILES
+    CommonDecayTruth.h
+    CommonTruthComposition.h
     DecayOriginDiagnostics.h
     EtaCascadeTruth.h
     EtaOriginFractions.h

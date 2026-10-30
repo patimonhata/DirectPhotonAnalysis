@@ -1,6 +1,44 @@
 # Photon-candidate definition notes
 
-Current production: map schema 8, pi0 topology v12, eta v2, decay-origin v1. Section headings below retain the version in which a feature was introduced. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for current paths and execution; historical command blocks were removed.
+Development format: map schema 9, partial schema 11, common composition v1, pi0 topology v13, eta topology v3, direct hit matcher v5. Saved schema-8 productions retain their original definitions and results. A new production requires a new clean-source software snapshot and regenerated maps. Section headings below retain the version in which a feature was introduced. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for current paths and execution; historical command blocks were removed.
+
+## Boundary independent composition (map schema 9)
+
+This section supersedes the historical origin/population rules below. Reconstructed selections, scores, models, training labels and the actual reconstructed tag veto are unchanged.
+
+`CommonDecayTruth` resolves an event-local graph across HepMC/G4 using `(event_uid, embedding, source, barcode/track ID)`. The shared physical particle uses its unambiguous matching HepMC identity when available. G4 daughter vertices must be recorded decays; generator decays have one incoming hadron. Beam particles, partons, hadronization and interactions never define parent sums. Photon bookkeeping copies are collapsed. Shower electrons/photons remain under the original independent photon; they are not extra primary photons.
+
+The exclusive units are individual pi0 (including non-gg decays), direct eta-to-gg, independent photons outside those units, charged particles and residual particles. Contributions of distinct particles are never combined merely because their PDGs agree. First select a unit with deposit **strictly greater than half** the original truth deposit. This includes charged particles and direct decay photons. Only if no unit has a majority, sum confirmed descendants of each individual hadron and choose the downstream-most majority parent. Without any majority, use mixed when the required information is known; otherwise preserve unknown and its reason. Signal embedding is 1. A non-signal majority is separate from unknown. Prompt requires the existing HepMC category 1/2; an unclassified photon is not implicitly prompt.
+
+The denominator is the original sum of shower deposits from `PythiaClusterTruthMatcher`, not reconstructed cluster energy. `original_cluster_truth_*` retains the original primary contributions. Common expansion uses complete hit ancestry with the existing split-tower allocation and measured conditional daughter ratios. A split is accepted only when child deposits conserve the measured parent deposit; otherwise retain the known parent with unresolved daughter shares. Parent summary rows overlap the unit table and must never be added into the deposit total. Legacy eta refinement feeds only the retained legacy contributor table and migration reference, never the common contribution input.
+
+There is **no lifetime or flight-distance expansion cut** in either representation. Proper lengths, known production/decay vertices, flight lengths, and long-lived ancestry are diagnostics. Unknown flight alone does not invalidate known composition. The `long_lived_ancestor` diagnostic uses c-tau >= 1 micrometre independently of classification; this threshold cannot change main categories.
+
+Known parent origin with unresolved daughters (`parent_unresolved`) is separate from confirmed parent majority and mixed. A known pi0 majority remains pi0 when other deposits are unresolved. Individual photon deposits, largest/other independent-photon deposits, charged deposits and unresolved deposits are retained for future purity work. These fields do not change BDT training or determine clean-photon labels.
+
+### Saved common tables and quality
+
+`split_cluster_common_*` stores main, selected identity/PDG/fraction, original total, attributed total, unresolved deposit, independent-photon purity components, quality flags, topology applicability/reason, matching status/minimum coverage, and legacy overview origin (0 Prompt, 1 pi0, 2 eta, 3 Other). Main codes follow `composition::Main` in `CommonTruthComposition.h`: unknown=0, prompt=1, pi0=2, eta_gg=3, decay_photon=4, charged=5, particle=6, parent=7, parent_unresolved=8, mixed=9, non_signal=10, photon_unknown=11.
+
+`offset` indexes particle rows per cluster. `table` is 0 units, 1 independent photons, 2 overlapping parent totals. Rows retain particle IDs, deposit, mode, prompt category, unresolved flag, lifetime/flight and vertices. Known independent photon IDs are retained even when their shares are unresolved: table-1 deposit -1 is an unavailable value, never a negative physical contribution or zero deposit. Maximum/other-photon deposits sum only resolved rows and therefore are lower bounds when unresolved photons exist. The cluster unresolved deposit includes both unresolved classification units and unresolved photon shares within known pi0/eta units; row-level flags distinguish these scopes. `ancestor_offset` indexes each row's full confirmed ancestry; ancestor IDs retain embedding/source as well as PDG. Empty vertex arrays and negative flight/proper lengths mean unavailable. Quality bits are missing particle=1, ambiguous identity=2, incomplete split=4, interaction=8, unknown species=16, ancestry cycle=32, invalid/unavailable truth deposit or denominator=64, unknown decay=128.
+
+### Composition and topology populations
+
+Pi0 composition equals topology-evaluable + topology-not-applicable + topology-unknown. A confirmed direct gg decay with identifiable photons and adequate event-wide matching is evaluable. Confirmed non-gg pi0 is not applicable; unknown decay mode, identity, necessary projection, or insufficient matching is unknown. Eta overview includes direct eta-to-gg, eta parent majority and eta origin with unresolved daughter shares. Direct eta topology and the remaining eta population are recorded separately.
+
+`applicability`: 0 unknown, 1 evaluable, 2 not applicable. `topology_reason`: 0 available, 1 confirmed non-gg/parent sum, 2 unknown decay, 3 unavailable candidate/photon identity, 4 insufficient matching, 5 unavailable projection, 6 unavailable first-daughter interaction information. Mapping statuses remain invalid=0, partial=1, complete=2. Topology accepts complete or the existing partial matching with member-energy coverage >= 0.5; daughter splitting requires complete conserved attribution. Coverage is distinct from photon fraction and from reconstructed energy purity. Missing hit ancestry makes matching unusable. Noise energy is never assigned to a fabricated particle. Event-wide minimum coverage and matching status are saved, with ET and reason in quality histograms. Information missing in any searched positive-energy cluster conservatively prevents establishing a valid global maximum.
+
+Topology fractions and topology BDT distributions use only the evaluable population. `other` still means an evaluable anchor outside the named topology cases; it does not absorb missing information. The single-contaminated definition remains exactly one photon with first daughter-vertex radius < 90 cm; both photons interacting falls under merged. Partner selection maximizes absolute deposit over positive-energy clusters before applying the actual configured partner threshold. A known ray with no forward intersection with the CEMC reference cylinder is saved separately as `photon*_projection_no_intersection`; it is geometric non-arrival (missing/acceptance when unrecovered), not an unavailable-vertex unknown. Ties choose the smallest cluster ID. A failing representative is never replaced by a lower-deposit candidate. Reconstructed veto flags remain independent.
+
+### Outputs, denominators and migration
+
+All six selections reuse the same stored main class. Fractions count each selected cluster once with its event weight and reconstructed ET. Summary composition remains Prompt/pi0/eta/Other. Detailed common composition includes pi0 and direct-eta topology, unavailable/not-applicable topology, eta/other parent majority versus unresolved daughters, decay photons, charged/residual particles, mixed, unknown and non-signal.
+
+`common_composition.root`, `common_composition_summary.csv`, and `common_composition_migration.csv` cover **all** origins, selections, ET bins and flows. Count, weighted yield and Sumw2 close for exclusive details, legacy-to-common transitions and the new topology population partitions. Sparse tables preserve ancestry species and matching quality versus ET. Migration-reason bits record possible boundary generalization (1), charged/direct-photon priority (2), long-lived ancestry (4), explicit topology quality (8), and missing information (16); these overlapping diagnostic flags are not a causal decomposition. Exact event-local particle identities remain in maps.
+
+Composition fractions divide by all selected clusters; topology fractions divide by evaluable mesons. Survival divides by the same new class at kinematic or the specified predecessor: kinematic for preselection; preselection for tight/isolation/Region A; Region A for final veto. BDT shapes normalize each ET/topology/isolation distribution independently. ET pages remain [5,6), [6,8), [8,10), [10,18), [18,30), and the full selected range; 30–35 appears only in the full-range page.
+
+Old Other-origin and supplemental decay-origin outputs retain the **legacy Other population**, with their old lifetime/flight policy. They are historical diagnostics, not tests of the new formal classification. No `workinprogress` directory or duplicate WIP plots are created. Existing WIP outputs are retained.
 
 ## Region A/B/C/D content
 
@@ -82,7 +120,7 @@ where `weight_numerator_pb = sample_cross_section_pb * generator_weight`. The de
 
 ## Pi0 BDT distributions and common population
 
-Topology spectra and BDT diagnostics now use exactly the composition pi0 category: a valid anchor with main fraction strictly greater than 0.5, with multiple-origin majorities assigned to composition Other. The map anchor construction, ancestry classifier and topology algorithm are unchanged. The reducer computes origin once for all three outputs. Reduce and merge check topology/composition agreement and BDT selected totals. Weighted total comparisons use a relative tolerance of `1e-8` (with a 1 pb scale floor), allowing roundoff from different cluster/bin summation orders. Count, metadata and binwise comparisons retain their strict checks. Old partials are rejected; rerun reduce and merge into a new output location to preserve existing results. DST/map regeneration is unnecessary for compatible maps.
+Topology spectra and BDT diagnostics use the topology-evaluable subset of common pi0 composition. Pi0 topology-not-applicable and unknown remain in composition and are excluded from topology/BDT denominators. Reduce and merge check count, weighted yield, Sumw2 and BDT totals under this inclusion relation. New maps must be regenerated from DST; reduce/merge alone cannot migrate schema-8 results. Use a new software/production manifest and output directory.
 
 Every selection directory (`kinematic`, `preselection`, `preselection_isolation`, `preselection_tight`, `region_a`, `region_a_tagging_veto`) receives:
 
@@ -265,7 +303,7 @@ negative times, strict CDF boundaries and weighted errors, plus split ROOT input
 request deduplication, output protection and missing-request failure handling.
 
 
-## Eta daughter pseudo-primary composition (map schema 7 / topology v12, eta v2)
+## Historical eta daughter pseudo-primary composition (map schema 7 / topology v12, eta v2)
 
 Candidate maps now resolve G4-primary eta decays to three pi0 or pi+ pi- pi0 into
 individual daughter-pion contributions. The same ancestry information is recorded
@@ -322,7 +360,7 @@ paths, both pion modes, 30/30/40 sharing, split-tower allocation, closure, missi
 provenance, interaction rejection and grouping by distinct eta parents.
 
 
-## Other-origin diagnostics (introduced with map schema 7, partial schema 9)
+## Legacy Other-origin diagnostics (introduced with map schema 7, partial schema 9)
 
 `OtherOriginHistograms.h` adds a disjoint subdivision of **existing composition
 Other only**. Prompt, pi0, eta, their topology populations, and all reconstructed
@@ -394,7 +432,7 @@ roundtrips, plus map-to-reduce-to-merge output and unchanged pi0/eta populations
 
 
 
-## Supplemental decay origins (map schema 8, partial schema 10)
+## Legacy supplemental decay origins (introduced in map schema 8, partial schema 10)
 
 `src/DecayOriginDiagnostics.{h,cc}` adds independent per-cluster truth information.
 It never modifies the legacy truth contributors, prompt flags, pi0/eta anchors,

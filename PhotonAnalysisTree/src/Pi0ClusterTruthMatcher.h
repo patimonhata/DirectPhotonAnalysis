@@ -38,6 +38,7 @@ struct Pi0ClusterTruthMatch
 {
   bool valid = false;
   bool usable = false;
+  bool ancestry_complete = true;
   Pi0ClusterTruthMatchStatus status = Pi0ClusterTruthMatchStatus::invalid;
   Pi0ClusterTruthMatchFailure failure = Pi0ClusterTruthMatchFailure::none;
   int failure_ieta = -999;
@@ -61,7 +62,7 @@ const char* pi0_cluster_truth_match_failure_name(Pi0ClusterTruthMatchFailure val
 class Pi0ClusterTruthMatcher
 {
  public:
-  static constexpr int kAlgorithmVersion = 4;
+  static constexpr int kAlgorithmVersion = 5;
 
   Pi0ClusterTruthMatch match(
       const RawCluster* cluster,

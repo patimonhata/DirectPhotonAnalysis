@@ -59,7 +59,7 @@ def production_summary(new, old, output):
         sample = path.parent.parent.name
         f = root_file(path)
         m = f.Get('metadata'); m.GetEntry(0)
-        if int(m.schema_version) != 11:
+        if int(m.schema_version) not in (11, 12):
             raise RuntimeError(f'Unexpected partial schema: {path}')
         denom = float(m.sample_sum_generator_weights[0])
         if sample in normalizations and normalizations[sample] != denom:

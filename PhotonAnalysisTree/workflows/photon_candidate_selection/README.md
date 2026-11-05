@@ -1,6 +1,6 @@
 # Pythia photon-candidate selection
 
-Main map → reduce → merge workflow. The development implementation writes map schema **9**, common composition **1**, pi0 topology **13**, eta topology **3**, supplemental decay-origin **1**, and partial schema **11**. Existing productions remain unchanged; freeze clean software and create a new manifest before formal execution. Physics definitions and diagnostic details are in [definition notes](../../docs/photon_candidate_definitions.md).
+Main map → reduce → merge workflow. The development implementation writes map schema **10**, common composition **1**, pi0 topology **14**, eta topology **4**, supplemental decay-origin **1**, and partial schema **12**. Existing productions remain unchanged; freeze clean software and create a new manifest before formal execution. Physics definitions and diagnostic details are in [definition notes](../../docs/photon_candidate_definitions.md).
 
 ## Results and inputs
 

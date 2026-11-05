@@ -58,5 +58,21 @@ python3 PhotonAnalysisTree/validation/photon_candidate_selection/summarize_commo
 ```
 
 出力する代替 gate の件数は保存済み判定に対する診断値です。特に anchor のみを確認する条件は partner の未検出を保証せず、
-両 photon の代表 cluster を要求する条件は本来の missing を落とします。いずれも採用済みの物理判定ではありません。
+両 photon の代表 cluster を要求する条件は本来の missing を落とします。これらは当初の調査時点の比較であり、その後の採用条件は以下の schema-10 検証を参照してください。
 各スクリプトは新しい出力先を要求し、production や解析ライブラリを書き換えません。
+
+
+## Anchor matching 適用条件の回帰検証（map schema 10）
+
+`photon_candidate_selection/compare_anchor_matching.py OLD_MAP NEW_MAP DST_DIAGNOSTIC_DIRECTORY NEW_SUMMARY_JSON`
+は schema 9 / pi0 v13 / eta v3 と schema 10 / pi0 v14 / eta v4 の同一 source-file/event を比較します。
+新 map に保存された全イベントについて、適用可否・理由を除く既存の全 event branch を完全一致で検証します。
+元の DST 診断 CSV の anchor matching・projection・interaction から独立に期待値を計算し、新しい適用結果と照合します。
+入力は同じ manifest row 0 と Jet 設定で、DST 診断と新 map は同じイベント範囲を使ってください。
+新しい anchor 診断3枝も CSV と照合し、非評価 cluster の適用結果が変わっていないことを確認します。
+
+今回の小規模検証は `output/photon_candidate_selection/qa/anchor_matching_v14/` に保存しています。
+Jet3/Jet40 各30入力イベント（各21 written events）で、既存464枝が完全一致し、独立診断の423 anchor のうち422件が評価可能、
+coverage 約0.452の1件が unknown のままでした。これは少数イベントの動作検証であり、全 production の割合の推定ではありません。
+開発ビルド・テスト・map/reduce のログ、map と partial、比較 JSON を同じ QA directory に置いています。
+正式 production は clean-source software を新規 freeze し、新規出力先で map から再実行してください。

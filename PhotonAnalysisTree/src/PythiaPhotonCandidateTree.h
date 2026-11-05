@@ -217,7 +217,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 9;
+  static constexpr int schema_version_ = 10;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);
@@ -314,7 +314,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   int decay_origin_algorithm_version_ = photon_tree::DecayOriginDiagnostics::kAlgorithmVersion;
   double decay_origin_max_proper_length_cm_ = photon_tree::DecayOriginDiagnostics::kMaxProperLengthCm;
   double decay_origin_max_flight_cm_ = photon_tree::DecayOriginDiagnostics::kMaxFlightCm;
-  int eta_topology_algorithm_version_ = 3;
+  int eta_topology_algorithm_version_ = 4;
   int eta_topology_parent_pdg_ = 221;
   std::string eta_topology_decay_definition_ = "direct_eta_to_two_photons_same_parent_strict_majority";
 

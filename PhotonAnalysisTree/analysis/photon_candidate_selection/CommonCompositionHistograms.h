@@ -37,11 +37,11 @@ inline int detail(int main, int pdg, int applicability, int topology)
 }
 struct Reader
 {
-  std::vector<int> *main = nullptr, *selected_pdg = nullptr, *applicability = nullptr, *topology_reason = nullptr, *legacy_origin = nullptr, *matching_status = nullptr;
-  std::vector<unsigned char>* long_lived_ancestor = nullptr;
+  std::vector<int> *main = nullptr, *selected_pdg = nullptr, *applicability = nullptr, *topology_reason = nullptr, *legacy_origin = nullptr, *matching_status = nullptr, *anchor_matching_status = nullptr;
+  std::vector<unsigned char> *long_lived_ancestor = nullptr, *anchor_matching_usable = nullptr;
   std::vector<unsigned int> *quality = nullptr, *offset = nullptr, *ancestor_offset = nullptr;
   std::vector<int> *table = nullptr, *pdg = nullptr, *embedding = nullptr, *source = nullptr, *id = nullptr, *ancestor_pdg = nullptr;
-  std::vector<double> *total = nullptr, *attributed = nullptr, *unresolved = nullptr, *max_photon = nullptr, *other_photons = nullptr, *charged = nullptr, *minimum_coverage = nullptr;
+  std::vector<double> *total = nullptr, *attributed = nullptr, *unresolved = nullptr, *max_photon = nullptr, *other_photons = nullptr, *charged = nullptr, *minimum_coverage = nullptr, *anchor_matching_coverage = nullptr;
   std::vector<double> *deposit = nullptr, *flight_cm = nullptr, *proper_length_cm = nullptr, *ancestor_flight_cm = nullptr, *ancestor_proper_length_cm = nullptr;
   bool bind(TTree* tree)
   {
@@ -49,6 +49,7 @@ struct Reader
 #define B(member) ok &= bind_active(tree, "split_cluster_common_" #member, &member)
     B(long_lived_ancestor); B(main); B(selected_pdg); B(applicability); B(topology_reason); B(legacy_origin); B(quality); B(offset); B(ancestor_offset);
     B(table); B(pdg); B(embedding); B(source); B(id); B(ancestor_pdg); B(total); B(attributed); B(unresolved); B(max_photon); B(other_photons); B(charged); B(matching_status); B(minimum_coverage);
+    B(anchor_matching_status); B(anchor_matching_coverage); B(anchor_matching_usable);
     B(deposit); B(flight_cm); B(proper_length_cm); B(ancestor_flight_cm); B(ancestor_proper_length_cm);
 #undef B
     return ok;
@@ -60,12 +61,19 @@ struct Reader
         !std::is_sorted(offset->begin(), offset->end()) || !std::is_sorted(ancestor_offset->begin(), ancestor_offset->end())) return false;
 #define N(member) if (!member || member->size() != n) return false
     N(long_lived_ancestor); N(main); N(selected_pdg); N(applicability); N(topology_reason); N(legacy_origin); N(quality); N(total); N(attributed); N(unresolved); N(max_photon); N(other_photons); N(charged); N(matching_status); N(minimum_coverage);
+    N(anchor_matching_status); N(anchor_matching_coverage); N(anchor_matching_usable);
 #undef N
 #define N(member) if (!member || member->size() != id->size()) return false
     N(table); N(pdg); N(embedding); N(source); N(deposit); N(flight_cm); N(proper_length_cm);
 #undef N
     for (std::size_t c = 0; c < n; ++c)
     {
+      const int status = (*anchor_matching_status)[c];
+      const double coverage = (*anchor_matching_coverage)[c];
+      const auto usable = (*anchor_matching_usable)[c];
+      if (status < -1 || status > 2 || !std::isfinite(coverage) || usable > 1 ||
+          (status == -1 ? coverage != -1 || usable : coverage < 0) ||
+          ((*applicability)[c] == 1 && (status < 0 || !usable))) return false;
       double sum = 0;
       for (auto i = (*offset)[c]; i < (*offset)[c + 1]; ++i) if ((*table)[i] == 0) sum += (*deposit)[i];
       if (!std::isfinite((*total)[c]) || (*total)[c] < 0 || !same_double(sum, (*attributed)[c]) ||
@@ -81,13 +89,15 @@ struct Histograms
   std::array<std::unique_ptr<TH1D>, 4> legacy_counts, legacy_weighted;
   TH3D migration_count, migration_weighted;
   std::unique_ptr<THnSparseD> migration_reasons_count, migration_reasons_weighted;
-  std::unique_ptr<THnSparseD> ancestry_count, ancestry_weighted, matching_count, matching_weighted;
+  std::unique_ptr<THnSparseD> ancestry_count, ancestry_weighted, matching_count, matching_weighted, anchor_matching_count, anchor_matching_weighted;
   std::unique_ptr<TH1D> unresolved_count, unresolved_weighted;
   Histograms(int bins, double max) :
     migration_count("migration_count", "All origins;Reconstructed E_{T};Legacy origin;Common detail", bins, 0, max, 4, 0, 4, keys.size()-1, 1, keys.size()),
     migration_weighted("migration_weighted", "All origins;Reconstructed E_{T};Legacy origin;Common detail", bins, 0, max, 4, 0, 4, keys.size()-1, 1, keys.size()),
     ancestry_count(make_sparse("ancestry_count", bins, max, true)), ancestry_weighted(make_sparse("ancestry_weighted", bins, max, true)),
-    matching_count(make_sparse("matching_count", bins, max, false)), matching_weighted(make_sparse("matching_weighted", bins, max, false))
+    matching_count(make_sparse("matching_count", bins, max, false)), matching_weighted(make_sparse("matching_weighted", bins, max, false)),
+    anchor_matching_count(make_sparse("anchor_matching_count", bins, max, false)),
+    anchor_matching_weighted(make_sparse("anchor_matching_weighted", bins, max, false))
   {
     migration_count.SetDirectory(nullptr); migration_weighted.SetDirectory(nullptr); migration_count.Sumw2(); migration_weighted.Sumw2();
     for (std::size_t i = 0; i < keys.size(); ++i)
@@ -126,6 +136,11 @@ struct Histograms
     unresolved_count->Fill(et, fraction); unresolved_weighted->Fill(et, fraction * weight);
     if (status < 0) { status = (*r.matching_status)[c]; coverage = (*r.minimum_coverage)[c]; }
     const double match[] = {et, double(status), coverage, double((*r.topology_reason)[c])}; matching_count->Fill(match); matching_weighted->Fill(match, weight);
+    if ((*r.anchor_matching_status)[c] >= 0)
+    {
+      const double local[] = {et, double((*r.anchor_matching_status)[c]), (*r.anchor_matching_coverage)[c], double((*r.topology_reason)[c])};
+      anchor_matching_count->Fill(local); anchor_matching_weighted->Fill(local, weight);
+    }
     std::set<int> ancestors;
     for (auto i = (*r.offset)[c]; i < (*r.offset)[c + 1]; ++i)
     {
@@ -174,6 +189,7 @@ struct Histograms
     d.cd(); for (std::size_t i = 0; i < keys.size(); ++i) { counts[i]->Write(); weighted[i]->Write(); }
     for (int i = 0; i < 4; ++i) { legacy_counts[i]->Write(); legacy_weighted[i]->Write(); }
     migration_count.Write(); migration_weighted.Write(); migration_reasons_count->Write(); migration_reasons_weighted->Write(); ancestry_count->Write(); ancestry_weighted->Write(); matching_count->Write(); matching_weighted->Write();
+    anchor_matching_count->Write(); anchor_matching_weighted->Write();
     unresolved_count->Write(); unresolved_weighted->Write(); return true;
   }
   bool add(TDirectory& d)
@@ -183,7 +199,7 @@ struct Histograms
     for (int i = 0; i < 4; ++i) for (auto* h : {legacy_counts[i].get(), legacy_weighted[i].get()})
     { const auto* v = d.Get<TH1D>(h->GetName()); if (!v || !h->Add(v)) return false; }
     for (auto* h : {&migration_count, &migration_weighted}) { const auto* v = d.Get<TH3D>(h->GetName()); if (!v || !h->Add(v)) return false; }
-    for (auto* h : {ancestry_count.get(), ancestry_weighted.get(), matching_count.get(), matching_weighted.get(), migration_reasons_count.get(), migration_reasons_weighted.get()})
+    for (auto* h : {ancestry_count.get(), ancestry_weighted.get(), matching_count.get(), matching_weighted.get(), anchor_matching_count.get(), anchor_matching_weighted.get(), migration_reasons_count.get(), migration_reasons_weighted.get()})
     { const auto* v = d.Get<THnSparseD>(h->GetName()); if (!v) return false; h->Add(v); }
     for (auto* h : {unresolved_count.get(), unresolved_weighted.get()}) { const auto* v = d.Get<TH1D>(h->GetName()); if (!v || !h->Add(v)) return false; }
     return true;

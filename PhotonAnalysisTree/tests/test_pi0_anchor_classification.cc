@@ -137,6 +137,41 @@ int main()
   assert(classify().topology == Pi0AnchorTopology::single_contaminated);
   partner.cluster_energy = 0.5;
   assert(classify().topology == Pi0AnchorTopology::missing);
-  assert(Pi0AnchorTopologyEvaluator::kAlgorithmVersion == 13);
+  // A noisy cluster and a failed sibling anchor must not veto the healthy anchor of the same meson.
+  candidate.cluster_matches.resize(3);
+  candidate.matching_usable = false; candidate.matching_status = 1; candidate.minimum_coverage = .1;
+  auto& healthy = candidate.cluster_matches[0];
+  healthy.status = Pi0ClusterTruthMatchStatus::partial; healthy.cluster_member_energy_coverage = .5; healthy.usable = true;
+  candidate.cluster_matches[1].status = Pi0ClusterTruthMatchStatus::partial;
+  candidate.cluster_matches[1].cluster_member_energy_coverage = .45;
+  candidate.cluster_matches[2].failure = Pi0ClusterTruthMatchFailure::missing_truth_tower;
+  composition::Result good, bad;
+  finalize_common_topology(candidate, 0, good); finalize_common_topology(candidate, 1, bad);
+  assert(good.applicability == composition::Applicability::applicable && good.topology_reason == 0);
+  assert(good.anchor_matching_status == 1 && good.anchor_matching_coverage == .5 && good.anchor_matching_usable);
+  assert(bad.applicability == composition::Applicability::unknown && bad.topology_reason == 4 && !bad.anchor_matching_usable);
+  assert(!candidate.matching_usable && good.matching_status == 1 && good.minimum_coverage == .1);
+  assert(good.minimum_coverage == bad.minimum_coverage && good.matching_status == bad.matching_status);
+  // Missing/incomplete partner information stays in the missing diagnostics, not a new applicability veto.
+  candidate.photon_pre_cemc_interaction[1] = false;
+  truth.found = false; candidate.partner_diagnostics[1].found = true; candidate.partner_diagnostics[1].match.usable = false;
+  anchor = classify();
+  assert(anchor.topology == Pi0AnchorTopology::missing && anchor.missing_detail == Pi0MissingDetail::partner_direct_match_incomplete);
+  finalize_common_topology(candidate, 0, good);
+  assert(good.applicability == composition::Applicability::applicable);
+  candidate.photon_projection_valid[1] = false;
+  finalize_common_topology(candidate, 0, good);
+  assert(good.applicability == composition::Applicability::unknown && good.topology_reason == 5);
+  candidate.photon_projection_no_intersection[1] = true;
+  finalize_common_topology(candidate, 0, good);
+  assert(good.applicability == composition::Applicability::applicable);
+  candidate.interaction_info_valid = false;
+  finalize_common_topology(candidate, 0, good);
+  assert(good.applicability == composition::Applicability::unknown && good.topology_reason == 6);
+  candidate.interaction_info_valid = true;
+  healthy.usable = false; healthy.ancestry_complete = false;
+  finalize_common_topology(candidate, 0, good);
+  assert(good.applicability == composition::Applicability::unknown && good.topology_reason == 4);
+  assert(Pi0AnchorTopologyEvaluator::kAlgorithmVersion == 14);
   std::cout << "pi0 anchor classification: passed\n";
 }

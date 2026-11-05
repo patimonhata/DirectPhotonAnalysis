@@ -224,12 +224,12 @@ bool read_metadata(const std::string& path, MapMetadata& value)
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 9 && value.common_composition_algorithm_version == 1 && value.decay_origin_algorithm_version == 1 &&
+  return value.schema_version == 10 && value.common_composition_algorithm_version == 1 && value.decay_origin_algorithm_version == 1 &&
       same_double(value.decay_origin_max_proper_length_cm, 1e-4) && same_double(value.decay_origin_max_flight_cm, 1e-2) && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
       std::isfinite(value.partner_diagnostic_min_cluster_energy) && same_double(value.partner_diagnostic_min_cluster_energy, 0.0) &&
-      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 13 && value.eta_topology_algorithm_version == 3 &&
+      std::isfinite(value.pi0_partner_min_energy) && value.pi0_partner_min_energy >= 0.0 && value.pi0_topology_algorithm_version == 14 && value.eta_topology_algorithm_version == 4 &&
       std::isfinite(value.eta_partner_min_energy) && value.eta_partner_min_energy >= 0.0 &&
       std::isfinite(value.pi0_mass_min) && value.pi0_mass_min >= 0.0 &&
       std::isfinite(value.pi0_mass_max) && value.pi0_mass_max >= 0.0 &&

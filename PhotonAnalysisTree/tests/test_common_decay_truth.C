@@ -193,12 +193,24 @@ void test_common_decay_truth()
   }
   g4_case(false, false, 1e-4, true); g4_case(false, false, 1e-4, false, true);
   charged_priority(); weak_parent(); non_gg_and_duplicate(); unknown_eta_mode(); known_majority_with_unresolved_sibling(); photon_copies_and_partial_matching();
-  auto r = g4_case(false); CommonTruthCollection collection; collection.clear(); collection.append(r, 3);
-  TMemFile file("common_roundtrip.root", "RECREATE"); TTree tree("event_tree", "Common truth"); collection.create_branches(&tree); tree.Fill(); tree.Write();
+  auto r = g4_case(false);
+  r.matching_status = 1; r.minimum_coverage = .1;
+  r.anchor_matching_status = 2; r.anchor_matching_coverage = 1; r.anchor_matching_usable = true;
+  CommonTruthCollection collection; collection.clear(); collection.append(r, 3);
+  TMemFile file("common_roundtrip.root", "RECREATE"); TTree tree("event_tree", "Common truth"); collection.create_branches(&tree); tree.Fill();
+  collection.clear(); collection.append({}); tree.Fill(); tree.Write();
   auto* saved = file.Get<TTree>("event_tree"); common_composition::Reader reader; assert(reader.bind(saved)); assert(saved->GetEntry(0) > 0); assert(reader.valid(1));
+  assert((*reader.matching_status)[0] == 1 && (*reader.minimum_coverage)[0] == .1);
+  assert((*reader.anchor_matching_status)[0] == 2 && (*reader.anchor_matching_coverage)[0] == 1 && (*reader.anchor_matching_usable)[0]);
   common_composition::Histograms h(4, 20);
   for (double et : {-1., 7., 21.}) for (double weight : {-2., 3.}) h.fill(reader, 0, 8, et, weight);
   assert(h.valid()); auto* d = file.mkdir("histograms"); h.write(*d); common_composition::Histograms restored(4,20); assert(restored.add(*d) && restored.valid());
+  assert(restored.matching_count->GetEntries() == 6 && restored.anchor_matching_count->GetEntries() == 6);
+  assert(restored.matching_count->GetAxis(1)->GetNbins() == 3);
+  assert(saved->GetEntry(1) > 0 && reader.valid(1));
+  assert((*reader.anchor_matching_status)[0] == -1 && (*reader.anchor_matching_coverage)[0] == -1 && !(*reader.anchor_matching_usable)[0]);
+  const auto entries = h.anchor_matching_count->GetEntries(); h.fill(reader, 0, 23, 7, 1);
+  assert(h.anchor_matching_count->GetEntries() == entries);
   saved->ResetBranchAddresses();
   std::cout << "Common truth: HepMC/G4/mixed conservation, long-lived and displaced parents, charged priority, secondary mesons, non-gg, missing hits, duplicates, flows/Sumw2 and branch roundtrip passed" << std::endl;
 }

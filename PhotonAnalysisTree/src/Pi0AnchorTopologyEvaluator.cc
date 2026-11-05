@@ -365,6 +365,20 @@ const char* pi0_anchor_reason_name(Pi0AnchorReason value)
   return "unknown";
 }
 
+void finalize_common_topology(const Pi0TopologyCandidateRecord& candidate, std::size_t anchor_cluster_index, composition::Result& result)
+{
+  const auto& match = candidate.cluster_matches.at(anchor_cluster_index);
+  const bool projection = (candidate.photon_projection_valid[0] || candidate.photon_projection_no_intersection[0]) &&
+      (candidate.photon_projection_valid[1] || candidate.photon_projection_no_intersection[1]);
+  result.applicability = match.usable && projection && candidate.interaction_info_valid ? composition::Applicability::applicable : composition::Applicability::unknown;
+  result.matching_status = candidate.matching_status;
+  result.minimum_coverage = candidate.minimum_coverage;
+  result.anchor_matching_status = static_cast<int>(match.status);
+  result.anchor_matching_coverage = match.cluster_member_energy_coverage;
+  result.anchor_matching_usable = match.usable;
+  result.topology_reason = !match.usable ? 4 : !projection ? 5 : !candidate.interaction_info_valid ? 6 : 0;
+}
+
 void classify_pi0_anchor(const Pi0AnchorTopologyConfig& config, const Pi0TopologyCandidateRecord& candidate,
                          const Pi0TopologyClusterRecord& anchor_cluster, Pi0TopologyAnchorRecord& anchor)
 {
@@ -1272,12 +1286,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
       classify_pi0_anchor(config_, candidate, result.clusters[anchor.cluster_index], anchor);
       if (config_.common_composition)
       {
-        auto& c = result.clusters[anchor.cluster_index].composition;
-        const bool projection = (candidate.photon_projection_valid[0] || candidate.photon_projection_no_intersection[0]) &&
-            (candidate.photon_projection_valid[1] || candidate.photon_projection_no_intersection[1]);
-        c.applicability = candidate.matching_usable && projection && candidate.interaction_info_valid ? composition::Applicability::applicable : composition::Applicability::unknown;
-        c.matching_status = candidate.matching_status; c.minimum_coverage = candidate.minimum_coverage;
-        c.topology_reason = !candidate.matching_usable ? 4 : !projection ? 5 : !candidate.interaction_info_valid ? 6 : 0;
+        finalize_common_topology(candidate, anchor.cluster_index, result.clusters[anchor.cluster_index].composition);
       }
     }
   }

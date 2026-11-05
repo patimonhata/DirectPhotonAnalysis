@@ -290,6 +290,9 @@ struct Pi0AnchorTopologyEventResult
 void classify_pi0_anchor(const Pi0AnchorTopologyConfig& config, const Pi0TopologyCandidateRecord& candidate,
                          const Pi0TopologyClusterRecord& anchor_cluster, Pi0TopologyAnchorRecord& anchor);
 
+// Finalize common pi0/eta applicability without propagating other clusters' matching failures to this anchor.
+void finalize_common_topology(const Pi0TopologyCandidateRecord& candidate, std::size_t anchor_cluster_index, composition::Result& result);
+
 const char* pi0_missing_detail_name(Pi0MissingDetail value);
 const char* pi0_missing_category_name(Pi0MissingCategory value);
 const char* pi0_pathway_name(Pi0Pathway value);
@@ -302,7 +305,7 @@ const char* pi0_anchor_tag_result_name(Pi0AnchorTagResult value);
 class Pi0AnchorTopologyEvaluator
 {
  public:
-  static constexpr int kAlgorithmVersion = 13;
+  static constexpr int kAlgorithmVersion = 14;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
   Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);

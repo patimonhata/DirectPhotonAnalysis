@@ -638,7 +638,13 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     if (found == shared.end()) { common_truth_.append({}); original_truth_.append({}); continue; }
     auto r = found->second->composition;
     if (r.main == photon_tree::composition::Main::eta_gg && eta_shared.count(id))
-    { r.applicability = eta_shared[id]->composition.applicability; r.topology_reason = eta_shared[id]->composition.topology_reason; r.matching_status = eta_shared[id]->composition.matching_status; r.minimum_coverage = eta_shared[id]->composition.minimum_coverage; }
+    {
+      const auto& eta = eta_shared[id]->composition;
+      r.applicability = eta.applicability; r.topology_reason = eta.topology_reason;
+      r.matching_status = eta.matching_status; r.minimum_coverage = eta.minimum_coverage;
+      r.anchor_matching_status = eta.anchor_matching_status; r.anchor_matching_coverage = eta.anchor_matching_coverage;
+      r.anchor_matching_usable = eta.anchor_matching_usable;
+    }
     const auto origin = eta_origin::summarize(cluster_truth_.contributor_offset[i], cluster_truth_.contributor_offset[i + 1],
         cluster_truth_.contributor_embedding_id, cluster_truth_.contributor_fraction, cluster_truth_.contributor_eta_parent_barcode,
         cluster_truth_.contributor_eta_parent_track_id, cluster_truth_.contributor_eta_decay_mode, cluster_truth_.contributor_eta_split_status,

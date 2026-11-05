@@ -28,7 +28,7 @@ def compare(old_path, new_path):
     for key in ('model_sha256', 'min_cluster_energy', 'pi0_partner_min_energy', 'eta_partner_min_energy',
                 'pi0_mass_min', 'pi0_mass_max', 'eta_mass_min', 'eta_mass_max', 'missing_energy_min', 'missing_energy_max'):
         assert getattr(old_meta, key) == getattr(new_meta, key), key
-    assert int(old_meta.schema_version) == 8 and int(new_meta.schema_version) == 9
+    assert int(old_meta.schema_version) == 8 and int(new_meta.schema_version) in (9, 10)
     keys = [b.GetName() for b in old.GetListOfBranches() if b.GetName().startswith((
         'split_cluster_pass_', 'split_cluster_bdt_', 'split_cluster_iso_'))]
     keys += ['split_cluster_id', 'split_cluster_e', 'split_cluster_et', 'split_cluster_pi0_tag', 'split_cluster_eta_tag',

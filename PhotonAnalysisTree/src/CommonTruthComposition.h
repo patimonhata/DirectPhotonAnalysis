@@ -53,6 +53,9 @@ struct Result
   Applicability applicability = Applicability::unknown;
   int matching_status = 0;
   double minimum_coverage = 0;
+  int anchor_matching_status = -1; // -1: no anchor matching evaluated; candidate-wide fields above stay diagnostic.
+  double anchor_matching_coverage = -1;
+  bool anchor_matching_usable = false;
   int topology_reason = 0; // 1 non-gg, 2 unknown mode, 3 missing candidate, 4 matching, 5 projection, 6 first-daughter interaction information.
 };
 inline int overview(Main main, int pdg)

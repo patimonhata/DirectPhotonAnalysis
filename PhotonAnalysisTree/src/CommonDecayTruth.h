@@ -34,10 +34,10 @@ class CommonDecayTruth
 // Flat event-local tables. Every row retains its own ancestry and identity; parent rows are overlapping summaries, never extra deposit.
 struct CommonTruthCollection
 {
-  std::vector<int> main, selected_pdg, selected_embedding, selected_source, selected_id, applicability, topology_reason, legacy_origin, matching_status;
+  std::vector<int> main, selected_pdg, selected_embedding, selected_source, selected_id, applicability, topology_reason, legacy_origin, matching_status, anchor_matching_status;
   std::vector<unsigned int> quality;
-  std::vector<unsigned char> long_lived_ancestor;
-  std::vector<double> total, attributed, unresolved, fraction, max_photon, other_photons, charged, minimum_coverage;
+  std::vector<unsigned char> long_lived_ancestor, anchor_matching_usable;
+  std::vector<double> total, attributed, unresolved, fraction, max_photon, other_photons, charged, minimum_coverage, anchor_matching_coverage;
   std::vector<unsigned int> offset, ancestor_offset;
   std::vector<int> table, pdg, embedding, source, id, decay, prompt, unresolved_piece;
   std::vector<unsigned int> piece_quality;

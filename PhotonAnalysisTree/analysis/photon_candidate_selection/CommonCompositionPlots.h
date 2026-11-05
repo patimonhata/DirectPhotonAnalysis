@@ -9,7 +9,7 @@ inline bool export_outputs(const std::string& base, const candidate_composition_
   TFile file((base + "/common_composition.root").c_str(), "RECREATE"); if (file.IsZombie()) return false;
   auto saved = source; TTree metadata("metadata", "Boundary independent composition and matching quality, all origins");
   std::string policy = "units_before_downstream_hadron_parent;strict_majority;original_shower_deposit_denominator;no_lifetime_or_flight_cut";
-  std::string matching = "split:complete_and_conserved;topology:complete_or_partial_coverage_ge_0.5";
+  std::string matching = "split:complete_and_conserved;topology:anchor_complete_or_partial_coverage_ge_0.5;candidate_matching:diagnostic_only";
   metadata.Branch("policy", &policy); metadata.Branch("matching", &matching);
 #define M(member) metadata.Branch(#member, &saved.member)
   M(common_composition_algorithm_version); M(source_map_schema_version); M(schema_version); M(model_sha256); M(family); M(map_root);

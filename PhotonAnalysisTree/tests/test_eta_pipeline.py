@@ -1,4 +1,4 @@
-"""Synthetic schema-9 map -> reduce -> merge, including eta cascade modes, pi0 priority and distinct-parent rejection."""
+"""Synthetic schema-10 map -> reduce -> merge, including eta cascade modes, pi0 priority and distinct-parent rejection."""
 import os
 from pathlib import Path
 import re
@@ -23,7 +23,7 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
   const auto sample = *std::find_if(samples.begin(), samples.end(), [&](const auto& s) { return sample_name == s.name; });
   TFile file(path.c_str(), "RECREATE");
   MapMetadata map;
-  map.schema_version = 9; map.common_composition_algorithm_version = 1; map.decay_origin_algorithm_version = 1; map.decay_origin_max_proper_length_cm = 1e-4; map.decay_origin_max_flight_cm = 1e-2; map.pi0_topology_algorithm_version = 13; map.eta_topology_algorithm_version = 3;
+  map.schema_version = 10; map.common_composition_algorithm_version = 1; map.decay_origin_algorithm_version = 1; map.decay_origin_max_proper_length_cm = 1e-4; map.decay_origin_max_flight_cm = 1e-2; map.pi0_topology_algorithm_version = 14; map.eta_topology_algorithm_version = 4;
   map.input_manifest = "synthetic"; map.sample_name = sample.name; map.analysis_release = "ana.565"; map.model_sha256 = "synthetic";
   map.manifest_begin = 0; map.manifest_end = 1; map.input_file_count = 1;
   map.cross_section_pb = sample.cross_section_pb; map.window_min = sample.window_min; map.window_max = sample.window_max;
@@ -175,6 +175,8 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
     const bool old_pi0 = pi0_valid[0] && pi0_fraction[0] > .5;
     const auto old_eta = eta_origin::summarize(0, fraction.size(), embedding, fraction, eta_parent_barcode, eta_parent_track_id, eta_decay_mode, eta_split_status, pi0_parent_barcode, pi0_parent_track_id);
     const int legacy = prompt[0] ? 0 : old_pi0 ? 1 : old_eta.fraction > .5 ? 2 : 3;
+    if (r.applicability == photon_tree::composition::Applicability::applicable)
+    { r.anchor_matching_status = 2; r.anchor_matching_coverage = 1; r.anchor_matching_usable = true; }
     common.clear(); common.append(r, legacy);
     final[0] = region[0] && !pi0_tag[0] && !eta_tag[0]; events.Fill();
   }
@@ -246,4 +248,4 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
                 assert len(re.findall(rb'/Type\s*/Page\b', pdf.read_bytes())) == 6
     assert not list(output.rglob('workinprogress'))
     assert (output / 'common_composition_migration.csv').is_file()
-    print('Schema-9 map -> reduce -> merge with supplemental decay origins, eta residuals, veto survival, both plot families: passed')
+    print('Schema-10 map -> reduce -> merge with supplemental decay origins, eta residuals, veto survival, both plot families: passed')

@@ -430,6 +430,7 @@ void CommonTruthCollection::append(const composition::Result& r, int legacy)
 #define PUSH(field) field.push_back(r.field)
   quality.push_back(r.quality | (!r.valid ? composition::missing_particle : 0U) | (!(r.total > 0) ? composition::invalid_deposit : 0U));
   PUSH(total); PUSH(attributed); PUSH(unresolved); PUSH(fraction); PUSH(max_photon); PUSH(other_photons); PUSH(charged); PUSH(matching_status); PUSH(minimum_coverage);
+  PUSH(anchor_matching_status); PUSH(anchor_matching_coverage); PUSH(anchor_matching_usable);
 #undef PUSH
   const std::array<const std::vector<composition::Piece>*, 3> tables = {&r.units, &r.photons, &r.parents};
   for (int t = 0; t < 3; ++t) for (const auto& p : *tables[t])
@@ -451,6 +452,7 @@ void CommonTruthCollection::create_branches(TTree* tree)
 #define B(field) tree->Branch("split_cluster_common_" #field, &field)
   B(main); B(selected_pdg); B(selected_embedding); B(selected_source); B(selected_id); B(applicability); B(topology_reason); B(legacy_origin);
   B(long_lived_ancestor); B(quality); B(total); B(attributed); B(unresolved); B(fraction); B(max_photon); B(other_photons); B(charged); B(matching_status); B(minimum_coverage);
+  B(anchor_matching_status); B(anchor_matching_coverage); B(anchor_matching_usable);
   B(offset); B(ancestor_offset); B(table); B(pdg); B(embedding); B(source); B(id); B(decay); B(prompt); B(unresolved_piece); B(piece_quality); B(deposit);
   B(flight_cm); B(proper_length_cm); B(production_vertex); B(decay_vertex);
   B(ancestor_pdg); B(ancestor_embedding); B(ancestor_source); B(ancestor_id); B(ancestor_flight_cm); B(ancestor_proper_length_cm);

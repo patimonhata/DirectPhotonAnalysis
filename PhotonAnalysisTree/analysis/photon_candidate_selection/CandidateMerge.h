@@ -191,7 +191,7 @@ bool read_metadata(TFile& file, Metadata& value)
   ok &= bind(tree, "region_a_anchor_clusters", &value.region_a_anchor_clusters);
   if (!ok || tree->GetEntry(0) <= 0 || value.common_composition_algorithm_version != 1 || value.decay_origin_algorithm_version != decay_origin::kAlgorithmVersion ||
       !same_double(value.decay_origin_max_proper_length_cm, decay_origin::kMaxProperLengthCm) ||
-      !same_double(value.decay_origin_max_flight_cm, decay_origin::kMaxFlightCm) || value.pi0_topology_algorithm_version != 13 || value.eta_topology_algorithm_version != 3 || value.other_origin_algorithm_version != other_origin::kAlgorithmVersion || !family || !map_root || !majority_comparison || !eta_definition ||
+      !same_double(value.decay_origin_max_flight_cm, decay_origin::kMaxFlightCm) || value.pi0_topology_algorithm_version != 14 || value.eta_topology_algorithm_version != 4 || value.other_origin_algorithm_version != other_origin::kAlgorithmVersion || !family || !map_root || !majority_comparison || !eta_definition ||
       !other_definition || !weight_definition || !analysis_release || !model_sha256 || !sample_names || !sample_map_counts ||
       !sample_sum_generator_weights) return false;
   value.family = *family;

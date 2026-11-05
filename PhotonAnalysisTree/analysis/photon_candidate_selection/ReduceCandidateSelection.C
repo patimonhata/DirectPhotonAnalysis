@@ -424,7 +424,7 @@ int reduce(
   if (!eta_topology::write_partial(output, eta_histograms, eta_bdt_histograms)) return 8;
   output.cd();
   int common_composition_algorithm_version = 1;
-  int schema_version = 11, source_schema_version = 9, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 12, source_schema_version = 10, signal_embedding_id = kSignalEmbeddingId;
   int decay_origin_algorithm_version = maps.front().decay_origin_algorithm_version;
   double decay_origin_max_proper_length_cm = maps.front().decay_origin_max_proper_length_cm;
   double decay_origin_max_flight_cm = maps.front().decay_origin_max_flight_cm;

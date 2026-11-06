@@ -31,7 +31,7 @@ photon_setup_runtime()
 
 photon_check_output()
 {
-  python3 "$PHOTON_SOURCE_ROOT/tools/software.py" check-output "$1"
+  python3 "$PHOTON_SOURCE_ROOT/tools/software.py" check-output "$@"
 }
 
 photon_check_inputs()

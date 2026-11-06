@@ -110,6 +110,49 @@ python3 PhotonAnalysisTree/tools/software.py run \
 production を選ばない通常の `run_*.sh` は、既定の開発用 install を使います。
 別の開発 prefix を使う場合は `PHOTON_INSTALL_PREFIX`、release を変更する場合は `PHOTON_RELEASE` を明示します。
 
+## map だけを tg に保存する
+
+新しい production の作成時に `--map-root` を指定します。指定先は新規または空のディレクトリに限ります。
+production manifest は `/sphenix/user` に置き、外部 map root の実パスを manifest の `output_roots.map` に保存します。
+`production/maps` のシンボリックリンクは自動作成するため、手動の `ln -s` は不要です。
+map ROOT とその `.execution.json` は tg、partials・results・下記のログは `/sphenix/user` に置かれます。
+
+この機能を含むコードをコミットし、ビルド・新規 freeze を済ませてから実行します。
+旧 frozen software は新しい設定を解釈できないため、`--map-root` での production 作成を拒否します。
+既存 manifest や frozen software の直接編集、既存 map directory の再登録は行いません。
+以下は新 software ID を `common_composition_anchor_v14_maproot1_ana565` とした例です。
+
+```bash
+module=/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree
+production_name=common_composition_anchor_v14_maproot1
+configuration=jet_cluster0p12_partner0p5
+software="$module/software/${production_name}_ana565"
+prod="$module/output/photon_candidate_selection/productions/$production_name/$configuration"
+map_root="/sphenix/tg/tg01/coldqcd/ryotaro/DirectPhotonAnalysis/photon_candidate_selection/$production_name/$configuration/maps"
+
+python3 "$module/tools/software.py" production "$software" "$prod/manifest.json" \
+  --production "$production_name" --configuration "$configuration" --map-root "$map_root"
+
+mkdir -p "$prod/logs"
+for sample in jet3 jet5 jet8 jet12 jet20 jet30 jet40; do
+  condor_submit \
+    -append "production_directory = $prod" \
+    -append "log_directory = $prod/logs" \
+    -append "Log = $prod/logs/map_${sample}.events.log" \
+    "$module/workflows/photon_candidate_selection/submit_${sample}.job"
+done
+```
+
+reduce は従来どおり `$prod/maps` を読み、`$prod/partials/jet` に保存します。
+map が全件完了したら、reduce の submit にも同じ `production_directory` と `log_directory` を指定してください。
+Condor event log も user に集める場合は、それぞれ `Log = $prod/logs/reduce_samples.events.log`、
+`Log = $prod/logs/reduce_jet12.events.log` を指定します。
+merge は `run --production-manifest "$prod/manifest.json" merge jet "$prod/partials/jet" "$prod/results/jet"` です。
+
+外部 root への書き込み許可は map stage のみに適用します。reduce・merge の出力や、未登録の外部リンク先は許可しません。
+入力検証でも stage の出力先制限と従来の software/production/hash 照合を行うため、別 production の map は混在できません。
+`--map-root` を使わない既存 production の配置規則は変わりません。
+
 ## 出力の履歴と入力の混在防止
 
 主解析の shell wrapper は、出力 ROOT ごとに `<filename>.root.execution.json` を作ります。

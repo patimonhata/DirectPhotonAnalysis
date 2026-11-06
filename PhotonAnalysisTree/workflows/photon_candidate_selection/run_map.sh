@@ -93,7 +93,7 @@ cleanup()
 trap cleanup EXIT
 
 photon_setup_runtime "$module_dir"
-photon_check_output "$final_output"
+photon_check_output "$final_output" --stage map
 input_manifest_sha256=$(sha256sum "$input_manifest" | awk '{print $1}')
 export PHOTON_INPUT_MANIFEST_SHA256="$input_manifest_sha256"
 model_file="$PHOTON_SOURCE_ROOT/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root"

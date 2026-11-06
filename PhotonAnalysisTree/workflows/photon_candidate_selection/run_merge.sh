@@ -35,7 +35,7 @@ fi
 partial_root=$(cd "$partial_root" && pwd)
 
 photon_setup_runtime "$module_dir"
-photon_check_output "$output_base/candidate_composition.root"
+photon_check_output "$output_base/candidate_composition.root" --stage merge
 photon_check_inputs reduce "$partial_root/*/shard_*/photon_candidate_selection.root"
 root -l -b -q "$workflow_dir/MergePythiaPhotonCandidateSelection.C(\"$family\",\"$partial_root\",\"$output_base\")"
 

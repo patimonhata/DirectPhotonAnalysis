@@ -66,7 +66,7 @@ fi
 map_root=$(cd "$map_root" && pwd)
 
 photon_setup_runtime "$module_dir"
-photon_check_output "$output_base.root"
+photon_check_output "$output_base.root" --stage reduce
 photon_check_inputs map "$map_root/$sample_name/map_*.root"
 root -l -b -q "$workflow_dir/ReducePythiaPhotonCandidateSelection.C(\"$family\",\"$map_root\",\"$output_base\",$require_complete,$n_bins,$et_max,\"$sample_name\",$shard_index)"
 

@@ -30,6 +30,11 @@ This builds the local dependency and module in fixed `ana.565`, under `build/dev
 For formal productions, commit the execution code, rebuild clean source, freeze a software ID, and initialize a new production manifest.
 See [software/build provenance](../../docs/software.md) for the complete procedure. Existing outputs and legacy installs are retained.
 
+For maps on tg with manifests, partials, results and logs on `/sphenix/user`, initialize a new production with `software.py production ... --map-root /absolute/tg/path`.
+The storage directory must be new or empty; the command records its canonical path and creates `configuration/maps` as a symlink.
+This requires newly frozen software containing the external-map-root feature. Existing submit arguments remain valid, and `log_directory` stays independent.
+See [external map storage](../../docs/software.md#map-だけを-tg-に保存する) for the full setup and Condor log overrides.
+
 ## Map
 
 Review the production/configuration and choose new map outputs when rerunning a production. Existing map files are not overwritten. No repository script automatically submits jobs.

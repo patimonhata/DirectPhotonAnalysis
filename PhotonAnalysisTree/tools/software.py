@@ -226,7 +226,7 @@ def freeze(args):
             stream.extractall(snapshot, members=members, filter='data')
         archive.unlink()
         (temporary / 'build-manifest.json').unlink()
-        value.update(kind='frozen', software_id=args.software_id, frozen_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        value.update(kind='frozen', software_id=args.software_id, features=['external_map_root_v1'], frozen_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
         value['artifacts'] = inventory(temporary)
         write_json(temporary / 'manifest.json', value)
         verify(temporary)
@@ -247,13 +247,34 @@ def production(args):
     manifest = args.manifest.resolve()
     if manifest.exists() or (manifest.parent.exists() and any(manifest.parent.iterdir())):
         raise ValueError('Create a production in a new, empty configuration directory; retained results are never relabelled')
+    map_root = getattr(args, 'map_root', None)
+    if map_root is not None:
+        if 'external_map_root_v1' not in software.get('features', []):
+            raise ValueError('Freeze new software with external map-root support before using --map-root')
+        map_root = map_root.resolve()
+        if map_root.is_relative_to(manifest.parent) or manifest.parent.is_relative_to(map_root):
+            raise ValueError('--map-root must be separate from the production configuration directory')
+        if map_root.exists() and (not map_root.is_dir() or any(map_root.iterdir())):
+            raise ValueError('--map-root must be a new or empty directory; retained maps are never relabelled')
     value = {'format_version': 1, 'workflow': 'photon_candidate_selection', 'production': args.production,
         'configuration': args.configuration, 'status': 'configured',
         'software': {'id': software['software_id'], 'path': str(prefix), 'manifest_sha256': digest(prefix / 'manifest.json'),
             'git_commit': software['source']['git_commit'], 'release': software['environment']['release']},
         'settings': read_json(args.settings) if args.settings else {},
         'created_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
-    write_json(manifest, value)
+    if map_root is not None:
+        value['output_roots'] = {'map': str(map_root)}
+        map_root.mkdir(parents=True, exist_ok=True)
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        link = manifest.parent / 'maps'
+        link.symlink_to(map_root, target_is_directory=True)
+        try:
+            write_json(manifest, value)
+        except Exception:
+            link.unlink()
+            raise
+    else:
+        write_json(manifest, value)
     print(manifest)
 
 
@@ -293,9 +314,19 @@ def resolve(args):
         print(item)
 
 
-def assert_output(path, production_path):
-    if production_path and not Path(path).resolve().is_relative_to(production_path.parent):
-        raise ValueError('Output lies outside the bound production configuration')
+def assert_output(path, production_path, stage=None):
+    if not production_path:
+        return
+    production_path = Path(production_path).resolve()
+    resolved = Path(path).resolve()
+    if resolved.is_relative_to(production_path.parent):
+        return
+    # Only map jobs may write to the explicitly registered external root. Keep the
+    # stored canonical root fixed so retargeting a symlink cannot expand this grant.
+    root = read_json(production_path).get('output_roots', {}).get('map') if stage == 'map' else None
+    if root and Path(root).is_absolute() and resolved.is_relative_to(Path(root)):
+        return
+    raise ValueError('Output lies outside the bound production configuration or registered map root for this stage')
 
 
 def check_inputs(args):
@@ -308,6 +339,7 @@ def check_inputs(args):
         raise ValueError('No inputs match the production stage')
     for name in matches:
         path = Path(name).resolve()
+        assert_output(path, production_path, args.stage)
         record = read_json(str(path) + '.execution.json')
         if (record.get('stage') != args.stage or record.get('software_manifest_sha256') != digest(prefix / 'manifest.json')
                 or record.get('production_manifest_sha256') != digest(production_path) or record.get('output_sha256') != digest(path)):
@@ -317,7 +349,9 @@ def check_inputs(args):
 def record(args):
     prefix, _, value, production_path = selection(args.software, args.production_manifest, args.release)
     output = args.output.resolve()
-    assert_output(output, production_path)
+    assert_output(output, production_path, args.stage)
+    if args.final_output is not None:
+        assert_output(args.final_output, production_path, args.stage)
     manifest = prefix / ('manifest.json' if value['kind'] == 'frozen' else 'build-manifest.json')
     selected_release = os.environ.get('OFFLINE_MAIN', '')
     if Path(selected_release).resolve() != Path(value['environment']['offline_main']).resolve():
@@ -373,6 +407,7 @@ def parser():
     init.add_argument('--production', required=True)
     init.add_argument('--configuration', required=True)
     init.add_argument('--settings', type=Path)
+    init.add_argument('--map-root', type=Path, help='new or empty external map directory; creates configuration/maps as a symlink')
     for name in ('resolve', 'check-inputs', 'record', 'run', 'check-output'):
         command = sub.add_parser(name)
         command.add_argument('--software', default=os.environ.get('PHOTON_SOFTWARE_ROOT') or None)
@@ -385,6 +420,8 @@ def parser():
             if name == 'record':
                 command.add_argument('--final-output', type=Path)
                 command.add_argument('stage', choices=STAGES)
+            if name == 'check-output':
+                command.add_argument('--stage', choices=STAGES)
             command.add_argument('output', type=Path)
         if name == 'run':
             command.add_argument('stage', choices=STAGES)
@@ -401,7 +438,7 @@ def main():
             print(f'Verified {value["software_id"]}: {len(value["artifacts"])} artifacts')
         elif args.command == 'check-output':
             _, _, _, production_path = selection(args.software, args.production_manifest, args.release)
-            assert_output(args.output, production_path)
+            assert_output(args.output, production_path, args.stage)
         else:
             globals()[args.command.replace('-', '_')](args)
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:

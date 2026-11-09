@@ -1,6 +1,6 @@
 # Photon-candidate definition notes
 
-Development format: map schema 10, partial schema 12, common composition v1, pi0 topology v14, eta topology v4, direct hit matcher v5. Saved schema-8 productions retain their original definitions and results. A new production requires a new clean-source software snapshot and regenerated maps. Section headings below retain the version in which a feature was introduced. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for current paths and execution; historical command blocks were removed.
+Development format: map schema 10, partial schema 13, common composition v1, pi0 topology v14, eta topology v4, direct hit matcher v5. Saved schema-8 productions retain their original definitions and results. A new production requires a new clean-source software snapshot. Map-affecting changes require regenerated maps; reduce-only corrections still follow production provenance checks. Section headings below retain the version in which a feature was introduced. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for current paths and execution; historical command blocks were removed.
 
 ## Boundary independent composition (map schema 9)
 
@@ -28,7 +28,7 @@ Pi0 composition equals topology-evaluable + topology-not-applicable + topology-u
 
 `applicability`: 0 unknown, 1 evaluable, 2 not applicable. `topology_reason`: 0 available, 1 confirmed non-gg/parent sum, 2 unknown decay, 3 unavailable candidate/photon identity, 4 insufficient matching, 5 unavailable projection, 6 unavailable first-daughter interaction information. Mapping statuses remain invalid=0, partial=1, complete=2. Topology accepts complete or the existing partial matching with member-energy coverage >= 0.5; daughter splitting requires complete conserved attribution. Coverage is distinct from photon fraction and from reconstructed energy purity. Missing hit ancestry makes matching unusable. Noise energy is never assigned to a fabricated particle. Candidate-wide minimum coverage and matching status remain saved, with ET and reason in `matching_count`/`matching_weighted`, as diagnostics only. Starting with map schema 10, one failed searched cluster or sibling anchor no longer vetoes all anchors of that meson. Applicability requires the current anchor's existing `match.usable`, both photons' valid projection or known non-intersection, and first-daughter interaction information. Partner selection and `partner_direct_match_incomplete` diagnostics are unchanged; no partner representative is required merely to evaluate a missing topology. The selected maximum is therefore a maximum over available matching information, not proof that incomplete clusters contain no larger deposit.
 
-`split_cluster_common_anchor_matching_status`, `anchor_matching_coverage`, and `anchor_matching_usable` separately save the current anchor's match. Before anchor evaluation they are -1, -1, and false. Evaluated status uses 0/1/2 as above. `anchor_matching_count`/`anchor_matching_weighted` preserve ET, local status, local coverage and topology reason, only for evaluated anchors. Candidate aggregates retain their original meaning even when the anchor is evaluable. Map schema 9 and partial schema 11 must not be mixed with schema 10/12; regenerate maps from DST for the new applicability policy.
+`split_cluster_common_anchor_matching_status`, `anchor_matching_coverage`, and `anchor_matching_usable` separately save the current anchor's match. Before anchor evaluation they are -1, -1, and false. Evaluated status uses 0/1/2 as above. `anchor_matching_count`/`anchor_matching_weighted` preserve ET, local status, local coverage and topology reason, only for evaluated anchors. Candidate aggregates retain their original meaning even when the anchor is evaluable. Map schema 9 and partial schema 11 must not be mixed with map schema 10 / partial schema 12 or 13; regenerate maps from DST for the new applicability policy.
 
 Topology fractions and topology BDT distributions use only the evaluable population. `other` still means an evaluable anchor outside the named topology cases; it does not absorb missing information. The single-contaminated definition remains exactly one photon with first daughter-vertex radius < 90 cm; both photons interacting falls under merged. Partner selection maximizes absolute deposit over positive-energy clusters before applying the actual configured partner threshold. A known ray with no forward intersection with the CEMC reference cylinder is saved separately as `photon*_projection_no_intersection`; it is geometric non-arrival (missing/acceptance when unrecovered), not an unavailable-vertex unknown. Ties choose the smallest cluster ID. A failing representative is never replaced by a lower-deposit candidate. Reconstructed veto flags remain independent.
 
@@ -347,8 +347,20 @@ fallback. Per-cluster truth branches also store `pi0_total_fraction`,
 `eta_main_track_id`, and `eta_main_unresolved` for the signal embedding (1).
 The pi0 total is a diagnostic and is never substituted for a single-parent majority.
 
-Reduce saves the disjoint eta-mode subsets under `eta_decay/<selection>`; merge
-checks raw-count and Sumw2 closure against the eta composition and direct eta
+Reduce saves the disjoint eta-mode subsets under `eta_decay/<selection>`. In partial
+schema 13, only common-composition `parent` with selected PDG 221 can enter the
+resolved cascade subsets. Contributor annotations must match that selected parent's
+embedding and identity (HepMC barcode for source 1, G4 track ID for source 2), and
+all matching annotations must agree on mode 2 or 3. No legacy-largest-parent or
+legacy-fraction threshold is used. Missing/conflicting modes stay in the existing
+eta residual. Common `parent_unresolved` with PDG 221 enters only the unresolved
+subset; `eta_gg` never enters any of these subsets, even with unknown/N/A topology.
+This corrects the earlier claim of disjointness: schema 12 mixed common selection
+with the legacy largest eta's mode and could count a cluster twice. All partials
+must be regenerated for schema 13; schema 12 partials are rejected by merge. The
+map schema remains 10, and this correction requires no new map branches. Normal
+production provenance checks still apply when reusing maps with corrected software.
+Merge checks raw-count and Sumw2 closure against the eta composition and direct eta
 anchors. Existing eta-topology composition stack/survival PDFs now resolve these
 subsets. `eta_cascade_composition_summary.csv` reports raw and weighted yields and
 fractions per selection and ET bin; bin -1 is the full range including flows.

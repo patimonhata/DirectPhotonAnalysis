@@ -130,6 +130,9 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
     pi0_parent_barcode.assign(fraction.size(), 0); pi0_parent_track_id.assign(fraction.size(), 0);
     for (std::size_t i = 0; i < fraction.size(); ++i) if (parent[i] == 221 || pdg[i] == 221)
     { eta_parent_barcode[i] = row == 16 ? i + 100 : 100; eta_decay_mode[i] = pdg[i] == 221 ? 2 : 1; }
+    // Regression: a common direct-gg eta must not also use an unrelated legacy cascade mode.
+    // Before the selected-parent fix this makes the eta subsets exceed the eta total.
+    if (row == 6) { eta_parent_barcode[0] = 999; eta_decay_mode[0] = 3; }
     if (row >= 20)
     {
       offsets = {0, 3}; pdg = {211, -211, 111}; embedding = {1, 1, 1}; fraction = {.3, .3, .4};
@@ -193,6 +196,8 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
         partial = root / 'partial' / sample / 'shard_0' / 'photon_candidate_selection'
         assert ROOT.ReducePythiaPhotonCandidateSelection('photonjet', str(root / 'maps'), str(partial), False, 40, 40., sample, 0) == 0
         f = ROOT.TFile.Open(str(partial) + '.root')
+        metadata = f.Get('metadata'); metadata.GetEntry(0)
+        assert int(metadata.schema_version) == 13 and int(metadata.source_map_schema_version) == 10
         assert f.Get('composition/kinematic/h_candidate_eta_et_count').Integral() == 12
         assert f.Get('eta_anchor_topology/kinematic/h_region_a_eta_anchor_et_count').Integral() == 10
         assert f.Get('eta_anchor_topology/region_a_tagging_veto/h_region_a_eta_anchor_et_count').Integral() == 6

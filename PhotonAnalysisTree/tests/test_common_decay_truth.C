@@ -200,6 +200,9 @@ void test_common_decay_truth()
   TMemFile file("common_roundtrip.root", "RECREATE"); TTree tree("event_tree", "Common truth"); collection.create_branches(&tree); tree.Fill();
   collection.clear(); collection.append({}); tree.Fill(); tree.Write();
   auto* saved = file.Get<TTree>("event_tree"); common_composition::Reader reader; assert(reader.bind(saved)); assert(saved->GetEntry(0) > 0); assert(reader.valid(1));
+  assert((*reader.selected_pdg)[0] == r.selected.pdg);
+  assert((*reader.selected_embedding)[0] == r.selected.identity.embedding && (*reader.selected_source)[0] == r.selected.identity.source &&
+         (*reader.selected_id)[0] == r.selected.identity.id);
   assert((*reader.matching_status)[0] == 1 && (*reader.minimum_coverage)[0] == .1);
   assert((*reader.anchor_matching_status)[0] == 2 && (*reader.anchor_matching_coverage)[0] == 1 && (*reader.anchor_matching_usable)[0]);
   common_composition::Histograms h(4, 20);

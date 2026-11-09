@@ -153,9 +153,6 @@ int reduce(
     std::vector<int>* eta_parent_barcode = nullptr;
     std::vector<int>* eta_parent_track_id = nullptr;
     std::vector<int>* eta_decay_mode = nullptr;
-    std::vector<int>* eta_split_status = nullptr;
-    std::vector<int>* pi0_parent_barcode = nullptr;
-    std::vector<int>* pi0_parent_track_id = nullptr;
 
     tree->SetBranchStatus("*", false);
     tree->SetCacheSize(kEventTreeCacheSize);
@@ -199,9 +196,6 @@ int reduce(
     ok &= bind_active(tree, "split_cluster_truth_contributor_eta_parent_barcode", &eta_parent_barcode);
     ok &= bind_active(tree, "split_cluster_truth_contributor_eta_parent_track_id", &eta_parent_track_id);
     ok &= bind_active(tree, "split_cluster_truth_contributor_eta_decay_mode", &eta_decay_mode);
-    ok &= bind_active(tree, "split_cluster_truth_contributor_eta_split_status", &eta_split_status);
-    ok &= bind_active(tree, "split_cluster_truth_contributor_pi0_parent_barcode", &pi0_parent_barcode);
-    ok &= bind_active(tree, "split_cluster_truth_contributor_pi0_parent_track_id", &pi0_parent_track_id);
     if (!ok) return 5;
     tree->StopCacheLearningPhase();
     events_written += static_cast<unsigned long long>(tree->GetEntries());
@@ -225,9 +219,6 @@ int reduce(
       if (!eta_parent_barcode || eta_parent_barcode->size() != fraction->size()) return 6;
       if (!eta_parent_track_id || eta_parent_track_id->size() != fraction->size()) return 6;
       if (!eta_decay_mode || eta_decay_mode->size() != fraction->size()) return 6;
-      if (!eta_split_status || eta_split_status->size() != fraction->size()) return 6;
-      if (!pi0_parent_barcode || pi0_parent_barcode->size() != fraction->size()) return 6;
-      if (!pi0_parent_track_id || pi0_parent_track_id->size() != fraction->size()) return 6;
       if (!weight_valid || !stitch_valid || !stitch_pass) continue;
       ++events_stitch_pass;
       const double weight = weight_numerator / sample_sumw;
@@ -236,11 +227,10 @@ int reduce(
       {
         const double cluster_et = (*et)[cluster];
         if (!std::isfinite(cluster_et)) return 6;
-        const auto eta_origin = eta_origin::summarize((*offset)[cluster], (*offset)[cluster + 1], *embedding, *fraction,
-            *eta_parent_barcode, *eta_parent_track_id, *eta_decay_mode, *eta_split_status, *pi0_parent_barcode, *pi0_parent_track_id);
-        const double eta_contribution = eta_origin.fraction;
-        if (!std::isfinite(eta_contribution) || eta_contribution < -1e-6 || eta_contribution > 1.0 + 1e-5) return 6;
         const auto main = static_cast<photon_tree::composition::Main>((*common.main)[cluster]);
+        const auto eta_decay_category = eta_decay::classify(main, (*common.selected_pdg)[cluster],
+            {(*common.selected_embedding)[cluster], (*common.selected_source)[cluster], (*common.selected_id)[cluster]},
+            (*offset)[cluster], (*offset)[cluster + 1], *embedding, *eta_parent_barcode, *eta_parent_track_id, *eta_decay_mode);
         const bool is_prompt = main == photon_tree::composition::Main::prompt;
         const bool is_pi0 = main == photon_tree::composition::Main::pi0;
         const bool is_eta = photon_tree::composition::overview(main, (*common.selected_pdg)[cluster]) == 2;
@@ -275,7 +265,7 @@ int reduce(
           if (is_prompt) spectra.fill(0, cluster_et, weight);
           auto& eta_spectra = *eta_histograms[topology_selection];
           if (is_prompt) eta_spectra.fill(0, cluster_et, weight);
-          if (category == eta && applicable && (*eta_valid)[cluster] && (*eta_main_fraction)[cluster] > kMajorityThreshold)
+          if (main == photon_tree::composition::Main::eta_gg && applicable && (*eta_valid)[cluster] && (*eta_main_fraction)[cluster] > kMajorityThreshold)
           {
             if (!eta_topology::fill(eta_spectra, (*eta_topology)[cluster], (*eta_missing_category)[cluster], cluster_et, weight) ||
                 !eta_bdt_histograms[topology_selection].fill(eta_topology::bdt_category((*eta_topology)[cluster]), (*bdt_score)[cluster],
@@ -323,7 +313,7 @@ int reduce(
           else if (category == eta)
           {
             ++summary.eta;
-            eta_decay_histograms[selection_index]->fill(eta_origin.mode, main == photon_tree::composition::Main::parent_unresolved, cluster_et, weight);
+            eta_decay_histograms[selection_index]->fill(eta_decay_category, cluster_et, weight);
           }
           else ++summary.other;
           if ((*common.legacy_origin)[cluster] == 3)
@@ -338,26 +328,33 @@ int reduce(
     }
   }
 
-  if (events_written != expected_events_written || sample_names.empty()) return 7;
+  const auto integrity_failure = [&](const char* check, std::size_t selection = kSelectionCount) {
+    std::cerr << "ReducePythiaPhotonCandidateSelection: integrity check failed: " << check
+              << ", sample=" << sample_name << ", shard=" << shard_index;
+    if (selection < kSelectionCount) std::cerr << ", selection=" << kSelectionKeys[selection];
+    std::cerr << std::endl;
+    return 7;
+  };
+  if (events_written != expected_events_written || sample_names.empty()) return integrity_failure("event_count");
   for (std::size_t selection_index = 0; selection_index < kSelectionCount; ++selection_index)
   {
     const Summary& summary = composition_summaries[selection_index];
     if (!consistent_pi0_bdt(*composition_histograms[selection_index], *topology_histograms[selection_index], bdt_histograms[selection_index]) ||
-        !eta_topology::valid(*composition_histograms[selection_index], *eta_histograms[selection_index], eta_bdt_histograms[selection_index])) return 7;
+        !eta_topology::valid(*composition_histograms[selection_index], *eta_histograms[selection_index], eta_bdt_histograms[selection_index])) return integrity_failure("topology/BDT", selection_index);
     if (summary.selected != summary.prompt + summary.pi0 + summary.eta + summary.other ||
         !candidate_composition::valid_partition(composition_histograms[selection_index]->counts) ||
         !candidate_composition::valid_partition(composition_histograms[selection_index]->weighted) ||
-        !::valid_partition(topology_histograms[selection_index]->counts) || !::valid_partition(topology_histograms[selection_index]->weighted_pb)) return 7;
+        !::valid_partition(topology_histograms[selection_index]->counts) || !::valid_partition(topology_histograms[selection_index]->weighted_pb)) return integrity_failure("composition/topology_partition", selection_index);
   }
   for (std::size_t i = 0; i < kSelectionCount; ++i)
     if (!eta_decay_histograms[i]->valid(*composition_histograms[i]->counts[eta], *composition_histograms[i]->weighted[eta],
-                                      *eta_histograms[i]->counts[1], *eta_histograms[i]->weighted_pb[1])) return 7;
+                                      *eta_histograms[i]->counts[1], *eta_histograms[i]->weighted_pb[1])) return integrity_failure("eta_decay", i);
   for (std::size_t i = 0; i < kSelectionCount; ++i)
-    if (!other_histograms[i]->valid(*common_histograms[i]->legacy_counts[3], *common_histograms[i]->legacy_weighted[3])) return 7;
+    if (!other_histograms[i]->valid(*common_histograms[i]->legacy_counts[3], *common_histograms[i]->legacy_weighted[3])) return integrity_failure("legacy_other", i);
   for (std::size_t i = 0; i < kSelectionCount; ++i)
-    if (!diagnostic_histograms[i]->valid(*common_histograms[i]->legacy_counts[3], *common_histograms[i]->legacy_weighted[3])) return 7;
+    if (!diagnostic_histograms[i]->valid(*common_histograms[i]->legacy_counts[3], *common_histograms[i]->legacy_weighted[3])) return integrity_failure("legacy_decay_origin", i);
   for (std::size_t i = 0; i < kSelectionCount; ++i)
-    if (!common_histograms[i]->valid() || !common_composition::valid_populations(*common_histograms[i], *composition_histograms[i], *topology_histograms[i], *eta_histograms[i])) return 7;
+    if (!common_histograms[i]->valid() || !common_composition::valid_populations(*common_histograms[i], *composition_histograms[i], *topology_histograms[i], *eta_histograms[i])) return integrity_failure("common_composition", i);
   TFile output((resolved_output_base + ".root").c_str(), "RECREATE");
   if (output.IsZombie()) return 8;
   auto* common_root = output.mkdir("common_composition");
@@ -424,7 +421,7 @@ int reduce(
   if (!eta_topology::write_partial(output, eta_histograms, eta_bdt_histograms)) return 8;
   output.cd();
   int common_composition_algorithm_version = 1;
-  int schema_version = 12, source_schema_version = 10, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 13, source_schema_version = 10, signal_embedding_id = kSignalEmbeddingId;
   int decay_origin_algorithm_version = maps.front().decay_origin_algorithm_version;
   double decay_origin_max_proper_length_cm = maps.front().decay_origin_max_proper_length_cm;
   double decay_origin_max_flight_cm = maps.front().decay_origin_max_flight_cm;

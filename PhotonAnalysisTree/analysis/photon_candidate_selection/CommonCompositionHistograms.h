@@ -38,6 +38,7 @@ inline int detail(int main, int pdg, int applicability, int topology)
 struct Reader
 {
   std::vector<int> *main = nullptr, *selected_pdg = nullptr, *applicability = nullptr, *topology_reason = nullptr, *legacy_origin = nullptr, *matching_status = nullptr, *anchor_matching_status = nullptr;
+  std::vector<int> *selected_embedding = nullptr, *selected_source = nullptr, *selected_id = nullptr;
   std::vector<unsigned char> *long_lived_ancestor = nullptr, *anchor_matching_usable = nullptr;
   std::vector<unsigned int> *quality = nullptr, *offset = nullptr, *ancestor_offset = nullptr;
   std::vector<int> *table = nullptr, *pdg = nullptr, *embedding = nullptr, *source = nullptr, *id = nullptr, *ancestor_pdg = nullptr;
@@ -47,6 +48,7 @@ struct Reader
   {
     bool ok = true;
 #define B(member) ok &= bind_active(tree, "split_cluster_common_" #member, &member)
+    B(selected_embedding); B(selected_source); B(selected_id);
     B(long_lived_ancestor); B(main); B(selected_pdg); B(applicability); B(topology_reason); B(legacy_origin); B(quality); B(offset); B(ancestor_offset);
     B(table); B(pdg); B(embedding); B(source); B(id); B(ancestor_pdg); B(total); B(attributed); B(unresolved); B(max_photon); B(other_photons); B(charged); B(matching_status); B(minimum_coverage);
     B(anchor_matching_status); B(anchor_matching_coverage); B(anchor_matching_usable);
@@ -60,6 +62,7 @@ struct Reader
         ancestor_offset->size() != id->size() + 1 || ancestor_offset->front() || ancestor_offset->back() != ancestor_pdg->size() ||
         !std::is_sorted(offset->begin(), offset->end()) || !std::is_sorted(ancestor_offset->begin(), ancestor_offset->end())) return false;
 #define N(member) if (!member || member->size() != n) return false
+    N(selected_embedding); N(selected_source); N(selected_id);
     N(long_lived_ancestor); N(main); N(selected_pdg); N(applicability); N(topology_reason); N(legacy_origin); N(quality); N(total); N(attributed); N(unresolved); N(max_photon); N(other_photons); N(charged); N(matching_status); N(minimum_coverage);
     N(anchor_matching_status); N(anchor_matching_coverage); N(anchor_matching_usable);
 #undef N

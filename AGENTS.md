@@ -20,3 +20,6 @@
   - lists where one item per line improves comparison or review.
 - When wrapping is necessary, wrap at semantic boundaries and use as few lines as practical.
 - Preserve the surrounding style and do not reformat unrelated code.
+
+## Documentation
+When a repository's documentation and its existing code disagree, follow the conventions used in the existing code, and in your final reply point out each inconsistency you found between the documentation and the code.

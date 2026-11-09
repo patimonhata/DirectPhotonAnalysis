@@ -115,7 +115,8 @@ production を選ばない通常の `run_*.sh` は、既定の開発用 install 
 新しい production の作成時に `--map-root` を指定します。指定先は新規または空のディレクトリに限ります。
 production manifest は `/sphenix/user` に置き、外部 map root の実パスを manifest の `output_roots.map` に保存します。
 `production/maps` のシンボリックリンクは自動作成するため、手動の `ln -s` は不要です。
-map ROOT とその `.execution.json` は tg、partials・results・下記のログは `/sphenix/user` に置かれます。
+map ROOT とその `.execution.json` は tg、partials・results・標準出力/標準エラーのログは `/sphenix/user` に置かれます。
+HTCondor の event log（`Log`）はサイト規則により `/tmp/` が必須です。submit ファイルの既定値を使います。
 
 この機能を含むコードをコミットし、ビルド・新規 freeze を済ませてから実行します。
 旧 frozen software は新しい設定を解釈できないため、`--map-root` での production 作成を拒否します。
@@ -138,15 +139,13 @@ for sample in jet3 jet5 jet8 jet12 jet20 jet30 jet40; do
   condor_submit \
     -append "production_directory = $prod" \
     -append "log_directory = $prod/logs" \
-    -append "Log = $prod/logs/map_${sample}.events.log" \
-    "$module/workflows/photon_candidate_selection/submit_${sample}.job"
+    "$module/workflows/photon_candidate_selection/submit_${sample}.job" || break
 done
 ```
 
 reduce は従来どおり `$prod/maps` を読み、`$prod/partials/jet` に保存します。
 map が全件完了したら、reduce の submit にも同じ `production_directory` と `log_directory` を指定してください。
-Condor event log も user に集める場合は、それぞれ `Log = $prod/logs/reduce_samples.events.log`、
-`Log = $prod/logs/reduce_jet12.events.log` を指定します。
+reduce でも `Log` は上書きせず、既定の `/tmp/` を使います。`log_directory` は標準出力/標準エラーの保存先だけを変更します。
 merge は `run --production-manifest "$prod/manifest.json" merge jet "$prod/partials/jet" "$prod/results/jet"` です。
 
 外部 root への書き込み許可は map stage のみに適用します。reduce・merge の出力や、未登録の外部リンク先は許可しません。

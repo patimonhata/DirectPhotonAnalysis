@@ -33,7 +33,8 @@ See [software/build provenance](../../docs/software.md) for the complete procedu
 For maps on tg with manifests, partials, results and logs on `/sphenix/user`, initialize a new production with `software.py production ... --map-root /absolute/tg/path`.
 The storage directory must be new or empty; the command records its canonical path and creates `configuration/maps` as a symlink.
 This requires newly frozen software containing the external-map-root feature. Existing submit arguments remain valid, and `log_directory` stays independent.
-See [external map storage](../../docs/software.md#map-だけを-tg-に保存する) for the full setup and Condor log overrides.
+HTCondor event logs (`Log`) must stay under `/tmp/` by site policy; retain the submit defaults. `log_directory` controls stdout/stderr only.
+See [external map storage](../../docs/software.md#map-だけを-tg-に保存する) for the full setup.
 
 ## Map
 

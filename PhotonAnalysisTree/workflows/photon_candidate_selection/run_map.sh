@@ -96,7 +96,8 @@ photon_setup_runtime "$module_dir"
 photon_check_output "$final_output" --stage map
 input_manifest_sha256=$(sha256sum "$input_manifest" | awk '{print $1}')
 export PHOTON_INPUT_MANIFEST_SHA256="$input_manifest_sha256"
-model_file="$PHOTON_SOURCE_ROOT/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root"
+# model_file="$PHOTON_SOURCE_ROOT/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root"
+model_file="$PHOTON_SOURCE_ROOT/models/model_tmva_newsignaldefinition.root"
 root -l -b -q \
   "$workflow_dir/Fun4All_PythiaPhotonCandidateTreeMap.C(\"${input_manifest}\",${manifest_begin},${manifest_end},\"${temporary_output}\",\"${sample_name}\",${chunk_index},${n_events},${min_cluster_energy},\"${model_file}\",${tagging_partner_min_energy},${eta_partner_min_energy},${pi0_mass_min},${pi0_mass_max},${eta_mass_min},${eta_mass_max},${missing_energy_min},${missing_energy_max})"
 root -l -b -q \

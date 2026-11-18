@@ -41,7 +41,7 @@ int Fun4All_PythiaPhotonCandidateTreeMap(
     const unsigned int map_chunk_id,
     const int n_events = 0,
     const double min_cluster_energy = 0.1,
-    const std::string model_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root",
+    const std::string model_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/model_tmva_newsignaldefinition.root",
     const double tagging_partner_min_energy = -1.0, const double eta_partner_min_energy = -1.0,
     const double pi0_mass_min = 0.10, const double pi0_mass_max = 0.20, const double eta_mass_min = 0.45, const double eta_mass_max = 0.65,
     const double missing_energy_min = 0.2, const double missing_energy_max = 0.5)

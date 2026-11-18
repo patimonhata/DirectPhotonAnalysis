@@ -2,9 +2,52 @@
 
 Development format: map schema 10, partial schema 13, common composition v1, pi0 topology v14, eta topology v4, direct hit matcher v5. Saved schema-8 productions retain their original definitions and results. A new production requires a new clean-source software snapshot. Map-affecting changes require regenerated maps; reduce-only corrections still follow production provenance checks. Section headings below retain the version in which a feature was introduced. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for current paths and execution; historical command blocks were removed.
 
+## BDT model and input order
+
+The development map uses `models/model_tmva_newsignaldefinition.root`, with SHA-256
+`4cf8a46e3f25d9d68e499f2a2bf395beb053d0dbc613070edf763c4d18f70e86`.
+`TMVA::Experimental::RBDT` loads key `myBDT`. `run_map.sh` passes the model from
+`PHOTON_SOURCE_ROOT/models/` explicitly; the direct map macro defaults to the same
+model. The previous PPG15 model remains available for retained software/results.
+The new file is byte-identical to the completed **nominal** acceptance model at
+`/sphenix/tg/tg01/coldqcd/jaein213/photon/bdt_v11_acceptance_20261102/models/nominal/model_tmva.root`.
+Its SHA-256 also matches that model's `COMPLETE.json` artifact record.
+The training/export source is
+`/gpfs/mnt/gpfs02/sphenix/user/jaein213/photon/BDT/PPG15PhotonAN/bdt_training/studies/v11_acceptance_20261102/`:
+`vendor/v11_photonlike_fullsample_20261011/common.py::FEATURES`, `export_wide.py`,
+`train.py`, and the output `resolved_config.yaml` confirm the 11 positions below.
+The export uses `SaveXGBoost(..., 'myBDT', ..., num_inputs=11)` without a feature scaler.
+The `model_sha256` metadata value is a fixed code value, not a runtime file hash.
+Keep the model file, configured path and recorded SHA-256 together when changing it.
+
+`PythiaPhotonCandidateTree.cc` passes these 11 inputs in this exact order:
+
+| Index | Training feature | Map input |
+|---|---|---|
+| 0 | `cluster_Et` | cluster ET |
+| 1 | `cluster_weta_cogx` | `shower_w_eta_cogx` |
+| 2 | `cluster_wphi_cogx` | `shower_w_phi_cogx` |
+| 3 | `vertexz` (reconstructed MBD z) | signal HepMC collision z (`b_vertex_z_`) |
+| 4 | `cluster_Eta` | cluster eta |
+| 5 | `e11_over_e33` | `shower_e11_over_e33` |
+| 6 | `cluster_et1` | `shower_et1` |
+| 7 | `cluster_et2` | `shower_et2` |
+| 8 | `cluster_et3` | `shower_et3` |
+| 9 | `cluster_et4` | `shower_et4` |
+| 10 | `e32_over_e35` | `shower_e32_over_e35` |
+
+The input positions agree with the training/export order. The vertex source differs:
+training uses reconstructed MBD z, while `fill_event_truth()` assigns the map's
+`b_vertex_z_` from `PHHepMCGenEvent::get_collision_vertex()`. The current map also
+uses this signal vertex for cluster kinematics. The model-only comparison retains
+these existing map definitions and the tight/non-tight formulas in Selection
+definitions below. A model switch changes
+stored scores and score-dependent flags, so regenerate maps from DST in a new
+production before reduce/merge. Replotting stored histograms cannot apply a new model.
+
 ## Boundary independent composition (map schema 9)
 
-This section supersedes the historical origin/population rules below. Reconstructed selections, scores, models, training labels and the actual reconstructed tag veto are unchanged.
+This section supersedes the historical origin/population rules below. The composition change itself did not alter reconstructed selections, scores, models, training labels or the reconstructed tag veto. The current model is specified separately above.
 
 `CommonDecayTruth` resolves an event-local graph across HepMC/G4 using `(event_uid, embedding, source, barcode/track ID)`. The shared physical particle uses its unambiguous matching HepMC identity when available. G4 daughter vertices must be recorded decays; generator decays have one incoming hadron. Beam particles, partons, hadronization and interactions never define parent sums. Photon bookkeeping copies are collapsed. Shower electrons/photons remain under the original independent photon; they are not extra primary photons.
 
@@ -154,7 +197,7 @@ for PDG 221. Generator candidates must have exactly two photon daughters in the
 HepMC decay vertex and exactly two corresponding G4-primary photons. Unique photon
 bookkeeping copies are followed. G4-primary eta candidates must have exactly two
 direct G4 photon daughters. Eta-to-pi0 cascades and all other eta decays are excluded.
-The pi0 candidate selection and algorithm version 11 are unchanged.
+When this extension was introduced in map schema 6, the pi0 candidate selection and algorithm version 11 were unchanged. Current algorithm versions are listed at the start of this document.
 
 Eta topology uses the existing `eta_partner_min_energy` and `eta_mass_min/max`
 settings, including for missing energy-band mass classification and truth-pair
@@ -189,19 +232,22 @@ All six existing selection directories gain these separate outputs:
 The additional spectra, fractions, uncertainties and source metadata are saved in
 `eta_anchor_topology.root` and `candidate_composition_eta_topology.root` (schema 1).
 Existing pi0 and composition file names, histogram categories and plot layouts are
-retained. No BDT model is retrained or changed. `ReplotEtaBdtScores.C` redraws only
+retained. That eta extension did not retrain or change the BDT; the current model
+is specified above. `ReplotEtaBdtScores.C` redraws only
 eta BDT PDFs from their stored ROOT histograms.
 
 Regenerate maps from DST, then reduce and merge. Old schema-5 maps and schema-6
-partials cannot supply the new eta records. Current submission and QA defaults use
-`topology_v11_eta_v1/` to preserve previous production directories. No jobs are
-submitted by this change. Use a new output base when invoking merge explicitly.
+partials cannot supply the new eta records. Current submit files default to
+`production_directory = UNCONFIGURED`; initialize a new production manifest and
+pass its configuration directory explicitly. The small-sample QA wrapper defaults
+to `output/photon_candidate_selection/qa/common_composition_v1/` with threshold,
+sample and segment-count subdirectories. No script automatically submits jobs.
 The pi0-only spectrum workflow and event display are outside this extension.
 
-A dedicated build can be prepared without replacing the shared installed library:
-
-Map production uses the installed headers/library. Install this build after jobs
-using the current shared library have finished. The tests include HepMC direct
+Map production selects the headers, libraries, model and source snapshot bound to
+the production manifest. Commit changes, build a development prefix, freeze a new
+software ID and initialize a new production; existing frozen software remains intact.
+See [software/build provenance](software.md). The tests include HepMC direct
 eta decay and photon-copy ancestry, rejection of extra daughters and pi0 cascades,
 eta mass-window boundaries, ROOT branch roundtrips, category/BDT closure, residual
 covariance, and a synthetic four-sample map-to-reduce-to-merge run that verifies both
@@ -438,8 +484,9 @@ must reproduce the existing Other raw count, weighted yield and Sumw2 before out
 Histogram axes/types and algorithm metadata are checked when partials are merged.
 
 The original Other-only production used `.../jet/partial_other_v1` and merge
-configuration suffix `_v12_eta_v2_other_v1`. Current submit files use the new
-map/partial directories described below. The synthetic tests cover both
+configuration suffix `_v12_eta_v2_other_v1`. Current submit files derive map and
+partial directories from the explicitly selected `production_directory`.
+The synthetic tests cover both
 particle signs, hadron versus parton/diquark photon parents, exact-half boundaries,
 non-signal/invalid truth, photon contamination, negative-weight closure and ROOT
 roundtrips, plus map-to-reduce-to-merge output and unchanged pi0/eta populations.

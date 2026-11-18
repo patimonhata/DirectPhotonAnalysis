@@ -8,7 +8,7 @@ Main map → reduce → merge workflow. The development implementation writes ma
 output/photon_candidate_selection/
   current/jet/  -> validated current results
   productions/
-    topology_v12_eta_v2_decay_v1/ClusterE0p12_Pi0Partner0p5/
+    <production>/<configuration>/
       maps/<sample>/map_<chunk>.root
       partials/jet/<sample>/shard_<index>/photon_candidate_selection.root
       results/jet/
@@ -39,6 +39,10 @@ See [external map storage](../../docs/software.md#map-だけを-tg-に保存す�
 ## Map
 
 Review the production/configuration and choose new map outputs when rerunning a production. Existing map files are not overwritten. No repository script automatically submits jobs.
+
+The default model is `models/model_tmva_newsignaldefinition.root`, loaded as `myBDT` by `TMVA::Experimental::RBDT`. `run_map.sh` passes the model path explicitly from `PHOTON_SOURCE_ROOT`; the macro default uses the same model. The existing tight/non-tight thresholds are retained intentionally. See [model and input order](../../docs/photon_candidate_definitions.md#bdt-model-and-input-order). Model changes require new DST maps; reduce, merge and replot do not recompute scores or selection flags.
+
+Submit files default to `production_directory = UNCONFIGURED`. Initialize a new production manifest, then pass its configuration directory to every map/reduce submission. The submit file sets `PHOTON_PRODUCTION_MANIFEST`; runtime dispatch selects the bound frozen scripts and libraries. `software.py production` creates the manifest without exporting shell variables, and normal production submissions do not need a separate `PHOTON_SOFTWARE_ROOT`.
 
 ```bash
 mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection
@@ -71,19 +75,19 @@ run_reduce.sh FAMILY MAP_ROOT OUTPUT_BASE REQUIRE_COMPLETE N_BINS ET_MAX SAMPLE 
 run_merge.sh FAMILY PARTIAL_ROOT OUTPUT_DIRECTORY
 ```
 
-After all 16 partials complete, use a new final output directory:
+After all 16 Jet partials complete, select the same production manifest and write results within its configuration directory:
 
 ```bash
-bash PhotonAnalysisTree/workflows/photon_candidate_selection/run_merge.sh jet \
-  PhotonAnalysisTree/output/photon_candidate_selection/productions/common_composition_v1/NEW_CONFIGURATION/partials/jet \
-  /tmp/photon_candidate_merge_replay
+python3 PhotonAnalysisTree/tools/software.py run \
+  --production-manifest /absolute/path/to/new_configuration/manifest.json \
+  merge jet /absolute/path/to/new_configuration/partials/jet /absolute/path/to/new_configuration/results/jet
 ```
 
 Merged outputs include all-origin common composition, transition CSVs and matching/ancestry quality, candidate composition, pi0/eta anchor topology, eta cascade composition, Other-origin and supplemental decay-origin histograms, spectra/fractions/survival PDFs, ET-binned BDT distributions and summaries. ROOT histogram metadata records source map/partial versions, cuts, weights and uncertainty conventions. Statistical errors use the documented candidate/pair-level Sumw2 and subset covariance; event-level correlations are not estimated.
 
 ## Retained v11/schema-5 results
 
-Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the schema-9 reducer. See [reference replay](../../docs/reproduction.md).
+Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the current schema-10 map reducer. See [reference replay](../../docs/reproduction.md).
 
 `ReplotPi0BdtScores.C` / `ReplotEtaBdtScores.C` redraw stored BDT ROOT distributions where present. [`CheckEtaDecayFlight.C`](../diagnostics/eta_decay_flight/README.md) is an independent DST diagnostic and does not change composition/topology selections; arguments and interpretation are in the definition notes.
 
@@ -99,4 +103,4 @@ Production tree/map validators and small-sample QA live under [validation](../..
 bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
 ```
 
-The checks cover shared topology/eta/decay-origin behavior, branch roundtrips, metadata, closure, category covariance, veto survival and a synthetic schema-9 map → reduce → merge pipeline. Logs use one fixed `output/condor/photon_candidate_selection/<stage>_<ProcId>.out/.err` per job position and are reused across productions. HTCondor event logs use fixed `/tmp/` paths.
+The checks cover shared topology/eta/decay-origin behavior, branch roundtrips, metadata, closure, category covariance, veto survival and a synthetic schema-10 map → reduce → merge pipeline. Logs use one fixed `output/condor/photon_candidate_selection/<stage>_<ProcId>.out/.err` per job position and are reused across productions. HTCondor event logs use fixed `/tmp/` paths.

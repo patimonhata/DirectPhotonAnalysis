@@ -40,6 +40,17 @@ bash PhotonAnalysisTree/src/build.sh --build-dir /tmp/photon-build --install-pre
 ```
 
 環境・ソース・install 先が異なる CMake cache は再利用しません。release を変える場合は別の build ディレクトリを使います。
+`Build cache belongs to another release` は、キャッシュの `PHOTON_CONFIGURED_PREFIX` と setup が返す `OFFLINE_MAIN` の文字列が異なると、コンパイル前に発生します。
+同じ `ana.565` でも CVMFS のリンク先変更により表記が変わると、実体が同じパスでも停止します。Git の clean 状態とは別の判定です。
+既存キャッシュを保持する場合は、repository root から新しい build ディレクトリを指定します。
+
+```bash
+bash PhotonAnalysisTree/src/build.sh --release ana.565 --build-dir "$PWD/PhotonAnalysisTree/build/newsignal_v1/ana.565"
+```
+
+この例は新しい build 内に `pi0reconstruction/` と `photon/` を作り、既定の `install/dev/ana.565/` を更新します。
+開発 install も保持する場合は別の `--install-prefix` を指定し、freeze 時にも同じ値を渡します。新しい build ディレクトリを使っても既存の frozen software は更新しません。
+ビルドはキャッシュ検査より前に install 先の `build-manifest.json` を無効化します。失敗後にファイルが残っていても、完成済みのビルドとして freeze することはできません。
 旧 `build/current`、`candidate`、`eta_topology`、`topology_v11` は当時の作業領域です。名前だけでソース版が固定されているとは扱いません。
 `build/layout_migration` と `recovery_v11_schema5` は過去の検証・復元記録なので、通常ビルドの整理対象と区別します。今回これらは移動・削除していません。
 
@@ -65,6 +76,9 @@ software/<software-id>/
 ```
 
 input list はデータとして扱い、ソフトウェア snapshot には複製しません。map 実行時に入力 manifest を明示します。
+ソース snapshot は `git archive HEAD` から作ります。map が読むモデルは `source/PhotonAnalysisTree/models/` に必要なので、モデル本体も Git に収録してください。
+`.gitignore` の `*.root` に対して、production 用モデルには個別の例外を追加します。CMake の `install(FILES ...)` に追加するだけではソース snapshot に含まれません。
+現在の map モデル・SHA-256・11入力の順序は [candidate definitions](photon_candidate_definitions.md#bdt-model-and-input-order) を参照してください。
 同じ software ID は上書きしません。実行前に保存ファイルを hash 検証し、改変や欠落・未記録ファイルがあれば停止します。
 異なる解析条件の production が同じ software ID を共有することはできます。
 
@@ -97,6 +111,10 @@ condor_submit -append "production_directory = /absolute/path/to/new_configuratio
 ```
 
 同じ設定を reduce の submit にも渡します。各 submit の物理 cut は引き続き確認してください。Jet と PhotonJet は別 configuration に分けます。
+各 submit は `production_manifest = $(production_directory)/manifest.json` を `PHOTON_PRODUCTION_MANIFEST` に渡します。
+`software.py production` は manifest を作成するだけで、呼び出し元のシェル環境変数を設定しません。
+実行時は `runtime.sh` の `photon_dispatch` が manifest に結び付いた固定ソースへ切り替え、`photon_setup_runtime` が `PHOTON_SOURCE_ROOT` などを設定します。
+通常の production submit に `PHOTON_SOFTWARE_ROOT` の別指定は不要です。この変数は固定 software を直接選択する場合に使い、manifest の結び付けと異なる値は拒否されます。
 
 ローカルでは、既存の引数をそのまま渡せます。
 
@@ -182,4 +200,4 @@ python3 PhotonAnalysisTree/tests/test_software.py
 
 ## Common composition の開発版
 
-map schema 9 / partial schema 11 / common composition 1 / pi0 topology 13 / eta topology 3 は新しい DST map が必要です。旧 schema 8 map や partial の再ラベル、reduce のみの移行はできません。固定 software・production manifest の作成は上記の clean-source 手順に従い、保存済み production と異なる出力先を指定してください。新しいコードを検証する開発 build に既存 cache を流用できない場合は、`--build-dir` と `--install-prefix` に独立した検証先を指定します。
+現在の開発版は map schema 10 / partial schema 13 / common composition 1 / pi0 topology 14 / eta topology 4 です。旧 schema 8・9 map や異なる partial の再ラベル、reduce のみの移行はできません。新しい DST map が必要です。固定 software・production manifest の作成は上記の clean-source 手順に従い、保存済み production と異なる出力先を指定してください。新しいコードを検証する開発 build に既存 cache を流用できない場合は、`--build-dir` と `--install-prefix` に独立した検証先を指定します。

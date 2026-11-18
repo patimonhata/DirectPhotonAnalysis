@@ -7,6 +7,7 @@
 *.pcm
 *.root
 !PhotonAnalysisTree/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root
+!PhotonAnalysisTree/models/model_tmva_newsignaldefinition.root
 *.swp
 compile_commands.json
 */src/autom4te.cache/

@@ -1,16 +1,10 @@
 # ビルドと production の対応
 
-通常の開発用ビルドと、正式 production が使う固定ソフトウェアを分けます。既存の `install/` 直下と旧 build は保管し、新しいビルドの既定先として使いません。
+通常の開発用ビルドは `build/dev/` と `install/dev/`、正式 production 用の固定ソフトウェアは `software/` に置きます。
 
 ## 開発用ビルド
 
-repository root から実行します。
-
-```bash
-bash PhotonAnalysisTree/src/build.sh
-```
-
-既定 release は `ana.565` です。rolling alias の `ana` は受け付けません。Pi0Reconstruction と PhotonAnalysisTree の両方を同じ release でビルドし、次に配置します。
+repository root から実行します。引数なしで `bash PhotonAnalysisTree/src/build.sh` を実行したときの既定 release は `ana.565` です。rolling alias の `ana` は受け付けません。Pi0Reconstruction と PhotonAnalysisTree の両方を同じ release でビルドし、既定では次に配置します。
 
 ```text
 PhotonAnalysisTree/
@@ -31,36 +25,48 @@ Pi0Reconstruction の新しい CMake 手順は、この管理ビルドで使用�
 `build-manifest.json` は Git commit・dirty 状態・source hash・実際の OFFLINE_MAIN・ROOT/compiler version・ビルド設定・配置後の artifact SHA-256・解決したライブラリ依存を記録します。
 開発中の dirty source はビルドできます。正式 software の発行には使えません。
 
-固定 release と出力先は明示的に変更できます。
+ローカルで使う版のビルドでは、固定 release と出力先の組を明示できます。
 
 ```bash
-bash PhotonAnalysisTree/src/build.sh --release ana.565 --jobs 4
-# 別の検証先（共通 install/ や software/<id>/ は指定しない）
-bash PhotonAnalysisTree/src/build.sh --build-dir /tmp/photon-build --install-prefix /tmp/photon-install
+version=ana.565-ppg15v1
+bash PhotonAnalysisTree/src/build.sh --release ana.565 \
+  --build-dir "$PWD/PhotonAnalysisTree/build/dev/$version" \
+  --install-prefix "$PWD/PhotonAnalysisTree/install/dev/$version"
 ```
 
 環境・ソース・install 先が異なる CMake cache は再利用しません。release を変える場合は別の build ディレクトリを使います。
 `Build cache belongs to another release` は、キャッシュの `PHOTON_CONFIGURED_PREFIX` と setup が返す `OFFLINE_MAIN` の文字列が異なると、コンパイル前に発生します。
 同じ `ana.565` でも CVMFS のリンク先変更により表記が変わると、実体が同じパスでも停止します。Git の clean 状態とは別の判定です。
-既存キャッシュを保持する場合は、repository root から新しい build ディレクトリを指定します。
+既存キャッシュを保持する場合は、新しい build ディレクトリを指定します。`--build-dir` だけを指定した場合、install 先は既定の `install/dev/ana.565/` です。既存の開発 install も保持する場合は、別の `--install-prefix` を指定します。freeze 時にも同じ install prefix を渡します。
+ビルドはキャッシュ検査より前に install 先の `build-manifest.json` を無効化します。失敗後にファイルが残っていても、完成済みのビルドとして freeze することはできません。
+
+`build/topology_v11` は当時の build、`build/layout_migration` と `build/recovery_v11_schema5` は検証・復元の記録です。これらは過去参照用に保持します。
+
+### 開発 install の選択
+
+日常の ROOT 実行では、検証済み install を `install/current` で手動選択できます。上の例を選ぶリンクを初めて作る場合は、次のようにします。
 
 ```bash
-bash PhotonAnalysisTree/src/build.sh --release ana.565 --build-dir "$PWD/PhotonAnalysisTree/build/newsignal_v1/ana.565"
+ln -sT "dev/$version" PhotonAnalysisTree/install/current
 ```
 
-この例は新しい build 内に `pi0reconstruction/` と `photon/` を作り、既定の `install/dev/ana.565/` を更新します。
-開発 install も保持する場合は別の `--install-prefix` を指定し、freeze 時にも同じ値を渡します。新しい build ディレクトリを使っても既存の frozen software は更新しません。
-ビルドはキャッシュ検査より前に install 先の `build-manifest.json` を無効化します。失敗後にファイルが残っていても、完成済みのビルドとして freeze することはできません。
-旧 `build/current`、`candidate`、`eta_topology`、`topology_v11` は当時の作業領域です。名前だけでソース版が固定されているとは扱いません。
-`build/layout_migration` と `recovery_v11_schema5` は過去の検証・復元記録なので、通常ビルドの整理対象と区別します。今回これらは移動・削除していません。
+このリンクを workflow の管理ラッパーでも使う場合は、`PHOTON_INSTALL_PREFIX` に明示します。未指定時の既定は `install/dev/<release>/` です。
+
+```bash
+export PHOTON_INSTALL_PREFIX="$PWD/PhotonAnalysisTree/install/current"
+python3 PhotonAnalysisTree/tools/software.py resolve
+```
 
 ## 正式 software の作成
 
 実行コードをコミットして作業ツリーを clean にした後、ビルドし直します。clean な現在のソースとビルド記録が一致した場合にだけ freeze できます。
 
 ```bash
-bash PhotonAnalysisTree/src/build.sh
-python3 PhotonAnalysisTree/tools/software.py freeze candidate_v1_ana565
+version=ana.565-candidate-v1
+prefix="$PWD/PhotonAnalysisTree/install/dev/$version"
+bash PhotonAnalysisTree/src/build.sh --release ana.565 \
+  --build-dir "$PWD/PhotonAnalysisTree/build/dev/$version" --install-prefix "$prefix"
+python3 PhotonAnalysisTree/tools/software.py freeze candidate_v1_ana565 --install-prefix "$prefix"
 python3 PhotonAnalysisTree/tools/software.py verify PhotonAnalysisTree/software/candidate_v1_ana565
 ```
 
@@ -183,13 +189,15 @@ map の一時名は正式出力名と分けて扱い、出力名の公開時に 
 
 ```bash
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh
+PHOTON_INSTALL_PREFIX="$PWD/PhotonAnalysisTree/install/current" \
+  bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh \
+  "$PWD/PhotonAnalysisTree/build/dev/ana.565-ppg15v1/photon"
 python3 PhotonAnalysisTree/tests/test_software.py
 ```
 
 後者は rolling release の拒否、artifact 改変・欠落、clean-source gate、既存結果の保護、production のソフトウェア切替拒否、stage 間の入力混在を検証します。
 
-## 今回の移行で確認した範囲
+## ビルド管理を導入したときの検証
 
 - ana.565 で両ローカル library を新規ビルドし、既存 candidate / tagging mass テストと provenance の回帰テストを確認した。
 - 実 DST 1 segment・2イベントの map → validator → reduce が成功し、従来の install による結果と histogram 2,202個と tree 内容が一致した。出力先とランダムな一時ファイル名だけを正規化した。

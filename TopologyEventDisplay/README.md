@@ -23,24 +23,46 @@ checks live under `validation/`; they are not analysis entry points.
 
 ## Build
 
-From the project root, in an sPHENIX analysis environment:
+From the project root, select a compatible PhotonAnalysisTree install and a
+versioned build and install destination for the display. All three paths are
+required.
+
+```sh
+display="$PWD/TopologyEventDisplay"
+version=ana.565-ppg15v1
+photon_prefix="$PWD/PhotonAnalysisTree/install/current"
+
+TOPOLOGY_BUILD_DIR="$display/build/$version" \
+  TOPOLOGY_INSTALL_PREFIX="$display/install/$version" \
+  PHOTON_ANALYSIS_TREE_PREFIX="$photon_prefix" \
+  bash "$display/src/build.sh"
+```
+
+CMake resolves the PhotonAnalysisTree prefix to its real path and records that
+path in the display library's RPATH. Build the display against the selected
+PhotonAnalysisTree version before switching to a new pair.
+
+After verifying the display install, select it through `install/current`. To
+create this link for the first time:
+
+```sh
+ln -sT "$version" "$display/install/current"
+```
+
+Set up the selected pair in a single call to `setup_local.sh` so ROOT can find
+the headers for both modules and their Pi0Reconstruction dependency.
 
 ```sh
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
-PhotonAnalysisTree/src/build.sh
-TopologyEventDisplay/src/build.sh
-
-photon_prefix="$PWD/PhotonAnalysisTree/install/dev/ana.565"
-display_prefix="$PWD/TopologyEventDisplay/install"
-export ROOT_INCLUDE_PATH="$display_prefix/include:$photon_prefix/include:${ROOT_INCLUDE_PATH:-}"
-export LD_LIBRARY_PATH="$display_prefix/lib64:$photon_prefix/lib64:$photon_prefix/dependencies/Pi0Reconstruction/lib:${LD_LIBRARY_PATH:-}"
+source /opt/sphenix/core/bin/setup_local.sh \
+  "$display/install/current" \
+  "$photon_prefix" \
+  "$photon_prefix/dependencies/Pi0Reconstruction"
 ```
 
-The two dump macros resolve their libraries using this environment. To build
-against a different compatible PhotonAnalysisTree install, set
-`PHOTON_ANALYSIS_TREE_PREFIX` when building the display and use the same prefix
-in the exports above. The ROOT-only viewing macros can also open older dumps
-with the `pi0_candidates` tree.
+The two dump macros resolve their libraries using this environment. The
+ROOT-only viewing macros can also open older dumps with the `pi0_candidates`
+tree.
 
 ## Pythia workflow
 

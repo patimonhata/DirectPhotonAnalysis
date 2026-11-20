@@ -2,10 +2,9 @@
 set -eo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-project_dir=$(cd "$module_dir/.." && pwd)
-build_dir="${TOPOLOGY_BUILD_DIR:-$project_dir/build/current}"
-install_prefix="${TOPOLOGY_INSTALL_PREFIX:-$project_dir/install}"
-photon_prefix="${PHOTON_ANALYSIS_TREE_PREFIX:-$project_dir/../PhotonAnalysisTree/install/dev/ana.565}"
+build_dir="${TOPOLOGY_BUILD_DIR:?set the Display build directory}"
+install_prefix="${TOPOLOGY_INSTALL_PREFIX:?set the Display install directory}"
+photon_prefix="${PHOTON_ANALYSIS_TREE_PREFIX:?set the PhotonAnalysisTree install prefix}"
 source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
 
 cmake -S "$module_dir" -B "$build_dir" \

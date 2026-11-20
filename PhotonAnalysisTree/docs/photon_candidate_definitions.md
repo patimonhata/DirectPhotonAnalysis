@@ -4,15 +4,17 @@ Development format: map schema 10, partial schema 13, common composition v1, pi0
 
 ## BDT model and input order
 
-The development map uses `models/model_tmva_newsignaldefinition.root`, with SHA-256
-`4cf8a46e3f25d9d68e499f2a2bf395beb053d0dbc613070edf763c4d18f70e86`.
+The development map uses `models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root`, with SHA-256
+`5494946f40213a1035dc9e883bc71ddfdcebf86015d279300c8f44774e846248`.
 `TMVA::Experimental::RBDT` loads key `myBDT`. `run_map.sh` passes the model from
 `PHOTON_SOURCE_ROOT/models/` explicitly; the direct map macro defaults to the same
-model. The previous PPG15 model remains available for retained software/results.
-The new file is byte-identical to the completed **nominal** acceptance model at
+model.
+
+For the retained `newsignal_v1` production, `models/model_tmva_newsignaldefinition.root` has SHA-256
+`4cf8a46e3f25d9d68e499f2a2bf395beb053d0dbc613070edf763c4d18f70e86` and is byte-identical to the completed **nominal** acceptance model at
 `/sphenix/tg/tg01/coldqcd/jaein213/photon/bdt_v11_acceptance_20261102/models/nominal/model_tmva.root`.
 Its SHA-256 also matches that model's `COMPLETE.json` artifact record.
-The training/export source is
+The training/export source for that model is
 `/gpfs/mnt/gpfs02/sphenix/user/jaein213/photon/BDT/PPG15PhotonAN/bdt_training/studies/v11_acceptance_20261102/`:
 `vendor/v11_photonlike_fullsample_20261011/common.py::FEATURES`, `export_wide.py`,
 `train.py`, and the output `resolved_config.yaml` confirm the 11 positions below.
@@ -36,8 +38,8 @@ Keep the model file, configured path and recorded SHA-256 together when changing
 | 9 | `cluster_et4` | `shower_et4` |
 | 10 | `e32_over_e35` | `shower_e32_over_e35` |
 
-The input positions agree with the training/export order. The vertex source differs:
-training uses reconstructed MBD z, while `fill_event_truth()` assigns the map's
+The input positions agree with the `newsignal_v1` training/export order. That training uses
+reconstructed MBD z, while `fill_event_truth()` assigns the map's
 `b_vertex_z_` from `PHHepMCGenEvent::get_collision_vertex()`. The current map also
 uses this signal vertex for cluster kinematics. The model-only comparison retains
 these existing map definitions and the tight/non-tight formulas in Selection

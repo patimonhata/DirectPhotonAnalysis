@@ -6,14 +6,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(NOT PHOTON_ANALYSIS_TREE_PREFIX)
+  message(FATAL_ERROR "Set -DPHOTON_ANALYSIS_TREE_PREFIX to the PhotonAnalysisTree install directory")
+endif()
+get_filename_component(PHOTON_ANALYSIS_TREE_PREFIX "${PHOTON_ANALYSIS_TREE_PREFIX}" REALPATH)
+
 if(NOT DEFINED ENV{OFFLINE_MAIN})
   message(FATAL_ERROR "OFFLINE_MAIN is not set; source the sPHENIX environment first")
 endif()
 set(SPHENIX_PREFIX "$ENV{OFFLINE_MAIN}")
 find_package(ROOT REQUIRED COMPONENTS Core RIO Tree)
 
-set(PHOTON_ANALYSIS_TREE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/../../PhotonAnalysisTree/install/dev/ana.565"
-    CACHE PATH "PhotonAnalysisTree install to use for this build")
 unset(PHOTON_ANALYSIS_TREE_INCLUDE_DIR CACHE)
 unset(PHOTON_ANALYSIS_TREE_LIBRARY CACHE)
 find_path(PHOTON_ANALYSIS_TREE_INCLUDE_DIR PhotonCandidateTopology.h

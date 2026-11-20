@@ -8,11 +8,10 @@ input/<sample>/segments.list + 同期した Pythia DST
   → workflows/photon_candidate_selection/run_map.sh
   → run_reduce.sh
   → run_merge.sh
-  → output/photon_candidate_selection/current/jet/ （検証済み結果の入口）
+  → output/photon_candidate_selection/productions/<production>/<configuration>/results/jet/
 ```
 
-再実行では新しい production/configuration と出力先を指定します。`current/jet/` は保存された検証済み結果への参照で、
-任意の実行結果を自動的に昇格させる場所ではありません。
+再実行では新しい production/configuration と出力先を指定します。保存結果は各 production の `results/` を参照してください。
 
 | 目的 | 配置・説明 |
 |---|---|
@@ -64,15 +63,9 @@ invalid値または空vectorとして保存します。
 
 ## Build
 
-開発用の既定環境は `ana.565` です。Pi0Reconstruction も同じ環境でビルドし、`install/dev/ana.565/` に同梱します。
-
-```bash
-cd /sphenix/user/ryotaro/DirectPhotonAnalysis
-bash PhotonAnalysisTree/src/build.sh
-```
-
-ビルドの設計、正式 software の freeze、production との対応は [software](docs/software.md) を参照してください。
-旧 `build/current`・`candidate` と共通 `install/` は保管済みの作業領域で、新しい実行の既定先には使いません。
+ビルドスクリプトの既定 release は `ana.565` です。Pi0Reconstruction も同じ release でビルドし、Photon の install 先に同梱します。
+ローカルで選択している版は `install/current` が指します。開発版をビルドし直す場合は、対応する build ディレクトリと install prefix を指定できます。
+ビルドと切り替えの手順、正式 software の freeze、production との対応は [software](docs/software.md) を参照してください。
 
 buildは次を作ります。
 

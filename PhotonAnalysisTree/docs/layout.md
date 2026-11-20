@@ -26,9 +26,8 @@ tests/                                    # 自動テスト（synthetic 入力�
 
 ## ビルドと実行ソフトウェア
 
-開発用は `build/dev/<release>/` と `install/dev/<release>/`、正式実行用は `software/<software-id>/` に分けます。
-ビルド記録・固定 source・依存 library・production manifest の設計は [software](software.md) を参照してください。
-旧 build・共通 install・保存成果物は保持しています。
+開発用は `build/dev/<version>/` と `install/dev/<version>/`、正式実行用は `software/<software-id>/` に置きます。既定の開発版名は release 名です。
+ローカルでは `install/current` が検証済みの開発 install を指します。ビルド記録と production manifest の設計は [software](software.md) を参照してください。
 
 ## 成果物の配置
 
@@ -39,11 +38,11 @@ tests/                                    # 自動テスト（synthetic 入力�
 output/<workflow>/
   productions/<production>/<configuration>/
     manifest.json
-    maps/       # tree 生成では個別 tree、candidate 解析では外部 map へのリンク
+    maps/       # 個別 tree、または外部 map へのリンク
     partials/   # 必要な workflow のみ
     results/    # 最終 ROOT・PDF・CSV。tree 生成では merged dataset
   qa/
-output/condor/<workflow>/  # configuration/production に依存しない固定ログ
+output/condor/<workflow>/  # submit の stdout/stderr の既定先
 ```
 
 旧 `macro` と共通の `output/plots`・`root`・`merged`・`intermediate_files`・`qa` は前回の成果物整理で廃止済みです。
@@ -53,10 +52,11 @@ output/condor/<workflow>/  # configuration/production に依存しない固定�
 
 ## 主解析と過去参照
 
-- 正式結果の入口: `output/photon_candidate_selection/current/jet/`。この新しい入口は `productions/topology_v12_eta_v2_decay_v1/ClusterE0p12_Pi0Partner0p5/results/jet/` を指す。
-- 過去参照: `output/photon_candidate_selection/productions/topology_v11/` の4 configuration。map schema 5、eta topology 拡張前。eta tagging 自体は存在する。
-- 各 configuration の `maps` は cold-storage の実体へのリンク。実体の移動・削除は行っていない。
-- 保存 ROOT 内の入力パス・metadata は当時の記録として維持する。移動対応は `output/layout_manifest.json` に記録する。
+- 正式結果は `output/photon_candidate_selection/productions/<production>/<configuration>/results/` を参照する。ローカルに残る production は `common_composition_anchor_v14_eta_parent_v1_ana565`、`newsignal_v1`、`topology_v11`。
+- `topology_v11` は4 configuration の過去参照。map schema 5 で、eta topology 拡張前の eta tagging を含む。
+- `topology_v11` と `common_composition_anchor_v14_eta_parent_v1_ana565` の `maps/` は tg を指す。`newsignal_v1` の map は production 配下にある。
+- `common_composition_anchor_v14_eta_parent_v1_ana565` は既存の map を tg に移し、当時の manifest を保持している。移動先は manifest の `output_roots.map` に登録されていないため、その manifest を指定した通常の reduce では入力検証が止まる。
+- 保存 ROOT 内の入力パス・metadata は当時の記録として維持する。前回の成果物移行の対応表は `output/layout_manifest.json` にある。
 - 新しい設定で実行するときは、新しい configuration/output を明示する。過去結果を上書きしない。
 
 ## Workflow の扱い
@@ -82,7 +82,7 @@ output/condor/<workflow>/  # configuration/production に依存しない固定�
 
 ## ログ
 
-submit ごとに同じ `output/condor/<workflow>/<stage>_<ProcId>.out/.err` を使い、別 production/configuration でも上書きする。HTCondor のイベントログはサイト規則に従って固定の `/tmp/ryotaro-PhotonAnalysisTree-<workflow>-<stage>_<ProcId>.log` を使う。
+stdout/stderr の既定先は `output/condor/<workflow>/<stage>_<ProcId>.out/.err`。主解析の submit は `log_directory` で production ごとの保存先も指定できる。HTCondor のイベントログはサイト規則に従って固定の `/tmp/ryotaro-PhotonAnalysisTree-<workflow>-<stage>_<ProcId>.log` を使う。
 
 ## コード配置変更の検証
 
@@ -96,11 +96,7 @@ Reduce / Merge の計算本体は変更前と文字列単位で一致する。
 - 過去 study の12 configuration で入力・再現レシピの存在を確認し、全28 submit file の dry-run を確認した。ジョブは投入していない。
 - include、Markdown link、shell の参照、Condor の実行先を確認した。既存の submit / recipe の成果物パスは維持した。
 
-テストの再実行（ana.565 を設定し、ライブラリを build 後）:
-
-```bash
-bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
-```
+開発版のテストの再実行は [software の検証手順](software.md#検証) を参照してください。
 
 ## 前回の成果物移行時の検証
 

@@ -17,7 +17,7 @@ bash PhotonAnalysisTree/workflows/studies/pair_matching_efficiency/run.sh defaul
 
 ## Photon candidate の v11/schema 5
 
-現行 reducer は schema 8 用なので、過去版の再実行には、partner 0.15 GeV の partial schema 5 用に `5c1a09ba54b091e2f3f4419d8106e4027cc9160f`、partner 0.5 GeV の partial schema 6 用に `f9813670f083bbcf6e3d8116a7d87aae1f868601` を使う。wrapper が必要な ROOT マクロと描画スタイルだけを build 内に展開する。現行のソースや install は変更しない。
+現行 reducer は map schema 10 を入力に取り、partial schema 13 を出力する。v11 の再実行には、partner 0.15 GeV の partial schema 5 用に `5c1a09ba54b091e2f3f4419d8106e4027cc9160f`、partner 0.5 GeV の partial schema 6 用に `f9813670f083bbcf6e3d8116a7d87aae1f868601` を使う。wrapper が必要な ROOT マクロと描画スタイルだけを build 内に展開する。現行のソースや install は変更しない。
 
 ```bash
 bash PhotonAnalysisTree/workflows/photon_candidate_selection/run_reference.sh merge ClusterE0p12_Pi0Partner0p5 /tmp/v11_reference_replay

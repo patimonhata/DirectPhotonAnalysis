@@ -6,7 +6,6 @@ Main map → reduce → merge workflow. The development implementation writes ma
 
 ```text
 output/photon_candidate_selection/
-  current/jet/  -> validated current results
   productions/
     <production>/<configuration>/
       maps/<sample>/map_<chunk>.root
@@ -16,19 +15,15 @@ output/photon_candidate_selection/
   qa/
 ```
 
-The existing map directories link to cold storage. Do not remove the underlying map inputs when reorganizing diagnostics. Saved ROOT metadata retains its original paths; `output/layout_manifest.json` records where files moved. See [layout](../../docs/layout.md).
+Some retained map directories link to cold storage. Do not remove the underlying map inputs when reorganizing diagnostics. Saved ROOT metadata retains its original paths; `output/layout_manifest.json` records where files moved. See [layout](../../docs/layout.md).
 
 Each map reads synchronized `DST_CALO_CLUSTER`, `DST_MBD_EPD`, `DST_TRUTH_JET`, and `G4Hits` basenames from `input/<sample>/segments.list`. Fun4All resolves the logical filenames through the file catalog. Jet submit defaults use 50 segments per map, 200 maps per ordinary sample and 2,000 for Jet12. Exact selection settings are in each submit file and map metadata. Jet defaults are cluster E>0.12 GeV, pi0/eta partner E>0.5 GeV, pi0 0.10<m<0.20 GeV, eta 0.45<m<0.65 GeV, missing band 0.12<E<=0.5 GeV, and recovery disabled. PhotonJet defaults are a separate configuration; do not mix them with Jet outputs.
 
 ## Build
 
-```bash
-bash PhotonAnalysisTree/src/build.sh
-```
-
-This builds the local dependency and module in fixed `ana.565`, under `build/dev/ana.565/` and `install/dev/ana.565/`.
+See [software/build provenance](../../docs/software.md) for the managed build,
+versioned build and install paths, and selection through `install/current`.
 For formal productions, commit the execution code, rebuild clean source, freeze a software ID, and initialize a new production manifest.
-See [software/build provenance](../../docs/software.md) for the complete procedure. Existing outputs and legacy installs are retained.
 
 For maps on tg with manifests, partials, results and logs on `/sphenix/user`, initialize a new production with `software.py production ... --map-root /absolute/tg/path`.
 The storage directory must be new or empty; the command records its canonical path and creates `configuration/maps` as a symlink.
@@ -40,7 +35,7 @@ See [external map storage](../../docs/software.md#map-だけを-tg-に保存す�
 
 Review the production/configuration and choose new map outputs when rerunning a production. Existing map files are not overwritten. No repository script automatically submits jobs.
 
-The default model is `models/model_tmva_newsignaldefinition.root`, loaded as `myBDT` by `TMVA::Experimental::RBDT`. `run_map.sh` passes the model path explicitly from `PHOTON_SOURCE_ROOT`; the macro default uses the same model. The existing tight/non-tight thresholds are retained intentionally. See [model and input order](../../docs/photon_candidate_definitions.md#bdt-model-and-input-order). Model changes require new DST maps; reduce, merge and replot do not recompute scores or selection flags.
+The default model is `models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root`, loaded as `myBDT` by `TMVA::Experimental::RBDT`. `run_map.sh` passes the model path explicitly from `PHOTON_SOURCE_ROOT`; the macro default uses the same model. The existing tight/non-tight thresholds are retained intentionally. See [model and input order](../../docs/photon_candidate_definitions.md#bdt-model-and-input-order). Model changes require new DST maps; reduce, merge and replot do not recompute scores or selection flags.
 
 Submit files default to `production_directory = UNCONFIGURED`. Initialize a new production manifest, then pass its configuration directory to every map/reduce submission. The submit file sets `PHOTON_PRODUCTION_MANIFEST`; runtime dispatch selects the bound frozen scripts and libraries. `software.py production` creates the manifest without exporting shell variables, and normal production submissions do not need a separate `PHOTON_SOFTWARE_ROOT`.
 
@@ -55,7 +50,7 @@ Other samples have matching submit files. The explicit local interface is:
 run_map.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST SAMPLE OUTPUT_DIRECTORY [N_EVENTS] [MIN_CLUSTER_ENERGY] [PI0_PARTNER_MIN_ENERGY] [ETA_PARTNER_MIN_ENERGY] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]
 ```
 
-[`check_sample_map_outputs.sh`](../../validation/photon_candidate_selection/check_sample_map_outputs.sh) checks expected file coverage and optionally performs deep ROOT validation; pass the output directory and exact cuts for a non-default production. [`run_small_sample.sh`](../../validation/photon_candidate_selection/run_small_sample.sh) runs limited-input end-to-end QA under `output/photon_candidate_selection/qa/`; this is not a physics normalization. Jet12 QA needs at least ten maps so every fixed shard is nonempty.
+[`check_sample_map_outputs.sh`](../../validation/photon_candidate_selection/check_sample_map_outputs.sh) checks expected file coverage and optionally performs deep ROOT validation; pass the output directory and exact cuts for a non-default production. [`run_small_sample.sh`](../../validation/photon_candidate_selection/run_small_sample.sh) runs map and reduce on a small input sample under `output/photon_candidate_selection/qa/`; this is not a physics normalization. Jet12 QA needs at least ten maps so every fixed shard is nonempty.
 
 ## Reduce and merge
 
@@ -99,8 +94,6 @@ Production tree/map validators and small-sample QA live under [validation](../..
 
 ## Checks
 
-```bash
-bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
-```
+See [the software test commands](../../docs/software.md#検証) for the build and install paths to pass.
 
-The checks cover shared topology/eta/decay-origin behavior, branch roundtrips, metadata, closure, category covariance, veto survival and a synthetic schema-10 map → reduce → merge pipeline. Logs use one fixed `output/condor/photon_candidate_selection/<stage>_<ProcId>.out/.err` per job position and are reused across productions. HTCondor event logs use fixed `/tmp/` paths.
+The checks cover shared topology/eta/decay-origin behavior, branch roundtrips, metadata, closure, category covariance, veto survival and a synthetic schema-10 map → reduce → merge pipeline. By default, stdout and stderr use `output/condor/photon_candidate_selection/<stage>_<ProcId>.out/.err` across productions. Set `log_directory` at submit time to use a production-specific directory. HTCondor event logs use fixed `/tmp/` paths.

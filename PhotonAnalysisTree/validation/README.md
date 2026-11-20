@@ -16,19 +16,18 @@
 repository root からの例:
 
 ```bash
-bash PhotonAnalysisTree/validation/photon_candidate_selection/check_sample_map_outputs.sh jet5
-bash PhotonAnalysisTree/validation/photon_candidate_selection/run_small_sample.sh jet5 1 1
+map_dir="$PWD/PhotonAnalysisTree/output/photon_candidate_selection/productions/common_composition_anchor_v14_eta_parent_v1_ana565/jet_cluster0p12_partner0p5/maps/jet5"
+bash PhotonAnalysisTree/validation/photon_candidate_selection/check_sample_map_outputs.sh \
+  jet5 50 false "$map_dir" 0.12 0.5 0.5 0.10 0.20 0.45 0.65 0.12 0.5
+PHOTON_INSTALL_PREFIX="$PWD/PhotonAnalysisTree/install/current" \
+  bash PhotonAnalysisTree/validation/photon_candidate_selection/run_small_sample.sh jet5 1 1
 root -l -b -q 'PhotonAnalysisTree/validation/pythia_tree/check_pythia_tree.C("input.root")'
 ```
 
 coverage 検証と小規模 QA は既定の cut を持ちます。本番とは異なる条件の場合は引数で入力・出力・cut を明示してください。
 小規模 QA は `output/photon_candidate_selection/qa/` に map と partial を作り、物理的な full-sample 正規化の代用にはしません。
 
-コード変更時の既存テスト（ana.565 を設定し、ライブラリを build 後）:
-
-```bash
-bash PhotonAnalysisTree/tests/run_candidate_selection_tests.sh "$PWD/PhotonAnalysisTree/build/dev/ana.565/photon"
-```
+コード変更時のテストは [software の検証手順](../docs/software.md#検証) を参照してください。
 
 ## Common composition の移行・matching 診断
 
@@ -71,8 +70,8 @@ python3 PhotonAnalysisTree/validation/photon_candidate_selection/summarize_commo
 入力は同じ manifest row 0 と Jet 設定で、DST 診断と新 map は同じイベント範囲を使ってください。
 新しい anchor 診断3枝も CSV と照合し、非評価 cluster の適用結果が変わっていないことを確認します。
 
-今回の小規模検証は `output/photon_candidate_selection/qa/anchor_matching_v14/` に保存しています。
+当時の小規模検証では、次の結果を確認しました。
 Jet3/Jet40 各30入力イベント（各21 written events）で、既存464枝が完全一致し、独立診断の423 anchor のうち422件が評価可能、
 coverage 約0.452の1件が unknown のままでした。これは少数イベントの動作検証であり、全 production の割合の推定ではありません。
-開発ビルド・テスト・map/reduce のログ、map と partial、比較 JSON を同じ QA directory に置いています。
+当時の QA 出力ディレクトリ `output/photon_candidate_selection/qa/anchor_matching_v14/` は整理済みです。
 正式 production は clean-source software を新規 freeze し、新規出力先で map から再実行してください。

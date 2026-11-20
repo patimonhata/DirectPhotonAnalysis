@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Run after sourcing ana.565 and building the library; no installation required.
+# Run after sourcing ana.565 and building and installing PhotonAnalysisTree.
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 prefix=${PHOTON_INSTALL_PREFIX:-$module_dir/install/dev/ana.565}
 build_dir=${1:-$module_dir/build/dev/ana.565/photon}

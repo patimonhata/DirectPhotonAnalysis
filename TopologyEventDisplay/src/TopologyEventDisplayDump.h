@@ -8,6 +8,7 @@
 #include <array>
 #include <string>
 
+class Fun4AllInputManager;
 class PHCompositeNode;
 class PHG4Particle;
 class PHG4TruthInfoContainer;
@@ -33,6 +34,7 @@ class TopologyEventDisplayDump : public SubsysReco
     manifest_end_ = end;
   }
   void set_sample_mode(photon_tree::Pi0SampleMode value) { config_.sample_mode = value; }
+  void set_primary_input_manager(Fun4AllInputManager* value) { primary_input_manager_ = value; }
   void set_first_event(int value) { first_event_ = value; }
   void set_signal_embedding_id(int value) { config_.signal_embedding_id = value; }
   void set_truth_node_name(const std::string& value) { config_.truth_node_name = value; }
@@ -54,18 +56,35 @@ class TopologyEventDisplayDump : public SubsysReco
   void set_min_photon_energy_recovery(double value) { config_.min_photon_energy_recovery = value; }
   void set_min_direct_match_cluster_energy_coverage(double value) { config_.min_direct_match_cluster_energy_coverage = value; }
   void set_missing_diagnostic_max_delta_r(double value) { config_.missing_diagnostic_max_delta_r = value; }
+  void set_partner_selection(double pi0_energy, double eta_energy, double pi0_mass_min, double pi0_mass_max, double eta_mass_min, double eta_mass_max)
+  {
+    config_.tagging_partner_min_cluster_energy = pi0_energy;
+    config_.tagging_pi0_mass_min = pi0_mass_min;
+    config_.tagging_pi0_mass_max = pi0_mass_max;
+    eta_partner_min_energy_ = eta_energy;
+    eta_mass_min_ = eta_mass_min;
+    eta_mass_max_ = eta_mass_max;
+  }
+  void set_missing_energy_range(double minimum, double maximum)
+  {
+    config_.missing_energy_min = minimum;
+    config_.missing_energy_max = maximum;
+  }
   void set_write_detail(bool value) { write_detail_ = value; }
   void set_verbosity(int value) { verbosity_ = value; config_.verbosity = value; }
 
  private:
-  static constexpr int schema_version_ = 6;
+  static constexpr int schema_version_ = 7;
   static constexpr int invalid_int_ = -999;
   static constexpr double invalid_double_ = -999.0;
 
   void create_output();
   void create_output_directory() const;
   void close_output();
-  void fill_event(PHCompositeNode*, const photon_tree::Pi0AnchorTopologyEventResult&);
+  bool update_input_provenance();
+  bool add_eta_topology(PHCompositeNode*, photon_tree::Pi0AnchorTopologyEventResult&);
+  void fill_cluster_origins(const photon_tree::Pi0AnchorTopologyEventResult&);
+  void fill_event(const photon_tree::Pi0AnchorTopologyEventResult&);
   void fill_candidates(const photon_tree::Pi0AnchorTopologyEventResult&);
   void fill_anchors(const photon_tree::Pi0AnchorTopologyEventResult&);
   void fill_candidate_cluster_truth(const photon_tree::Pi0AnchorTopologyEventResult&);
@@ -88,12 +107,23 @@ class TopologyEventDisplayDump : public SubsysReco
   int first_event_ = 0;
   photon_tree::Pi0AnchorTopologyConfig config_;
   photon_tree::Pi0AnchorTopologyEvaluator evaluator_;
+  photon_tree::Pi0AnchorTopologyEvaluator eta_evaluator_;
+  double eta_partner_min_energy_ = -1.0;
+  double eta_mass_min_ = 0.45;
+  double eta_mass_max_ = 0.65;
+  Fun4AllInputManager* primary_input_manager_ = nullptr;
+  std::string current_input_file_;
+  unsigned int next_event_in_file_ = 0;
+  bool has_input_provenance_ = false;
+  int common_composition_algorithm_version_ = 0;
+  int eta_topology_algorithm_version_ = 0;
 
   TFile* output_file_ = nullptr;
   TTree* metadata_tree_ = nullptr;
   TTree* events_tree_ = nullptr;
   TTree* candidates_tree_ = nullptr;
   TTree* anchors_tree_ = nullptr;
+  TTree* cluster_origin_tree_ = nullptr;
   TTree* candidate_cluster_truth_tree_ = nullptr;
   TTree* clusters_tree_ = nullptr;
   TTree* cluster_contributors_tree_ = nullptr;
@@ -105,11 +135,18 @@ class TopologyEventDisplayDump : public SubsysReco
   unsigned long long source_events_seen_ = 0;
   unsigned long long events_written_ = 0;
   unsigned long long events_invalid_ = 0;
+  unsigned long long events_vertex_rejected_ = 0;
 
   int b_event_ = 0;
+  unsigned int b_source_file_id_ = 0;
+  unsigned int b_event_in_file_ = 0;
+  unsigned long long b_event_uid_ = 0;
   int b_candidate_id_ = invalid_int_;
   int b_pathway_ = invalid_int_;
   std::string b_pathway_name_;
+  int b_parent_pdg_id_ = 111;
+  photon_tree::composition::Identity b_parent_identity_;
+  std::array<photon_tree::composition::Identity, 2> b_photon_identities_;
   int b_parent_barcode_ = invalid_int_;
   int b_g4_parent_track_id_ = invalid_int_;
   double b_energy_ = invalid_double_;
@@ -133,6 +170,14 @@ class TopologyEventDisplayDump : public SubsysReco
   double b_photon1_phi_ = invalid_double_;
   int b_photon0_projection_valid_ = 0;
   int b_photon1_projection_valid_ = 0;
+  int b_photon0_projection_no_intersection_ = 0;
+  int b_photon1_projection_no_intersection_ = 0;
+  int b_interaction_info_valid_ = 0;
+  int b_candidate_matching_status_ = 0;
+  double b_candidate_minimum_coverage_ = 0.0;
+  std::array<int, 2> b_truth_representative_id_;
+  std::array<double, 2> b_truth_representative_energy_;
+  std::array<double, 2> b_truth_representative_edep_;
   double b_photon0_projection_eta_ = invalid_double_;
   double b_photon1_projection_eta_ = invalid_double_;
   double b_photon0_projection_phi_ = invalid_double_;
@@ -160,6 +205,18 @@ class TopologyEventDisplayDump : public SubsysReco
   int b_anchor_id_ = invalid_int_;
   unsigned int b_cluster_id_ = 0;
   int b_topology_ = 0;
+  int b_applicability_ = -1;
+  int b_topology_reason_ = 0;
+  int b_common_main_ = 0;
+  int b_selected_pdg_ = 0;
+  photon_tree::composition::Identity b_selected_identity_;
+  unsigned int b_quality_ = 0;
+  double b_common_fraction_ = 0.0;
+  double b_original_truth_total_ = 0.0;
+  double b_unresolved_edep_ = 0.0;
+  int b_anchor_matching_status_ = -1;
+  double b_anchor_matching_coverage_ = -1.0;
+  bool b_anchor_matching_usable_ = false;
   std::string b_topology_name_;
   int b_reason_ = 0;
   std::string b_reason_name_;
@@ -167,6 +224,11 @@ class TopologyEventDisplayDump : public SubsysReco
   std::string b_missing_category_name_;
   int b_missing_detail_ = 0;
   std::string b_missing_detail_name_;
+  int b_truth_partner_cluster_id_ = invalid_int_;
+  double b_truth_partner_cluster_energy_ = invalid_double_;
+  double b_truth_partner_direct_edep_ = 0.0;
+  double b_truth_partner_invariant_mass_ = invalid_double_;
+  std::string b_truth_partner_tag_status_name_;
   int b_partner_photon_index_ = invalid_int_;
   int b_pre_cemc_photon_index_ = invalid_int_;
   double b_partner_cemc_edep_ = 0.0;
@@ -179,6 +241,7 @@ class TopologyEventDisplayDump : public SubsysReco
   int b_match_valid_ = 0;
   double b_total_edep_ = 0.0;
   int b_match_usable_ = 0;
+  bool b_match_ancestry_complete_ = true;
   int b_match_status_ = 0;
   std::string b_match_status_name_;
   int b_match_failure_ = 0;
@@ -259,6 +322,10 @@ class TopologyEventDisplayDump : public SubsysReco
   double b_z1_ = invalid_double_;
 
   int b_n_candidates_ = 0;
+  int b_n_pi0_candidates_ = 0;
+  int b_n_eta_candidates_ = 0;
+  int b_n_g4_secondary_candidates_ = 0;
+  int b_n_gun_candidates_ = 0;
   int b_n_g4_primary_pi0_ = 0;
   int b_n_generator_pi0_ = 0;
   int b_n_g4_secondary_pi0_ = 0;
@@ -267,6 +334,7 @@ class TopologyEventDisplayDump : public SubsysReco
   int b_n_clusters_ = 0;
   int b_n_topology_clusters_ = 0;
   int b_n_anchors_ = 0;
+  int b_n_unevaluable_anchors_ = 0;
   int b_n_separated_ = 0;
   int b_n_merged_ = 0;
   int b_n_single_contaminated_ = 0;

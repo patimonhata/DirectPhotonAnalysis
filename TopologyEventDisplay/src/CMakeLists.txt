@@ -12,19 +12,15 @@ endif()
 set(SPHENIX_PREFIX "$ENV{OFFLINE_MAIN}")
 find_package(ROOT REQUIRED COMPONENTS Core RIO Tree)
 
-find_path(
-  PHOTON_ANALYSIS_TREE_INCLUDE_DIR
-  Pi0AnchorTopologyEvaluator.h
-  HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../PhotonAnalysisTree/install/include"
-  REQUIRED
-)
-find_library(
-  PHOTON_ANALYSIS_TREE_LIBRARY
-  NAMES PhotonAnalysisTree
-  HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../PhotonAnalysisTree/install/lib64"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../../PhotonAnalysisTree/install/lib"
-  REQUIRED
-)
+set(PHOTON_ANALYSIS_TREE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/../../PhotonAnalysisTree/install/dev/ana.565"
+    CACHE PATH "PhotonAnalysisTree install to use for this build")
+unset(PHOTON_ANALYSIS_TREE_INCLUDE_DIR CACHE)
+unset(PHOTON_ANALYSIS_TREE_LIBRARY CACHE)
+find_path(PHOTON_ANALYSIS_TREE_INCLUDE_DIR PhotonCandidateTopology.h
+          PATHS "${PHOTON_ANALYSIS_TREE_PREFIX}/include" NO_DEFAULT_PATH REQUIRED)
+find_library(PHOTON_ANALYSIS_TREE_LIBRARY NAMES PhotonAnalysisTree
+             PATHS "${PHOTON_ANALYSIS_TREE_PREFIX}/lib64" "${PHOTON_ANALYSIS_TREE_PREFIX}/lib" NO_DEFAULT_PATH REQUIRED)
+get_filename_component(PHOTON_ANALYSIS_TREE_LIB_DIR "${PHOTON_ANALYSIS_TREE_LIBRARY}" DIRECTORY)
 
 foreach(library phool SubsysReco fun4all calo_io g4dst g4eval phhepmc HepMC)
   string(TOUPPER "${library}" library_upper)
@@ -56,5 +52,6 @@ target_link_libraries(
 )
 target_compile_options(TopologyEventDisplay PRIVATE -Wall -Wextra -Wpedantic)
 
+set_target_properties(TopologyEventDisplay PROPERTIES INSTALL_RPATH "${PHOTON_ANALYSIS_TREE_LIB_DIR}")
 install(TARGETS TopologyEventDisplay)
 install(FILES TopologyEventDisplayDump.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

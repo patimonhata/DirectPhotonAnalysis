@@ -58,6 +58,10 @@ struct Result
   bool anchor_matching_usable = false;
   int topology_reason = 0; // 1 non-gg, 2 unknown mode, 3 missing candidate, 4 matching, 5 projection, 6 first-daughter interaction information.
 };
+inline unsigned int stored_quality(const Result& result)
+{
+  return result.quality | (!result.valid ? missing_particle : 0U) | (!(result.total > 0) ? invalid_deposit : 0U);
+}
 inline int overview(Main main, int pdg)
 {
   if (main == Main::prompt) return 0;

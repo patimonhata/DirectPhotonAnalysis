@@ -968,6 +968,7 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
   result.candidates.reserve(candidates.size());
   for (CandidateWork& candidate : candidates)
   {
+    candidate.record.parent_pdg_id = config_.parent_pdg_id;
     result.candidates.push_back(std::move(candidate.record));
   }
   for (auto& candidate : result.candidates)

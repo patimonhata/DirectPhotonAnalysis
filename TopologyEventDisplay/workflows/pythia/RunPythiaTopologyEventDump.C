@@ -13,12 +13,10 @@
 #include <string>
 #include <vector>
 
-R__ADD_INCLUDE_PATH(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include)
+#include <TopologyEventDisplayDump.h>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopologyEventDisplay/install/include/TopologyEventDisplayDump.h"
-
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/TopologyEventDisplay/install/lib64/libTopologyEventDisplay.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libTopologyEventDisplay.so)
 R__LOAD_LIBRARY(libg4detectors.so)
 R__LOAD_LIBRARY(libg4calo.so)
 
@@ -43,14 +41,17 @@ int RunPythiaTopologyEventDump(
     const double anchor_cluster_eta_max = 0.7,
     const double partner_cluster_eta_max = -1.0,
     const double cemc_acceptance_eta_max = 1.1,
-    const double min_cluster_energy = 0.2,
+    const double min_cluster_energy = 0.1,
     const double anchor_pi0_fraction_min = 0.5,
     const double min_energy_contribution_fraction = 0.0,
     const double min_photon_energy_recovery = 0.0,
     const double min_direct_match_cluster_energy_coverage = 0.5,
     const double missing_diagnostic_max_delta_r = 0.15,
     const int first_event = 0,
-    const double pre_cemc_interaction_radius = 90.0)
+    const double pre_cemc_interaction_radius = 90.0,
+    const double pi0_partner_min_energy = -1.0, const double eta_partner_min_energy = -1.0,
+    const double pi0_mass_min = 0.10, const double pi0_mass_max = 0.20, const double eta_mass_min = 0.45, const double eta_mass_max = 0.65,
+    const double missing_energy_min = 0.2, const double missing_energy_max = 0.5)
 {
   if (manifest_path.empty() || output_file.empty() || manifest_begin < 0 ||
       manifest_end <= manifest_begin || n_events < 0 || first_event < 0)
@@ -138,6 +139,7 @@ int RunPythiaTopologyEventDump(
   display->set_manifest_path(manifest_path);
   display->set_manifest_range(manifest_begin, manifest_end);
   display->set_sample_mode(photon_tree::Pi0SampleMode::pythia);
+  display->set_primary_input_manager(calo_input);
   display->set_signal_embedding_id(1);
   display->set_first_event(first_event);
   display->set_anchor_cluster_eta_max(anchor_cluster_eta_max);
@@ -145,6 +147,8 @@ int RunPythiaTopologyEventDump(
   display->set_cemc_acceptance_eta_max(cemc_acceptance_eta_max);
   display->set_pre_cemc_interaction_radius(pre_cemc_interaction_radius);
   display->set_min_cluster_energy(min_cluster_energy);
+  display->set_partner_selection(pi0_partner_min_energy, eta_partner_min_energy, pi0_mass_min, pi0_mass_max, eta_mass_min, eta_mass_max);
+  display->set_missing_energy_range(missing_energy_min, missing_energy_max);
   display->set_anchor_pi0_fraction_min(anchor_pi0_fraction_min);
   display->set_min_energy_contribution_fraction(min_energy_contribution_fraction);
   display->set_min_photon_energy_recovery(min_photon_energy_recovery);

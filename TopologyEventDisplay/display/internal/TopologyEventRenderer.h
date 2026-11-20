@@ -14,6 +14,7 @@
 #include <TTree.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -34,6 +35,12 @@ struct Event
   double cy = 0.0;
   double cz = 0.0;
   int candidates = 0;
+  int pi0_candidates = 0;
+  int eta_candidates = 0;
+  int secondary_candidates = 0;
+  int gun_candidates = 0;
+  int unevaluable_anchors = 0;
+  bool has_meson_counts = false;
   int g4_primary = 0;
   int generator = 0;
   int secondary = 0;
@@ -52,6 +59,7 @@ struct Candidate
 {
   int id = -1;
   int pathway = 0;
+  int parent_pdg = 111;
   std::string pathway_name;
   int barcode = -999;
   int g4_parent = -999;
@@ -64,6 +72,11 @@ struct Candidate
   double photon_eta[2] = {0.0, 0.0};
   double photon_phi[2] = {0.0, 0.0};
   int photon_projection_valid[2] = {0, 0};
+  int photon_projection_no_intersection[2] = {0, 0};
+  double minimum_coverage = -1.0;
+  int representative[2] = {-999, -999};
+  double representative_energy[2] = {-999.0, -999.0};
+  double representative_edep[2] = {0.0, 0.0};
   double photon_projection_eta[2] = {-999.0, -999.0};
   double photon_projection_phi[2] = {-999.0, -999.0};
   int photon_in_cemc_acceptance[2] = {0, 0};
@@ -84,6 +97,8 @@ struct Anchor
   double energy = 0.0;
   double et = 0.0;
   int topology = 0;
+  int applicability = -1;
+  int topology_reason = 0;
   std::string topology_name;
   int reason = 0;
   std::string reason_name;
@@ -92,6 +107,8 @@ struct Anchor
   int missing_detail = 0;
   std::string missing_detail_name;
   int partner_photon = -1;
+  int truth_partner = -999;
+  double truth_partner_mass = -999.0;
   int pre_cemc_photon = -1;
   double partner_cemc_edep = 0.0;
   double diagnostic_invariant_mass = -999.0;
@@ -182,19 +199,60 @@ struct CandidateClusterMatch
   double gamma_fraction[2] = {0.0, 0.0};
 };
 
+struct ClusterOrigin
+{
+  int main = 0;
+  int selected_pdg = 0;
+  double fraction = 0.0;
+  int applicability = 0;
+};
+
 struct DisplayData
 {
   Event event;
   std::vector<Candidate> candidates;
   std::vector<Anchor> anchors;
+  std::map<unsigned int, ClusterOrigin> origins;
   std::vector<Segment> segments;
   std::vector<Cluster> clusters;
   std::vector<Tower> towers;
   std::vector<CandidateClusterMatch> matches;
 };
 
+inline TTree* candidate_tree(TFile* file)
+{
+  auto* tree = file->Get<TTree>("meson_candidates");
+  return tree ? tree : file->Get<TTree>("pi0_candidates");
+}
+
+inline const char* meson_name(int pdg) { return pdg == 221 ? "#eta" : "#pi^{0}"; }
+inline bool evaluable(const Anchor& anchor) { return anchor.applicability == -1 || anchor.applicability == 1; }
+inline int display_topology(const Anchor& anchor) { return evaluable(anchor) ? anchor.topology : -2; }
+inline const char* display_topology_name(const Anchor& anchor)
+{
+  return evaluable(anchor) ? anchor.topology_name.c_str() : anchor.applicability == 2 ? "N/A" : "unknown";
+}
+
+inline const char* topology_reason_name(int reason)
+{
+  static const std::array<const char*, 7> names = {
+      "available", "non-diphoton origin", "decay mode unavailable", "no eligible diphoton anchor",
+      "insufficient anchor matching", "projection unavailable", "interaction information unavailable"};
+  return reason >= 0 && reason < static_cast<int>(names.size()) ? names[reason] : "unrecorded";
+}
+
+inline const char* origin_name(int main)
+{
+  static const std::array<const char*, 12> names = {
+      "unknown", "prompt", "#pi^{0}", "#eta#rightarrow#gamma#gamma", "decay photon", "charged",
+      "particle", "parent", "unresolved parent", "mixed", "non-signal", "unclassified photon"};
+  return main >= 0 && main < static_cast<int>(names.size()) ? names[main] : "unrecorded";
+}
+
 inline int topology_color(int topology)
 {
+  if (topology == -3) return kGray + 1;
+  if (topology == -2) return kBlue + 3;
   if (topology == 1) return kGreen + 2;
   if (topology == 2) return kMagenta + 1;
   if (topology == 3) return kOrange + 7;
@@ -240,7 +298,7 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   if (!file || file->IsZombie()) return false;
   data = DisplayData{};
   TTree* events = static_cast<TTree*>(file->Get("events"));
-  TTree* candidates = static_cast<TTree*>(file->Get("pi0_candidates"));
+  TTree* candidates = candidate_tree(file);
   TTree* anchors = static_cast<TTree*>(file->Get("anchor_decisions"));
   TTree* matches = static_cast<TTree*>(file->Get("candidate_cluster_truth"));
   TTree* segments = static_cast<TTree*>(file->Get("truth_segments"));
@@ -254,6 +312,15 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   events->SetBranchAddress("collision_y", &data.event.cy);
   events->SetBranchAddress("collision_z", &data.event.cz);
   events->SetBranchAddress("n_candidates", &data.event.candidates);
+  data.event.has_meson_counts = events->GetBranch("n_pi0_candidates");
+  if (data.event.has_meson_counts)
+  {
+    events->SetBranchAddress("n_pi0_candidates", &data.event.pi0_candidates);
+    events->SetBranchAddress("n_eta_candidates", &data.event.eta_candidates);
+    events->SetBranchAddress("n_g4_secondary_candidates", &data.event.secondary_candidates);
+    events->SetBranchAddress("n_gun_candidates", &data.event.gun_candidates);
+    events->SetBranchAddress("n_unevaluable_anchors", &data.event.unevaluable_anchors);
+  }
   events->SetBranchAddress("n_g4_primary_pi0", &data.event.g4_primary);
   events->SetBranchAddress("n_generator_pi0", &data.event.generator);
   events->SetBranchAddress("n_g4_secondary_pi0", &data.event.secondary);
@@ -280,11 +347,42 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   events->ResetBranchAddresses();
   if (!found) return false;
 
+  if (auto* origins = file->Get<TTree>("cluster_origins"))
+  {
+    unsigned int cluster_id = 0;
+    ClusterOrigin origin;
+    origins->SetBranchAddress("event", &event);
+    origins->SetBranchAddress("cluster_id", &cluster_id);
+    origins->SetBranchAddress("common_main", &origin.main);
+    origins->SetBranchAddress("selected_pdg", &origin.selected_pdg);
+    origins->SetBranchAddress("common_fraction", &origin.fraction);
+    origins->SetBranchAddress("applicability", &origin.applicability);
+    for (Long64_t entry = 0; entry < origins->GetEntries(); ++entry)
+    {
+      origins->GetEntry(entry);
+      if (event == event_id) data.origins.emplace(cluster_id, origin);
+    }
+    origins->ResetBranchAddresses();
+  }
+
   Candidate candidate;
   std::string* pathway_name = nullptr;
   candidates->SetBranchAddress("event", &event);
   candidates->SetBranchAddress("candidate_id", &candidate.id);
   candidates->SetBranchAddress("pathway", &candidate.pathway);
+  if (candidates->GetBranch("parent_pdg_id"))
+  {
+    candidates->SetBranchAddress("parent_pdg_id", &candidate.parent_pdg);
+    candidates->SetBranchAddress("candidate_minimum_coverage", &candidate.minimum_coverage);
+    for (int photon = 0; photon < 2; ++photon)
+    {
+      const std::string prefix = "photon" + std::to_string(photon) + "_";
+      candidates->SetBranchAddress((prefix + "projection_no_intersection").c_str(), &candidate.photon_projection_no_intersection[photon]);
+      candidates->SetBranchAddress((prefix + "truth_representative_id").c_str(), &candidate.representative[photon]);
+      candidates->SetBranchAddress((prefix + "truth_representative_energy").c_str(), &candidate.representative_energy[photon]);
+      candidates->SetBranchAddress((prefix + "truth_representative_edep").c_str(), &candidate.representative_edep[photon]);
+    }
+  }
   candidates->SetBranchAddress("pathway_name", &pathway_name);
   candidates->SetBranchAddress("parent_barcode", &candidate.barcode);
   candidates->SetBranchAddress("g4_parent_track_id", &candidate.g4_parent);
@@ -355,6 +453,10 @@ inline bool load_event(TFile* file, int event_id, DisplayData& data)
   anchors->SetBranchAddress("topology_name", &topology_name);
   anchors->SetBranchAddress("reason", &anchor.reason);
   anchors->SetBranchAddress("reason_name", &reason_name);
+  bind_anchor("applicability", &anchor.applicability);
+  bind_anchor("topology_reason", &anchor.topology_reason);
+  bind_anchor("truth_partner_cluster_id", &anchor.truth_partner);
+  bind_anchor("truth_partner_invariant_mass", &anchor.truth_partner_mass);
   bind_anchor("missing_category", &anchor.missing_category);
   bind_anchor("missing_category_name", &missing_category_name);
   bind_anchor("missing_detail", &anchor.missing_detail);
@@ -514,70 +616,97 @@ inline std::vector<int> event_ids(
     TFile* file, int topology_filter = -1, int pathway_filter = -1,
     double vertex_z_min = -std::numeric_limits<double>::infinity(),
     double vertex_z_max = std::numeric_limits<double>::infinity(),
-    double truth_pi0_pt_min = -std::numeric_limits<double>::infinity(),
-    double truth_pi0_pt_max = std::numeric_limits<double>::infinity())
+    double truth_pt_min = -std::numeric_limits<double>::infinity(),
+    double truth_pt_max = std::numeric_limits<double>::infinity(),
+    int meson_pdg_filter = 0, int origin_filter = -1, int applicability_filter = -1)
 {
   std::vector<int> result;
-  if (!file || file->IsZombie() || vertex_z_min > vertex_z_max || truth_pi0_pt_min > truth_pi0_pt_max) return result;
-  TTree* events = static_cast<TTree*>(file->Get("events"));
-  TTree* anchors = static_cast<TTree*>(file->Get("anchor_decisions"));
-  TTree* candidates = static_cast<TTree*>(file->Get("pi0_candidates"));
+  if (!file || file->IsZombie() || vertex_z_min > vertex_z_max || truth_pt_min > truth_pt_max) return result;
+  auto* events = file->Get<TTree>("events");
+  auto* anchors = file->Get<TTree>("anchor_decisions");
+  auto* candidates = candidate_tree(file);
   if (!events || !anchors || !candidates) return result;
-  struct CandidateFilterValues
-  {
-    int pathway = -1;
-    double pt = -1.0;
-  };
-  std::map<std::pair<int, int>, CandidateFilterValues> candidate_values;
-  std::set<int> candidate_accepted;
+
+  const bool filter_candidates = pathway_filter >= 0 || meson_pdg_filter != 0 ||
+      truth_pt_min != -std::numeric_limits<double>::infinity() || truth_pt_max != std::numeric_limits<double>::infinity();
+  const bool filter_origins = origin_filter >= 0 || applicability_filter >= 0;
+  std::set<std::pair<int, unsigned int>> matching_clusters;
+  std::set<int> matching_origin_events;
   int event = -1;
-  int candidate = -1;
-  int path = -1;
+  unsigned int cluster = 0;
+  if (filter_origins)
+  {
+    auto* origins = file->Get<TTree>("cluster_origins");
+    if (!origins) return result;
+    int origin = -1, applicability = -1;
+    origins->SetBranchAddress("event", &event);
+    origins->SetBranchAddress("cluster_id", &cluster);
+    origins->SetBranchAddress("common_main", &origin);
+    origins->SetBranchAddress("applicability", &applicability);
+    for (Long64_t entry = 0; entry < origins->GetEntries(); ++entry)
+    {
+      origins->GetEntry(entry);
+      if ((origin_filter < 0 || origin == origin_filter) && (applicability_filter < 0 || applicability == applicability_filter))
+      {
+        matching_clusters.emplace(event, cluster);
+        matching_origin_events.insert(event);
+      }
+    }
+    origins->ResetBranchAddresses();
+  }
+
+  std::set<std::pair<int, int>> matching_candidates;
+  std::set<int> matching_candidate_events;
+  int candidate = -1, path = -1, pdg = 111;
   double pt = -1.0;
-  candidates->SetBranchAddress("event", &event);
-  candidates->SetBranchAddress("candidate_id", &candidate);
-  candidates->SetBranchAddress("pathway", &path);
-  candidates->SetBranchAddress("pt", &pt);
-  for (Long64_t entry = 0; entry < candidates->GetEntries(); ++entry)
+  if (filter_candidates)
   {
-    candidates->GetEntry(entry);
-    candidate_values[{event, candidate}] = {path, pt};
-    const bool pathway_ok = pathway_filter < 0 || path == pathway_filter;
-    const bool pt_ok = pt >= truth_pi0_pt_min && pt <= truth_pi0_pt_max;
-    if (pathway_ok && pt_ok) candidate_accepted.insert(event);
+    candidates->SetBranchAddress("event", &event);
+    candidates->SetBranchAddress("candidate_id", &candidate);
+    candidates->SetBranchAddress("pathway", &path);
+    candidates->SetBranchAddress("pt", &pt);
+    if (candidates->GetBranch("parent_pdg_id")) candidates->SetBranchAddress("parent_pdg_id", &pdg);
+    for (Long64_t entry = 0; entry < candidates->GetEntries(); ++entry)
+    {
+      candidates->GetEntry(entry);
+      if ((pathway_filter < 0 || path == pathway_filter) && (meson_pdg_filter == 0 || pdg == meson_pdg_filter) && pt >= truth_pt_min && pt <= truth_pt_max)
+      {
+        matching_candidates.emplace(event, candidate);
+        matching_candidate_events.insert(event);
+      }
+    }
+    candidates->ResetBranchAddresses();
   }
-  candidates->ResetBranchAddresses();
-  std::set<int> topology_accepted;
-  int topology = -1;
-  anchors->SetBranchAddress("event", &event);
-  anchors->SetBranchAddress("candidate_id", &candidate);
-  anchors->SetBranchAddress("topology", &topology);
-  for (Long64_t entry = 0; entry < anchors->GetEntries(); ++entry)
+
+  const bool filter_anchors = topology_filter >= 0 || (filter_origins && filter_candidates);
+  std::set<int> matching_anchor_events;
+  if (filter_anchors)
   {
-    anchors->GetEntry(entry);
-    const bool topology_ok = topology_filter < 0 || topology == topology_filter;
-    const auto found = candidate_values.find({event, candidate});
-    const bool pathway_ok = pathway_filter < 0 ||
-        (found != candidate_values.end() && found->second.pathway == pathway_filter);
-    const bool pt_ok = found != candidate_values.end() &&
-        found->second.pt >= truth_pi0_pt_min && found->second.pt <= truth_pi0_pt_max;
-    if (topology_ok && pathway_ok && pt_ok) topology_accepted.insert(event);
+    Anchor anchor;
+    anchors->SetBranchAddress("event", &event);
+    anchors->SetBranchAddress("candidate_id", &candidate);
+    anchors->SetBranchAddress("cluster_id", &cluster);
+    anchors->SetBranchAddress("topology", &anchor.topology);
+    if (anchors->GetBranch("applicability")) anchors->SetBranchAddress("applicability", &anchor.applicability);
+    for (Long64_t entry = 0; entry < anchors->GetEntries(); ++entry)
+    {
+      anchors->GetEntry(entry);
+      if ((topology_filter < 0 || (evaluable(anchor) && anchor.topology == topology_filter)) &&
+          (!filter_candidates || matching_candidates.count({event, candidate})) &&
+          (!filter_origins || matching_clusters.count({event, cluster}))) matching_anchor_events.insert(event);
+    }
+    anchors->ResetBranchAddresses();
   }
-  anchors->ResetBranchAddresses();
+
   double collision_z = 0.0;
   events->SetBranchAddress("event", &event);
   events->SetBranchAddress("collision_z", &collision_z);
-  const bool candidate_filter_enabled = pathway_filter >= 0 ||
-      truth_pi0_pt_min != -std::numeric_limits<double>::infinity() ||
-      truth_pi0_pt_max != std::numeric_limits<double>::infinity();
   for (Long64_t entry = 0; entry < events->GetEntries(); ++entry)
   {
     events->GetEntry(entry);
-    const bool vertex_ok = collision_z >= vertex_z_min && collision_z <= vertex_z_max;
-    const bool candidate_topology_ok = topology_filter >= 0
-        ? topology_accepted.count(event) != 0U
-        : (!candidate_filter_enabled || candidate_accepted.count(event) != 0U);
-    if (vertex_ok && candidate_topology_ok) result.push_back(event);
+    const bool accepted = filter_anchors ? matching_anchor_events.count(event) != 0 :
+        (!filter_origins || matching_origin_events.count(event)) && (!filter_candidates || matching_candidate_events.count(event));
+    if (collision_z >= vertex_z_min && collision_z <= vertex_z_max && accepted) result.push_back(event);
   }
   events->ResetBranchAddresses();
   return result;
@@ -593,7 +722,10 @@ inline const Candidate* find_candidate(const DisplayData& data, int id)
 inline int cluster_topology(const DisplayData& data, unsigned int id)
 {
   for (const auto& anchor : data.anchors)
-    if (anchor.cluster == id) return anchor.topology;
+    if (anchor.cluster == id) return display_topology(anchor);
+  const auto origin = data.origins.find(id);
+  if (origin != data.origins.end() && (origin->second.main == 2 || origin->second.main == 3))
+    return origin->second.applicability == 2 ? -3 : -2;
   return -1;
 }
 
@@ -624,7 +756,7 @@ inline void draw_cluster_marker(const DisplayData& data, const Cluster& cluster,
 {
   const int topology = cluster_topology(data, cluster.id);
   auto* marker = new TMarker(first, second, 20);
-  marker->SetMarkerColor(topology >= 0 ? topology_color(topology) : kGray + 2);
+  marker->SetMarkerColor(topology_color(topology));
   marker->SetMarkerSize(marker_size);
   marker->Draw();
   const int family = cluster_family(data, cluster.id, selected_family);
@@ -747,6 +879,8 @@ inline void draw_anchor_towers(const DisplayData& data, const Anchor& anchor)
   std::set<unsigned int> roles = {anchor.cluster};
   if (anchor.best_cluster[0] >= 0) roles.insert(static_cast<unsigned int>(anchor.best_cluster[0]));
   if (anchor.best_cluster[1] >= 0) roles.insert(static_cast<unsigned int>(anchor.best_cluster[1]));
+  const auto* candidate = find_candidate(data, anchor.candidate);
+  if (candidate) for (const int id : candidate->representative) if (id >= 0) roles.insert(static_cast<unsigned int>(id));
   int reference = 0;
   bool have_reference = false;
   for (const auto& tower : data.towers)
@@ -790,9 +924,11 @@ inline void draw_anchor_towers(const DisplayData& data, const Anchor& anchor)
       box->SetFillStyle(0); box->SetLineColor(color); box->SetLineStyle(style); box->SetLineWidth(width); box->Draw();
     }
   };
-  draw_outline(static_cast<int>(anchor.cluster), 0.47, topology_color(anchor.topology), 1, 3);
-  draw_outline(anchor.best_cluster[0], 0.36, family_color(anchor.candidate), photon0_line_style, 2);
-  draw_outline(anchor.best_cluster[1], 0.25, family_color(anchor.candidate), photon1_line_style, 2);
+  draw_outline(static_cast<int>(anchor.cluster), 0.47, topology_color(display_topology(anchor)), 1, 3);
+  const int photon0 = candidate && candidate->representative[0] >= 0 ? candidate->representative[0] : anchor.best_cluster[0];
+  const int photon1 = candidate && candidate->representative[1] >= 0 ? candidate->representative[1] : anchor.best_cluster[1];
+  draw_outline(photon0, 0.36, family_color(anchor.candidate), photon0_line_style, 2);
+  draw_outline(photon1, 0.25, family_color(anchor.candidate), photon1_line_style, 2);
 }
 
 inline int anchor_display_role(const DisplayData& data, const Anchor& anchor)
@@ -832,7 +968,7 @@ inline void draw_display_legend(int family = -1, bool tower_detail = false,
   const int color = family >= 0 ? family_color(family) : kAzure + 1;
   TLatex title; title.SetTextSize(text_size + 0.012); title.SetTextFont(62); title.DrawLatex(0.05, start_y, "Legend");
   double y = start_y - step;
-  draw_legend_line(y, color, 1, 3, "#pi^{0} direction / segment", text_size); y -= step;
+  draw_legend_line(y, color, 1, 3, "meson direction / segment", text_size); y -= step;
   draw_legend_line(y, color, photon0_line_style, 2, "photon: fine dash", text_size); y -= step;
   draw_legend_line(y, color, photon1_line_style, 2, "partner photon: coarse dash", text_size); y -= step;
   draw_legend_line(y, color, photon0_line_style, 1, "pre-CEMC descendants: thin", text_size); y -= step;
@@ -864,14 +1000,17 @@ inline void draw_display_legend(int family = -1, bool tower_detail = false,
   text.SetTextColor(kAzure + 2); text.DrawLatex(0.43, y, "C contaminated");
   text.SetTextColor(kOrange + 7); text.DrawLatex(0.67, y, "X missing");
   text.SetTextColor(kGray + 2); text.DrawLatex(0.84, y, "O other");
+  y -= step;
+  text.SetTextColor(topology_color(-2)); text.DrawLatex(0.05, y, "unknown topology");
+  text.SetTextColor(topology_color(-3)); text.DrawLatex(0.44, y, "topology N/A");
   text.SetTextColor(kBlack);
 
   if (!tower_detail) return;
   y -= step;
   text.DrawLatex(0.05, y, "Tower map: heat = calibrated tower E"); y -= step;
   draw_legend_line(y, topology_color(1), 1, 3, "anchor cluster outline", text_size); y -= step;
-  draw_legend_line(y, color, photon0_line_style, 2, "best-cluster outline: fine dash", text_size); y -= step;
-  draw_legend_line(y, color, photon1_line_style, 2, "best-cluster outline: coarse dash", text_size);
+  draw_legend_line(y, color, photon0_line_style, 2, "photon representative: fine dash", text_size); y -= step;
+  draw_legend_line(y, color, photon1_line_style, 2, "photon representative: coarse dash", text_size);
 }
 
 inline void draw_overview_text(const DisplayData& data)
@@ -880,11 +1019,37 @@ inline void draw_overview_text(const DisplayData& data)
   TLatex text; text.SetNDC(); text.SetTextSize(0.043);
   double y = 0.95;
   text.DrawLatex(0.04, y, Form("vertex = (%.2f, %.2f, %.2f) cm", data.event.cx, data.event.cy, data.event.cz)); y -= 0.07;
-  text.DrawLatex(0.04, y, Form("selected #pi^{0}: %d   G4-primary: %d   generator: %d",
-      data.event.candidates, data.event.g4_primary, data.event.generator)); y -= 0.065;
-  text.DrawLatex(0.04, y, Form("clusters: %d   anchors: %d   S/M/C/X/O = %d/%d/%d/%d/%d",
+  if (data.event.has_meson_counts)
+  {
+    text.DrawLatex(0.04, y, Form("diphotons: #pi^{0} %d   #eta %d   G4 secondary %d   gun %d",
+        data.event.pi0_candidates, data.event.eta_candidates, data.event.secondary_candidates, data.event.gun_candidates)); y -= 0.065;
+  }
+  else
+  {
+    text.DrawLatex(0.04, y, Form("selected #pi^{0}: %d   G4-primary: %d   generator: %d",
+        data.event.candidates, data.event.g4_primary, data.event.generator)); y -= 0.065;
+  }
+  text.DrawLatex(0.04, y, Form("clusters %d   anchors %d   S/M/C/X/O = %d/%d/%d/%d/%d",
       data.event.clusters, data.event.anchors, data.event.separated,
-      data.event.merged, data.event.single_contaminated, data.event.missing, data.event.other)); y -= 0.075;
+      data.event.merged, data.event.single_contaminated, data.event.missing, data.event.other)); y -= 0.065;
+  if (!data.origins.empty())
+  {
+    std::array<int, 3> pi0{}, eta{};
+    int prompt = 0;
+    for (const auto& entry : data.origins)
+    {
+      const auto& origin = entry.second;
+      if (origin.main == 1) ++prompt;
+      if (origin.applicability < 0 || origin.applicability > 2) continue;
+      if (origin.main == 2) ++pi0[origin.applicability];
+      if (origin.main == 3) ++eta[origin.applicability];
+    }
+    text.SetTextSize(0.036);
+    text.DrawLatex(0.04, y, Form("cluster origins: %zu   prompt %d   unevaluable anchors %d",
+        data.origins.size(), prompt, data.event.unevaluable_anchors)); y -= 0.048;
+    text.DrawLatex(0.04, y, Form("eval / unknown / N/A: #pi^{0} %d/%d/%d   #eta#rightarrow#gamma#gamma %d/%d/%d",
+        pi0[1], pi0[0], pi0[2], eta[1], eta[0], eta[2])); y -= 0.054;
+  }
 
   const auto anchors = ordered_anchors(data);
   text.SetTextSize(0.038);
@@ -892,9 +1057,9 @@ inline void draw_overview_text(const DisplayData& data)
   for (const Anchor* anchor : anchors)
   {
     if (y < 0.57) break;
-    text.SetTextColor(topology_color(anchor->topology));
+    text.SetTextColor(topology_color(display_topology(*anchor)));
     text.DrawLatex(0.04, y, Form("P%d  A%d  C%u  %-9s  E_{T}=%.2f  f=%.3f",
-        anchor->candidate, anchor->id, anchor->cluster, anchor->topology_name.c_str(), anchor->et, anchor->main_fraction));
+        anchor->candidate, anchor->id, anchor->cluster, display_topology_name(*anchor), anchor->et, anchor->main_fraction));
     text.SetTextColor(kBlack); y -= 0.052; ++shown;
   }
   if (shown < anchors.size()) text.DrawLatex(0.04, y, Form("... %zu more anchors", anchors.size() - shown));
@@ -908,15 +1073,16 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
   TLatex text; text.SetNDC(); text.SetTextSize(0.040);
   double y = 0.96;
   text.SetTextFont(62); text.DrawLatex(0.04, y, "Anchor classification"); text.SetTextFont(42); y -= 0.055;
-  text.SetTextColor(topology_color(anchor.topology));
-  text.DrawLatex(0.04, y, Form("%s", anchor.topology_name.c_str()));
+  text.SetTextColor(topology_color(display_topology(anchor)));
+  text.DrawLatex(0.04, y, display_topology_name(anchor));
   text.SetTextColor(kBlack); y -= 0.050;
-  text.SetTextSize(0.030); text.DrawLatex(0.04, y, Form("reason: %s", anchor.reason_name.c_str())); y -= 0.045;
-  if (anchor.topology == 4)
+  text.SetTextSize(0.030);
+  text.DrawLatex(0.04, y, Form("reason: %s", evaluable(anchor) ? anchor.reason_name.c_str() : topology_reason_name(anchor.topology_reason))); y -= 0.045;
+  if (evaluable(anchor) && anchor.topology == 4)
   {
     text.DrawLatex(0.04, y, Form("pre-CEMC interacting photon: #gamma%d", anchor.pre_cemc_photon)); y -= 0.045;
   }
-  if (anchor.topology == 3)
+  if (evaluable(anchor) && anchor.topology == 3)
   {
     text.DrawLatex(0.04, y, Form("missing: %s / %s  (partner #gamma%d)", anchor.missing_category_name.c_str(), anchor.missing_detail_name.c_str(), anchor.partner_photon)); y -= 0.045;
     text.DrawLatex(0.04, y, Form("partner CEMC truth Edep = %.4g GeV", anchor.partner_cemc_edep)); y -= 0.045;
@@ -930,17 +1096,22 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
       }
       else
       {
-        text.DrawLatex(0.04, y, "partner projection: invalid"); y -= 0.045;
+        text.DrawLatex(0.04, y, candidate->photon_projection_no_intersection[partner] ? "partner ray misses CEMC cylinder" : "partner projection unavailable");
+        y -= 0.045;
       }
     }
   }
   text.SetTextSize(0.036);
   text.DrawLatex(0.04, y, Form("E = %.3f GeV    E_{T} = %.3f GeV", anchor.energy, anchor.et)); y -= 0.048;
-  text.DrawLatex(0.04, y, Form("main/second/unmatched f = %.4f / %.4f / %.4f",
-      anchor.main_fraction, anchor.second_fraction, anchor.unmatched_fraction)); y -= 0.044;
+  const auto origin = data.origins.find(anchor.cluster);
+  if (origin != data.origins.end())
+    text.DrawLatex(0.04, y, Form("origin: %s  PDG %d  f=%.4f", origin_name(origin->second.main), origin->second.selected_pdg, origin->second.fraction));
+  else
+    text.DrawLatex(0.04, y, Form("main/second/unmatched f = %.4f / %.4f / %.4f", anchor.main_fraction, anchor.second_fraction, anchor.unmatched_fraction));
+  y -= 0.044;
   if (candidate)
   {
-    text.DrawLatex(0.04, y, Form("candidate P%d    p_{T} = %.3f GeV", candidate->id, candidate->pt)); y -= 0.044;
+    text.DrawLatex(0.04, y, Form("%s candidate %d    p_{T} = %.3f GeV", meson_name(candidate->parent_pdg), candidate->id, candidate->pt)); y -= 0.044;
     text.SetTextSize(0.030); text.DrawLatex(0.04, y, candidate->pathway_name.c_str()); y -= 0.050;
   }
   text.SetTextSize(0.032);
@@ -950,11 +1121,18 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
     const int style = photon == 0 ? photon0_line_style : photon1_line_style;
     auto* sample = new TLine(0.04, y + 0.008, 0.16, y + 0.008);
     sample->SetLineColor(family_color(anchor.candidate)); sample->SetLineStyle(style); sample->SetLineWidth(2); sample->Draw();
-    text.DrawLatex(0.19, y, Form("#gamma%d Cbest=%d  recovered=%s", photon, anchor.best_cluster[photon],
-        anchor.recovered[photon] ? "yes" : "no")); y -= 0.038;
-    text.DrawLatex(0.19, y, Form("Etruth=%.3f  Erec=%.3f  ratio=%.3f",
-        anchor.truth_energy[photon], anchor.reconstructed[photon], recovery)); y -= 0.038;
-    if (candidate->photon_first_daughter_vertex_valid[photon])
+    if (candidate && origin != data.origins.end())
+    {
+      if (candidate->representative[photon] >= 0)
+        text.DrawLatex(0.19, y, Form("#gamma%d truth C%d  E=%.3f  Edep=%.4g",
+            photon, candidate->representative[photon], candidate->representative_energy[photon], candidate->representative_edep[photon]));
+      else text.DrawLatex(0.19, y, Form("#gamma%d: no truth representative", photon));
+    }
+    else text.DrawLatex(0.19, y, Form("#gamma%d Cbest=%d", photon, anchor.best_cluster[photon]));
+    y -= 0.038;
+    text.DrawLatex(0.19, y, Form("Etruth=%.3f  Erec=%.3f  ratio=%.3f  recovered=%s",
+        anchor.truth_energy[photon], anchor.reconstructed[photon], recovery, anchor.recovered[photon] ? "yes" : "no")); y -= 0.038;
+    if (candidate && candidate->photon_first_daughter_vertex_valid[photon])
       text.DrawLatex(0.19, y, Form("first daughter r=%.3f cm  pre-CEMC=%s", candidate->photon_first_daughter_radius[photon],
           candidate->photon_pre_cemc_interaction[photon] ? "yes" : "no"));
     else
@@ -968,7 +1146,20 @@ inline void draw_anchor_text(const DisplayData& data, const Anchor& anchor)
       anchor.match_failure_ieta, anchor.match_failure_iphi)); y -= 0.038;
   text.DrawLatex(0.04, y, Form("anchor edep: total=%.4g  other=%.4g", anchor.total_edep, anchor.other_edep)); y -= 0.038;
   text.DrawLatex(0.04, y, Form("fine/coarse photon edep = %.4g / %.4g", anchor.gamma_edep[0], anchor.gamma_edep[1])); y -= 0.038;
-  if (anchor.diagnostic_found)
+  if (anchor.truth_partner >= 0 && anchor.truth_partner_mass >= 0.0)
+  {
+    text.DrawLatex(0.04, y, Form("truth pair C%u+C%d: m_{#gamma#gamma}=%.4f GeV", anchor.cluster, anchor.truth_partner, anchor.truth_partner_mass)); y -= 0.038;
+  }
+  if (candidate && origin != data.origins.end())
+  {
+    text.DrawLatex(0.04, y, Form("candidate min. match coverage = %.3f", candidate->minimum_coverage)); y -= 0.038;
+  }
+  if (anchor.diagnostic_found && origin != data.origins.end())
+  {
+    text.DrawLatex(0.04, y, Form("nearby diagnostic C%d: E=%.3f  #DeltaR=%.4f  usable=%d",
+        anchor.diagnostic_cluster, anchor.diagnostic_energy, anchor.diagnostic_delta_r, anchor.diagnostic_match_usable));
+  }
+  else if (anchor.diagnostic_found)
   {
     text.DrawLatex(0.04, y, Form("partner diagnostic C%d: E=%.3f  #DeltaR=%.4f  below=%d direct=%d",
         anchor.diagnostic_cluster, anchor.diagnostic_energy, anchor.diagnostic_delta_r,
@@ -1013,9 +1204,9 @@ inline void draw_page_header(TCanvas* canvas, const DisplayData& data,
   text.DrawLatex(0.02, 0.50, Form("ANCHOR DETAIL %zu/%zu   |   Event %d   |   P%d   A%d   C%u",
       anchor_position, anchor_count, data.event.id, anchor->candidate, anchor->id, anchor->cluster));
   auto* badge = new TBox(0.83, 0.13, 0.98, 0.87);
-  badge->SetFillColor(topology_color(anchor->topology)); badge->SetLineColor(topology_color(anchor->topology)); badge->Draw();
+  badge->SetFillColor(topology_color(display_topology(*anchor))); badge->SetLineColor(topology_color(display_topology(*anchor))); badge->Draw();
   text.SetTextAlign(22); text.SetTextColor(kWhite); text.SetTextSize(0.25);
-  text.DrawLatex(0.905, 0.50, anchor->topology_name.c_str());
+  text.DrawLatex(0.905, 0.50, display_topology_name(*anchor));
 }
 
 inline void configure_plot_pad(TPad* pad, bool color_bar = false)

@@ -207,6 +207,7 @@ inline bool prefer_pi0_truth_partner(const Pi0TruthPartnerClusterRecord& propose
 
 struct Pi0TopologyCandidateRecord
 {
+  int parent_pdg_id = 111;
   composition::Identity parent_identity;
   std::array<composition::Identity, 2> photon_identities;
   bool matching_usable = true;

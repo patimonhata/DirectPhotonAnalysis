@@ -10,12 +10,10 @@
 #include <iostream>
 #include <string>
 
-R__ADD_INCLUDE_PATH(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/include)
+#include <TopologyEventDisplayDump.h>
 
-#include "/sphenix/user/ryotaro/DirectPhotonAnalysis/TopologyEventDisplay/install/include/TopologyEventDisplayDump.h"
-
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/install/lib64/libPhotonAnalysisTree.so)
-R__LOAD_LIBRARY(/sphenix/user/ryotaro/DirectPhotonAnalysis/TopologyEventDisplay/install/lib64/libTopologyEventDisplay.so)
+R__LOAD_LIBRARY(libPhotonAnalysisTree.so)
+R__LOAD_LIBRARY(libTopologyEventDisplay.so)
 R__LOAD_LIBRARY(libg4detectors.so)
 R__LOAD_LIBRARY(libg4calo.so)
 

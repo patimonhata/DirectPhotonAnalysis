@@ -15,8 +15,9 @@ void BrowseTopologyEvents(
     int first_event = -1,
     double vertex_z_min = -std::numeric_limits<double>::infinity(),
     double vertex_z_max = std::numeric_limits<double>::infinity(),
-    double truth_pi0_pt_min = -std::numeric_limits<double>::infinity(),
-    double truth_pi0_pt_max = std::numeric_limits<double>::infinity())
+    double truth_meson_pt_min = -std::numeric_limits<double>::infinity(),
+    double truth_meson_pt_max = std::numeric_limits<double>::infinity(),
+    int meson_pdg_filter = 0, int origin_filter = -1, int applicability_filter = -1)
 {
   TFile* file = TFile::Open(input_file, "READ");
   if (!file || file->IsZombie())
@@ -25,7 +26,7 @@ void BrowseTopologyEvents(
     return;
   }
   const auto events = topology_display::event_ids(
-      file, topology_filter, pathway_filter, vertex_z_min, vertex_z_max, truth_pi0_pt_min, truth_pi0_pt_max);
+      file, topology_filter, pathway_filter, vertex_z_min, vertex_z_max, truth_meson_pt_min, truth_meson_pt_max, meson_pdg_filter, origin_filter, applicability_filter);
   if (events.empty())
   {
     std::cerr << "BrowseTopologyEvents - no events match the filters" << std::endl;

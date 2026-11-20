@@ -1,9 +1,9 @@
 # Topology event display
 
-This package is a diagnostic view of the pi0 anchor-topology decision.  The
-decision itself is not implemented in the display: both
-the photon-candidate workflow and this package call the shared
-`photon_tree::Pi0AnchorTopologyEvaluator` in `PhotonAnalysisTree`.
+This package displays truth cluster origin and diphoton topology for Pythia
+events. It uses the same common composition and π⁰/η topology evaluator as
+`PhotonAnalysisTree/workflows/photon_candidate_selection`. The single-particle
+workflow retains its gun-specific π⁰ anchor selection.
 
 ## Main entry points
 
@@ -26,12 +26,21 @@ checks live under `validation/`; they are not analysis entry points.
 From the project root, in an sPHENIX analysis environment:
 
 ```sh
+source /opt/sphenix/core/bin/sphenix_setup.sh -n ana.565
 PhotonAnalysisTree/src/build.sh
 TopologyEventDisplay/src/build.sh
+
+photon_prefix="$PWD/PhotonAnalysisTree/install/dev/ana.565"
+display_prefix="$PWD/TopologyEventDisplay/install"
+export ROOT_INCLUDE_PATH="$display_prefix/include:$photon_prefix/include:${ROOT_INCLUDE_PATH:-}"
+export LD_LIBRARY_PATH="$display_prefix/lib64:$photon_prefix/lib64:$photon_prefix/dependencies/Pi0Reconstruction/lib:${LD_LIBRARY_PATH:-}"
 ```
 
-The first command installs the shared evaluator.  The second installs the
-Fun4All dumper.
+The two dump macros resolve their libraries using this environment. To build
+against a different compatible PhotonAnalysisTree install, set
+`PHOTON_ANALYSIS_TREE_PREFIX` when building the display and use the same prefix
+in the exports above. The ROOT-only viewing macros can also open older dumps
+with the `pi0_candidates` tree.
 
 ## Pythia workflow
 
@@ -46,13 +55,23 @@ Example for manifest row 0 and one event:
 root -l -b -q 'TopologyEventDisplay/workflows/pythia/RunPythiaTopologyEventDump.C("PhotonAnalysisTree/input/minimum_bias/segments.list",0,1,"output/topology_pythia.root",1,true)'
 ```
 
-Arguments after the output filename are `n_events`, `write_detail`, then the
-topology thresholds.  A manifest range makes the extraction naturally
-batchable.  For a large sample, first run ranges with `write_detail=false`
-(the event/candidate/anchor catalog), select interesting source ranges and
-event indices, then rerun only those ranges with `write_detail=true`.
-Summary files are intentionally not merged because their local event indices
-are only unique together with the manifest range stored in `metadata`.
+The Pythia macro uses the candidate-map defaults of `E > 0.1 GeV` for stored
+clusters and `|z| < 60 cm` for the signal HepMC vertex. By default each meson's
+partner threshold follows the cluster threshold. For production comparisons,
+pass the settings recorded in the candidate map metadata. For example, the
+Jet12 submit settings use `E > 0.12 GeV` for clusters, `E > 0.5 GeV` for both
+truth partners, and `0.12 < E <= 0.5 GeV` for the missing energy band.
+
+```sh
+root -l -b -q 'TopologyEventDisplay/workflows/pythia/RunPythiaTopologyEventDump.C("PhotonAnalysisTree/input/jet12/segments.list",0,1,"output/topology_jet12.root",40,true,0.7,-1.0,1.1,0.12,0.5,0.0,0.0,0.5,0.15,0,90.0,0.5,0.5,0.10,0.20,0.45,0.65,0.12,0.5)'
+```
+
+The final eight arguments set π⁰/η partner thresholds, π⁰ and η mass windows,
+and the missing-energy bounds. For a large sample, first run manifest ranges with
+`write_detail=false`. The event, candidate, anchor and cluster origin tables
+support selection of interesting ranges for a detailed rerun. The local
+`event` index is relative to the input range. The map and display share
+`event_uid`, derived from the input segment and entry within the file.
 
 ## Single-particle workflow
 
@@ -63,10 +82,11 @@ and truth-tower nodes:
 root -l -b -q 'TopologyEventDisplay/workflows/single_particle/RunSingleParticleTopologyEventDump.C("input.root","output/topology_gun.root",10)'
 ```
 
-The optional argument after `write_detail` is `rebuild_truth_nodes`; leave it
-`false` for the standard reconstructed DST and use `true` only for a stripped
-DST that lacks those nodes.  The intermediate schema and renderer are the same
-as for Pythia.
+After `n_events`, the optional arguments start with `cluster_node`,
+`write_detail` and `rebuild_truth_nodes`. Set `rebuild_truth_nodes=true` for a
+stripped DST that lacks the truth-cell and truth-tower nodes. The gun uses the
+same ROOT schema and renderer. Its `cluster_origins` table is empty and its
+anchor `applicability` is -1, the legacy-mode sentinel.
 
 ## Viewing
 
@@ -77,21 +97,28 @@ root -l -b -q 'TopologyEventDisplay/display/MakeTopologyEventBook.C("output/topo
 ```
 
 The next three arguments are `topology_filter`, `pathway_filter`, and
-`max_events`.  Use `-1` for no filter.  Topology codes are 0 other,
-1 separated, 2 merged, 3 missing, and 4 single-contaminated.  Pathway codes are 1 G4-primary pi0
-decay, 2 generator-level pi0 decay, and 3 single-particle G4 decay.
+`max_events`. Use `-1` to leave a filter disabled. The topology codes are
+0 other, 1 separated, 2 merged, 3 missing, and 4 single-contaminated. In a
+Pythia dump these filters require an evaluable anchor. Pathway codes are
+1 G4 primary, 2 generator, 3 single-particle gun, 4 legacy G4 η daughter, and
+5 G4 secondary.
 
-Four optional range arguments follow: `vertex_z_min`, `vertex_z_max`,
-`truth_pi0_pt_min`, and `truth_pi0_pt_max`.  Bounds are inclusive.  For
-example, this selects up to 20 events with collision vertex z in [-10, 10] cm
-and at least one selected truth pi0 candidate with pT in [5, 15] GeV/c:
+The four inclusive range arguments are `vertex_z_min`, `vertex_z_max`,
+`truth_meson_pt_min`, and `truth_meson_pt_max`. Three optional arguments
+follow. `meson_pdg_filter` is 111 for π⁰, 221 for η, or 0 for either.
+`origin_filter` and `applicability_filter` use the codes in the [candidate
+definitions](../PhotonAnalysisTree/docs/photon_candidate_definitions.md),
+with -1 disabling the filter. Origin and applicability alone can find
+clusters without anchor rows. When combined with a candidate or topology
+filter, they apply to the cluster of the same anchor. Filters select events for
+viewing. The PDF shows the full selected event.
+
+This example selects up to 20 events containing a π⁰ candidate with
+`5 <= pT <= 15 GeV/c` at `-10 <= z <= 10 cm`.
 
 ```sh
-root -l -b -q 'TopologyEventDisplay/display/MakeTopologyEventBook.C("output/topology_pythia.root","output/selected.pdf",-1,-1,20,-10,10,5,15)'
+root -l -b -q 'TopologyEventDisplay/display/MakeTopologyEventBook.C("output/topology_pythia.root","output/selected.pdf",-1,-1,20,-10,10,5,15,111)'
 ```
-
-Topology, pathway and truth-pT filters apply to the same pi0 candidate.  Omit
-the range arguments to leave these filters disabled.
 
 For sequential inspection in an interactive ROOT session:
 
@@ -99,11 +126,11 @@ For sequential inspection in an interactive ROOT session:
 .L TopologyEventDisplay/display/BrowseTopologyEvents.C
 BrowseTopologyEvents("output/topology_pythia.root",
                      "output/current_event.pdf", -1, -1, -1,
-                     -10.0, 10.0, 5.0, 15.0);
+                     -10.0, 10.0, 5.0, 15.0, 111);
 ```
 
 Every event starts with an overview page containing x-y, z-r and eta-phi
-views.  One color consistently identifies one selected pi0 family: the pi0 is
+views.  One color consistently identifies one meson family. The parent line is
 solid, while its two daughter-photon branches use fine and coarse dashes.  The
 open cluster ring uses the same family color.  Cluster markers below 0.1 GeV use a
 separate compressed size scale, while markers at or above 0.1 GeV start from a substantially larger size; the fill color
@@ -114,94 +141,87 @@ self-contained legend.  Stars in eta-phi use the daughter-photon momentum
 eta and phi, matching the vertex-corrected cluster coordinates.  The separate
 CEMC projection eta and phi remain available for acceptance and missing-partner
 diagnostics, but are not used as star coordinates.  Detail pages are grouped by
-pi0 candidate; the stored anchor IDs and intermediate trees are unchanged.
-Nested tower outlines identify the anchor and the two best daughter-photon clusters
-using the same line grammar.  Within a selected pi0 family, a direct photon with
+meson candidate. Nested tower outlines identify the anchor and the truth
+representative for each daughter, including representatives below the cluster
+threshold. Within a meson family, a direct photon with
 stored daughters stops at its first daughter-production vertex instead of being
 projected to the calorimeter.  Pre-CEMC descendants are drawn as thin branch
 lines: successive daughter-production vertices on one parent track are joined
 in time order and clipped at the CEMC inner surface.  Fallback projection to the
-calorimeter is reserved for terminal pi0 and direct-photon tracks; terminal
+calorimeter is reserved for terminal meson and direct-photon tracks; terminal
 shower descendants without a child vertex are omitted.  Truth segments are
 straight display guides between G4 vertices or to the calorimeter radius; they
 are not magnetic-field-propagated charged tracks.
 
-## Anchor and direct-match diagnostics
+## Cluster origin and topology
 
-An anchor must pass the cluster energy and eta selections, and its main truth
-pi0 contribution must be at least `anchor_pi0_fraction_min` (0.5 by default).
-The fraction is the selected pi0 contribution divided by the cluster energy;
-being selected as an anchor does not by itself mean that both daughter photons
-were reconstructed.
+Pythia stores a common-composition row for each cluster above the map energy
+threshold, including clusters outside anchor η acceptance. The selected origin
+uses the common majority rule, with a strict fraction above 0.5 and the original
+cluster truth deposit as denominator. η parent contributions have their own
+origin classes. Direct π⁰ and η diphotons use the matching topology evaluator
+for that meson. See the [candidate definitions](../PhotonAnalysisTree/docs/photon_candidate_definitions.md)
+for the full origin and topology codes.
 
-Direct daughter matching now distinguishes a strict complete match from a
-usable partial match. A complete match resolves every cluster member tower. A
-partial match is usable for topology decisions when the resolved member-energy
-coverage is at least `min_direct_match_cluster_energy_coverage` (0.5 by
-default). The first unresolved tower is recorded together with a failure name:
-`missing_tower_info`, `invalid_tower_energy`, `missing_truth_tower`,
-`missing_g4_cell`, `missing_g4_hit`, or `invalid_hit_edep`. `match_valid`
-continues to mean strict completeness; `match_usable` is the quantity used by
-the topology evaluator.
+An anchor associates a cluster with a concrete diphoton candidate. The
+cluster's `applicability` controls whether to count that topology in the event
+summary. The values are 0 unknown, 1 evaluable, and 2 not applicable. For example,
+a confirmed non-diphoton π⁰ has a cluster origin row with applicability 2.
+A diphoton can have an anchor and still be unknown because its anchor match,
+projection, or interaction information is unavailable.
 
-The top-level topology is `separated`, `merged`, `single_contaminated`,
-`missing`, or `other`. A would-be merged anchor is reclassified as
-`single_contaminated` when exactly one of its two direct daughter photons has
-its first daughter-production vertex at transverse radius
-`r < pre_cemc_interaction_radius` (90 cm by default). Neither/both pre-CEMC
-interactions remain `merged`; the boundary is strict. The selected photon index
-is stored as `pre_cemc_photon_index`.
+Matching can use a complete match or a partial match with member-energy coverage
+of at least 0.5 by default, with complete hit ancestry. A failed match in
+another cluster leaves the current anchor's applicability intact. The stored
+candidate-wide minimum coverage is diagnostic. A ray with a known lack of
+intersection with the CEMC cylinder can produce a missing partner classified
+as acceptance. An unavailable projection produces unknown applicability.
 
-Only `missing` is subdivided by `missing_category_name`:
-
-- `energy_band_taggable`: full representative partner-cluster energy `0.2 < E <= 0.5 GeV` and pair mass inside the pi0 window;
-- `energy_band_not_taggable`: the same energy band and a finite mass outside the pi0 window;
-- `low_energy`: partner-cluster energy `E <= 0.2 GeV`;
-- `unclustered_or_no_cemc_deposit`: no associated cluster, or no CEMC deposit;
-- `acceptance`: valid partner projection outside CEMC acceptance;
-- `other`: invalid projection, unresolved matching, same-as-anchor cluster, energy above the band, invalid mass, or disabled diagnostics.
-
-These follow shared topology algorithm 10. Diagnostic matching searches all valid positive-energy clusters and selects the maximum direct daughter-deposit cluster. Invalid projection and acceptance take priority over energy classification. Displacement is diagnostic information rather than a missing category. Missing details retain finer reasons; `write_detail=false` still controls only the large geometry/truth tables.
-
-The default photon-energy recovery threshold is zero (disabled), following photon_candidate_selection. Positive values remain available for explicit comparison runs. The recovery estimate and direct truth-match quality requirement remain recorded and unchanged. The event-display workflow has no meson veto; its topology partner energy cut defaults to the configured anchor energy threshold.
+Truth partner selection uses the available positive-energy cluster with the
+largest daughter deposit, with ties broken by the smallest cluster ID. The
+partner energy and optional photon recovery cuts are applied to that
+representative. The default recovery requirement is disabled. The PDF and ROOT
+output retain the representative and the nearby matching diagnostic.
+The single-contaminated category requires exactly one photon with its first
+daughter-production radius strictly below the default 90 cm boundary.
 
 ## Intermediate ROOT schema
 
-- `metadata`: schema/algorithm versions, sample mode, source range,
-  thresholds (including `pre_cemc_interaction_radius`), detail flag and
-  processing counters. The current schema version is 6.
-- `events`: pi0 population, truth/cluster population and topology counts.
-- `pi0_candidates`: the two supported Pythia pathways (or gun pathway),
-  daughter photons, CEMC projection validity/eta/phi/fiducial status, each
-  photon's first daughter-production radius/pre-CEMC flag and total descendant
-  CEMC truth deposit, best clusters and recovery decision.
-- `anchor_decisions`: one row per anchor, including topology, reason,
-  coarse and detailed missing reasons, partner CEMC truth deposit and diagnostic
-  invariant mass, the pre-CEMC photon index for single-contaminated anchors,
-  strict/usable direct-match status, failure location, coverage and the selected
-  below-threshold partner diagnostic.
-- `candidate_cluster_truth`: direct daughter-photon deposit and recovery
-  quantities plus strict/usable match status, failure and coverage for every
-  evaluated candidate/cluster pair.
-- `clusters`, `cluster_contributors`: reconstructed clusters and their
-  truth contributors.
-- `cluster_towers`: member energy, calibrated tower energy and allocation
-  fraction, so shared/adjacent cluster boundaries remain visible.
-- `truth_particles`, `truth_segments`: all G4 particles plus selected-pi0
-  family labels and display segments.
+Schema 7 includes these classification tables.
 
-With `write_detail=false`, the four detailed geometry/truth tables may be
-empty while event, candidate and anchor tables remain usable for selection.
+- `metadata` records the algorithm versions, input range, thresholds, detail
+  flag and processing counters.
+- `events` records local and source event IDs, π⁰ and η candidate populations,
+  topology counts and unevaluable anchor counts.
+- `cluster_origins` records the common class, selected particle identity and PDG,
+  fraction, original and unresolved truth deposit, quality, applicability and
+  topology reason. It also retains candidate-wide and anchor-local match metrics.
+- `meson_candidates` stores the meson PDG, canonical parent and photon identities,
+  pathway, truth kinematics, projection and interaction diagnostics, and the two
+  truth representatives. A representative can be below the cluster threshold.
+- `anchor_decisions` connects each candidate and anchor cluster. It stores the
+  topology code, applicability and reasons, truth partner, and direct-match
+  diagnostics. Interpret a Pythia topology code together with applicability.
+
+Detailed dumps also populate six tables. `candidate_cluster_truth` stores direct
+daughter matches for evaluated candidates and above-threshold clusters.
+`clusters`, `cluster_contributors`, and `cluster_towers` provide reconstructed
+geometry, contributors and tower allocation. `truth_particles` and
+`truth_segments` provide the G4 geometry and family labels. With Pythia, the
+evaluator runs on anchored candidates in both detail modes. The gun can
+evaluate all candidates when detail is enabled.
 
 ## Validation
 
-The auxiliary validator is deliberately separated from the main macros:
+Run the ROOT validator on an intermediate dump. To compare a Pythia dump with a
+candidate map, use the same manifest and thresholds and run the second command.
 
 ```sh
-root -l -b -q 'TopologyEventDisplay/validation/CheckTopologyEventDump.C("output/topology_pythia.root")'
+root -l -b -q 'TopologyEventDisplay/validation/CheckTopologyEventDump.C("output/topology_jet12.root")'
+python3 TopologyEventDisplay/validation/compare_dump_to_candidate_map.py output/topology_jet12.root output/candidate_map.root
 ```
 
-It checks required trees and branches, category closure, anchor references,
-projection/fiducial consistency, the strict 90 cm pre-CEMC flag and
-single-contaminated XOR condition, missing-category priority, key uniqueness and
-direct energy-deposit closure.
+The validator checks counts, references, evaluation status, missing-category
+priority and direct energy-deposit closure. The comparison uses
+`(event_uid, cluster_id)` to verify origin, the selected identity, matching and
+topology diagnostics, and truth partners against the map.

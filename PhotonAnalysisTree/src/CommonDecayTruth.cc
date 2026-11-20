@@ -428,7 +428,7 @@ void CommonTruthCollection::append(const composition::Result& r, int legacy)
   selected_embedding.push_back(r.selected.identity.embedding); selected_source.push_back(r.selected.identity.source); selected_id.push_back(r.selected.identity.id);
   applicability.push_back(static_cast<int>(r.applicability)); topology_reason.push_back(r.topology_reason); legacy_origin.push_back(legacy);
 #define PUSH(field) field.push_back(r.field)
-  quality.push_back(r.quality | (!r.valid ? composition::missing_particle : 0U) | (!(r.total > 0) ? composition::invalid_deposit : 0U));
+  quality.push_back(composition::stored_quality(r));
   PUSH(total); PUSH(attributed); PUSH(unresolved); PUSH(fraction); PUSH(max_photon); PUSH(other_photons); PUSH(charged); PUSH(matching_status); PUSH(minimum_coverage);
   PUSH(anchor_matching_status); PUSH(anchor_matching_coverage); PUSH(anchor_matching_usable);
 #undef PUSH

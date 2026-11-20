@@ -123,6 +123,8 @@ install(
     Pi0AnchorTopologyEvaluator.h
     Pi0ClusterTruthMatcher.h
     PhotonAnalysisTree.h
+    PhotonCandidateInput.h
+    PhotonCandidateTopology.h
     PhotonTreeCommon.h
     Pi0GammaOnnx.h
     PythiaClusterTruthMatcher.h

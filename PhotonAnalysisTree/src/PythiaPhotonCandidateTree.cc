@@ -1,5 +1,7 @@
 #include "PythiaPhotonCandidateTree.h"
+
 #include "EtaOriginFractions.h"
+#include "PhotonCandidateInput.h"
 
 #include <calobase/RawCluster.h>
 #include <calobase/RawClusterContainer.h>
@@ -408,34 +410,12 @@ bool PythiaPhotonCandidateTree::update_input_provenance()
   }
   if (!input_file.empty() && input_file != current_input_file_)
   {
-    const std::size_t basename_begin = input_file.find_last_of("/\\");
-    const std::string basename = input_file.substr(basename_begin == std::string::npos ? 0U : basename_begin + 1U);
-    const std::size_t extension_position = basename.rfind(".root");
-    const std::size_t segment_separator = extension_position == std::string::npos ? std::string::npos : basename.rfind("-", extension_position);
-    if (extension_position == std::string::npos || extension_position + 5U != basename.size() ||
-        segment_separator == std::string::npos || segment_separator + 1U >= extension_position)
-    {
-      std::cerr << "PythiaPhotonCandidateTree::process_event - cannot parse input segment: " << input_file << std::endl;
-      return false;
-    }
-    const std::string segment_text = basename.substr(segment_separator + 1U, extension_position - segment_separator - 1U);
-    std::size_t parsed = 0U;
-    unsigned long segment_id = 0UL;
-    try
-    {
-      segment_id = std::stoul(segment_text, &parsed);
-    }
-    catch (const std::exception&)
-    {
-      parsed = 0U;
-    }
-    if (parsed != segment_text.size() || segment_id > std::numeric_limits<unsigned int>::max())
+    if (!photon_tree::photon_candidate_source_segment(input_file, source_file_id_))
     {
       std::cerr << "PythiaPhotonCandidateTree::process_event - invalid input segment: " << input_file << std::endl;
       return false;
     }
     current_input_file_ = input_file;
-    source_file_id_ = static_cast<unsigned int>(segment_id);
     next_event_in_file_ = 0U;
   }
   if (next_event_in_file_ == std::numeric_limits<unsigned int>::max())
@@ -445,7 +425,7 @@ bool PythiaPhotonCandidateTree::update_input_provenance()
   }
   b_source_file_id_ = source_file_id_;
   b_event_in_file_ = next_event_in_file_++;
-  b_event_uid_ = (static_cast<unsigned long long>(b_source_file_id_) << 32U) | b_event_in_file_;
+  b_event_uid_ = photon_tree::photon_candidate_event_uid(b_source_file_id_, b_event_in_file_);
   return true;
 }
 
@@ -495,7 +475,7 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.signal_embedding_id = signal_embedding_id_;
   config.anchor_cluster_eta_max = candidate_abs_eta_max_;
   config.partner_cluster_eta_max = -1.0;
-  config.min_cluster_energy = std::nextafter(min_cluster_energy_, std::numeric_limits<double>::infinity());
+  config.min_cluster_energy = min_cluster_energy_;
   config.partner_diagnostic_min_cluster_energy = partner_diagnostic_min_cluster_energy_;
   config.tagging_partner_min_cluster_energy = pi0_partner_min_energy_;
   config.missing_energy_min = missing_energy_min_;
@@ -504,18 +484,13 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.tagging_pi0_mass_min = pi0_mass_min_;
   config.tagging_pi0_mass_max = pi0_mass_max_;
   config.max_abs_vertex_z = max_abs_vertex_z_;
-  config.enable_missing_diagnostics = true;
-  config.eta_pseudo_primary = true;
   config.verbosity = verbosity_;
-  legacy_topology_evaluator_.configure(config);
-  config.common_composition = true;
+  config = photon_tree::photon_candidate_topology_config(config);
+  auto legacy_config = config;
+  legacy_config.common_composition = false;
+  legacy_topology_evaluator_.configure(legacy_config);
   topology_evaluator_.configure(config);
-  config.parent_pdg_id = 221;
-  config.require_hepmc_two_photon_decay = true;
-  config.tagging_partner_min_cluster_energy = eta_partner_min_energy_;
-  config.tagging_pi0_mass_min = eta_mass_min_;
-  config.tagging_pi0_mass_max = eta_mass_max_;
-  eta_topology_evaluator_.configure(config);
+  eta_topology_evaluator_.configure(photon_tree::photon_candidate_eta_topology_config(config, eta_partner_min_energy_, eta_mass_min_, eta_mass_max_));
 
   try
   {
@@ -637,13 +612,9 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     const auto id = common_.split().data.cluster_id[i]; auto found = shared.find(id);
     if (found == shared.end()) { common_truth_.append({}); original_truth_.append({}); continue; }
     auto r = found->second->composition;
-    if (r.main == photon_tree::composition::Main::eta_gg && eta_shared.count(id))
+    if (const auto eta = eta_shared.find(id); r.main == photon_tree::composition::Main::eta_gg && eta != eta_shared.end())
     {
-      const auto& eta = eta_shared[id]->composition;
-      r.applicability = eta.applicability; r.topology_reason = eta.topology_reason;
-      r.matching_status = eta.matching_status; r.minimum_coverage = eta.minimum_coverage;
-      r.anchor_matching_status = eta.anchor_matching_status; r.anchor_matching_coverage = eta.anchor_matching_coverage;
-      r.anchor_matching_usable = eta.anchor_matching_usable;
+      photon_tree::copy_common_topology(r, eta->second->composition);
     }
     const auto origin = eta_origin::summarize(cluster_truth_.contributor_offset[i], cluster_truth_.contributor_offset[i + 1],
         cluster_truth_.contributor_embedding_id, cluster_truth_.contributor_fraction, cluster_truth_.contributor_eta_parent_barcode,

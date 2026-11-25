@@ -28,7 +28,8 @@ int select_spin_qa_runs(
   }
 
   std::error_code error;
-  if (std::filesystem::equivalent(golden_path, output_path, error)) {
+  const bool same_file = std::filesystem::equivalent(golden_path, output_path, error);
+  if (same_file) {
     std::cerr << "The golden run list and output must be different files.\n";
     return EXIT_FAILURE;
   }
@@ -43,9 +44,17 @@ int select_spin_qa_runs(
     if (record.eof()) continue;
 
     int run = 0;
-    char extra = '\0';
-    if (!(record >> run) || run <= 0 || (record >> extra) || !runs.insert(run).second) {
-      std::cerr << "Invalid or duplicate run number in " << golden_path << ':' << line_number << '\n';
+    record >> run;
+    const bool valid_run = record && run > 0;
+    record >> std::ws;
+    if (!valid_run || !record.eof()) {
+      std::cerr << "Invalid run number in " << golden_path << ':' << line_number << '\n';
+      return EXIT_FAILURE;
+    }
+
+    const bool inserted = runs.insert(run).second;
+    if (!inserted) {
+      std::cerr << "Duplicate run number in " << golden_path << ':' << line_number << '\n';
       return EXIT_FAILURE;
     }
   }
@@ -55,7 +64,8 @@ int select_spin_qa_runs(
   }
 
   SpinDBOutput spin_db("phnxrc");
-  if (spin_db.StoreDBContent(*runs.begin(), *runs.rbegin()) != 1) {
+  const int load_status = spin_db.StoreDBContent(*runs.begin(), *runs.rbegin());
+  if (load_status != 1) {
     std::cerr << "Cannot load default Spin DB rows for runs " << *runs.begin() << " through " << *runs.rbegin() << '\n';
     return EXIT_FAILURE;
   }
@@ -66,7 +76,8 @@ int select_spin_qa_runs(
   std::size_t missing = 0;
   std::size_t flagged = 0;
   for (const int run : runs) {
-    if (spin_db.GetDBContentStore(content, run) != 1) {
+    const int lookup_status = spin_db.GetDBContentStore(content, run);
+    if (lookup_status != 1) {
       ++missing;
     }
     else if (content->GetBadRunFlag() == 0) {
@@ -95,7 +106,11 @@ int select_spin_qa_runs(
   for (const int run : selected) std::fprintf(output, "%d\n", run);
   const bool write_ok = std::ferror(output) == 0;
   const bool close_ok = std::fclose(output) == 0;
-  if (!write_ok || !close_ok || std::rename(temporary_path.c_str(), output_path) != 0) {
+  bool replaced = false;
+  if (write_ok && close_ok) {
+    replaced = std::rename(temporary_path.c_str(), output_path) == 0;
+  }
+  if (!replaced) {
     std::cerr << "Cannot write Spin QA run list: " << output_path << '\n';
     std::remove(temporary_path.c_str());
     return EXIT_FAILURE;

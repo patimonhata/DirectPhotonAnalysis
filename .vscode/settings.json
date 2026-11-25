@@ -14,7 +14,12 @@
         "**/build/**": true,
         "**/install/**": true,
         "**/autom4te.cache/**": true,
-        "PhotonAnalysisTree/input/physics_data/Jet_and_JETCALO_ana521_2025p007_v001/**": true
+        "PhotonAnalysisTree/input/physics_data/Jet_and_JETCALO_ana521_2025p007_v001/**": true,
+        "EmcalETViewer/**": true,
+        "EventDisplay": true,
+        "ImageSample": true,
+        "SinglePi0GunSimulation": true,
+        "TopoClusterHcalStudy": true
     },
     "files.exclude": {
         "**/autom4te.cache": true
@@ -25,5 +30,8 @@
         "**/build": true,
         "**/install": true,
         "**/autom4te.cache": true
-    }
+    },
+    
+    "git.autofetch": false,
+    "git.autorefresh": true,
 }

@@ -421,7 +421,8 @@ int reduce(
   if (!eta_topology::write_partial(output, eta_histograms, eta_bdt_histograms)) return 8;
   output.cd();
   int common_composition_algorithm_version = 1;
-  int schema_version = 13, source_schema_version = 10, signal_embedding_id = kSignalEmbeddingId;
+  int schema_version = 13, source_schema_version = maps.front().schema_version, signal_embedding_id = kSignalEmbeddingId;
+  auto mbd = maps.front().mbd;
   int decay_origin_algorithm_version = maps.front().decay_origin_algorithm_version;
   double decay_origin_max_proper_length_cm = maps.front().decay_origin_max_proper_length_cm;
   double decay_origin_max_flight_cm = maps.front().decay_origin_max_flight_cm;
@@ -440,6 +441,7 @@ int reduce(
   metadata.Branch("schema_version", &schema_version);
   metadata.Branch("common_composition_algorithm_version", &common_composition_algorithm_version);
   metadata.Branch("source_map_schema_version", &source_schema_version);
+  mbd.create_branches(metadata);
   metadata.Branch("other_origin_algorithm_version", &other_origin_algorithm_version);
   metadata.Branch("decay_origin_algorithm_version", &decay_origin_algorithm_version);
   metadata.Branch("decay_origin_max_proper_length_cm", &decay_origin_max_proper_length_cm);

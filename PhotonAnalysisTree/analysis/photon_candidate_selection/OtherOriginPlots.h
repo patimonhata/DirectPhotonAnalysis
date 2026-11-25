@@ -63,7 +63,9 @@ inline void metadata(TFile& file, const candidate_composition_merge::Metadata& s
   OTHER_METADATA(sample_names); OTHER_METADATA(sample_map_counts); OTHER_METADATA(sample_sum_generator_weights);
   OTHER_METADATA(min_cluster_energy); OTHER_METADATA(pi0_partner_min_energy); OTHER_METADATA(eta_partner_min_energy);
 #undef OTHER_METADATA
-  tree.Branch("source_partial_schema_version", &value.schema_version); tree.Fill(); tree.Write();
+  tree.Branch("source_partial_schema_version", &value.schema_version);
+  value.mbd.create_branches(tree);
+  tree.Fill(); tree.Write();
 }
 inline bool export_outputs(const std::string& base, const candidate_composition_merge::Metadata& source,
                            const std::array<std::unique_ptr<candidate_composition::Histograms>, kSelectionCount>& composition,

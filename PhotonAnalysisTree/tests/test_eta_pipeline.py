@@ -1,4 +1,4 @@
-"""Synthetic schema-10 map -> reduce -> merge, including eta cascade modes, pi0 priority and distinct-parent rejection."""
+"""Synthetic map -> reduce -> merge, including eta cascade modes, pi0 priority and distinct-parent rejection."""
 import os
 from pathlib import Path
 import re
@@ -23,7 +23,7 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
   const auto sample = *std::find_if(samples.begin(), samples.end(), [&](const auto& s) { return sample_name == s.name; });
   TFile file(path.c_str(), "RECREATE");
   MapMetadata map;
-  map.schema_version = 10; map.common_composition_algorithm_version = 1; map.decay_origin_algorithm_version = 1; map.decay_origin_max_proper_length_cm = 1e-4; map.decay_origin_max_flight_cm = 1e-2; map.pi0_topology_algorithm_version = 14; map.eta_topology_algorithm_version = 4;
+  map.schema_version = kMbdMapSchema; map.common_composition_algorithm_version = 1; map.decay_origin_algorithm_version = 1; map.decay_origin_max_proper_length_cm = 1e-4; map.decay_origin_max_flight_cm = 1e-2; map.pi0_topology_algorithm_version = 14; map.eta_topology_algorithm_version = 4;
   map.input_manifest = "synthetic"; map.sample_name = sample.name; map.analysis_release = "ana.565"; map.model_sha256 = "synthetic";
   map.manifest_begin = 0; map.manifest_end = 1; map.input_file_count = 1;
   map.cross_section_pb = sample.cross_section_pb; map.window_min = sample.window_min; map.window_max = sample.window_max;
@@ -49,6 +49,8 @@ void make_eta_test_map(const std::string& path, const std::string& sample_name) 
   M("pi0_topology_algorithm_version", pi0_topology_algorithm_version); M("eta_topology_algorithm_version", eta_topology_algorithm_version);
 #undef M
   metadata.Branch("common_composition_algorithm_version", &map.common_composition_algorithm_version);
+  map.mbd = {100., 3., 1., .9, 5., 35., "MbdVertexMap", "signal HepMC collision"};
+  map.mbd.create_branches(metadata);
   metadata.Fill(); metadata.Write();
   TTree events("event_tree", "Synthetic event");
   unsigned int ncluster = 1;
@@ -197,7 +199,12 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
         assert ROOT.ReducePythiaPhotonCandidateSelection('photonjet', str(root / 'maps'), str(partial), False, 40, 40., sample, 0) == 0
         f = ROOT.TFile.Open(str(partial) + '.root')
         metadata = f.Get('metadata'); metadata.GetEntry(0)
-        assert int(metadata.schema_version) == 13 and int(metadata.source_map_schema_version) == 10
+        assert int(metadata.schema_version) == 13 and int(metadata.source_map_schema_version) == 11
+        assert float(metadata.max_abs_mbd_vertex_z) == 100.
+        assert float(metadata.shower_shape_min_cluster_et) == 3.
+        assert float(metadata.candidate_abs_eta_max) == 1.
+        assert float(metadata.topology_anchor_abs_eta_max) == .9
+        assert str(metadata.reconstruction_vertex_source) == 'MbdVertexMap'
         assert f.Get('composition/kinematic/h_candidate_eta_et_count').Integral() == 12
         assert f.Get('eta_anchor_topology/kinematic/h_region_a_eta_anchor_et_count').Integral() == 10
         assert f.Get('eta_anchor_topology/region_a_tagging_veto/h_region_a_eta_anchor_et_count').Integral() == 6
@@ -213,6 +220,13 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
         f.Close()
     output = root / 'merged'
     assert ROOT.MergePythiaPhotonCandidateSelection('photonjet', str(root / 'partial'), str(output)) == 0
+    for name in ('candidate_composition.root', 'common_composition.root', 'pi0_anchor_topology.root', 'candidate_composition_eta_topology.root'):
+        with ROOT.TFile.Open(str(output / name)) as merged:
+            metadata = merged.Get('metadata')
+            assert metadata.GetEntry(0) > 0
+            assert int(metadata.source_map_schema_version) == 11
+            assert float(metadata.max_abs_mbd_vertex_z) == 100.
+            assert float(metadata.topology_anchor_abs_eta_max) == .9
     f = ROOT.TFile.Open(str(output / 'candidate_composition_eta_topology.root'))
     assert f.Get('kinematic/detailed/h_candidate_eta_residual_et_count').Integral() == 0
     assert f.Get('kinematic/detailed/h_candidate_eta_three_pi0_et_count').Integral() == 0
@@ -253,4 +267,4 @@ with tempfile.TemporaryDirectory(prefix='eta_pipeline_') as temporary:
                 assert len(re.findall(rb'/Type\s*/Page\b', pdf.read_bytes())) == 6
     assert not list(output.rglob('workinprogress'))
     assert (output / 'common_composition_migration.csv').is_file()
-    print('Schema-10 map -> reduce -> merge with supplemental decay origins, eta residuals, veto survival, both plot families: passed')
+    print('Schema-11 map -> reduce -> merge with supplemental decay origins, eta residuals, veto survival, both plot families: passed')

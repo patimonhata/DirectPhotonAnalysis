@@ -5,7 +5,8 @@
 void test_candidate_metadata()
 {
   MapMetadata map;
-  map.schema_version = 10; map.common_composition_algorithm_version = 1;
+  map.schema_version = kMbdMapSchema; map.common_composition_algorithm_version = 1;
+  map.mbd = {60., 3., .7, .7, 5., 35., "MbdVertexMap", "signal HepMC collision"};
   map.eta_topology_algorithm_version = 4;
   map.pi0_topology_algorithm_version = 14;
   map.min_photon_energy_recovery = 0.0;
@@ -36,6 +37,8 @@ void test_candidate_metadata()
     assert(!compatible(map, policy));
   }
   candidate_composition_merge::Metadata partial;
+  partial.source_map_schema_version = kMbdMapSchema;
+  partial.mbd = map.mbd;
   assert(candidate_composition_merge::compatible(partial, partial));
   const std::array<double candidate_composition_merge::Metadata::*, 10> partial_fields = {
       &candidate_composition_merge::Metadata::min_cluster_energy, &candidate_composition_merge::Metadata::pi0_partner_min_energy,
@@ -58,6 +61,17 @@ void test_candidate_metadata()
     if (field == 3) ++policy.common_composition_algorithm_version;
     assert(!candidate_composition_merge::compatible(partial, policy));
   }
+  for (const auto field : {&MbdMapSettings::max_abs_mbd_vertex_z, &MbdMapSettings::shower_shape_min_cluster_et,
+       &MbdMapSettings::candidate_abs_eta_max, &MbdMapSettings::topology_anchor_abs_eta_max, &MbdMapSettings::candidate_et_min, &MbdMapSettings::candidate_et_max})
+  {
+    auto different_map = map;
+    auto different_partial = partial;
+    different_map.mbd.*field += .1;
+    different_partial.mbd.*field += .1;
+    assert(!compatible(map, different_map));
+    assert(!candidate_composition_merge::compatible(partial, different_partial));
+  }
+
   auto different_eta = partial;
   --different_eta.eta_topology_algorithm_version;
   assert(!candidate_composition_merge::compatible(partial, different_eta));

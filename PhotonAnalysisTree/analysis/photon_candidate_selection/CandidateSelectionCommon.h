@@ -107,6 +107,32 @@ std::vector<SampleDefinition> sample_definitions(const std::string& family)
   return {};
 }
 
+constexpr int kMbdMapSchema = 11;
+
+struct MbdMapSettings
+{
+  double max_abs_mbd_vertex_z = -1.0;
+  double shower_shape_min_cluster_et = -1.0;
+  double candidate_abs_eta_max = -1.0;
+  double topology_anchor_abs_eta_max = -1.0;
+  double candidate_et_min = -1.0;
+  double candidate_et_max = -1.0;
+  std::string reconstruction_vertex_source;
+  std::string topology_vertex_source;
+
+  void create_branches(TTree& tree)
+  {
+    tree.Branch("max_abs_mbd_vertex_z", &max_abs_mbd_vertex_z);
+    tree.Branch("shower_shape_min_cluster_et", &shower_shape_min_cluster_et);
+    tree.Branch("candidate_abs_eta_max", &candidate_abs_eta_max);
+    tree.Branch("topology_anchor_abs_eta_max", &topology_anchor_abs_eta_max);
+    tree.Branch("candidate_et_min", &candidate_et_min);
+    tree.Branch("candidate_et_max", &candidate_et_max);
+    tree.Branch("reconstruction_vertex_source", &reconstruction_vertex_source);
+    tree.Branch("topology_vertex_source", &topology_vertex_source);
+  }
+};
+
 struct MapMetadata
 {
   std::string path;
@@ -144,6 +170,7 @@ struct MapMetadata
   unsigned long long events_written = 0;
   unsigned long long events_vertex_rejected = 0;
   unsigned long long events_invalid = 0;
+  MbdMapSettings mbd;
 };
 
 template <class T>
@@ -164,6 +191,42 @@ bool bind_active(TTree* tree, const char* name, T* address)
 bool same_double(double left, double right)
 {
   return std::abs(left - right) <= 1e-11 * std::max({1.0, std::abs(left), std::abs(right)});
+}
+
+bool read_mbd_map_settings(TTree* tree, MbdMapSettings& value)
+{
+  std::string* reconstruction_vertex_source = nullptr;
+  std::string* topology_vertex_source = nullptr;
+  const bool ok = bind(tree, "max_abs_mbd_vertex_z", &value.max_abs_mbd_vertex_z) &&
+      bind(tree, "shower_shape_min_cluster_et", &value.shower_shape_min_cluster_et) &&
+      bind(tree, "candidate_abs_eta_max", &value.candidate_abs_eta_max) &&
+      bind(tree, "topology_anchor_abs_eta_max", &value.topology_anchor_abs_eta_max) &&
+      bind(tree, "candidate_et_min", &value.candidate_et_min) && bind(tree, "candidate_et_max", &value.candidate_et_max) &&
+      bind(tree, "reconstruction_vertex_source", &reconstruction_vertex_source) && bind(tree, "topology_vertex_source", &topology_vertex_source);
+  const bool loaded = ok && tree->GetEntry(0) > 0 && reconstruction_vertex_source && topology_vertex_source;
+  if (loaded)
+  {
+    value.reconstruction_vertex_source = *reconstruction_vertex_source;
+    value.topology_vertex_source = *topology_vertex_source;
+  }
+  tree->ResetBranchAddresses();
+  return loaded && std::isfinite(value.max_abs_mbd_vertex_z) && value.max_abs_mbd_vertex_z > 0.0 &&
+      std::isfinite(value.shower_shape_min_cluster_et) && value.shower_shape_min_cluster_et >= 0.0 &&
+      std::isfinite(value.candidate_abs_eta_max) && value.candidate_abs_eta_max > 0.0 &&
+      std::isfinite(value.topology_anchor_abs_eta_max) && value.topology_anchor_abs_eta_max > 0.0 &&
+      std::isfinite(value.candidate_et_min) && std::isfinite(value.candidate_et_max) && value.candidate_et_min >= 0.0 &&
+      value.candidate_et_max > value.candidate_et_min && value.reconstruction_vertex_source == "MbdVertexMap" &&
+      value.topology_vertex_source == "signal HepMC collision";
+}
+
+bool compatible(const MbdMapSettings& value, const MbdMapSettings& reference)
+{
+  return same_double(value.max_abs_mbd_vertex_z, reference.max_abs_mbd_vertex_z) &&
+      same_double(value.shower_shape_min_cluster_et, reference.shower_shape_min_cluster_et) &&
+      same_double(value.candidate_abs_eta_max, reference.candidate_abs_eta_max) &&
+      same_double(value.topology_anchor_abs_eta_max, reference.topology_anchor_abs_eta_max) &&
+      same_double(value.candidate_et_min, reference.candidate_et_min) && same_double(value.candidate_et_max, reference.candidate_et_max) &&
+      value.reconstruction_vertex_source == reference.reconstruction_vertex_source && value.topology_vertex_source == reference.topology_vertex_source;
 }
 
 bool read_metadata(const std::string& path, MapMetadata& value)
@@ -219,12 +282,17 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   value.sample_name = *sample_name;
   value.analysis_release = *analysis_release;
   value.model_sha256 = *model_sha256;
-  return true;
+  if (value.schema_version != kMbdMapSchema)
+  {
+    std::cerr << "Unsupported map schema " << value.schema_version << " in " << path << ", expected " << kMbdMapSchema << std::endl;
+    return false;
+  }
+  return read_mbd_map_settings(tree, value.mbd);
 }
 
 bool valid_metadata(const MapMetadata& value, const SampleDefinition& sample)
 {
-  return value.schema_version == 10 && value.common_composition_algorithm_version == 1 && value.decay_origin_algorithm_version == 1 &&
+  return value.common_composition_algorithm_version == 1 && value.decay_origin_algorithm_version == 1 &&
       same_double(value.decay_origin_max_proper_length_cm, 1e-4) && same_double(value.decay_origin_max_flight_cm, 1e-2) && value.sample_name == sample.name && !value.input_manifest.empty() &&
       !value.analysis_release.empty() && !value.model_sha256.empty() && value.manifest_begin >= 0 &&
       std::isfinite(value.min_cluster_energy) && value.min_cluster_energy >= 0.0 &&
@@ -267,7 +335,8 @@ bool compatible(const MapMetadata& value, const MapMetadata& reference)
       same_double(value.missing_energy_min, reference.missing_energy_min) &&
       same_double(value.missing_energy_max, reference.missing_energy_max) &&
       same_double(value.min_photon_energy_recovery, reference.min_photon_energy_recovery) && value.pi0_topology_algorithm_version == reference.pi0_topology_algorithm_version &&
-      value.eta_topology_algorithm_version == reference.eta_topology_algorithm_version;
+      value.eta_topology_algorithm_version == reference.eta_topology_algorithm_version &&
+      compatible(value.mbd, reference.mbd);
 }
 
 bool collect_maps(const std::string& pattern, const SampleDefinition& sample, bool require_complete, std::vector<MapMetadata>& maps)

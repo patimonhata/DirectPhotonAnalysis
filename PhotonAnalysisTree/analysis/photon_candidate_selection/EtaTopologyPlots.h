@@ -42,6 +42,7 @@ inline void write_metadata(TFile& output, const candidate_composition_merge::Met
   ETA_METADATA(sample_names); ETA_METADATA(sample_map_counts); ETA_METADATA(sample_sum_generator_weights);
 #undef ETA_METADATA
   tree.Branch("sample_cross_sections_pb", &sample_cross_sections);
+  metadata.mbd.create_branches(tree);
   tree.Fill(); tree.Write();
 }
 

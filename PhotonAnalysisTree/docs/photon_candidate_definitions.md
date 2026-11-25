@@ -1,6 +1,6 @@
 # Photon-candidate definition notes
 
-Development maps use schema 11 with common composition v1, pi0 topology v14, eta topology v4, and direct hit matcher v5. The existing reducer accepts schema 10 and writes partial schema 13. Saved productions retain their original definitions and results. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for paths and execution.
+Development maps use schema 11 with common composition v1, pi0 topology v14, eta topology v4, and direct hit matcher v5. Reduce reads schema-11 maps and writes partial schema 13 with the source map schema. Reduce and merge check and retain the MBD and topology vertex definitions and the associated vertex, eta, and ET cuts. Use the matching Git revision or frozen software for schema-10 productions. Saved productions retain their original definitions and results. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for paths and execution.
 
 ## BDT model and input order
 

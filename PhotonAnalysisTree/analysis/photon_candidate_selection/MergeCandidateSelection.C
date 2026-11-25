@@ -60,7 +60,7 @@ int merge(
         std::cerr << "Missing or invalid composition partial: " << path << std::endl;
         return 3;
       }
-      if (metadata.schema_version != 13 || metadata.source_map_schema_version != 10 || metadata.family != family ||
+      if (metadata.schema_version != 13 || metadata.family != family ||
           metadata.sample_names.size() != 1U || metadata.sample_names.front() != sample.name ||
           metadata.sample_map_counts.size() != 1U || metadata.sample_sum_generator_weights.size() != 1U || !same_double(metadata.sample_cross_section_pb, sample.cross_section_pb) ||
           metadata.events_stitch_pass > metadata.events_written || metadata.region_a_prompt_clusters > metadata.region_a_clusters ||
@@ -280,6 +280,7 @@ int merge(
     bdt_metadata.Branch("sample_map_counts", &combined.sample_map_counts);
     bdt_metadata.Branch("sample_sum_generator_weights", &combined.sample_sum_generator_weights);
     bdt_metadata.Branch("sample_cross_sections_pb", &sample_cross_sections_pb);
+    combined.mbd.create_branches(bdt_metadata);
     bdt_metadata.Fill();
     bdt_metadata.Write();
   }
@@ -432,6 +433,7 @@ int merge(
   metadata.Branch("sample_names", &combined.sample_names);
   metadata.Branch("sample_map_counts", &combined.sample_map_counts);
   metadata.Branch("sample_sum_generator_weights", &combined.sample_sum_generator_weights);
+  combined.mbd.create_branches(metadata);
   metadata.Fill();
   metadata.Write();
   TTree composition_summary_output("selection_summary", "Per-selection candidate-composition merge summary");
@@ -590,6 +592,7 @@ int merge(
   topology_metadata.Branch("sample_region_a_anchor_clusters", &sample_region_a_anchor_clusters);
   topology_metadata.Branch("sample_cross_sections_pb", &sample_cross_sections_pb);
   topology_metadata.Branch("sample_sum_generator_weights", &combined.sample_sum_generator_weights);
+  combined.mbd.create_branches(topology_metadata);
   topology_metadata.Fill();
   topology_metadata.Write();
 

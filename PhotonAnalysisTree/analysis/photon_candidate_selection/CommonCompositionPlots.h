@@ -15,6 +15,7 @@ inline bool export_outputs(const std::string& base, const candidate_composition_
   M(common_composition_algorithm_version); M(source_map_schema_version); M(schema_version); M(model_sha256); M(family); M(map_root);
   M(pi0_topology_algorithm_version); M(eta_topology_algorithm_version); M(sample_names); M(sample_map_counts); M(sample_sum_generator_weights);
 #undef M
+  saved.mbd.create_branches(metadata);
   metadata.Fill(); metadata.Write();
   std::ofstream csv(base + "/common_composition_migration.csv"), detail_csv(base + "/common_composition_summary.csv");
   if (!csv || !detail_csv) return false;

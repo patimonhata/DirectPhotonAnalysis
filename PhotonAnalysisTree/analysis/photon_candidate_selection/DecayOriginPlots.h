@@ -17,6 +17,7 @@ inline bool export_outputs(const std::string& base, const candidate_composition_
   META(family); META(map_root); META(model_sha256); META(source_map_schema_version); META(decay_origin_algorithm_version);
   META(decay_origin_max_proper_length_cm); META(decay_origin_max_flight_cm); META(sample_names); META(sample_map_counts); META(sample_sum_generator_weights);
 #undef META
+  saved.mbd.create_branches(metadata);
   metadata.Fill(); metadata.Write();
   std::ofstream csv(base + "/decay_origin_summary.csv"); if (!csv) return false;
   csv << "selection,bin,et_low,et_high,category,raw_count,weighted_pb,other_raw_count,other_weighted_pb,all_raw_count,all_weighted_pb,fraction_of_other,fraction_of_all\n" << std::setprecision(17);

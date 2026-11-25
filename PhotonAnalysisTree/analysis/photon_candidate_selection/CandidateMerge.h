@@ -17,6 +17,7 @@ struct Metadata
   int common_composition_algorithm_version = -1;
   int schema_version = -1;
   int source_map_schema_version = -1;
+  MbdMapSettings mbd;
   std::string family;
   std::string map_root;
   bool require_complete = false;
@@ -205,7 +206,13 @@ bool read_metadata(TFile& file, Metadata& value)
   value.sample_names = *sample_names;
   value.sample_map_counts = *sample_map_counts;
   value.sample_sum_generator_weights = *sample_sum_generator_weights;
-  return true;
+  if (value.source_map_schema_version != kMbdMapSchema)
+  {
+    std::cerr << "Unsupported source map schema " << value.source_map_schema_version << " in " << file.GetName()
+              << ", expected " << kMbdMapSchema << std::endl;
+    return false;
+  }
+  return read_mbd_map_settings(tree, value.mbd);
 }
 
 bool read_composition_summary(TFile& file, CompositionSummary& value)
@@ -265,6 +272,7 @@ bool read_shard_metadata(TFile& file, ShardMetadata& value)
 bool compatible(const Metadata& value, const Metadata& reference)
 {
   return value.common_composition_algorithm_version == reference.common_composition_algorithm_version && value.schema_version == reference.schema_version && value.source_map_schema_version == reference.source_map_schema_version &&
+      ::compatible(value.mbd, reference.mbd) &&
       value.family == reference.family && value.map_root == reference.map_root &&
       value.require_complete == reference.require_complete && value.n_bins == reference.n_bins && same_double(value.et_max, reference.et_max) &&
       same_double(value.min_cluster_energy, reference.min_cluster_energy) &&

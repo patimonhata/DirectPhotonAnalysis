@@ -62,8 +62,9 @@ void test_eta_topology(const std::string output_base = "")
       assert(scores[i].fill(0, .9, true, true, false, 7, 2));
     }
     candidate_composition_merge::Metadata metadata;
-    metadata.family = "jet"; metadata.schema_version = 8; metadata.source_map_schema_version = 7;
-    metadata.eta_topology_algorithm_version = 2;
+    metadata.family = "jet"; metadata.schema_version = 13; metadata.source_map_schema_version = kMbdMapSchema;
+    metadata.eta_topology_algorithm_version = 4;
+    metadata.mbd = {60., 3., .7, .7, 5., 35., "MbdVertexMap", "signal HepMC collision"};
     plot_caption = {"jet", "Kinematic", .2, .5, .5, .1, .2, .45, .65};
     const auto previous_labels = ::kLabels;
     assert(make_output_directory(output_base + "/placeholder"));

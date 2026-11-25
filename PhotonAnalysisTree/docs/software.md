@@ -208,4 +208,4 @@ python3 PhotonAnalysisTree/tests/test_software.py
 
 ## Common composition の開発版
 
-現在の開発版は map schema 10 / partial schema 13 / common composition 1 / pi0 topology 14 / eta topology 4 です。旧 schema 8・9 map や異なる partial の再ラベル、reduce のみの移行はできません。新しい DST map が必要です。固定 software・production manifest の作成は上記の clean-source 手順に従い、保存済み production と異なる出力先を指定してください。新しいコードを検証する開発 build に既存 cache を流用できない場合は、`--build-dir` と `--install-prefix` に独立した検証先を指定します。
+現在の開発版 map は schema 11 / common composition 1 / pi0 topology 14 / eta topology 4 です。現行 reducer は schema 10 map を入力として partial schema 13 を出力します。旧 schema 8・9 map や異なる partial の再ラベル、reduce のみの移行はできません。新しい DST map が必要です。固定 software・production manifest の作成は上記の clean-source 手順に従い、保存済み production と異なる出力先を指定してください。新しいコードを検証する開発 build に既存 cache を流用できない場合は、`--build-dir` と `--install-prefix` に独立した検証先を指定します。

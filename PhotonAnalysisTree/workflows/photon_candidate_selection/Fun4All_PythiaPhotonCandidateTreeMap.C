@@ -44,7 +44,9 @@ int Fun4All_PythiaPhotonCandidateTreeMap(
     const std::string model_file = "/sphenix/user/ryotaro/DirectPhotonAnalysis/PhotonAnalysisTree/models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root",
     const double tagging_partner_min_energy = -1.0, const double eta_partner_min_energy = -1.0,
     const double pi0_mass_min = 0.10, const double pi0_mass_max = 0.20, const double eta_mass_min = 0.45, const double eta_mass_max = 0.65,
-    const double missing_energy_min = 0.2, const double missing_energy_max = 0.5)
+    const double missing_energy_min = 0.2, const double missing_energy_max = 0.5,
+    const double shower_shape_min_cluster_et = 3.0, const double max_abs_mbd_vertex_z = 60.0,
+    const double candidate_abs_eta_max = 0.7, const double topology_anchor_abs_eta_max = 0.7)
 {
   const double resolved_tagging_partner_min_energy = tagging_partner_min_energy < 0.0 ? min_cluster_energy : tagging_partner_min_energy;
   if (manifest_path.empty() || output_file.empty() || sample_name.empty() || model_file.empty() || manifest_begin < 0 ||
@@ -153,6 +155,10 @@ int Fun4All_PythiaPhotonCandidateTreeMap(
   producer->set_truth_jet_node_name("AntiKt_Truth_r04");
   producer->set_verbosity(1);
   producer->set_min_cluster_energy(min_cluster_energy);
+  producer->set_shower_shape_min_cluster_et(shower_shape_min_cluster_et);
+  producer->set_max_abs_mbd_vertex_z(max_abs_mbd_vertex_z);
+  producer->set_candidate_abs_eta_max(candidate_abs_eta_max);
+  producer->set_topology_anchor_abs_eta_max(topology_anchor_abs_eta_max);
   producer->set_pi0_partner_min_energy(resolved_tagging_partner_min_energy);
   producer->set_eta_partner_min_energy(eta_partner_min_energy < 0.0 ? resolved_tagging_partner_min_energy : eta_partner_min_energy);
   producer->set_pi0_mass_window(pi0_mass_min, pi0_mass_max);

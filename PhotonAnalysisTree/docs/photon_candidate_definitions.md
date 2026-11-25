@@ -1,6 +1,6 @@
 # Photon-candidate definition notes
 
-Development format: map schema 10, partial schema 13, common composition v1, pi0 topology v14, eta topology v4, direct hit matcher v5. Saved schema-8 productions retain their original definitions and results. A new production requires a new clean-source software snapshot. Map-affecting changes require regenerated maps; reduce-only corrections still follow production provenance checks. Section headings below retain the version in which a feature was introduced. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for current paths and execution; historical command blocks were removed.
+Development maps use schema 11 with common composition v1, pi0 topology v14, eta topology v4, and direct hit matcher v5. The existing reducer accepts schema 10 and writes partial schema 13. Saved productions retain their original definitions and results. Use [the workflow README](../workflows/photon_candidate_selection/README.md) for paths and execution.
 
 ## BDT model and input order
 
@@ -29,7 +29,7 @@ Keep the model file, configured path and recorded SHA-256 together when changing
 | 0 | `cluster_Et` | cluster ET |
 | 1 | `cluster_weta_cogx` | `shower_w_eta_cogx` |
 | 2 | `cluster_wphi_cogx` | `shower_w_phi_cogx` |
-| 3 | `vertexz` (reconstructed MBD z) | signal HepMC collision z (`b_vertex_z_`) |
+| 3 | `vertexz` (reconstructed MBD z) | `mbd_vertex_z` |
 | 4 | `cluster_Eta` | cluster eta |
 | 5 | `e11_over_e33` | `shower_e11_over_e33` |
 | 6 | `cluster_et1` | `shower_et1` |
@@ -38,14 +38,7 @@ Keep the model file, configured path and recorded SHA-256 together when changing
 | 9 | `cluster_et4` | `shower_et4` |
 | 10 | `e32_over_e35` | `shower_e32_over_e35` |
 
-The input positions agree with the `newsignal_v1` training/export order. That training uses
-reconstructed MBD z, while `fill_event_truth()` assigns the map's
-`b_vertex_z_` from `PHHepMCGenEvent::get_collision_vertex()`. The current map also
-uses this signal vertex for cluster kinematics. The model-only comparison retains
-these existing map definitions and the tight/non-tight formulas in Selection
-definitions below. A model switch changes
-stored scores and score-dependent flags, so regenerate maps from DST in a new
-production before reduce/merge. Replotting stored histograms cannot apply a new model.
+The input positions agree with the `newsignal_v1` training/export order. Schema 10 used the signal HepMC collision vertex for the BDT z input and cluster kinematics. Schema 11 uses (0, 0, MBD z) for the BDT inputs, cluster kinematics, isolation, and reconstructed meson tags. The existing `split_cluster_et`, eta, phi, and momentum branch names therefore capture MBD-based kinematics in schema 11. The event `vertex_*` branches still store the signal HepMC collision point.
 
 ## Boundary independent composition (map schema 9)
 
@@ -104,19 +97,21 @@ Thus the future ABCD purity calculation can be performed entirely from these int
 
 ## Selection definitions
 
-- The signal HepMC collision vertex must satisfy `|z| < 60 cm`; missing or rejected vertices are not written.
+- The first vertex in `MbdVertexMap` must have finite z and satisfy the configured strict MBD z cut (60 cm by default). The metadata records missing and out-of-range MBD vertices as separate rejection counts. Generator-weight normalization is accumulated before this cut.
+- `mbd_north_hits` and `mbd_south_hits` count finite PMT charges above 0.4 on physical north (channels 64–127) and south (0–63). Both fields are −1 if the PMT container is missing. The counts do not enter event selection.
+- The truth topology evaluator uses the signal HepMC collision point and a separately configured anchor eta limit. The event z cut is applied by the map using MBD.
 - `TOPOCLUSTER_ALLCALO` is reconstructed in the job with the requested EMCal+HCal topological-clustering configuration.
 - Only split clusters from `CLUSTERINFO_CEMC` with `E > min_cluster_energy` are stored; the threshold is strict and configured per map production.
-- Shower shapes use the existing 7x7 calculator and a 70 MeV per-tower threshold. Tower patches, constituent towers, and the all-pairs table are not populated.
+- Shower shapes use the existing 7x7 calculator and a 70 MeV per-tower threshold for clusters at or above the configured MBD-based ET threshold (3 GeV by default). `split_cluster_shower_computed` identifies clusters on which the calculator ran. Skipped clusters have aligned placeholders, an invalid score, and a false shape preselection. Tower patches, constituent towers, and the all-pairs table are not populated.
 - Raw isolation is `sum(TopoCluster ET, deltaR < 0.4) - candidate ET`.
 - Corrected simulation isolation is `1.2 * raw + 0.1 GeV`.
 - Isolated means `corrected_iso < 0.490 + 0.037 * candidate_ET`.
 - Non-isolated means `corrected_iso > 0.490 + 0.037 * candidate_ET + 0.8 GeV`.
-- The common ABCD candidate requirement is `5 < ET < 35 GeV`, `|eta| < 0.7`, and the shower-shape preselection.
+- The common ABCD candidate requirement is `5 < ET < 35 GeV`, the configurable MBD-based candidate eta limit (0.7 by default), and the shower-shape preselection.
 - Tight means `score > 0.8156 - 0.00156 ET`.
 - Non-tight is strictly `0.7333 - 0.01333 ET < score < 0.6844 + 0.00156 ET`.
 
-Meson tagging considers every other valid reconstructed split cluster in `CLUSTERINFO_CEMC`, without a partner eta cut. Pi0 and eta each require their own strict `E > threshold` and `mass_min < mass < mass_max`. Any qualifying pair sets the tag; among multiple pairs, the saved veto partner is the pair closest to the nominal meson mass. Truth matching is not used in this veto. `split_cluster_pass_final_photon` remains `region_a && !pi0_tag && !eta_tag`.
+Meson tagging considers every other valid reconstructed split cluster in `CLUSTERINFO_CEMC`, without a partner eta cut. Pi0 and eta each require their own strict `E > threshold` and `mass_min < mass < mass_max`. Any qualifying pair sets the tag; among multiple pairs, the saved veto partner is the pair closest to the nominal meson mass. The MBD-based `split_cluster_{pi0,eta}_anchor_mbd_truth_partner_taggable` flags identify whether each selected truth partner could produce that reconstructed tag. The existing truth-partner mass and status keep the truth-vertex geometry. `split_cluster_pass_final_photon` remains `region_a && !pi0_tag && !eta_tag`.
 
 
 ## Partner and missing definitions

@@ -130,7 +130,9 @@ bool PhotonTreeCommon::fill_collection(RawClusterContainer* clusters,
     output.cluster_px.push_back(px);
     output.cluster_py.push_back(py);
     output.cluster_pz.push_back(pz);
-    append_shower_shape(shower_shape_calculator_.calculate(*cluster, *towers), output);
+    const bool compute_shower = pt >= shower_shape_min_cluster_et_;
+    output.shower_computed.push_back(compute_shower ? 1U : 0U);
+    append_shower_shape(compute_shower ? shower_shape_calculator_.calculate(*cluster, *towers) : ShowerShapeCalculator::Result{}, output);
 
     if (!include_towers)
     {

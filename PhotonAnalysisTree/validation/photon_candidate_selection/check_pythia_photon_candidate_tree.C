@@ -34,14 +34,31 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
     return 1;
   }
 
+  int schema_version = -1;
   double stored_min_cluster_energy = -1.0;
-  if (!bind(metadata, "min_cluster_energy", &stored_min_cluster_energy) || metadata->GetEntry(0) <= 0 ||
-      !std::isfinite(stored_min_cluster_energy) || stored_min_cluster_energy < 0.0) return 1;
+  if (!bind(metadata, "schema_version", &schema_version) || !bind(metadata, "min_cluster_energy", &stored_min_cluster_energy) ||
+      metadata->GetEntry(0) <= 0 || !std::isfinite(stored_min_cluster_energy) || stored_min_cluster_energy < 0.0) return 1;
+  const bool uses_mbd = schema_version == 11;
+  double max_abs_mbd_vertex_z = 0.0, shower_shape_min_cluster_et = -1.0, candidate_abs_eta_max = 0.0;
+  double candidate_et_min = 0.0, candidate_et_max = 0.0;
+  if (uses_mbd &&
+      (!bind(metadata, "max_abs_mbd_vertex_z", &max_abs_mbd_vertex_z) ||
+       !bind(metadata, "shower_shape_min_cluster_et", &shower_shape_min_cluster_et) ||
+       !bind(metadata, "candidate_abs_eta_max", &candidate_abs_eta_max) ||
+       !bind(metadata, "candidate_et_min", &candidate_et_min) || !bind(metadata, "candidate_et_max", &candidate_et_max) ||
+       metadata->GetEntry(0) <= 0 || !std::isfinite(max_abs_mbd_vertex_z) || max_abs_mbd_vertex_z <= 0.0 ||
+       !std::isfinite(shower_shape_min_cluster_et) || shower_shape_min_cluster_et < 0.0 ||
+       !std::isfinite(candidate_abs_eta_max) || candidate_abs_eta_max <= 0.0 ||
+       !std::isfinite(candidate_et_min) || !std::isfinite(candidate_et_max) || candidate_et_min >= candidate_et_max)) return 1;
 
   unsigned int ncluster = 0;
-  double vertex_z = 0.0;
+  double vertex_z = 0.0, mbd_vertex_z = 0.0;
+  int mbd_north_hits = -1, mbd_south_hits = -1;
   std::vector<unsigned int>* cluster_id = nullptr;
   std::vector<double>* cluster_e = nullptr;
+  std::vector<double> *cluster_et = nullptr, *cluster_eta = nullptr;
+  std::vector<double> *cluster_x = nullptr, *cluster_y = nullptr, *cluster_z = nullptr;
+  std::vector<unsigned char> *shower_computed = nullptr, *shower_valid = nullptr, *mbd_truth_partner_taggable = nullptr;
   std::vector<float>* score = nullptr;
   std::vector<unsigned char>* valid = nullptr;
   std::vector<unsigned char>* kinematics = nullptr;
@@ -146,6 +163,20 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
   ok &= bind(events, (parent + "_topology_anchor_truth_partner_reconstructed_e").c_str(), &topology_anchor_truth_partner_reconstructed_e);
   ok &= bind(events, (parent + "_topology_anchor_truth_partner_recovery").c_str(), &topology_anchor_truth_partner_recovery);
   ok &= bind(events, (parent + "_topology_anchor_truth_partner_mass").c_str(), &topology_anchor_truth_partner_mass);
+  if (uses_mbd)
+  {
+    ok &= bind(events, "mbd_vertex_z", &mbd_vertex_z);
+    ok &= bind(events, "mbd_north_hits", &mbd_north_hits);
+    ok &= bind(events, "mbd_south_hits", &mbd_south_hits);
+    ok &= bind(events, "split_cluster_et", &cluster_et);
+    ok &= bind(events, "split_cluster_eta", &cluster_eta);
+    ok &= bind(events, "split_cluster_x", &cluster_x);
+    ok &= bind(events, "split_cluster_y", &cluster_y);
+    ok &= bind(events, "split_cluster_z", &cluster_z);
+    ok &= bind(events, "split_cluster_shower_computed", &shower_computed);
+    ok &= bind(events, "split_cluster_shower_valid", &shower_valid);
+    ok &= bind(events, (std::string("split_cluster_") + parent + "_anchor_mbd_truth_partner_taggable").c_str(), &mbd_truth_partner_taggable);
+  }
   if (!ok)
   {
     std::cerr << "Missing required branch" << std::endl;
@@ -169,7 +200,20 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
         pi0_anchor_truth_partner_recovery->size(), pi0_anchor_truth_partner_mass->size(),
         pi0_anchor_selected_tag_partner_matches_truth_partner->size(), eta_tag->size()};
     bool event_ok = std::all_of(sizes.begin(), sizes.end(), [ncluster](std::size_t size) { return size == ncluster; });
-    event_ok &= std::abs(vertex_z) < 60.0 && patch->empty() && pair_i->empty();
+    event_ok &= std::isfinite(vertex_z) && patch->empty() && pair_i->empty();
+    if (uses_mbd)
+    {
+      event_ok &= std::isfinite(mbd_vertex_z) && std::abs(mbd_vertex_z) < max_abs_mbd_vertex_z;
+      event_ok &= (mbd_north_hits == -1 && mbd_south_hits == -1) ||
+          (mbd_north_hits >= 0 && mbd_north_hits <= 64 && mbd_south_hits >= 0 && mbd_south_hits <= 64);
+      const std::vector<std::size_t> mbd_sizes = {cluster_et->size(), cluster_eta->size(), cluster_x->size(), cluster_y->size(), cluster_z->size(),
+          shower_computed->size(), shower_valid->size(), mbd_truth_partner_taggable->size()};
+      event_ok &= std::all_of(mbd_sizes.begin(), mbd_sizes.end(), [ncluster](std::size_t size) { return size == ncluster; });
+    }
+    else
+    {
+      event_ok &= std::abs(vertex_z) < 60.0;
+    }
     event_ok &= topology_anchor_cluster_id->size() == topology_anchor_count;
     const std::vector<std::size_t> topology_anchor_sizes = {
         topology_anchor_partner_alignment->size(), topology_anchor_truth_partner_tag_status->size(), topology_anchor_truth_partner_cluster_id->size(),
@@ -187,6 +231,19 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
     for (std::size_t cluster = 0; event_ok && cluster < ncluster; ++cluster)
     {
       event_ok &= (*cluster_e)[cluster] > stored_min_cluster_energy;
+      if (uses_mbd)
+      {
+        const double r = std::hypot((*cluster_x)[cluster], (*cluster_y)[cluster]);
+        const double dz = (*cluster_z)[cluster] - mbd_vertex_z;
+        const double et = (*cluster_et)[cluster];
+        const double eta = (*cluster_eta)[cluster];
+        event_ok &= r > 0.0 && std::isfinite(et) && std::isfinite(eta) &&
+            close_enough(et, (*cluster_e)[cluster] * r / std::hypot(r, dz)) && close_enough(eta, std::asinh(dz / r));
+        event_ok &= (*kinematics)[cluster] == (et > candidate_et_min && et < candidate_et_max && std::abs(eta) < candidate_abs_eta_max);
+        event_ok &= (*shower_computed)[cluster] == (et >= shower_shape_min_cluster_et);
+        event_ok &= (*shower_valid)[cluster] <= (*shower_computed)[cluster];
+        if (!(*shower_valid)[cluster]) event_ok &= !(*valid)[cluster] && !(*preselection)[cluster];
+      }
       event_ok &= close_enough((*iso_corrected)[cluster], 1.2 * (*iso_raw)[cluster] + 0.1);
       event_ok &= close_enough((*noniso_boundary)[cluster], (*iso_boundary)[cluster] + 0.8);
       event_ok &= static_cast<bool>((*isolated)[cluster]) == ((*iso_corrected)[cluster] < (*iso_boundary)[cluster]);
@@ -208,9 +265,10 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
       if (anchor)
       {
         event_ok &= alignment >= 0 && alignment <= 4 && truth_tag_status >= 0 && truth_tag_status <= 6;
-        const int expected_tag_result = !parent_tag ? 1 : (truth_tag_status == 1 ? 2 : 3);
+        const bool truth_partner_taggable = uses_mbd ? (*mbd_truth_partner_taggable)[cluster] : truth_tag_status == 1;
+        const int expected_tag_result = !parent_tag ? 1 : (truth_partner_taggable ? 2 : 3);
         event_ok &= tag_result == expected_tag_result;
-        event_ok &= truth_tag_status != 1 || parent_tag;
+        event_ok &= !truth_partner_taggable || (parent_tag && truth_partner_id >= 0);
         event_ok &= !selected_partner_matches || (parent_tag && (*pi0_partner_cluster_id)[cluster] == truth_partner_id);
         if (truth_tag_status == 0 || truth_tag_status == 2) event_ok &= truth_partner_id == -999;
         else event_ok &= truth_partner_id >= 0 && std::isfinite((*pi0_anchor_truth_partner_cluster_e)[cluster]) &&
@@ -221,6 +279,7 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
       else
       {
         event_ok &= alignment == -999 && truth_tag_status == -999 && tag_result == 0 && truth_partner_id == -999 && !selected_partner_matches;
+        event_ok &= !uses_mbd || !(*mbd_truth_partner_taggable)[cluster];
       }
       event_ok &= !(*valid)[cluster] || std::isfinite((*score)[cluster]);
     }

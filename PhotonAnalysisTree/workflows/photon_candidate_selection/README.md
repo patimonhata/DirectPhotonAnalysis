@@ -1,6 +1,6 @@
 # Pythia photon-candidate selection
 
-Main map → reduce → merge workflow. The development implementation writes map schema **10**, common composition **1**, pi0 topology **14**, eta topology **4**, supplemental decay-origin **1**, and partial schema **13**. Existing productions remain unchanged; freeze clean software and create a new manifest before formal execution. Physics definitions and diagnostic details are in [definition notes](../../docs/photon_candidate_definitions.md).
+The development map writes schema **11**, common composition **1**, pi0 topology **14**, eta topology **4**, and supplemental decay-origin **1**. The existing reducer reads schema-10 maps and writes schema-13 partials. Use matching frozen software for retained productions. Physics definitions and diagnostic details are in [definition notes](../../docs/photon_candidate_definitions.md).
 
 ## Results and inputs
 
@@ -44,13 +44,15 @@ mkdir -p PhotonAnalysisTree/output/condor/photon_candidate_selection
 condor_submit -append "production_directory = /absolute/path/to/new_configuration" PhotonAnalysisTree/workflows/photon_candidate_selection/submit_jet5.job
 ```
 
-Other samples have matching submit files. The explicit local interface is:
+Other samples have matching submit files. The four final arguments default to 3 GeV, 60 cm, 0.7, and 0.7. Set the MBD z limit to 100 cm and the candidate eta limit to 1.0 for wide reconstructed acceptance. The topology anchor limit uses truth-vertex eta and can be configured independently.
+
+The explicit local interface is:
 
 ```text
-run_map.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST SAMPLE OUTPUT_DIRECTORY [N_EVENTS] [MIN_CLUSTER_ENERGY] [PI0_PARTNER_MIN_ENERGY] [ETA_PARTNER_MIN_ENERGY] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX]
+run_map.sh JOB_INDEX CHUNK_OFFSET TOTAL_FILES FILES_PER_JOB INPUT_MANIFEST SAMPLE OUTPUT_DIRECTORY [N_EVENTS] [MIN_CLUSTER_ENERGY] [PI0_PARTNER_MIN_ENERGY] [ETA_PARTNER_MIN_ENERGY] [PI0_MASS_MIN] [PI0_MASS_MAX] [ETA_MASS_MIN] [ETA_MASS_MAX] [MISSING_ENERGY_MIN] [MISSING_ENERGY_MAX] [SHOWER_SHAPE_MIN_CLUSTER_ET] [MAX_ABS_MBD_VERTEX_Z] [CANDIDATE_ABS_ETA_MAX] [TOPOLOGY_ANCHOR_ABS_ETA_MAX]
 ```
 
-[`check_sample_map_outputs.sh`](../../validation/photon_candidate_selection/check_sample_map_outputs.sh) checks expected file coverage and optionally performs deep ROOT validation; pass the output directory and exact cuts for a non-default production. [`run_small_sample.sh`](../../validation/photon_candidate_selection/run_small_sample.sh) runs map and reduce on a small input sample under `output/photon_candidate_selection/qa/`; this is not a physics normalization. Jet12 QA needs at least ten maps so every fixed shard is nonempty.
+[`check_sample_map_outputs.sh`](../../validation/photon_candidate_selection/check_sample_map_outputs.sh) checks expected file coverage and optionally performs deep ROOT validation; pass the output directory and exact cuts for a non-default production. [`run_small_sample.sh`](../../validation/photon_candidate_selection/run_small_sample.sh) runs the schema-10 map and reduce chain with matching frozen software on a small input sample under `output/photon_candidate_selection/qa/`; this is not a physics normalization. Jet12 QA needs at least ten maps so every fixed shard is nonempty.
 
 ## Reduce and merge
 

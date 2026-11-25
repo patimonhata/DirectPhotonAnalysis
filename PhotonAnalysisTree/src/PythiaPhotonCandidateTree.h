@@ -76,6 +76,7 @@ struct PhotonCandidateSelectionBranches
   std::vector<int> pi0_anchor_partner_alignment;
   std::vector<int> pi0_anchor_truth_partner_tag_status;
   std::vector<int> pi0_anchor_tag_result;
+  std::vector<unsigned char> pi0_anchor_mbd_truth_partner_taggable;
   std::vector<int> pi0_anchor_truth_partner_cluster_id;
   std::vector<float> pi0_anchor_truth_partner_cluster_e;
   std::vector<float> pi0_anchor_truth_partner_cluster_eta;
@@ -206,6 +207,10 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_manifest_range(long long begin, long long end) { manifest_begin_ = begin; manifest_end_ = end; }
   void set_suffix_range(const std::string& first, const std::string& last) { first_input_suffix_ = first; last_input_suffix_ = last; }
   void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
+  void set_shower_shape_min_cluster_et(double value) { shower_shape_min_cluster_et_ = value; }
+  void set_max_abs_mbd_vertex_z(double value) { max_abs_mbd_vertex_z_ = value; }
+  void set_candidate_abs_eta_max(double value) { candidate_abs_eta_max_ = value; }
+  void set_topology_anchor_abs_eta_max(double value) { topology_anchor_abs_eta_max_ = value; }
   void set_pi0_partner_min_energy(double value) { pi0_partner_min_energy_ = value; }
   void set_eta_partner_min_energy(double value) { eta_partner_min_energy_ = value; }
   void set_pi0_mass_window(double low, double high) { pi0_mass_min_ = low; pi0_mass_max_ = high; }
@@ -217,7 +222,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   void set_verbosity(int value) { verbosity_ = value; }
 
  private:
-  static constexpr int schema_version_ = 10;
+  static constexpr int schema_version_ = 11;
 
   bool configure_sample();
   bool fill_event_truth(const PHHepMCGenEventMap* event_map, PHCompositeNode* topNode);
@@ -275,7 +280,11 @@ class PythiaPhotonCandidateTree : public SubsysReco
   double candidate_et_max_ = 35.0;
   std::string topocluster_configuration_ = "ALLCALO_EMCal_HCal_noise_0p006_0p03_0p09_significance_4_2_1_corner_split_localmax_1_2_0p5_Rshower_0p025";
   double candidate_abs_eta_max_ = 0.7;
-  double max_abs_vertex_z_ = 60.0;
+  double max_abs_mbd_vertex_z_ = 60.0;
+  double topology_anchor_abs_eta_max_ = 0.7;
+  double shower_shape_min_cluster_et_ = 3.0;
+  std::string reconstruction_vertex_source_ = "MbdVertexMap";
+  std::string topology_vertex_source_ = "signal HepMC collision";
   double isolation_radius_ = 0.4;
   double isolation_scale_ = 1.2;
   double isolation_offset_ = 0.1;
@@ -321,6 +330,8 @@ class PythiaPhotonCandidateTree : public SubsysReco
   unsigned long long n_events_processed_ = 0;
   unsigned long long n_events_written_ = 0;
   unsigned long long n_events_vertex_rejected_ = 0;
+  unsigned long long n_events_mbd_vertex_missing_ = 0;
+  unsigned long long n_events_mbd_vertex_out_of_range_ = 0;
   unsigned long long n_events_invalid_ = 0;
   unsigned long long n_events_stitch_pass_ = 0;
   unsigned long long n_clusters_region_a_ = 0;
@@ -339,6 +350,9 @@ class PythiaPhotonCandidateTree : public SubsysReco
   double b_vertex_y_ = photon_tree::kInvalidDouble;
   double b_vertex_z_ = photon_tree::kInvalidDouble;
   double b_vertex_t_ = photon_tree::kInvalidDouble;
+  double b_mbd_vertex_z_ = photon_tree::kInvalidDouble;
+  int b_mbd_north_hits_ = -1;
+  int b_mbd_south_hits_ = -1;
   unsigned char b_event_weight_valid_ = 0U;
   double b_generator_weight_ = 1.0;
   photon_tree::HepMCPhotonClassifier photon_classifier_;

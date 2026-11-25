@@ -32,7 +32,7 @@ if(NOT PI0RECONSTRUCTION_INCLUDE_DIR OR NOT PI0RECONSTRUCTION_LIBRARY)
   message(FATAL_ERROR "Build and install ../../Pi0Reconstruction before PhotonAnalysisTree")
 endif()
 
-foreach(library phool SubsysReco fun4all calo_io g4dst g4eval phhepmc HepMC)
+foreach(library phool SubsysReco fun4all calo_io g4dst g4eval globalvertex_io mbd_io phhepmc HepMC)
   string(TOUPPER "${library}" library_upper)
   find_library(
     ${library_upper}_LIBRARY

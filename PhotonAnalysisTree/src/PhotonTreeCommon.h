@@ -44,6 +44,7 @@ struct ClusterCollection
   std::vector<double> cluster_py;
   std::vector<double> cluster_pz;
 
+  std::vector<unsigned char> shower_computed;
   std::vector<unsigned char> shower_valid;
   std::vector<unsigned char> shower_full_containment;
   std::vector<unsigned char> shower_edge_padded;
@@ -108,6 +109,7 @@ class PhotonTreeCommon
   void set_min_cluster_energy(double value) { min_cluster_energy_ = value; }
   void set_min_cluster_energy_inclusive(bool value) { min_cluster_energy_inclusive_ = value; }
   void set_shower_shape_min_tower_energy(double value) { shower_shape_min_tower_energy_ = value; }
+  void set_shower_shape_min_cluster_et(double value) { shower_shape_min_cluster_et_ = value; }
   void set_store_shower_shape_tower_patch(bool value) { store_shower_shape_tower_patch_ = value; }
   void set_store_cluster_pairs(bool value) { store_cluster_pairs_ = value; }
 
@@ -147,6 +149,7 @@ class PhotonTreeCommon
   double min_cluster_energy_ = 0.0;
   bool min_cluster_energy_inclusive_ = true;
   double shower_shape_min_tower_energy_ = 0.070;
+  double shower_shape_min_cluster_et_ = 0.0;
   int shower_shape_algorithm_version_ = ShowerShapeCalculator::kAlgorithmVersion;
   int shower_shape_patch_side_ = ShowerShapeCalculator::kPatchSide;
   bool store_shower_shape_tower_patch_ = true;

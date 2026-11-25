@@ -13,8 +13,12 @@
 #include <g4main/PHG4HitContainer.h>
 #include <g4detectors/PHG4CellContainer.h>
 #include <calobase/RawTowerContainer.h>
+#include <globalvertex/MbdVertex.h>
+#include <globalvertex/MbdVertexMap.h>
 #include <jetbase/Jet.h>
 #include <jetbase/JetContainer.h>
+#include <mbd/MbdPmtContainer.h>
+#include <mbd/MbdPmtHit.h>
 #include <phhepmc/PHHepMCGenEvent.h>
 #include <phhepmc/PHHepMCGenEventMap.h>
 #include <phool/PHCompositeNode.h>
@@ -29,6 +33,7 @@
 #include <TTree.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <exception>
@@ -40,13 +45,15 @@
 namespace
 {
 constexpr float invalid_float = -999.0F;
+constexpr int mbd_pmts_per_arm = 64;
+constexpr double mbd_hit_charge_min = 0.4;
 
 double delta_phi(double first, double second)
 {
   return std::atan2(std::sin(first - second), std::cos(first - second));
 }
 
-bool raw_cluster_kinematics(const RawCluster* cluster, double vx, double vy, double vz,
+bool raw_cluster_kinematics(const RawCluster* cluster, double mbd_vertex_z,
                             double& energy, double& et, double& eta, double& phi)
 {
   if (!cluster || !std::isfinite(cluster->get_energy()) || !std::isfinite(cluster->get_x()) ||
@@ -54,9 +61,9 @@ bool raw_cluster_kinematics(const RawCluster* cluster, double vx, double vy, dou
   {
     return false;
   }
-  const double dx = cluster->get_x() - vx;
-  const double dy = cluster->get_y() - vy;
-  const double dz = cluster->get_z() - vz;
+  const double dx = cluster->get_x();
+  const double dy = cluster->get_y();
+  const double dz = cluster->get_z() - mbd_vertex_z;
   const double distance = std::sqrt(dx * dx + dy * dy + dz * dz);
   const double transverse = std::hypot(dx, dy);
   if (!(distance > 0.0) || !(transverse > 0.0))
@@ -142,6 +149,7 @@ void PhotonCandidateSelectionBranches::create_branches(TTree* tree, const std::s
   BRANCH(pi0_anchor_partner_alignment);
   BRANCH(pi0_anchor_truth_partner_tag_status);
   BRANCH(pi0_anchor_tag_result);
+  BRANCH(pi0_anchor_mbd_truth_partner_taggable);
   BRANCH(pi0_anchor_truth_partner_cluster_id);
   BRANCH(pi0_anchor_truth_partner_cluster_e);
   BRANCH(pi0_anchor_truth_partner_cluster_eta);
@@ -441,6 +449,10 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
 
   const bool manifest_valid = manifest_path_.empty() || (manifest_begin_ >= 0 && manifest_end_ > manifest_begin_ && primary_input_manager_);
   if (output_file_name_.empty() || model_file_name_.empty() || signal_embedding_id_ <= 0 || !manifest_valid ||
+      !std::isfinite(shower_shape_min_cluster_et_) || shower_shape_min_cluster_et_ < 0.0 ||
+      !std::isfinite(max_abs_mbd_vertex_z_) || max_abs_mbd_vertex_z_ <= 0.0 ||
+      !std::isfinite(candidate_abs_eta_max_) || candidate_abs_eta_max_ <= 0.0 ||
+      !std::isfinite(topology_anchor_abs_eta_max_) || topology_anchor_abs_eta_max_ <= 0.0 ||
       !std::isfinite(min_cluster_energy_) || min_cluster_energy_ < 0.0 || !std::isfinite(pi0_partner_min_energy_) ||
       pi0_partner_min_energy_ < 0.0 || !std::isfinite(eta_partner_min_energy_) || eta_partner_min_energy_ < 0.0 ||
       !std::isfinite(pi0_mass_min_) || !std::isfinite(pi0_mass_max_) || pi0_mass_min_ < 0.0 || pi0_mass_min_ >= pi0_mass_max_ ||
@@ -455,6 +467,7 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   common_.set_min_cluster_energy(min_cluster_energy_);
   common_.set_min_cluster_energy_inclusive(false);
   common_.set_shower_shape_min_tower_energy(shower_shape_min_tower_energy_);
+  common_.set_shower_shape_min_cluster_et(shower_shape_min_cluster_et_);
   common_.set_store_shower_shape_tower_patch(false);
   common_.set_store_cluster_pairs(false);
   if (!common_.initialize())
@@ -473,7 +486,7 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.cluster_node_name = split_cluster_node_name_;
   config.tower_geom_node_name = tower_geom_node_name_;
   config.signal_embedding_id = signal_embedding_id_;
-  config.anchor_cluster_eta_max = candidate_abs_eta_max_;
+  config.anchor_cluster_eta_max = topology_anchor_abs_eta_max_;
   config.partner_cluster_eta_max = -1.0;
   config.min_cluster_energy = min_cluster_energy_;
   config.partner_diagnostic_min_cluster_energy = partner_diagnostic_min_cluster_energy_;
@@ -483,7 +496,7 @@ int PythiaPhotonCandidateTree::Init(PHCompositeNode* /*topNode*/)
   config.min_photon_energy_recovery = min_photon_energy_recovery_;
   config.tagging_pi0_mass_min = pi0_mass_min_;
   config.tagging_pi0_mass_max = pi0_mass_max_;
-  config.max_abs_vertex_z = max_abs_vertex_z_;
+  config.max_abs_vertex_z = -1.0;
   config.verbosity = verbosity_;
   config = photon_tree::photon_candidate_topology_config(config);
   auto legacy_config = config;
@@ -535,12 +548,41 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     sum_generator_weight_stitch_pass_ += b_generator_weight_;
   }
 
-  const photon_tree::Pi0AnchorTopologyEventResult topology_result = topology_evaluator_.evaluate(topNode);
-  if (topology_result.status == photon_tree::Pi0TopologyEventStatus::vertex_rejected)
+  const auto* mbd_vertices = findNode::getClass<MbdVertexMap>(topNode, "MbdVertexMap");
+  const auto* mbd_vertex = mbd_vertices && !mbd_vertices->empty() ? mbd_vertices->begin()->second : nullptr;
+  if (!mbd_vertex || !std::isfinite(mbd_vertex->get_z()))
   {
+    ++n_events_mbd_vertex_missing_;
     ++n_events_vertex_rejected_;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
+  b_mbd_vertex_z_ = mbd_vertex->get_z();
+  if (std::abs(b_mbd_vertex_z_) >= max_abs_mbd_vertex_z_)
+  {
+    ++n_events_mbd_vertex_out_of_range_;
+    ++n_events_vertex_rejected_;
+    return Fun4AllReturnCodes::ABORTEVENT;
+  }
+
+  const auto* mbd_pmts = findNode::getClass<MbdPmtContainer>(topNode, "MbdPmtContainer");
+  if (mbd_pmts)
+  {
+    std::array<int, 2> hits{};
+    const int n_pmts = std::min<int>(mbd_pmts->get_npmt(), 2 * mbd_pmts_per_arm);
+    for (int channel = 0; channel < n_pmts; ++channel)
+    {
+      const auto* pmt = mbd_pmts->get_pmt(channel);
+      const double charge = pmt ? pmt->get_q() : 0.0;
+      if (std::isfinite(charge) && charge > mbd_hit_charge_min)
+      {
+        ++hits[channel / mbd_pmts_per_arm];
+      }
+    }
+    b_mbd_south_hits_ = hits[0];
+    b_mbd_north_hits_ = hits[1];
+  }
+
+  const photon_tree::Pi0AnchorTopologyEventResult topology_result = topology_evaluator_.evaluate(topNode);
   if (topology_result.status != photon_tree::Pi0TopologyEventStatus::accepted)
   {
     ++n_events_invalid_;
@@ -557,12 +599,7 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
-  photon_tree::EventVertex vertex;
-  vertex.valid = true;
-  vertex.x = b_vertex_x_;
-  vertex.y = b_vertex_y_;
-  vertex.z = b_vertex_z_;
-  vertex.source = signal_embedding_id_;
+  const photon_tree::EventVertex vertex{true, 0.0, 0.0, b_mbd_vertex_z_};
   if (!common_.fill_collection(split_clusters, towers, geometry, vertex, false, false, common_.split()))
   {
     ++n_events_invalid_;
@@ -783,6 +820,7 @@ void PythiaPhotonCandidateTree::fill_topology_cluster_links(const photon_tree::P
     links.pi0_anchor_partner_alignment.push_back(anchor ? static_cast<int>(anchor->partner_alignment) : -999);
     links.pi0_anchor_truth_partner_tag_status.push_back(anchor ? static_cast<int>(anchor->truth_partner_tag_status) : -999);
     links.pi0_anchor_tag_result.push_back(static_cast<int>(photon_tree::Pi0AnchorTagResult::not_applicable));
+    links.pi0_anchor_mbd_truth_partner_taggable.push_back(0U);
     links.pi0_anchor_truth_partner_cluster_id.push_back(anchor ? anchor->truth_partner_cluster_id : -999);
     links.pi0_anchor_truth_partner_cluster_e.push_back(anchor ? anchor->truth_partner_cluster_energy : invalid_float);
     links.pi0_anchor_truth_partner_cluster_eta.push_back(anchor ? anchor->truth_partner_cluster_eta : invalid_float);
@@ -812,7 +850,7 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
   {
     KinematicCluster value;
     value.cluster = iterator->second;
-    if (raw_cluster_kinematics(value.cluster, b_vertex_x_, b_vertex_y_, b_vertex_z_, value.energy, value.et, value.eta, value.phi))
+    if (raw_cluster_kinematics(value.cluster, b_mbd_vertex_z_, value.energy, value.et, value.eta, value.phi))
     {
       all_split.push_back(value);
     }
@@ -823,7 +861,7 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
   {
     KinematicCluster value;
     value.cluster = iterator->second;
-    if (raw_cluster_kinematics(value.cluster, b_vertex_x_, b_vertex_y_, b_vertex_z_, value.energy, value.et, value.eta, value.phi) &&
+    if (raw_cluster_kinematics(value.cluster, b_mbd_vertex_z_, value.energy, value.et, value.eta, value.phi) &&
         value.energy > 0.0 && value.et > 0.0)
     {
       all_topo.push_back(value);
@@ -836,19 +874,21 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
     const double et = data.cluster_et[index];
     const double eta = data.cluster_eta[index];
     const double phi = data.cluster_phi[index];
-    std::vector<float> features = {
-        static_cast<float>(et), data.shower_w_eta_cogx[index], data.shower_w_phi_cogx[index],
-        static_cast<float>(b_vertex_z_), static_cast<float>(eta), data.shower_e11_over_e33[index],
-        data.shower_et1[index], data.shower_et2[index], data.shower_et3[index], data.shower_et4[index],
-        data.shower_e32_over_e35[index]};
-    const bool finite_features = std::all_of(features.begin(), features.end(), [](float value) { return std::isfinite(value); });
     float score = invalid_float;
     bool bdt_valid = false;
-    if (finite_features && data.shower_valid[index])
+    if (data.shower_valid[index])
     {
-      const auto result = bdt_->Compute(features);
-      bdt_valid = !result.empty() && std::isfinite(result.front());
-      score = bdt_valid ? result.front() : invalid_float;
+      const std::vector<float> features = {
+          static_cast<float>(et), data.shower_w_eta_cogx[index], data.shower_w_phi_cogx[index],
+          static_cast<float>(b_mbd_vertex_z_), static_cast<float>(eta), data.shower_e11_over_e33[index],
+          data.shower_et1[index], data.shower_et2[index], data.shower_et3[index], data.shower_et4[index],
+          data.shower_e32_over_e35[index]};
+      if (std::all_of(features.begin(), features.end(), [](float value) { return std::isfinite(value); }))
+      {
+        const auto result = bdt_->Compute(features);
+        bdt_valid = !result.empty() && std::isfinite(result.front());
+        score = bdt_valid ? result.front() : invalid_float;
+      }
     }
 
     const float tight_boundary = static_cast<float>(0.8156 - 0.00156 * et);
@@ -893,26 +933,36 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
         continue;
       }
       const double mass = diphoton_mass(data.cluster_e[index], eta, phi, partner.energy, partner.eta, partner.phi);
-      if (partner.energy > pi0_partner_min_energy_ && mass > pi0_mass_min_ && mass < pi0_mass_max_ && std::abs(mass - 0.134977) < pi0_distance)
+      const int partner_id = static_cast<int>(partner.cluster->get_id());
+      auto consider_tag = [index, partner_id, mass](photon_tree::PhotonCandidateSelectionBranches& links, double nominal_mass,
+                              double& distance, double& partner_mass, int& selected_partner, bool& tag)
       {
-        pi0_tag = true;
-        pi0_distance = std::abs(mass - 0.134977);
-        pi0_mass = mass;
-        pi0_partner = static_cast<int>(partner.cluster->get_id());
+        tag = true;
+        if (partner_id == links.pi0_anchor_truth_partner_cluster_id[index])
+        {
+          links.pi0_anchor_mbd_truth_partner_taggable[index] = 1U;
+        }
+        const double mass_distance = std::abs(mass - nominal_mass);
+        if (mass_distance < distance)
+        {
+          distance = mass_distance;
+          partner_mass = mass;
+          selected_partner = partner_id;
+        }
+      };
+      if (partner.energy > pi0_partner_min_energy_ && mass > pi0_mass_min_ && mass < pi0_mass_max_)
+      {
+        consider_tag(selection_, 0.134977, pi0_distance, pi0_mass, pi0_partner, pi0_tag);
       }
-      if (partner.energy > eta_partner_min_energy_ && mass > eta_mass_min_ && mass < eta_mass_max_ && std::abs(mass - 0.547862) < eta_distance)
+      if (partner.energy > eta_partner_min_energy_ && mass > eta_mass_min_ && mass < eta_mass_max_)
       {
-        eta_tag = true;
-        eta_distance = std::abs(mass - 0.547862);
-        eta_mass = mass;
-        eta_partner = static_cast<int>(partner.cluster->get_id());
+        consider_tag(eta_selection_, 0.547862, eta_distance, eta_mass, eta_partner, eta_tag);
       }
     }
 
     if (selection_.pi0_anchor_valid[index])
     {
-      const bool truth_partner_taggable = selection_.pi0_anchor_truth_partner_tag_status[index] ==
-          static_cast<int>(photon_tree::Pi0TruthPartnerTagStatus::taggable);
+      const bool truth_partner_taggable = selection_.pi0_anchor_mbd_truth_partner_taggable[index];
       const photon_tree::Pi0AnchorTagResult tag_result = !pi0_tag
           ? photon_tree::Pi0AnchorTagResult::survived
           : (truth_partner_taggable ? photon_tree::Pi0AnchorTagResult::truth_pair_taggable_veto
@@ -924,8 +974,7 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
 
     if (eta_selection_.pi0_anchor_valid[index])
     {
-      const bool truth_partner_taggable = eta_selection_.pi0_anchor_truth_partner_tag_status[index] ==
-          static_cast<int>(photon_tree::Pi0TruthPartnerTagStatus::taggable);
+      const bool truth_partner_taggable = eta_selection_.pi0_anchor_mbd_truth_partner_taggable[index];
       const photon_tree::Pi0AnchorTagResult tag_result = !eta_tag
           ? photon_tree::Pi0AnchorTagResult::survived
           : (truth_partner_taggable ? photon_tree::Pi0AnchorTagResult::truth_pair_taggable_veto
@@ -992,7 +1041,8 @@ void PythiaPhotonCandidateTree::reset_event()
   b_event_in_file_ = 0U;
   b_event_uid_ = 0ULL;
   b_hepmc_event_number_ = -999;
-  b_vertex_x_ = b_vertex_y_ = b_vertex_z_ = b_vertex_t_ = photon_tree::kInvalidDouble;
+  b_vertex_x_ = b_vertex_y_ = b_vertex_z_ = b_vertex_t_ = b_mbd_vertex_z_ = photon_tree::kInvalidDouble;
+  b_mbd_north_hits_ = b_mbd_south_hits_ = -1;
   b_event_weight_valid_ = 0U;
   b_generator_weight_ = 1.0;
   b_weight_numerator_pb_ = 0.0;
@@ -1034,6 +1084,9 @@ void PythiaPhotonCandidateTree::create_output()
   EVENT_BRANCH(vertex_y);
   EVENT_BRANCH(vertex_z);
   EVENT_BRANCH(vertex_t);
+  EVENT_BRANCH(mbd_vertex_z);
+  EVENT_BRANCH(mbd_north_hits);
+  EVENT_BRANCH(mbd_south_hits);
   EVENT_BRANCH(event_weight_valid);
   EVENT_BRANCH(generator_weight);
   EVENT_BRANCH(weight_numerator_pb);
@@ -1049,6 +1102,7 @@ void PythiaPhotonCandidateTree::create_output()
   EVENT_BRANCH(final_photon_count);
 #undef EVENT_BRANCH
   common_.create_collection_branches(event_tree_, "split", common_.split().data, false);
+  event_tree_->Branch("split_cluster_shower_computed", &common_.split().data.shower_computed);
   cluster_truth_.create_branches(event_tree_, "split");
   decay_origin_.create_branches(event_tree_);
   common_truth_.create_branches(event_tree_);
@@ -1100,7 +1154,11 @@ void PythiaPhotonCandidateTree::create_output()
   metadata_tree_->Branch("candidate_et_min", &candidate_et_min_);
   metadata_tree_->Branch("candidate_et_max", &candidate_et_max_);
   metadata_tree_->Branch("candidate_abs_eta_max", &candidate_abs_eta_max_);
-  metadata_tree_->Branch("max_abs_vertex_z", &max_abs_vertex_z_);
+  metadata_tree_->Branch("max_abs_mbd_vertex_z", &max_abs_mbd_vertex_z_);
+  metadata_tree_->Branch("topology_anchor_abs_eta_max", &topology_anchor_abs_eta_max_);
+  metadata_tree_->Branch("shower_shape_min_cluster_et", &shower_shape_min_cluster_et_);
+  metadata_tree_->Branch("reconstruction_vertex_source", &reconstruction_vertex_source_);
+  metadata_tree_->Branch("topology_vertex_source", &topology_vertex_source_);
   metadata_tree_->Branch("isolation_radius", &isolation_radius_);
   metadata_tree_->Branch("isolation_scale", &isolation_scale_);
   metadata_tree_->Branch("isolation_offset", &isolation_offset_);
@@ -1117,6 +1175,8 @@ void PythiaPhotonCandidateTree::create_output()
   metadata_tree_->Branch("n_events_processed", &n_events_processed_);
   metadata_tree_->Branch("n_events_written", &n_events_written_);
   metadata_tree_->Branch("n_events_vertex_rejected", &n_events_vertex_rejected_);
+  metadata_tree_->Branch("n_events_mbd_vertex_missing", &n_events_mbd_vertex_missing_);
+  metadata_tree_->Branch("n_events_mbd_vertex_out_of_range", &n_events_mbd_vertex_out_of_range_);
   metadata_tree_->Branch("n_events_invalid", &n_events_invalid_);
   metadata_tree_->Branch("n_events_stitch_pass", &n_events_stitch_pass_);
   metadata_tree_->Branch("n_clusters_region_a", &n_clusters_region_a_);

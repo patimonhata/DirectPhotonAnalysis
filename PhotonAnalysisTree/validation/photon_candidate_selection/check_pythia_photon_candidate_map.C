@@ -21,7 +21,9 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
                                       const double expected_eta_mass_min = 0.45,
                                       const double expected_eta_mass_max = 0.65,
                                       const double expected_missing_energy_min = 0.2,
-                                      const double expected_missing_energy_max = 0.5)
+                                      const double expected_missing_energy_max = 0.5,
+                                      const double expected_shower_shape_min_cluster_et = -1.0, const double expected_max_abs_mbd_vertex_z = -1.0,
+                                      const double expected_candidate_abs_eta_max = -1.0, const double expected_topology_anchor_abs_eta_max = -1.0)
 {
   const double resolved_expected_tagging_energy = expected_tagging_partner_min_energy < 0.0 ? expected_min_cluster_energy : expected_tagging_partner_min_energy;
   const int tree_status = check_pythia_photon_candidate_tree(path);
@@ -102,7 +104,7 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   ok &= map_bind(metadata, "n_clusters_region_c", &n_clusters_region_c);
   ok &= map_bind(metadata, "n_clusters_region_d", &n_clusters_region_d);
   ok &= map_bind(metadata, "n_clusters_final_photon", &n_clusters_final_photon);
-  if (!ok || metadata->GetEntry(0) <= 0 || schema_version != 10 || common_composition_algorithm_version != 1 || decay_origin_algorithm_version != 1 ||
+  if (!ok || metadata->GetEntry(0) <= 0 || (schema_version != 10 && schema_version != 11) || common_composition_algorithm_version != 1 || decay_origin_algorithm_version != 1 ||
       !std::isfinite(decay_origin_max_proper_length_cm) || std::abs(decay_origin_max_proper_length_cm - 1e-4) > 1e-12 ||
       !std::isfinite(decay_origin_max_flight_cm) || std::abs(decay_origin_max_flight_cm - 1e-2) > 1e-12 || !input_manifest || input_manifest->empty() ||
       manifest_begin < 0 || manifest_end <= manifest_begin || input_file_count != manifest_end - manifest_begin ||
@@ -124,6 +126,39 @@ int check_pythia_photon_candidate_map(const char* path, const double expected_mi
   {
     std::cerr << "Invalid photon-candidate map metadata" << std::endl;
     return 4;
+  }
+
+  if (schema_version == 11)
+  {
+    double shower_shape_min_cluster_et = -1.0, max_abs_mbd_vertex_z = -1.0, candidate_abs_eta_max = -1.0, topology_anchor_abs_eta_max = -1.0;
+    unsigned long long processed = 0, vertex_rejected = 0, invalid = 0, mbd_missing = 0, mbd_out_of_range = 0;
+    std::string *reco_vertex_source = nullptr, *topology_vertex_source = nullptr;
+    ok = map_bind(metadata, "shower_shape_min_cluster_et", &shower_shape_min_cluster_et) &&
+        map_bind(metadata, "max_abs_mbd_vertex_z", &max_abs_mbd_vertex_z) &&
+        map_bind(metadata, "candidate_abs_eta_max", &candidate_abs_eta_max) &&
+        map_bind(metadata, "topology_anchor_abs_eta_max", &topology_anchor_abs_eta_max) &&
+        map_bind(metadata, "reconstruction_vertex_source", &reco_vertex_source) &&
+        map_bind(metadata, "topology_vertex_source", &topology_vertex_source) &&
+        map_bind(metadata, "n_events_processed", &processed) && map_bind(metadata, "n_events_invalid", &invalid) &&
+        map_bind(metadata, "n_events_vertex_rejected", &vertex_rejected) &&
+        map_bind(metadata, "n_events_mbd_vertex_missing", &mbd_missing) &&
+        map_bind(metadata, "n_events_mbd_vertex_out_of_range", &mbd_out_of_range);
+    const auto matches = [](double value, double expected) {
+      return std::isfinite(value) && value >= 0.0 && std::isfinite(expected) && (expected < 0.0 || std::abs(value - expected) <= 1e-12);
+    };
+    if (!ok || metadata->GetEntry(0) <= 0 ||
+        !matches(shower_shape_min_cluster_et, expected_shower_shape_min_cluster_et) ||
+        !matches(max_abs_mbd_vertex_z, expected_max_abs_mbd_vertex_z) || max_abs_mbd_vertex_z == 0.0 ||
+        !matches(candidate_abs_eta_max, expected_candidate_abs_eta_max) || candidate_abs_eta_max == 0.0 ||
+        !matches(topology_anchor_abs_eta_max, expected_topology_anchor_abs_eta_max) || topology_anchor_abs_eta_max == 0.0 ||
+        !reco_vertex_source || *reco_vertex_source != "MbdVertexMap" ||
+        !topology_vertex_source || *topology_vertex_source != "signal HepMC collision" ||
+        vertex_rejected != mbd_missing + mbd_out_of_range || processed != n_events_written + vertex_rejected + invalid)
+    {
+      std::cerr << "Invalid MBD photon-candidate map metadata" << std::endl;
+      return 4;
+    }
+    metadata->ResetBranchAddresses();
   }
 
   std::vector<int>* anchor_matching_status = nullptr;

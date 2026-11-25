@@ -27,3 +27,4 @@ compile_commands.json
 __pycache__/
 
 /PhotonAnalysisTree/software/
+/PhotonAnalysisTree/input/physics_data/Jet_and_JETCALO_ana521_2025p007_v001/

@@ -9,6 +9,17 @@
         "**/autom4te.cache": true
     },
 
+    "files.watcherExclude": {
+        "**/output/**": true,
+        "**/build/**": true,
+        "**/install/**": true,
+        "**/autom4te.cache/**": true,
+        "PhotonAnalysisTree/input/physics_data/Jet_and_JETCALO_ana521_2025p007_v001/**": true
+    },
+    "files.exclude": {
+        "**/autom4te.cache": true
+    },
+
     "search.exclude": {
         "**/output": true,
         "**/build": true,

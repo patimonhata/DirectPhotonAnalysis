@@ -39,6 +39,7 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
   if (!bind(metadata, "schema_version", &schema_version) || !bind(metadata, "min_cluster_energy", &stored_min_cluster_energy) ||
       metadata->GetEntry(0) <= 0 || !std::isfinite(stored_min_cluster_energy) || stored_min_cluster_energy < 0.0) return 1;
   const bool uses_mbd = schema_version == 11;
+  const bool has_truth_isolation = parent == "pi0" && metadata->GetBranch("truth_isolation_definition");
   double max_abs_mbd_vertex_z = 0.0, shower_shape_min_cluster_et = -1.0, candidate_abs_eta_max = 0.0;
   double candidate_et_min = 0.0, candidate_et_max = 0.0;
   if (uses_mbd &&
@@ -71,6 +72,9 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
   std::vector<double>* noniso_boundary = nullptr;
   std::vector<unsigned char>* isolated = nullptr;
   std::vector<unsigned char>* nonisolated = nullptr;
+  std::vector<unsigned char> *truth_prompt_cluster = nullptr, *truth_iso_valid = nullptr, *truth_isolated = nullptr, *truth_nonisolated = nullptr;
+  std::vector<double> *truth_photon_pt = nullptr, *truth_iso_et = nullptr;
+  std::vector<int>* truth_photon_track_id = nullptr;
   std::vector<unsigned char>* region_a = nullptr;
   std::vector<unsigned char>* region_b = nullptr;
   std::vector<unsigned char>* region_c = nullptr;
@@ -126,6 +130,16 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
   ok &= bind(events, "split_cluster_noniso_boundary", &noniso_boundary);
   ok &= bind(events, "split_cluster_pass_isolated", &isolated);
   ok &= bind(events, "split_cluster_pass_nonisolated", &nonisolated);
+  if (has_truth_isolation)
+  {
+    ok &= bind(events, "split_cluster_truth_prompt_cluster", &truth_prompt_cluster);
+    ok &= bind(events, "split_cluster_truth_iso_valid", &truth_iso_valid);
+    ok &= bind(events, "split_cluster_truth_iso_et", &truth_iso_et);
+    ok &= bind(events, "split_cluster_truth_iso_photon_pt", &truth_photon_pt);
+    ok &= bind(events, "split_cluster_truth_iso_photon_track_id", &truth_photon_track_id);
+    ok &= bind(events, "split_cluster_truth_pass_isolated", &truth_isolated);
+    ok &= bind(events, "split_cluster_truth_pass_nonisolated", &truth_nonisolated);
+  }
   ok &= bind(events, "split_cluster_pass_region_a", &region_a);
   ok &= bind(events, "split_cluster_pass_region_b", &region_b);
   ok &= bind(events, "split_cluster_pass_region_c", &region_c);
@@ -201,6 +215,12 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
         pi0_anchor_selected_tag_partner_matches_truth_partner->size(), eta_tag->size()};
     bool event_ok = std::all_of(sizes.begin(), sizes.end(), [ncluster](std::size_t size) { return size == ncluster; });
     event_ok &= std::isfinite(vertex_z) && patch->empty() && pair_i->empty();
+    if (has_truth_isolation)
+    {
+      const std::vector<std::size_t> truth_iso_sizes = {truth_prompt_cluster->size(), truth_iso_valid->size(), truth_iso_et->size(),
+          truth_photon_pt->size(), truth_photon_track_id->size(), truth_isolated->size(), truth_nonisolated->size()};
+      event_ok &= std::all_of(truth_iso_sizes.begin(), truth_iso_sizes.end(), [ncluster](std::size_t size) { return size == ncluster; });
+    }
     if (uses_mbd)
     {
       event_ok &= std::isfinite(mbd_vertex_z) && std::abs(mbd_vertex_z) < max_abs_mbd_vertex_z;
@@ -248,6 +268,20 @@ int check_pythia_photon_candidate_tree(const char* path, const std::string paren
       event_ok &= close_enough((*noniso_boundary)[cluster], (*iso_boundary)[cluster] + 0.8);
       event_ok &= static_cast<bool>((*isolated)[cluster]) == ((*iso_corrected)[cluster] < (*iso_boundary)[cluster]);
       event_ok &= static_cast<bool>((*nonisolated)[cluster]) == ((*iso_corrected)[cluster] > (*noniso_boundary)[cluster]);
+      if (has_truth_isolation)
+      {
+        const int track_id = (*truth_photon_track_id)[cluster];
+        const double pt = (*truth_photon_pt)[cluster];
+        const double sum = (*truth_iso_et)[cluster];
+        const double boundary = 0.490 + 0.037 * pt;
+        const bool has_pt = std::isfinite(pt) && pt > 0.0;
+        const bool truth_valid = (*truth_iso_valid)[cluster] != 0U;
+        event_ok &= track_id >= 0 && (track_id == 0 || (*truth_prompt_cluster)[cluster]);
+        event_ok &= pt == -999.0 || (track_id > 0 && has_pt);
+        event_ok &= truth_valid ? (has_pt && std::isfinite(sum) && sum >= 0.0) : sum == -999.0;
+        event_ok &= (*truth_isolated)[cluster] == (truth_valid && sum < boundary);
+        event_ok &= (*truth_nonisolated)[cluster] == (truth_valid && sum > boundary + 0.8);
+      }
       const bool common = (*kinematics)[cluster] && (*preselection)[cluster];
       event_ok &= static_cast<bool>((*region_a)[cluster]) == (common && (*isolated)[cluster] && (*tight)[cluster]);
       event_ok &= static_cast<bool>((*region_b)[cluster]) == (common && (*nonisolated)[cluster] && (*tight)[cluster]);

@@ -9,6 +9,7 @@
 #include <calobase/TowerInfoContainer.h>
 #include <fun4all/Fun4AllReturnCodes.h>
 #include <fun4all/Fun4AllInputManager.h>
+#include <g4main/PHG4Particle.h>
 #include <g4main/PHG4TruthInfoContainer.h>
 #include <g4main/PHG4HitContainer.h>
 #include <g4detectors/PHG4CellContainer.h>
@@ -51,6 +52,11 @@ constexpr double mbd_hit_charge_min = 0.4;
 double delta_phi(double first, double second)
 {
   return std::atan2(std::sin(first - second), std::cos(first - second));
+}
+
+double isolation_boundary(double transverse)
+{
+  return 0.490 + 0.037 * transverse;
 }
 
 bool raw_cluster_kinematics(const RawCluster* cluster, double mbd_vertex_z,
@@ -98,6 +104,70 @@ void PhotonCandidateSelectionBranches::clear()
   *this = PhotonCandidateSelectionBranches{};
 }
 
+void PhotonCandidateSelectionBranches::fill_truth_isolation(const PHG4TruthInfoContainer* truth, int signal_embedding, double radius, double nonisolation_gap)
+{
+  const std::size_t count = truth_iso_photon_track_id.size();
+  truth_iso_photon_pt.assign(count, kInvalidDouble);
+  truth_iso_et.assign(count, kInvalidDouble);
+  truth_iso_valid.assign(count, 0U);
+  truth_pass_isolated.assign(count, 0U);
+  truth_pass_nonisolated.assign(count, 0U);
+  if (!truth || std::none_of(truth_iso_photon_track_id.begin(), truth_iso_photon_track_id.end(), [](int id) { return id > 0; })) return;
+
+  struct KinematicPrimary
+  {
+    int track_id;
+    double pt, eta, phi, et;
+  };
+  std::vector<KinematicPrimary> primaries;
+  std::map<int, std::size_t> photon_index;
+  const auto range = truth->GetPrimaryParticleRange();
+  for (auto it = range.first; it != range.second; ++it)
+  {
+    const auto [track_id, particle] = *it;
+    if (truth->isEmbeded(track_id) != signal_embedding) continue;
+    if (!particle) return;
+    const double pt = std::hypot(particle->get_px(), particle->get_py());
+    const double pz = particle->get_pz();
+    if (!std::isfinite(pt) || !std::isfinite(pz)) return;
+    // A particle along the beam has zero transverse energy.
+    if (pt == 0.0) continue;
+    const double eta = std::asinh(pz / pt);
+    const double phi = std::atan2(particle->get_py(), particle->get_px());
+    const double energy = particle->get_e();
+    const double et = energy >= 0.0 ? energy * (pt / std::hypot(pt, pz)) : std::numeric_limits<double>::quiet_NaN();
+    if (particle->get_pid() == 22) photon_index.emplace(track_id, primaries.size());
+    primaries.push_back({track_id, pt, eta, phi, et});
+  }
+
+  std::map<int, double> photon_sums;
+  for (std::size_t cluster = 0; cluster < count; ++cluster)
+  {
+    const auto center = photon_index.find(truth_iso_photon_track_id[cluster]);
+    if (center == photon_index.end()) continue;
+    const auto& photon = primaries[center->second];
+    if (!std::isfinite(photon.eta)) continue;
+    truth_iso_photon_pt[cluster] = photon.pt;
+
+    auto [entry, inserted] = photon_sums.emplace(photon.track_id, 0.0);
+    if (inserted)
+    {
+      for (const auto& particle : primaries)
+      {
+        if (particle.track_id != photon.track_id && std::hypot(particle.eta - photon.eta, delta_phi(particle.phi, photon.phi)) < radius)
+          entry->second += particle.et;
+      }
+    }
+    const double sum = entry->second;
+    if (!std::isfinite(sum)) continue;
+    const double boundary = isolation_boundary(photon.pt);
+    truth_iso_et[cluster] = sum;
+    truth_iso_valid[cluster] = 1U;
+    truth_pass_isolated[cluster] = sum < boundary;
+    truth_pass_nonisolated[cluster] = sum > boundary + nonisolation_gap;
+  }
+}
+
 void PhotonCandidateSelectionBranches::create_branches(TTree* tree, const std::string& parent, bool anchors_only)
 {
 #define BRANCH(member) tree->Branch((std::string("split_cluster_") + #member).c_str(), &member)
@@ -131,6 +201,12 @@ void PhotonCandidateSelectionBranches::create_branches(TTree* tree, const std::s
     BRANCH(pi0_partner_mass);
     BRANCH(eta_partner_mass);
     BRANCH(truth_prompt_cluster);
+    BRANCH(truth_iso_photon_track_id);
+    BRANCH(truth_iso_photon_pt);
+    BRANCH(truth_iso_et);
+    BRANCH(truth_iso_valid);
+    BRANCH(truth_pass_isolated);
+    BRANCH(truth_pass_nonisolated);
   }
 #undef BRANCH
 #define BRANCH(member) tree->Branch(("split_cluster_" + parent + std::string(#member).substr(3)).c_str(), &member)
@@ -582,7 +658,7 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     b_mbd_north_hits_ = hits[1];
   }
 
-  const photon_tree::Pi0AnchorTopologyEventResult topology_result = topology_evaluator_.evaluate(topNode);
+  const photon_tree::Pi0AnchorTopologyEventResult topology_result = topology_evaluator_.evaluate(topNode, /*resolve_prompt_primary=*/true);
   if (topology_result.status != photon_tree::Pi0TopologyEventStatus::accepted)
   {
     ++n_events_invalid_;
@@ -623,13 +699,14 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
-  // Supplemental ancestry diagnostics do not feed the selection, legacy contributors or topology evaluators.
   auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
-  auto* events = findNode::getClass<PHHepMCGenEventMap>(topNode, hepmc_event_map_node_name_);
+  selection_.fill_truth_isolation(truth, signal_embedding_id_, isolation_radius_, nonisolation_gap_);
+
+  // Supplemental ancestry diagnostics do not feed the selection, legacy contributors or topology evaluators.
   auto* raw = findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
   auto* cells = findNode::getClass<PHG4CellContainer>(topNode, truth_cell_node_name_);
   auto* hits = findNode::getClass<PHG4HitContainer>(topNode, truth_hit_node_name_);
-  photon_tree::DecayOriginDiagnostics diagnostic(truth, events);
+  photon_tree::DecayOriginDiagnostics diagnostic(truth, event_map);
   std::map<unsigned int, const photon_tree::ClusterTruthMatch*> original;
   for (const auto& record : topology_result.clusters) original[record.cluster_id] = &record.truth;
   common_truth_.clear(); original_truth_.clear();
@@ -795,12 +872,14 @@ void PythiaPhotonCandidateTree::fill_topology_cluster_links(const photon_tree::P
       {
         cluster_truth_.append({});
         links.truth_prompt_cluster.push_back(0U);
+        links.truth_iso_photon_track_id.push_back(0);
       }
       else
       {
         const std::size_t index = result_found->second;
         cluster_truth_.append(result.clusters[index].truth);
         links.truth_prompt_cluster.push_back(index < result.prompt_cluster.size() ? result.prompt_cluster[index] : 0U);
+        links.truth_iso_photon_track_id.push_back(result.clusters[index].prompt_primary_track_id);
       }
     }
     const auto anchor_found = anchor_by_id.find(id);
@@ -913,7 +992,7 @@ bool PythiaPhotonCandidateTree::fill_candidate_selection(RawClusterContainer* sp
     }
     const double iso_raw = iso_sum - et;
     const double iso_corrected = isolation_scale_ * iso_raw + isolation_offset_;
-    const double iso_boundary = 0.490 + 0.037 * et;
+    const double iso_boundary = isolation_boundary(et);
     const double noniso_boundary = iso_boundary + nonisolation_gap_;
     const bool isolated = iso_corrected < iso_boundary;
     const bool nonisolated = iso_corrected > noniso_boundary;
@@ -1144,6 +1223,7 @@ void PythiaPhotonCandidateTree::create_output()
   metadata_tree_->Branch("truth_jet_node", &truth_jet_node_name_);
   metadata_tree_->Branch("topocluster_configuration", &topocluster_configuration_);
   metadata_tree_->Branch("isolation_definition", &isolation_definition_);
+  metadata_tree_->Branch("truth_isolation_definition", &truth_isolation_definition_);
   metadata_tree_->Branch("min_cluster_energy", &min_cluster_energy_);
   metadata_tree_->Branch("partner_diagnostic_min_cluster_energy", &partner_diagnostic_min_cluster_energy_);
   metadata_tree_->Branch("pi0_topology_algorithm_version", &pi0_topology_algorithm_version_);

@@ -33,6 +33,8 @@ See [external map storage](../../docs/software.md#map-だけを-tg-に保存す�
 
 ## Map
 
+Development maps also store per-cluster truth isolation and its two selection flags for matched prompt photons. See the [selection definitions](../../docs/photon_candidate_definitions.md#selection-definitions).
+
 Review the production/configuration and choose new map outputs when rerunning a production. Existing map files are not overwritten. No repository script automatically submits jobs.
 
 The default model is `models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root`, loaded as `myBDT` by `TMVA::Experimental::RBDT`. `run_map.sh` passes the model path explicitly from `PHOTON_SOURCE_ROOT`; the macro default uses the same model. The existing tight/non-tight thresholds are retained intentionally. See [model and input order](../../docs/photon_candidate_definitions.md#bdt-model-and-input-order). Model changes require new DST maps; reduce, merge and replot do not recompute scores or selection flags.
@@ -84,7 +86,7 @@ Merged outputs include all-origin common composition, transition CSVs and matchi
 
 ## Retained v11/schema-5 results
 
-Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the current schema-10 map reducer. See [reference replay](../../docs/reproduction.md).
+Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the current schema-11 map reducer. See [reference replay](../../docs/reproduction.md).
 
 `ReplotPi0BdtScores.C` / `ReplotEtaBdtScores.C` redraw stored BDT ROOT distributions where present. [`CheckEtaDecayFlight.C`](../diagnostics/eta_decay_flight/README.md) is an independent DST diagnostic and does not change composition/topology selections; arguments and interpretation are in the definition notes.
 

@@ -15,6 +15,7 @@
 
 class PHCompositeNode;
 class PHHepMCGenEventMap;
+class PHG4TruthInfoContainer;
 class RawClusterContainer;
 class Fun4AllInputManager;
 class TFile;
@@ -61,6 +62,9 @@ struct PhotonCandidateSelectionBranches
   std::vector<float> eta_partner_mass;
 
   std::vector<unsigned char> truth_prompt_cluster;
+  std::vector<int> truth_iso_photon_track_id;
+  std::vector<double> truth_iso_photon_pt, truth_iso_et;
+  std::vector<unsigned char> truth_iso_valid, truth_pass_isolated, truth_pass_nonisolated;
   std::vector<unsigned char> pi0_anchor_valid;
   std::vector<int> pi0_anchor_candidate_index;
   std::vector<float> pi0_anchor_main_fraction;
@@ -90,6 +94,7 @@ struct PhotonCandidateSelectionBranches
 
   void clear();
   void create_branches(TTree* tree, const std::string& parent = "pi0", bool anchors_only = false);
+  void fill_truth_isolation(const PHG4TruthInfoContainer* truth, int signal_embedding, double radius, double nonisolation_gap);
 };
 
 struct Pi0TopologyTreeBranches
@@ -255,6 +260,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   std::string truth_cell_node_name_ = "G4CELL_CEMC";
   std::string truth_hit_node_name_ = "G4HIT_CEMC";
   std::string isolation_definition_ = "sum_topocluster_et_delta_r_lt_0p4_minus_candidate_et";
+  std::string truth_isolation_definition_ = "sum_signal_g4_primary_et_in_prompt_photon_cone_excluding_center";
   std::string event_weight_definition_ = "cross_section_pb_times_generator_weight_divided_by_full_sample_sum_generator_weight_at_merge";
   std::string photon_stitch_definition_ = "leading_status1_terminal_prompt_hepmc_photon_pt";
   std::string jet_stitch_definition_ = "leading_AntiKt_Truth_r04_jet_pt";

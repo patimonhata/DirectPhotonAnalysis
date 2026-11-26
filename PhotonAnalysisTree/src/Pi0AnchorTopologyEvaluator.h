@@ -167,6 +167,7 @@ struct Pi0TopologyClusterRecord
   ClusterTruthMatch truth;
   ClusterTruthMatch original_truth;
   composition::Result composition;
+  int prompt_primary_track_id = 0;
 };
 
 struct Pi0PartnerDiagnosticRecord
@@ -309,7 +310,7 @@ class Pi0AnchorTopologyEvaluator
   static constexpr int kAlgorithmVersion = 14;
   void configure(const Pi0AnchorTopologyConfig& config);
   const Pi0AnchorTopologyConfig& config() const { return config_; }
-  Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode);
+  Pi0AnchorTopologyEventResult evaluate(PHCompositeNode* topNode, bool resolve_prompt_primary = false);
 
  private:
   Pi0AnchorTopologyConfig config_;

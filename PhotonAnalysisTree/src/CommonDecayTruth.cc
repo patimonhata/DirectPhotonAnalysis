@@ -376,6 +376,26 @@ composition::Result CommonDecayTruth::resolve(const ClusterTruthMatch& original,
   }
   return r;
 }
+std::map<composition::Identity, int> CommonDecayTruth::primary_photon_tracks(int embedding) const
+{
+  std::map<composition::Identity, int> tracks;
+  if (!impl_->truth) return tracks;
+
+  const auto range = impl_->truth->GetPrimaryParticleRange();
+  for (auto it = range.first; it != range.second; ++it)
+  {
+    const auto* particle = it->second;
+    if (!particle || particle->get_pid() != 22 || impl_->truth->isEmbeded(it->first) != embedding) continue;
+    const auto photon = impl_->physical(impl_->from_g4(particle, embedding));
+    if (!photon.hep) continue;
+    const auto [id_embedding, source, id] = photon.key();
+    if (id == 0) continue;
+    const auto [entry, inserted] = tracks.emplace(composition::Identity{id_embedding, source, id}, it->first);
+    if (!inserted) entry->second = 0;
+  }
+  return tracks;
+}
+
 std::vector<CommonDiphoton> CommonDecayTruth::diphotons(int pdg, int embedding) const
 {
   std::map<Key, Node> nodes;

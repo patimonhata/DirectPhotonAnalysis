@@ -27,6 +27,8 @@ class CommonDecayTruth
   composition::Result resolve(const ClusterTruthMatch& original, const RawCluster* cluster, TowerInfoContainer* towers,
                               RawTowerContainer* raw, PHG4CellContainer* cells, PHG4HitContainer* hits) const;
   std::vector<CommonDiphoton> diphotons(int pdg, int embedding) const;
+  // The canonical HepMC photon identity maps to 0 if it has multiple G4 primary tracks.
+  std::map<composition::Identity, int> primary_photon_tracks(int embedding) const;
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

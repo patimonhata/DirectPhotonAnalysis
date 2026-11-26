@@ -1,6 +1,7 @@
 #include "test_decay_origin.C"
 #include "../src/CommonDecayTruth.h"
 #include "../src/Pi0ClusterTruthMatcher.h"
+#include "../src/PythiaPhotonCandidateTree.h"
 #include "../analysis/photon_candidate_selection/CommonCompositionHistograms.h"
 namespace common_decay_test
 {
@@ -175,10 +176,93 @@ void photon_copies_and_partial_matching()
   assert(!missing.ancestry_complete);
 }
 
+void prompt_primary_tracks()
+{
+  PHG4TruthInfoContainer truth;
+  PHHepMCGenEventMap events;
+  auto* event = new HepMC::GenEvent;
+  auto* production = new HepMC::GenVertex;
+  auto* copy_vertex = new HepMC::GenVertex;
+  event->add_vertex(production);
+  event->add_vertex(copy_vertex);
+  auto* photon = new HepMC::GenParticle(HepMC::FourVector(10, 0, 0, 10), 22, 2);
+  auto* copy = new HepMC::GenParticle(photon->momentum(), 22, 1);
+  production->add_particle_out(photon);
+  copy_vertex->add_particle_in(photon);
+  copy_vertex->add_particle_out(copy);
+  events.insert_event(1)->addEvent(event);
+  particle(truth, 1, 22, 0, 1, copy->barcode());
+  const composition::Identity identity{1, 1, photon->barcode()};
+  assert(CommonDecayTruth(&truth, &events).primary_photon_tracks(1).at(identity) == 1);
+  particle(truth, 2, 22, 0, 1, photon->barcode());
+  assert(CommonDecayTruth(&truth, &events).primary_photon_tracks(1).at(identity) == 0);
+}
+
+void truth_isolation()
+{
+  PHG4TruthInfoContainer truth;
+  auto* photon = particle(truth, 1, 22, 0, 1, 100);
+  photon->set_px(-10.0);
+  photon->set_py(0.01);
+  photon->set_e(10.0);
+  auto* neighbor = particle(truth, 2, 22, 0, 1); // No HepMC match is needed for a cone constituent.
+  neighbor->set_px(-0.5);
+  neighbor->set_py(-0.01);
+  neighbor->set_e(0.5);
+  auto* massive = particle(truth, 3, 211, 0, 1);
+  massive->set_px(-0.3);
+  massive->set_pz(0.09);
+  massive->set_e(0.6);
+  auto* secondary = particle(truth, -1, 22, 1, -1);
+  secondary->set_px(-10.0);
+  auto* other_embedding = new PHG4Particlev2("background", 22, -10.0, 0.0, 0.0);
+  other_embedding->set_track_id(4);
+  other_embedding->set_e(10.0);
+  truth.AddParticle(4, other_embedding);
+  truth.AddEmbededTrkId(4, 2);
+  particle(truth, 5, 22, 0, 1, 102); // Outside the cone and isolated in its own cone.
+
+  PhotonCandidateSelectionBranches links;
+  links.truth_iso_photon_track_id = {1, 1, 0, 5, 4};
+  links.fill_truth_isolation(&truth, 1, 0.4, 0.8);
+  const double truth_pt = std::hypot(10.0, 0.01);
+  const double boundary = 0.490 + 0.037 * truth_pt;
+  const double massive_et = 0.6 * (0.3 / std::hypot(0.3, 0.09));
+  const double expected = 0.5 + massive_et;
+  assert(links.truth_iso_valid == (std::vector<unsigned char>{1, 1, 0, 1, 0}));
+  assert(links.truth_iso_photon_pt[0] == truth_pt);
+  assert(links.truth_iso_et == (std::vector<double>{expected, expected, -999, 0, -999}));
+  assert(links.truth_pass_isolated == (std::vector<unsigned char>{0, 0, 0, 1, 0}));
+  assert(links.truth_pass_nonisolated == (std::vector<unsigned char>{0, 0, 0, 0, 0}));
+  // Exact thresholds are in the gap. Use one constituent to avoid roundoff from the sum.
+  massive->set_e(0.0);
+  for (double sum : {boundary - 0.01, boundary, boundary + 0.8, boundary + 0.81})
+  {
+    neighbor->set_e(sum);
+    links.fill_truth_isolation(&truth, 1, 0.4, 0.8);
+    assert(links.truth_iso_et[0] == sum);
+    assert(links.truth_pass_isolated[0] == (sum < boundary));
+    assert(links.truth_pass_nonisolated[0] == (sum > boundary + 0.8));
+  }
+  TMemFile file("truth_isolation.root", "RECREATE");
+  TTree tree("event_tree", "Truth isolation");
+  links.create_branches(&tree);
+  tree.Fill();
+  tree.Write();
+  auto* saved = file.Get<TTree>("event_tree");
+  std::vector<double>* sum = nullptr;
+  std::vector<unsigned char>* nonisolated = nullptr;
+  assert(saved->SetBranchAddress("split_cluster_truth_iso_et", &sum) >= 0);
+  assert(saved->SetBranchAddress("split_cluster_truth_pass_nonisolated", &nonisolated) >= 0);
+  assert(saved->GetEntry(0) > 0 && *sum == links.truth_iso_et && *nonisolated == links.truth_pass_nonisolated);
+  saved->ResetBranchAddresses();
+}
+
 }
 void test_common_decay_truth()
 {
   using namespace common_decay_test;
+  prompt_primary_tracks(); truth_isolation();
   for (bool radiative : {false, true})
   {
     const auto g4 = g4_case(radiative), hep = hepmc_case(radiative), mixed = hepmc_case(radiative, true);

@@ -617,7 +617,7 @@ void Pi0AnchorTopologyEvaluator::configure(const Pi0AnchorTopologyConfig& config
   truth_matcher_.set_verbosity(config_.verbosity);
 }
 
-Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNode* topNode)
+Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNode* topNode, bool resolve_prompt_primary)
 {
   Pi0AnchorTopologyEventResult result;
   auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, config_.truth_node_name);
@@ -1002,8 +1002,20 @@ Pi0AnchorTopologyEventResult Pi0AnchorTopologyEvaluator::evaluate(PHCompositeNod
   }
 
   if (config_.common_composition)
+  {
     for (std::size_t i = 0; i < result.clusters.size(); ++i)
       result.prompt_cluster[i] = result.clusters[i].composition.main == composition::Main::prompt;
+    if (resolve_prompt_primary && std::any_of(result.prompt_cluster.begin(), result.prompt_cluster.end(), [](auto prompt) { return prompt != 0U; }))
+    {
+      const auto tracks = common_truth.primary_photon_tracks(config_.signal_embedding_id);
+      for (auto& cluster : result.clusters)
+      {
+        if (cluster.composition.main != composition::Main::prompt) continue;
+        const auto track = tracks.find(cluster.composition.selected.identity);
+        if (track != tracks.end()) cluster.prompt_primary_track_id = track->second;
+      }
+    }
+  }
 
   std::vector<std::vector<std::size_t>> anchors_by_candidate(
       result.candidates.size());

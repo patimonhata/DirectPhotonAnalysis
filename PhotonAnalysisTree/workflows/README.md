@@ -6,6 +6,7 @@
 | 入口 | 役割 |
 |---|---|
 | [photon_candidate_selection](photon_candidate_selection/README.md) | 主解析。Pythia DST → map → reduce → merge |
+| [bdt_training](bdt_training/README.md) | schema 11 map から inclusive なクラスターと3版の教師ラベルを軽量 ROOT に抽出 |
 | [pythia_tree](pythia_tree/README.md) | 汎用 Pythia tree 生成・score 追加 |
 | [single_particle](single_particle/README.md) | gun tree 生成・score 追加・dataset 作成 |
 | [physics_data](../input/physics_data/README.md) | Run 2 pp 物理データの Spin QA と DST 入力準備 |

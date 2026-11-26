@@ -47,9 +47,9 @@ SinglePi0GunSimulation
 
 * [マクロ入出力一覧](docs/macro-reference.md): 各マクロの引数、必要な node / Tree、生成ファイル
 
-* [ROOT TTree ブランチ一覧](docs/root-tree-schema.md): `event_uid` 追加後の Tree スキーマと branch の意味
+* [ROOT TTree ブランチ一覧](docs/root-tree-schema.md): Tree スキーマと branch の意味
 
-* [再現メモ](docs/reproducibility-log.md): 解析条件と生成物を後から追うための短い記録テンプレート
+過去の生成条件や解析手順は、対象のコミットで確認できます（例: `git show <commit>:SinglePi0GunSimulation/macro/Fun4All_SingleParticlePi0.C`）。
 
 ## ディレクトリ
 
@@ -90,7 +90,7 @@ cd /sphenix/user/ryotaro/DirectPhotonAnalysis/SinglePi0GunSimulation/macro
 ./run_job.sh 0 5 true
 ```
 
-現在の generator 設定では、主な出力は次です。
+以下は、単一 pi0 を `pt=5 GeV`、`eta=0.5`、`phi=[-pi,pi]` で生成する場合の出力例です。実際の保存先は生成マクロの `outDir` で確認してください。
 
 ```text
 SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/
@@ -101,12 +101,10 @@ SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/
 
 ## 単一粒子フローの注意点
 
-* `SinglePi0GunSimulation` の現行 generator は `pt=5 GeV`, `eta=0.5`, `phi=[-pi,pi]` です。
-
-* `Pi0Reconstruction` の既定入力ディレクトリは `DST_pi0_5GeV_eta0_towerinfo` なので、現行 simulation 出力 `eta05` を読む場合は引数で入力ディレクトリを指定します。
+* `Pi0Reconstruction` の入力ディレクトリには、使用する DST を生成したディレクトリを指定します。
 
 * `EventDisplay/macro/Fun4All_Pi0EventDisplayDump.C` の現行既定入力は別プロジェクトの single-gamma sample です。
 
 * `TruthAnalysis` を EventDisplay の後に使う場合は、両マクロ内の入力・出力ファイル名が一致しているか確認します。
 
-* `source /opt/sphenix/core/bin/sphenix_setup.sh -n ana` は rolling release です。厳密に再現したい解析では実際に使った release 名を再現メモに残します。
+* `source /opt/sphenix/core/bin/sphenix_setup.sh -n ana` は rolling release です。厳密に再現したい解析では固定 release を指定します。

@@ -46,17 +46,15 @@ Existing ROOT outputs are not overwritten. Event-limited and incomplete-map QA o
 
 ## QA
 
-The v2 QA uses two Jet8 maps (64,344 events, 56 Region-A candidates), one reduce partial, and a merge under `output/tagging_working_point_scan/qa/tagging_working_point_scan/v2/`. Input symlinks live under `output/tagging_working_point_scan/qa/tagging_working_point_scan/two_maps/maps/jet8/`. `check_scan.py MAP_GLOB MERGED_ROOT` independently recomputes all six pair predicates and exclusive pi0/prompt classification in Python and compares every raw/weighted mask bin and Sumw2 error; this passed. It is intended for small QA inputs only.
+`check_scan.py MAP_GLOB MERGED_ROOT` independently recomputes all six pair predicates and exclusive pi0/prompt classification in Python and compares every raw/weighted mask bin and Sumw2 error. It is intended for small QA inputs only.
 
 For a production v2 output, `check_reference_outputs.py SCAN_ROOT COMPOSITION_BASE PREVIOUS_SCAN_ROOT` compares all raw and weighted prompt/all/pi0 yields and variances before/after veto to the three existing photon compositions (E > 0.5 with 0.10–0.20; E > 0.15 with 0.10–0.20 and 0.08–0.18). It also projects out the new mask bits to compare every bin and variance with the v1 four-setting scan.
 
 ## v2 production execution
 
-Submitted on 2026-09-18: Condor cluster 188504 (six ordinary samples) and 188505 (ten Jet12 shards). The detached `wait_and_merge.py` monitors these jobs, merges all 16 partials, compares prompt/all/pi0 raw and weighted yields against `ClusterE0p12_Pi0Partner0p5_v11/jet/candidate_composition.root` before and after veto in all ET bins (504 comparisons), and generates `RESULTS.md`. `execution_status.json` and `completion.log` are saved in the v2 final directory. Held/removed jobs, missing outputs or a baseline mismatch mark the run failed; the monitor does not cancel or resubmit jobs. The monitor has a 24-hour limit.
+The detached `wait_and_merge.py` monitors the jobs specified by `--clusters`, merges all 16 partials, compares prompt/all/pi0 raw and weighted yields against `ClusterE0p12_Pi0Partner0p5_v11/jet/candidate_composition.root` before and after veto in all ET bins (504 comparisons), and generates `RESULTS.md`. `execution_status.json` and `completion.log` are saved in the v2 final directory. Held/removed jobs, missing outputs or a baseline mismatch mark the run failed; the monitor does not cancel or resubmit jobs. The monitor has a 24-hour limit.
 
 The v1 four-setting outputs remain at the original paths. The v2 analysis-definition marker and 64-mask axes reject mixing old and new partials. The source map configuration in the directory name describes the common input maps; the comparison reference is explicitly recorded in the analysis-definition marker and report.
 
-
-Production completed successfully: all 16 partials merged, the E > 0.5 reference passed 504 comparisons, and `check_reference_outputs.py` passed all 8,400 yield/variance comparisons against the three existing compositions and the v1 mask histograms.
 
 Output validators are under [`validation/tagging_working_point_scan/`](../../../validation/tagging_working_point_scan/), and are called automatically where required by the run scripts.

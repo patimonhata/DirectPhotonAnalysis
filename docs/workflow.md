@@ -10,8 +10,7 @@ source /opt/sphenix/core/bin/sphenix_setup.sh -n ana
 export PROJECT_ROOT=/sphenix/user/ryotaro/DirectPhotonAnalysis
 ```
 
-厳密な再現が必要な場合は `ana` の代わりに実行時の固定 release を使い、
-[再現メモ](reproducibility-log.md) に記録します。
+厳密な再現が必要な場合は `ana` の代わりに対象の解析で使用する固定 release を指定します。
 
 ## 2. Fun4All module のビルド
 
@@ -34,7 +33,7 @@ source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/EmcalEtViewer/insta
 
 ```bash
 cd "${PROJECT_ROOT}/Pi0Reconstruction/build"
-${PROJECT_ROOT}/EmcalEtViewer/src/autogen.sh --prefix="${PROJECT_ROOT}/Pi0Reconstruction/install"
+${PROJECT_ROOT}/Pi0Reconstruction/src/autogen.sh --prefix="${PROJECT_ROOT}/Pi0Reconstruction/install"
 make -j4
 make install
 source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/Pi0Reconstruction/install"
@@ -44,7 +43,7 @@ source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/Pi0Reconstruction/i
 
 ```bash
 cd "${PROJECT_ROOT}/EventDisplay/build"
-${PROJECT_ROOT}/EmcalEtViewer/src/autogen.sh --prefix="${PROJECT_ROOT}/EventDisplay/install"
+${PROJECT_ROOT}/EventDisplay/src/autogen.sh --prefix="${PROJECT_ROOT}/EventDisplay/install"
 make -j4
 make install
 source /opt/sphenix/core/bin/setup_local.sh "${PROJECT_ROOT}/EventDisplay/install"
@@ -74,7 +73,7 @@ cd "${PROJECT_ROOT}/SinglePi0GunSimulation/macro"
 引数は順に `processID nEvents save_tree` です。現在は DST が常に保存され、
 `save_tree` を使う追加 dumper はコメントアウトされています。
 
-現行設定で期待される出力は次です。
+以下は 5 GeV、eta=0.5 の sample を生成する設定での出力例です。実際のディレクトリは生成マクロの `outDir` で確認してください。
 
 ```text
 SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/
@@ -85,7 +84,7 @@ SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/
 
 ## 4. split / no-split pi0 再構成
 
-現行 simulation の `eta05` sample を明示的に読むローカル例です。
+以下では前節の `eta05` sample を例に使います。入力パスは実際の生成先に置き換えてください。
 `n_events=0` は入力にある全イベントを処理します。
 
 ```bash

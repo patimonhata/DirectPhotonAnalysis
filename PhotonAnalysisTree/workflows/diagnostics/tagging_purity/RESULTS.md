@@ -67,7 +67,7 @@ do not include correlations. The stored BDT score is descriptive only because th
 
 ## Recommendation and remaining work
 
-Use separate partner thresholds and take pi0=0.2 GeV, eta=0.5 GeV as the current working point. Before changing the production default, recompute
+For this schema-4 study, the recommended working point was pi0=0.2 GeV and eta=0.5 GeV. Before changing the production default, recompute
 pairing from the stored cluster four-vectors to scan intermediate eta thresholds (for example 0.3 and 0.4 GeV) and ET-specific mass/deltaR/asymmetry
 cuts. Validate the chosen point on an independent sample.
 

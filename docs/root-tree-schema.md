@@ -1,6 +1,6 @@
 # ROOT TTree ブランチ一覧
 
-この文書は `event_uid` 追加後の現行コードを対象とします。
+この文書は Pi0Reconstruction、EventDisplay、TruthAnalysis、EmcalEtViewer の出力を扱います。
 
 ## 共通規約
 
@@ -41,7 +41,7 @@ UID は一意です。split / no-split の同一イベントには、同じ `pro
 `CompareSplitClusterCounts.C` と `CompareSplitClusterMass.C` はこの UID で2本の Tree を結合し、
 各入力 Tree 内の重複 UID をエラーにします。
 
-現時点で `event_uid` を持つのは `Pi0Reconstruction/event_tree` です。EventDisplay、TruthAnalysis、
+この文書で扱う Tree のうち `event_uid` を持つのは `Pi0Reconstruction/event_tree` です。EventDisplay、TruthAnalysis、
 EmcalEtViewer の Tree は `event` のみなので、複数 process の file を結合する際は process 情報を
 別途保持する必要があります。
 
@@ -60,6 +60,10 @@ EmcalEtViewer の Tree は `event` のみなので、複数 process の file を
 | `ncluster_all` | `unsigned int` | finiteなenergy / positionからphoton candidateを構成できた全cluster数 |
 | `min_cluster_energy` | `double` | `ncluster` とpair作成に使ったenergy threshold [GeV] |
 | `vertex_x`, `vertex_y`, `vertex_z` | `double` | momentum方向の計算に使ったvertex [cm]。現行マクロでは原点 |
+| `shower_shape_min_tower_energy` | `double` | shower shape 計算の tower energy 閾値 [GeV] |
+| `shower_shape_algorithm_version` | `unsigned int` | 計算アルゴリズムの版 |
+| `shower_shape_patch_side` | `unsigned int` | 正方形の tower patch の一辺（tower 数） |
+| `store_shower_shape_tower_patch` | `bool` | 各 tower の patch 配列を格納する設定 |
 
 ### Cluster情報
 
@@ -69,11 +73,28 @@ energy cut 前の有効clusterも入る点に注意してください。
 | Branch | 説明 |
 | --- | --- |
 | `cluster_e` | cluster energy [GeV] |
+| `cluster_et`, `cluster_eta` | 横エネルギー [GeV] と擬ラピディティ |
 | `cluster_x`, `cluster_y`, `cluster_z` | cluster position [cm] |
 | `cluster_px`, `cluster_py`, `cluster_pz` | vertexからcluster位置へ向かうmassless photon仮定のmomentum [GeV] |
 
 cluster vector の index は、入力 `RawClusterContainer` の cluster ID ではなく、このTree内で
 有効candidateを追加した順番です。
+
+### Shower shape
+
+次の branch 名にはすべて `cluster_shower_` が付きます。各 vector は cluster と同じ順序で、長さは `ncluster_all` です。
+
+| Branch の接尾辞 | vector の要素型 | 内容 |
+| --- | --- | --- |
+| `valid`, `full_containment`, `edge_padded`, `tower_data_complete` | `unsigned char` | 計算の有効性、patch が検出器内に収まるか、η 端のゼロ埋めの有無、tower データの完全性（各 0/1） |
+| `cog_ieta`, `cog_iphi` | `float` | tower index 単位のエネルギー重心 |
+| `cluster_e_thresholded`, `owned_patch_e` | `float` | 閾値を超える cluster 割当エネルギーの和と、patch 内で cluster に属し選別を通った tower の較正エネルギーの和 [GeV] |
+| `w_eta_cogx`, `w_phi_cogx` | `float` | 重心に対する η・φ 方向の shower 幅変数 |
+| `e11`, `e33`, `e32`, `e35` | `float` | 各 tower 窓のエネルギー和 [GeV] |
+| `e11_over_e33`, `e32_over_e35` | `float` | 対応する窓のエネルギー比 |
+| `et1`, `et2`, `et3`, `et4` | `float` | 重心付近の 2×2 tower の割当エネルギーを組み合わせ、閾値を超えた cluster エネルギーで規格化した値 |
+
+`cluster_shower_patch_e` は `std::vector<float>`（較正エネルギー [GeV]）、`cluster_shower_patch_good` と `cluster_shower_patch_owned` は `std::vector<unsigned char>`（品質・cluster 所属の各フラグ）です。保存が有効なら各配列の長さは `ncluster_all × shower_shape_patch_side²` で、cluster ごとに η 方向の行、φ 方向の列の順で格納します。保存が無効でも branch は存在し、配列は空です。
 
 ### Cluster pair情報
 

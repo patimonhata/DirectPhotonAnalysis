@@ -11,4 +11,4 @@
 | [tagging_working_point_scan](tagging_working_point_scan/README.md) | 過去の閾値・質量窓比較。旧入力の再実行可能性は未保証 | `tagging_working_point_scan` |
 | [prompt_efficiency_projection](prompt_efficiency_projection/README.md) | 保存 v11 結果に基づく仮定上の効率・purity 予測 | `photon_candidate_selection/.../results/jet/prompt_efficiency_projection` |
 
-v11 用の診断に現行 schema-8 map を渡さないでください。最新定義への対応とは別に、今回の整理では既存の入力条件を維持しています。
+v11 用の診断には、対象 workflow が指定する map schema と topology version の入力を使用してください。

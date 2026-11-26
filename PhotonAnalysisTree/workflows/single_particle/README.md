@@ -11,7 +11,7 @@ Single-particle gun DSTから解析用TTreeを作り、photon-ID scoreを追加�
 5. hadd: scored filesのevent_treeとmetadataをmerge
 6. make_dataset_manifest.sh: merge結果、event数、model hash、Git revisionをmanifestへ記録
 
-低水準のscore macro (add_*.C) はPythia workflowとも共有するため、PhotonAnalysisTree/macroに残しています。
+低水準のscore macro (add_*.C) はPythia workflowとも共有するため、`PhotonAnalysisTree/workflows/common/scoring/` にあります。
 
 ## Base TTree
 

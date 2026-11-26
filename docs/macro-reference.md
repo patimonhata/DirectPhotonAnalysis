@@ -20,9 +20,9 @@
 | 目的 | 単一 pi0 を生成し、Geant4、calorimeter reconstruction、追加の no-split clustering を実行する |
 | 引数 | `processID=0`, `nEvents=5`, `save_tree=false` |
 | 入力ファイル | なし。`PHG4SimpleEventGenerator` を使用 |
-| 現行生成条件 | pi0 1個、vertex `(0,0,0)`、`eta=0.5`、`phi=[-pi,pi]`、`pt=5 GeV` |
+| 生成条件の例 | pi0 1個、vertex `(0,0,0)`、`eta=0.5`、`phi=[-pi,pi]`、`pt=5 GeV` |
 | 主な生成 node | `TOWERINFO_CALIB_CEMC`, `CLUSTERINFO_CEMC`, `CLUSTERINFO_CEMC_NO_SPLIT` |
-| 出力 | `SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/DST_single_pi0_reconstructedInfo_<pid>.root` |
+| 上記設定での出力例 | `SinglePi0GunSimulation/output/DST_pi0_5GeV_eta05_towerinfo/DST_single_pi0_reconstructedInfo_<pid>.root` |
 | 注意 | no-split builder の tower threshold は `0.070 GeV`。`save_tree` を使う dumper は現在コメントアウト |
 
 実行 wrapper:
@@ -39,9 +39,11 @@
 
 | マクロ | 引数 | 必要な入力 | 出力 |
 | --- | --- | --- | --- |
-| `Fun4All_Pi0Reconstruction.C` | `processID`, `n_events`, `cluster_node`, `input_directory`, `output_tag` | `DST_single_pi0_reconstructedInfo_<pid>.root` と指定 cluster node | `output/root/pi0_reconstruction_[<tag>_]<pid>.root` |
-| `Fun4All_Pi0ReconstructionSplitComparison.C` | `processID`, `n_events`, `input_directory`, `output_directory` | 同じDST内の `CLUSTERINFO_CEMC` と `CLUSTERINFO_CEMC_NO_SPLIT` | `pi0_reconstruction_SPLIT_<pid>.root` と `...NO_SPLIT_<pid>.root` |
+| `Fun4All_Pi0Reconstruction.C` | `processID`, `n_events`, `cluster_node`, `input_directory`, `output_tag` | `DST_single_pi0_reconstructedInfo_<pid>.root` と指定 cluster node、`TOWERINFO_CALIB_CEMC` | `output/root/pi0_reconstruction_[<tag>_]<pid>.root` |
+| `Fun4All_Pi0ReconstructionSplitComparison.C` | `processID`, `n_events`, `input_directory`, `output_directory` | 同じDST内の `CLUSTERINFO_CEMC` と `CLUSTERINFO_CEMC_NO_SPLIT`、`TOWERINFO_CALIB_CEMC` | `pi0_reconstruction_SPLIT_<pid>.root` と `...NO_SPLIT_<pid>.root` |
 | `Fun4All_TowerClusterEnergyAudit.C` | `processID`, `n_events`, `tower_node`, `split_cluster_node`, `no_split_cluster_node`, `input_directory`, `output_tag` | tower node と両cluster node | `output/tower_cluster_energy_audit_[<tag>_]<pid>.root` |
+
+単一 node 版と split / no-split 比較版は、指定した cluster node または CEMC tower node が欠けると `ABORTRUN` を返し、その run の処理を中断します。
 
 `Pi0Reconstruction` 出力には `event_tree` と `h_m_gg`, `h_ncluster`, `h_cluster_e`,
 `h_pair_e_asym` が入ります。vertex は現行マクロでは原点固定です。

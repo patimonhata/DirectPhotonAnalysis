@@ -24,7 +24,7 @@ input/<sample>/segments.list + 同期した Pythia DST
 | コード変更時の自動テスト | `tests/` |
 
 物理定義は [candidate definitions](docs/photon_candidate_definitions.md)、配置と成果物の保全は [layout](docs/layout.md)、
-過去 study の再実行は [reproduction](docs/reproduction.md) を参照してください。
+study の実行手順は [各 workflow の README](workflows/studies/README.md) を参照してください。
 コードの `studies/`・`diagnostics/` 分類と、成果物の workflow ID は独立です。既存の `output/<workflow>/` と Condor ログの配置は維持しています。
 
 ## Tree 生成と score 追加
@@ -53,7 +53,7 @@ Single-particle gun DSTを1回だけ読み、truth、SPLIT cluster、NO_SPLIT cl
 - `split_cluster_bdt_ppg15v1_*`: low-pT sampleを加えて学習したPPG15v1 BDTをSPLIT clusterへ適用
 - `nosplit_cluster_bdt_base_v3E_*`: NO_SPLIT clusterで学習した`base_v3E` BDTをNO_SPLIT clusterへ適用
 - `nosplit_cluster_p_gamma*`: 同梱ONNX modelが後段で追加
-- `split_cluster_p_gamma*`: 将来のSPLIT学習ONNX modelを`add_split_gamma_onnx.C`で追加
+- `split_cluster_p_gamma*`: single-particle の scoring wrapper が通常実行で追加。既定では NO_SPLIT・1 cluster のイベントで学習した同梱モデルを SPLIT にも適用します。
 
 完全なbranch契約は[docs/tree_schema.md](docs/tree_schema.md)を参照してください。
 
@@ -153,7 +153,7 @@ NO_SPLIT・1 cluster条件で学習された同梱`models/best_model.onnx`を明
 このONNX scoreは学習domain外であり、物理解析へ使用する前に別途validationが必要です。
 wrapperを直接呼ぶ場合は引き続き第3引数でmodel pathを明示します。
 
-`add_split_bdt_ppg15v1.C`は既存SPLIT BDTと同じ11 featureを使い、low-pT sampleを追加したモデルの出力を`split_cluster_bdt_ppg15v1_score`、入力・shower shape・推論が有効かを`split_cluster_bdt_ppg15v1_valid`へ保存します。wrapperの第7引数でdefault model pathを上書きできます。
+`add_split_bdt_ppg15v1.C`は既存SPLIT BDTと同じ11 featureを使い、low-pT sampleを追加したモデルの出力を`split_cluster_bdt_ppg15v1_score`、入力・shower shape・推論が有効かを`split_cluster_bdt_ppg15v1_valid`へ保存します。PPG15v1 モデルのパスは `workflows/pythia_tree/run_add_scores.sh` の第5引数、`workflows/single_particle/run_add_scores.sh` の第7引数で指定できます。
 
 NO_SPLIT clusterで学習したBDTも`workflows/single_particle/run_add_scores.sh`内でNO_SPLIT clusterへ適用します。default modelは`model_base_v3E_nosplit_single_tmva.root`です。必要に応じて独立macroとしても実行できます。
 
@@ -165,7 +165,7 @@ root -l -b \
 
 このmacroが追加するのは`nosplit_cluster_bdt_base_v3E_score`と`nosplit_cluster_bdt_base_v3E_valid`です。入力featureの定義と順序は既存のSPLIT学習版macroと同一ですが、値はすべて`nosplit_cluster_*` branchから取得します。
 
-SPLIT clusterで学習したONNX modelが用意できた後は、model pathを明示して次のmacroを使います。このmacroには意図的にdefault modelを設定していません。
+SPLIT 用の ONNX モデルを直接適用する場合は、model path を明示して次の macro を使います。このmacroには意図的にdefault modelを設定していません。
 
 ```bash
 root -l -b \

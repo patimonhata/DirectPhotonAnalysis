@@ -1,6 +1,6 @@
 # Tagging invariant-mass diagnostic
 
-保存する本番は map schema 5 / topology v11 の `ClusterE0p12_Pi0Partner0p5`。v10 本番・旧 QA は削除済み。最新定義への更新や新しい物理結果の生成は今回行っていない。
+保存する本番は map schema 5 / topology v11 の `ClusterE0p12_Pi0Partner0p5`。
 
 ```text
 output/tagging_mass_diagnostic/productions/topology_v11/ClusterE0p12_Pi0Partner0p5/
@@ -8,7 +8,7 @@ output/tagging_mass_diagnostic/productions/topology_v11/ClusterE0p12_Pi0Partner0
   results/jet/tagging_mass_diagnostic.root
 ```
 
-元 map は `output/photon_candidate_selection/productions/topology_v11/ClusterE0p12_Pi0Partner0p5/maps/<sample>/` を参照する。元の shared input を削除しない。current candidate の schema-8 map を渡してはいけない。
+元 map は `output/photon_candidate_selection/productions/topology_v11/ClusterE0p12_Pi0Partner0p5/maps/<sample>/` を参照する。入力には上記の map schema と topology version が必要。
 
 ## Populations and counting
 
@@ -45,5 +45,3 @@ python3 PhotonAnalysisTree/tests/test_tagging_mass.py
 ```
 
 全 sample/shard・設定・軸を検証する。各 partial の metadata は merged ROOT の sources に保持する。有限 event 数や不完全 map による QA は本番結果として扱わない。
-
-将来の新定義用は `output/tagging_mass_diagnostic/productions/pending_latest_definition/results/` に予約し、`not_generated` として明示する。

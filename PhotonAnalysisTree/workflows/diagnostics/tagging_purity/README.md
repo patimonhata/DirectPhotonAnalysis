@@ -56,7 +56,7 @@ PhotonAnalysisTree/workflows/diagnostics/tagging_purity/run_hybrid_merge.sh \
   PhotonAnalysisTree/output/tagging_purity_diagnostic/productions/historical/hybrid_threshold/results/jet
 ~~~
 
-The merge writes ROOT, flow TSV, metric TSV, and correlated-comparison TSV outputs. See `RESULTS.md` for the current full-statistics result.
+The merge writes ROOT, flow TSV, metric TSV, and correlated-comparison TSV outputs. The [full-statistics report](RESULTS.md) records the working points and yields measured with schema-4 Jet maps.
 
 ## Exploratory selected-partner scan
 

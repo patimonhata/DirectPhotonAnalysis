@@ -84,9 +84,14 @@ python3 PhotonAnalysisTree/tools/software.py run \
 
 Merged outputs include all-origin common composition, transition CSVs and matching/ancestry quality, candidate composition, pi0/eta anchor topology, eta cascade composition, Other-origin and supplemental decay-origin histograms, spectra/fractions/survival PDFs, ET-binned BDT distributions and summaries. ROOT histogram metadata records source map/partial versions, cuts, weights and uncertainty conventions. Statistical errors use the documented candidate/pair-level Sumw2 and subset covariance; event-level correlations are not estimated.
 
-## Retained v11/schema-5 results
+## Reference replay
 
-Four configurations under `productions/topology_v11/` retain maps, 16 partials and final results. Partner thresholds are 0.15 or 0.5 GeV and pi0 mass windows are 0.10–0.20 or 0.08–0.18 GeV. Eta topology extension is absent, but eta tagging remains enabled. Use `run_reference.sh` with the matching frozen Git version, rather than passing old maps to the current schema-11 map reducer. See [reference replay](../../docs/reproduction.md).
+For a saved `topology_v11` configuration, `run_reference.sh` loads the matching macros from Git. Supply a new output path, for example:
+
+```bash
+bash PhotonAnalysisTree/workflows/photon_candidate_selection/run_reference.sh merge ClusterE0p12_Pi0Partner0p5 /tmp/v11_reference_replay
+bash PhotonAnalysisTree/workflows/photon_candidate_selection/run_reference.sh reduce ClusterE0p12_Pi0Partner0p5 jet5 0 /tmp/v11_partial_replay/result
+```
 
 `ReplotPi0BdtScores.C` / `ReplotEtaBdtScores.C` redraw stored BDT ROOT distributions where present. [`CheckEtaDecayFlight.C`](../diagnostics/eta_decay_flight/README.md) is an independent DST diagnostic and does not change composition/topology selections; arguments and interpretation are in the definition notes.
 

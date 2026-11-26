@@ -292,6 +292,7 @@ class PythiaPhotonCandidateTree : public SubsysReco
   std::string reconstruction_vertex_source_ = "MbdVertexMap";
   std::string topology_vertex_source_ = "signal HepMC collision";
   double isolation_radius_ = 0.4;
+  double truth_isolation_radius_ = 0.3;
   double isolation_scale_ = 1.2;
   double isolation_offset_ = 0.1;
   double nonisolation_gap_ = 0.8;

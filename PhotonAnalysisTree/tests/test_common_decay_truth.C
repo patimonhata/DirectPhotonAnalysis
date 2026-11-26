@@ -221,10 +221,13 @@ void truth_isolation()
   truth.AddParticle(4, other_embedding);
   truth.AddEmbededTrkId(4, 2);
   particle(truth, 5, 22, 0, 1, 102); // Outside the cone and isolated in its own cone.
+  auto* outside_cone = particle(truth, 6, 211, 0, 1); // Delta R is approximately 0.35.
+  outside_cone->set_px(-5.0);
+  outside_cone->set_pz(5.0 * std::sinh(0.35));
 
   PhotonCandidateSelectionBranches links;
   links.truth_iso_photon_track_id = {1, 1, 0, 5, 4};
-  links.fill_truth_isolation(&truth, 1, 0.4, 0.8);
+  links.fill_truth_isolation(&truth, 1, 0.3, 0.8);
   const double truth_pt = std::hypot(10.0, 0.01);
   const double boundary = 0.490 + 0.037 * truth_pt;
   const double massive_et = 0.6 * (0.3 / std::hypot(0.3, 0.09));
@@ -239,7 +242,7 @@ void truth_isolation()
   for (double sum : {boundary - 0.01, boundary, boundary + 0.8, boundary + 0.81})
   {
     neighbor->set_e(sum);
-    links.fill_truth_isolation(&truth, 1, 0.4, 0.8);
+    links.fill_truth_isolation(&truth, 1, 0.3, 0.8);
     assert(links.truth_iso_et[0] == sum);
     assert(links.truth_pass_isolated[0] == (sum < boundary));
     assert(links.truth_pass_nonisolated[0] == (sum > boundary + 0.8));

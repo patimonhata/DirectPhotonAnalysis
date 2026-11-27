@@ -9,7 +9,6 @@
 #include <TTreeReaderValue.h>
 #include <TUUID.h>
 
-#include <cstdint>
 #include <filesystem>
 #include <stdexcept>
 
@@ -39,22 +38,12 @@ std::array<int, 3> labels(bool photonjet, Main main, int overview, int topology,
   }
 }
 
-// Mix the sample name and the full segment/event UID reproducibly across ROOT sessions and shards.
-int event_split(std::uint64_t sample_hash, std::uint64_t uid)
-{
-  std::uint64_t hash = (sample_hash ^ uid) + UINT64_C(0x9e3779b97f4a7c15);
-  hash = (hash ^ (hash >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-  hash = (hash ^ (hash >> 27)) * UINT64_C(0x94d049bb133111eb);
-  const auto bucket = (hash ^ (hash >> 31)) % 100;
-  return bucket < 70 ? 0 : bucket < 85 ? 1 : 2;
-}
-
 struct ClusterRow
 {
   std::string sample_name;
   ULong64_t event_uid = 0;
   UInt_t cluster_id = 0;
-  int split = 0, common_main = 0, common_origin = 0, topology_applicability = 0, topology = -1;
+  int common_main = 0, common_origin = 0, topology_applicability = 0, topology = -1;
   bool inputs_valid = false, event_eligible = false, truth_iso_valid = false, truth_pass_isolated = false;
   double weight_pb = 0, et = 0, eta = 0, z = 0;
   std::array<float, shapes.size()> shape{};
@@ -65,7 +54,6 @@ struct ClusterRow
     tree.Branch("sample_name", &sample_name);
     tree.Branch("event_uid", &event_uid);
     tree.Branch("cluster_id", &cluster_id);
-    tree.Branch("split", &split);
     tree.Branch("event_eligible", &event_eligible);
     tree.Branch("weight_pb", &weight_pb);
     tree.Branch("common_main", &common_main);
@@ -85,7 +73,7 @@ struct ClusterRow
   }
 };
 
-void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, std::uint64_t sample_hash, ClusterRow& row, TTree& output)
+void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, ClusterRow& row, TTree& output)
 {
   TFile file(map.path.c_str(), "READ");
   auto* tree = file.Get<TTree>("event_tree");
@@ -125,7 +113,6 @@ void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, std
     row.z = *z;
     if (!(std::abs(row.z) < 60.0)) continue;
     row.event_uid = *uid;
-    row.split = event_split(sample_hash, row.event_uid);
     row.event_eligible = *weight_valid && *stitch_valid && *stitch_pass;
     row.weight_pb = row.event_eligible ? *numerator / sample_sumw : 0.0;
     if (!std::isfinite(row.weight_pb)) throw std::runtime_error("nonfinite event weight");
@@ -182,7 +169,8 @@ int write_clusters(const std::vector<SampleInput>& inputs, const std::string& ou
   {
     if (inputs.empty() || output_path.empty()) throw std::runtime_error("missing inputs or output path");
     if (fs::exists(output_path)) throw std::runtime_error("output already exists");
-    if (!make_output_directory(output_path)) throw std::runtime_error("cannot create output directory");
+    const auto directory = fs::path(output_path).parent_path();
+    if (!directory.empty()) fs::create_directories(directory);
     temporary = output_path + ".tmp." + TUUID().AsString();
     TFile output(temporary.c_str(), "CREATE");
     if (output.IsZombie()) throw std::runtime_error("cannot create temporary output");
@@ -192,11 +180,12 @@ int write_clusters(const std::vector<SampleInput>& inputs, const std::string& ou
 
     int source_schema = kMbdMapSchema, shard_index = 0, shard_count = 0;
     Long64_t map_begin = 0, map_end = 0;
-    double sample_sumw = 0;
+    double sample_sumw = 0, truth_isolation_radius = -1.0, photonjet_radius = -1.0;
     std::string input_root;
     TTree metadata("metadata", "One entry per sample and extraction shard");
     metadata.Branch("source_map_root", &input_root);
     metadata.Branch("source_schema", &source_schema);
+    metadata.Branch("truth_isolation_radius", &truth_isolation_radius);
     metadata.Branch("sample_name", &row.sample_name);
     metadata.Branch("sample_sum_generator_weights", &sample_sumw);
     metadata.Branch("shard_index", &shard_index);
@@ -220,17 +209,28 @@ int write_clusters(const std::vector<SampleInput>& inputs, const std::string& ou
       if (!collect_maps(location + "/map_*.root", *sample, true, maps)) throw std::runtime_error("incomplete or incompatible input maps");
       if (static_cast<std::size_t>(shard_count) > maps.size()) throw std::runtime_error("more shards than input maps");
       sample_sumw = 0;
-      for (const auto& map : maps) sample_sumw += map.sum_generator_weight_processed;
+      truth_isolation_radius = photonjet ? maps.front().truth_isolation_radius : -1.0;
+      for (const auto& map : maps)
+      {
+        if (photonjet)
+        {
+          if (!std::isfinite(map.truth_isolation_radius) || map.truth_isolation_radius <= 0)
+            throw std::runtime_error("missing or invalid truth isolation radius in " + map.path);
+          if (photonjet_radius < 0) photonjet_radius = map.truth_isolation_radius;
+          if (!same_double(map.truth_isolation_radius, photonjet_radius))
+            throw std::runtime_error("inconsistent truth isolation radius in " + map.path + ": " + std::to_string(map.truth_isolation_radius) +
+                                     ", expected " + std::to_string(photonjet_radius));
+        }
+        sample_sumw += map.sum_generator_weight_processed;
+      }
       if (!std::isfinite(sample_sumw) || sample_sumw <= 0) throw std::runtime_error("invalid sample normalization");
       map_begin = maps.size() * static_cast<std::size_t>(shard_index) / shard_count;
       map_end = maps.size() * static_cast<std::size_t>(shard_index + 1) / shard_count;
-      std::uint64_t sample_hash = UINT64_C(14695981039346656037);
-      for (unsigned char ch : input.name) sample_hash = (sample_hash ^ ch) * UINT64_C(1099511628211);
       std::cout << input.name << ": processing maps [" << map_begin << ", " << map_end << ")" << std::endl;
       for (Long64_t i = map_begin; i < map_end; ++i)
       {
         location = maps[i].path;
-        extract_map(maps[i], photonjet, sample_sumw, sample_hash, row, clusters);
+        extract_map(maps[i], photonjet, sample_sumw, row, clusters);
       }
       if (metadata.Fill() < 0) throw std::runtime_error("failed writing sample metadata");
     }

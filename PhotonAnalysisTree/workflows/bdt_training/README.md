@@ -19,10 +19,11 @@ root -l -b -q 'PhotonAnalysisTree/workflows/bdt_training/ExtractBdtTrainingClust
 
 Use the corresponding sample name for each Jet and PhotonJet subsample. The optional fourth and fifth arguments are a zero-based shard index and shard count (defaults 0 and 1). Each shard reads a disjoint range of maps after validating metadata and computing the weight denominator over the complete subsample. Use a different output filename per shard. Output is published after a successful close and requires a fresh file path. A ROOT `TChain("clusters")` can read all outputs directly, or use `hadd` with each subsample's shards exactly once. The `metadata` tree records the input map root, schema, sample, normalization and half-open map range for each shard.
 
+The extraction checks the truth isolation cone radius in every PhotonJet map of each input subsample, including maps outside the requested shard. All PhotonJet inputs to one dataset must use the same radius. The output metadata records `truth_isolation_radius` per sample and shard. Earlier schema-11 maps with `truth_isolation_definition` and no explicit radius use 0.4. Jet metadata records −1 because its training labels use no truth isolation.
+
 ## Columns and labels
 
 - `sample_name`, `event_uid`, `cluster_id` identify the original cluster.
-- `split` assigns each (sample name, event UID) reproducibly to train (0, 70%), validation (1, 15%) or test (2, 15%) in expectation. The partition uses a 64-bit FNV-1a sample-name hash and a SplitMix64 mixing step on the event key. It is independent of labels, input ordering and sharding.
 - `event_eligible` requires a valid event weight and valid, passing sample stitching. For eligible events `weight_pb` divides the event’s `weight_numerator_pb` by the sum of `sum_generator_weight_processed` over all maps of its subsample, before vertex selection. Ineligible events remain available with zero physical weight and three excluded labels.
 - Inputs in the existing model order are `cluster_Et`, `cluster_weta_cogx`, `cluster_wphi_cogx`, `vertexz`, `cluster_Eta`, `e11_over_e33`, `cluster_et1`, `cluster_et2`, `cluster_et3`, `cluster_et4`, `e32_over_e35`. The vertex and cluster kinematics use MBD z. `inputs_valid` requires a valid shower shape and finite inputs.
 - `common_main` and `common_origin` store the map's common composition class and overview (0 prompt, 1 π⁰, 2 η, 3 Other). `topology_applicability` keeps the map code. `topology` is −1 unless the corresponding π⁰ or direct η→γγ anchor is valid and evaluable. The other codes are 0 other, 1 separated, 2 merged, 3 missing and 4 single_contaminated.
@@ -38,7 +39,7 @@ Use the corresponding sample name for each Jet and PhotonJet subsample. The opti
 | Jet common Other excluding decay_photon | 0 | 0 | 0 |
 | All remaining clusters | −1 | −1 | −1 |
 
-For version 1, train on `split == 0 && inputs_valid && label_v1 >= 0`; substitute the desired label for other versions. Use eligible validation events to select the working point and eligible test events for the fixed cut. Both evaluation partitions include the excluded classes. Use `inputs_valid` to identify scoreable clusters and account for the remainder in the inclusive denominator. Stored truth, labels, weights, identity, and split are analysis columns. Use the 11 listed input columns for scoring.
+For version 1, `inputs_valid && label_v1 >= 0` selects usable labeled rows. Use `label_v2` or `label_v3` for the other versions. The training framework can group rows by `(sample_name, event_uid)` for event-level partitioning. Use the 11 listed input columns for scoring.
 
 To cross-check an output against its source maps, run the validation script with uproot, Awkward Array and NumPy.
 

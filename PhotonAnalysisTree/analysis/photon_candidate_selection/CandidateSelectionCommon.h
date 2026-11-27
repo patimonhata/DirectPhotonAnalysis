@@ -170,6 +170,7 @@ struct MapMetadata
   unsigned long long events_written = 0;
   unsigned long long events_vertex_rejected = 0;
   unsigned long long events_invalid = 0;
+  double truth_isolation_radius = -1.0;
   MbdMapSettings mbd;
 };
 
@@ -240,6 +241,9 @@ bool read_metadata(const std::string& path, MapMetadata& value)
   std::string* analysis_release = nullptr;
   std::string* model_sha256 = nullptr;
   bool ok = true;
+  // Schema-11 maps with truth isolation but no explicit radius used R=0.4.
+  value.truth_isolation_radius = tree->GetBranch("truth_isolation_definition") ? 0.4 : -1.0;
+  if (tree->GetBranch("truth_isolation_radius")) ok &= bind(tree, "truth_isolation_radius", &value.truth_isolation_radius);
   ok &= bind(tree, "schema_version", &value.schema_version);
   ok &= bind(tree, "common_composition_algorithm_version", &value.common_composition_algorithm_version);
   ok &= bind(tree, "decay_origin_algorithm_version", &value.decay_origin_algorithm_version);

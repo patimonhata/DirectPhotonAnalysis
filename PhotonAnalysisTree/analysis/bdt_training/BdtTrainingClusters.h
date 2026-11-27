@@ -10,6 +10,7 @@
 #include <TUUID.h>
 
 #include <filesystem>
+#include <limits>
 #include <stdexcept>
 
 namespace bdt_training
@@ -22,9 +23,9 @@ constexpr std::array<ShapeFeature, 8> shapes = {{
     {"w_eta_cogx", "cluster_weta_cogx"}, {"w_phi_cogx", "cluster_wphi_cogx"}, {"e11_over_e33", "e11_over_e33"},
     {"et1", "cluster_et1"}, {"et2", "cluster_et2"}, {"et3", "cluster_et3"}, {"et4", "cluster_et4"}, {"e32_over_e35", "e32_over_e35"}}};
 
-std::array<int, 3> labels(bool photonjet, Main main, int overview, int topology, bool isolated)
+std::array<int, 3> labels(bool photonjet, Main main, int overview, int topology)
 {
-  if (photonjet) return main == Main::prompt && isolated ? std::array<int, 3>{1, 1, 1} : std::array<int, 3>{-1, -1, -1};
+  if (photonjet) return main == Main::prompt ? std::array<int, 3>{1, 1, 1} : std::array<int, 3>{-1, -1, -1};
   if (main == Main::decay_photon) return {-1, 1, 1};
   if (overview == 3) return {0, 0, 0};
   if (main != Main::pi0 && main != Main::eta_gg) return {-1, -1, -1};
@@ -42,10 +43,12 @@ struct ClusterRow
 {
   std::string sample_name;
   ULong64_t event_uid = 0;
-  UInt_t cluster_id = 0;
+  UInt_t cluster_id = 0, cluster_index = 0;
   int common_main = 0, common_origin = 0, topology_applicability = 0, topology = -1;
-  bool inputs_valid = false, event_eligible = false, truth_iso_valid = false, truth_pass_isolated = false;
-  double weight_pb = 0, et = 0, eta = 0, z = 0;
+  bool inputs_valid = false, sample_stitching_valid = false, sample_stitching_pass = false, truth_iso_valid = false, truth_pass_isolated = false;
+  double iso_raw_et = 0, iso_corrected_et = 0;
+  double leading_truth_jet_pt = 0, leading_truth_prompt_photon_pt = 0;
+  double et = 0, eta = 0, z = 0;
   std::array<float, shapes.size()> shape{};
   std::array<int, 3> label{};
 
@@ -54,8 +57,13 @@ struct ClusterRow
     tree.Branch("sample_name", &sample_name);
     tree.Branch("event_uid", &event_uid);
     tree.Branch("cluster_id", &cluster_id);
-    tree.Branch("event_eligible", &event_eligible);
-    tree.Branch("weight_pb", &weight_pb);
+    tree.Branch("cluster_index", &cluster_index);
+    tree.Branch("iso_raw_et", &iso_raw_et);
+    tree.Branch("iso_corrected_et", &iso_corrected_et);
+    tree.Branch("sample_stitching_valid", &sample_stitching_valid);
+    tree.Branch("sample_stitching_pass", &sample_stitching_pass);
+    tree.Branch("leading_truth_jet_pt", &leading_truth_jet_pt);
+    tree.Branch("leading_truth_prompt_photon_pt", &leading_truth_prompt_photon_pt);
     tree.Branch("common_main", &common_main);
     tree.Branch("common_origin", &common_origin);
     tree.Branch("topology_applicability", &topology_applicability);
@@ -73,7 +81,7 @@ struct ClusterRow
   }
 };
 
-void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, ClusterRow& row, TTree& output)
+void extract_map(const MapMetadata& map, bool photonjet, ClusterRow& row, TTree& output)
 {
   TFile file(map.path.c_str(), "READ");
   auto* tree = file.Get<TTree>("event_tree");
@@ -86,12 +94,15 @@ void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, Clu
   };
   TTreeReaderValue<UInt_t> n(reader, required("split_ncluster").c_str());
   TTreeReaderValue<ULong64_t> uid(reader, required("event_uid").c_str());
-  TTreeReaderValue<double> z(reader, required("mbd_vertex_z").c_str()), numerator(reader, required("weight_numerator_pb").c_str());
-  TTreeReaderValue<UChar_t> weight_valid(reader, required("event_weight_valid").c_str()), stitch_valid(reader, required("sample_stitching_valid").c_str());
+  TTreeReaderValue<double> z(reader, required("mbd_vertex_z").c_str());
+  TTreeReaderValue<int> north(reader, required("mbd_north_hits").c_str()), south(reader, required("mbd_south_hits").c_str());
+  TTreeReaderValue<double> leading_pt(reader, required(photonjet ? "leading_truth_photon_pt" : "leading_truth_jet_pt").c_str());
+  TTreeReaderValue<UChar_t> stitch_valid(reader, required("sample_stitching_valid").c_str());
   TTreeReaderValue<UChar_t> stitch_pass(reader, required("sample_stitching_pass").c_str());
   const auto cluster = [&](const std::string& name) { return required("split_cluster_" + name); };
   TTreeReaderArray<UInt_t> id(reader, cluster("id").c_str());
   TTreeReaderArray<double> et(reader, cluster("et").c_str()), eta(reader, cluster("eta").c_str());
+  TTreeReaderArray<double> iso_raw(reader, cluster("iso_raw_et").c_str()), iso_corrected(reader, cluster("iso_corrected_et").c_str());
   TTreeReaderArray<int> main(reader, cluster("common_main").c_str()), pdg(reader, cluster("common_selected_pdg").c_str());
   TTreeReaderArray<int> applicability(reader, cluster("common_applicability").c_str());
   TTreeReaderArray<int> pi0_topology(reader, cluster("pi0_anchor_topology").c_str()), eta_topology(reader, cluster("eta_anchor_topology").c_str());
@@ -111,14 +122,17 @@ void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, Clu
   while (reader.Next())
   {
     row.z = *z;
-    if (!(std::abs(row.z) < 60.0)) continue;
+    if (!(std::abs(row.z) <= 60.0 && *north >= 1 && *south >= 1)) continue;
     row.event_uid = *uid;
-    row.event_eligible = *weight_valid && *stitch_valid && *stitch_pass;
-    row.weight_pb = row.event_eligible ? *numerator / sample_sumw : 0.0;
-    if (!std::isfinite(row.weight_pb)) throw std::runtime_error("nonfinite event weight");
+    row.sample_stitching_valid = *stitch_valid;
+    row.sample_stitching_pass = *stitch_pass;
+    const double unavailable = std::numeric_limits<double>::quiet_NaN();
+    const double pt = std::isfinite(*leading_pt) && *leading_pt >= 0 ? *leading_pt : unavailable;
+    row.leading_truth_jet_pt = photonjet ? unavailable : pt;
+    row.leading_truth_prompt_photon_pt = photonjet ? pt : unavailable;
 
     const auto aligned = [&](const auto&... columns) { return ((columns.GetSize() == *n) && ...); };
-    if (!aligned(id, et, eta, main, pdg, applicability, pi0_topology, eta_topology, pi0_valid, eta_valid, shower_valid) ||
+    if (!aligned(id, et, eta, iso_raw, iso_corrected, main, pdg, applicability, pi0_topology, eta_topology, pi0_valid, eta_valid, shower_valid) ||
         (photonjet && !aligned(*iso_valid, *isolated))) throw std::runtime_error("misaligned cluster branches");
     for (const auto& feature : features) if (!aligned(*feature)) throw std::runtime_error("misaligned shower inputs");
 
@@ -126,8 +140,11 @@ void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, Clu
     {
       row.et = et[c];
       row.eta = eta[c];
-      if (!(row.et > 3.0 && row.et < 35.0 && std::abs(row.eta) < 0.7)) continue;
+      if (!(row.et >= 3.0 && row.et < 35.0 && std::abs(row.eta) <= 0.7)) continue;
       row.cluster_id = id[c];
+      row.cluster_index = c;
+      row.iso_raw_et = iso_raw[c];
+      row.iso_corrected_et = iso_corrected[c];
       row.common_main = main[c];
       if (main[c] < 0 || main[c] > static_cast<int>(Main::photon_unknown)) throw std::runtime_error("invalid common_main");
       const auto origin = static_cast<Main>(main[c]);
@@ -141,7 +158,7 @@ void extract_map(const MapMetadata& map, bool photonjet, double sample_sumw, Clu
       }
       row.truth_iso_valid = photonjet && (*iso_valid)[c];
       row.truth_pass_isolated = row.truth_iso_valid && (*isolated)[c];
-      row.label = row.event_eligible ? labels(photonjet, origin, row.common_origin, row.topology, row.truth_pass_isolated) : std::array<int, 3>{-1, -1, -1};
+      row.label = labels(photonjet, origin, row.common_origin, row.topology);
       row.inputs_valid = shower_valid[c];
       for (std::size_t i = 0; i < shapes.size(); ++i)
       {
@@ -180,14 +197,13 @@ int write_clusters(const std::vector<SampleInput>& inputs, const std::string& ou
 
     int source_schema = kMbdMapSchema, shard_index = 0, shard_count = 0;
     Long64_t map_begin = 0, map_end = 0;
-    double sample_sumw = 0, truth_isolation_radius = -1.0, photonjet_radius = -1.0;
+    double truth_isolation_radius = -1.0, photonjet_radius = -1.0;
     std::string input_root;
     TTree metadata("metadata", "One entry per sample and extraction shard");
     metadata.Branch("source_map_root", &input_root);
     metadata.Branch("source_schema", &source_schema);
     metadata.Branch("truth_isolation_radius", &truth_isolation_radius);
     metadata.Branch("sample_name", &row.sample_name);
-    metadata.Branch("sample_sum_generator_weights", &sample_sumw);
     metadata.Branch("shard_index", &shard_index);
     metadata.Branch("shard_count", &shard_count);
     metadata.Branch("map_begin", &map_begin);
@@ -208,7 +224,6 @@ int write_clusters(const std::vector<SampleInput>& inputs, const std::string& ou
       std::vector<MapMetadata> maps;
       if (!collect_maps(location + "/map_*.root", *sample, true, maps)) throw std::runtime_error("incomplete or incompatible input maps");
       if (static_cast<std::size_t>(shard_count) > maps.size()) throw std::runtime_error("more shards than input maps");
-      sample_sumw = 0;
       truth_isolation_radius = photonjet ? maps.front().truth_isolation_radius : -1.0;
       for (const auto& map : maps)
       {
@@ -221,16 +236,14 @@ int write_clusters(const std::vector<SampleInput>& inputs, const std::string& ou
             throw std::runtime_error("inconsistent truth isolation radius in " + map.path + ": " + std::to_string(map.truth_isolation_radius) +
                                      ", expected " + std::to_string(photonjet_radius));
         }
-        sample_sumw += map.sum_generator_weight_processed;
       }
-      if (!std::isfinite(sample_sumw) || sample_sumw <= 0) throw std::runtime_error("invalid sample normalization");
       map_begin = maps.size() * static_cast<std::size_t>(shard_index) / shard_count;
       map_end = maps.size() * static_cast<std::size_t>(shard_index + 1) / shard_count;
       std::cout << input.name << ": processing maps [" << map_begin << ", " << map_end << ")" << std::endl;
       for (Long64_t i = map_begin; i < map_end; ++i)
       {
         location = maps[i].path;
-        extract_map(maps[i], photonjet, sample_sumw, row, clusters);
+        extract_map(maps[i], photonjet, row, clusters);
       }
       if (metadata.Fill() < 0) throw std::runtime_error("failed writing sample metadata");
     }

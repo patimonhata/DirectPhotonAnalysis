@@ -700,7 +700,7 @@ int PythiaPhotonCandidateTree::process_event(PHCompositeNode* topNode)
   }
 
   auto* truth = findNode::getClass<PHG4TruthInfoContainer>(topNode, truth_node_name_);
-  selection_.fill_truth_isolation(truth, signal_embedding_id_, isolation_radius_, nonisolation_gap_);
+  selection_.fill_truth_isolation(truth, signal_embedding_id_, truth_isolation_radius_, nonisolation_gap_);
 
   // Supplemental ancestry diagnostics do not feed the selection, legacy contributors or topology evaluators.
   auto* raw = findNode::getClass<RawTowerContainer>(topNode, raw_truth_tower_node_name_);
@@ -1240,6 +1240,7 @@ void PythiaPhotonCandidateTree::create_output()
   metadata_tree_->Branch("reconstruction_vertex_source", &reconstruction_vertex_source_);
   metadata_tree_->Branch("topology_vertex_source", &topology_vertex_source_);
   metadata_tree_->Branch("isolation_radius", &isolation_radius_);
+  metadata_tree_->Branch("truth_isolation_radius", &truth_isolation_radius_);
   metadata_tree_->Branch("isolation_scale", &isolation_scale_);
   metadata_tree_->Branch("isolation_offset", &isolation_offset_);
   metadata_tree_->Branch("nonisolation_gap", &nonisolation_gap_);

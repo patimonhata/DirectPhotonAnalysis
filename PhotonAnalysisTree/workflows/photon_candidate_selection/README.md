@@ -23,7 +23,7 @@ Each map reads synchronized `DST_CALO_CLUSTER`, `DST_MBD_EPD`, `DST_TRUTH_JET`, 
 
 See [software/build provenance](../../docs/software.md) for the managed build,
 versioned build and install paths, and selection through `install/current`.
-For formal productions, commit the execution code, rebuild clean source, freeze a software ID, and initialize a new production manifest.
+For formal productions, commit the map code and its model before building. The freeze command uses `git archive HEAD` to populate `source/`, where the map reads the model. When adding a ROOT model, add an exception for its path in the repository’s `.gitignore` and commit the model file. Then rebuild from clean source, freeze a new software ID, and initialize a production manifest for that ID.
 
 For maps on tg with manifests, partials, results and logs on `/sphenix/user`, initialize a new production with `software.py production ... --map-root /absolute/tg/path`.
 The storage directory must be new or empty; the command records its canonical path and creates `configuration/maps` as a symlink.
@@ -37,7 +37,7 @@ Development maps also store per-cluster truth isolation and its two selection fl
 
 Review the production/configuration and choose new map outputs when rerunning a production. Existing map files are not overwritten. No repository script automatically submits jobs.
 
-The default model is `models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root`, loaded as `myBDT` by `TMVA::Experimental::RBDT`. `run_map.sh` passes the model path explicitly from `PHOTON_SOURCE_ROOT`; the macro default uses the same model. The existing tight/non-tight thresholds are retained intentionally. See [model and input order](../../docs/photon_candidate_definitions.md#bdt-model-and-input-order). Model changes require new DST maps; reduce, merge and replot do not recompute scores or selection flags.
+The default model is `models/model_methodA_v1.root`, loaded as `myBDT` by `TMVA::Experimental::RBDT`. `run_map.sh` passes the model path explicitly from `PHOTON_SOURCE_ROOT`; the macro default uses the same model. The existing tight/non-tight thresholds are retained intentionally. See [model and input order](../../docs/photon_candidate_definitions.md#bdt-model-and-input-order). Model changes require new DST maps; reduce, merge and replot do not recompute scores or selection flags.
 
 Submit files default to `production_directory = UNCONFIGURED`. Initialize a new production manifest, then pass its configuration directory to every map/reduce submission. The submit file sets `PHOTON_PRODUCTION_MANIFEST`; runtime dispatch selects the bound frozen scripts and libraries. `software.py production` creates the manifest without exporting shell variables, and normal production submissions do not need a separate `PHOTON_SOFTWARE_ROOT`.
 

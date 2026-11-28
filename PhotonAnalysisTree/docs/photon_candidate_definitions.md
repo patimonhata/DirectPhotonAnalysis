@@ -4,8 +4,8 @@ Development maps use schema 11 with common composition v1, pi0 topology v14, eta
 
 ## BDT model and input order
 
-The development map uses `models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root`, with SHA-256
-`5494946f40213a1035dc9e883bc71ddfdcebf86015d279300c8f44774e846248`.
+The development map uses `models/model_methodA_v1.root`, with SHA-256
+`37538b93cefbb27e8a282533d1479b5aab1da069a94234d41bbc5438c83080c7`.
 `TMVA::Experimental::RBDT` loads key `myBDT`. `run_map.sh` passes the model from
 `PHOTON_SOURCE_ROOT/models/` explicitly; the direct map macro defaults to the same
 model.

@@ -142,4 +142,5 @@ install(FILES
   ../models/onnx_metadata.json
   ../models/model_ppg15_nominal_base_v3E_split_3to35_allplus3jet40_ppg12split_single_tmva.root
   ../models/model_tmva_newsignaldefinition.root
+  ../models/model_methodA_v1.root
   DESTINATION ${CMAKE_INSTALL_DATADIR}/PhotonAnalysisTree/models)
